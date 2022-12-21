@@ -32,20 +32,22 @@ import kotlin.math.sin
 const val api = ASM9
 
 // todo why is LoggerImpl.interleave not working?
-// todo test LuaScripts
+// todo test LuaScripts -> magically not working :/
 
 // todo combine non-exported functions with the same content :3
 
 // todo often, there is local.getXX before drop -> remove those
 
-// todo do we already replace dependencies before resolving them? probably could save us tons of space (and wabt compile time 😁)
+// do we already replace dependencies before resolving them? probably could save us tons of space (and wabt compile time 😁)
 // todo mark empty functions as such, and skip them; e.g. new_java_lang_Object_V, new_java_lang_Number_V
 
 // todo loading bar for library loading
 
 
-// todo find pure (nothrow) functions, and spread them across other methods
+// to do find pure (nothrow) functions, and spread them across other methods
+// todo implement WASM throwables instead
 // todo finally fix huge switch-tables by splitting programs into sections & such
+// -> partially done already :)
 
 
 // we even could compile scene files to WASM for extremely fast load times 😄
@@ -536,8 +538,6 @@ fun main() {
                         continue
                     }
 
-                    // sun.util.locale.provider.SPILocaleProviderAdapter
-
                     val mappedParams = params.mapNotNull { p ->
                         if (p[0] == 'T') {
                             (generics.firstOrNull { it.name == p }
@@ -567,7 +567,6 @@ fun main() {
                             mappedParams[generics.indexOfFirst { it.name == p }]
                         } else p
                     }
-                    // println("$desc2j -> $mappedDesc")
 
                     // generate a new signature
                     val newDescBuilder = Builder(mappedDesc.sumOf { it.length } + 2)
@@ -722,44 +721,11 @@ fun main() {
             dlu.indexFields()
     }
 
-    // printUsed(MethodSig("me/anno/gpu/LogoKt", "drawLogo", "(IIZ)Z"))
-    // throw NotImplementedError()
-
     val testSig = MethodSig.c("java/lang/StackTraceElement", "equals", "(Ljava/lang/Object;)Z")
     if (testSig !in dIndex.usedMethods) {
         printUsed(testSig)
         throw IllegalStateException()
     }
-
-    /*val testSig2 = MethodSig.c("java/util/AbstractQueue", "add", "(Ljava/lang/Object;)Z")
-    val testSig3 = MethodSig.c("java/util/concurrent/LinkedBlockingQueue", "offer", "(Ljava/lang/Object;)Z")
-    val testSig4 = MethodSig.c("java/util/Queue", "offer", "(Ljava/lang/Object;)Z")
-    val testSig5 = MethodSig.c("java/util/AbstractQueue", "offer", "(Ljava/lang/Object;)Z")
-
-    if (testSig3 !in dIndex.usedMethods &&
-        testSig2 in dIndex.usedMethods &&
-        testSig3.clazz in dIndex.constructableClasses
-    ) {
-        printUsed(testSig2)
-        printUsed(testSig3)
-        printUsed(testSig4)
-        printUsed(testSig5)
-        throw IllegalStateException()
-    }*/
-
-    /*val testSig = MethodSig("java/util/Arrays\$ArrayList", "get", "(I)Ljava/lang/Object;")
-    if (testSig !in dIndex.usedMethods) {
-        println(dIndex.usedInterfaceCalls)
-        printUsed(testSig)
-        throw IllegalStateException()
-    }*/
-
-    /*val testSig1 = MethodSig("kotlin/ranges/CharRange", "getFirst", "()C")
-    if (testSig1 in dIndex.usedMethods) {
-        printUsed(testSig1)
-        println(resolvedMethods[testSig1])
-        throw NotImplementedError()
-    }*/
 
     /**
      * calculate the field offsets right here :)
@@ -775,16 +741,12 @@ fun main() {
     for (clazz in fieldsByClass.keys.sortedByTopology {
         listSuperClasses(it, HashSet())
     }) {
-        // println("processing $clazz")
         for (field in fieldsByClass[clazz]!!
             .sortedWith { a, b ->
                 storageSize(b.descriptor).compareTo(storageSize(a.descriptor))
                     .ifSame { (a.clazz in nativeClasses).toInt().compareTo((b.clazz in nativeClasses).toInt()) }
                     .ifSame { a.name.compareTo(b.name) }
-            }
-        /*.sortedByDescending { utils.storageSize(it.descriptor)
-            .ifSame { (it.clazz in nativeClasses).toInt() }
-        }*/) { // sort by size && is-ptr | later we even could respect alignment and fill gaps where possible :)
+            }) { // sort by size && is-ptr | later we even could respect alignment and fill gaps where possible :)
             gIndex.getFieldOffset(field.clazz, field.name, field.descriptor, field.static)
         }
     }
@@ -1073,9 +1035,6 @@ fun main() {
     }
 
     // going from parent classes to children, index all methods in gIndex
-    // printUsed(MethodSig("java/lang/Object", "clone", "()Ljava_lang_Object;"))
-    // printUsed(MethodSig("[]", "clone", "()Ljava_lang_Object;"))
-    // if("[]" !in classesToLoad) throw IllegalStateException()
     for (clazz in classesToLoad) {
         gIndex.getDynMethodIdx(clazz)
         val idx1 = dynIndex[clazz] ?: continue
@@ -1147,27 +1106,6 @@ fun main() {
         if (name in dIndex.constructableClasses)
             dlu.generateSyntheticMethod()
     }
-
-    /*if (false) for ((classIdx, methodToIdx) in gIndex.dynMethodIndices) {
-        val clazz = gIndex.classNames[classIdx]
-        if (clazz !in dIndex.constructableClasses) continue
-        for ((sig0, _) in methodToIdx) {
-            val sig = findMethod(clazz, sig0) ?: MethodSig.c(clazz, sig0)
-            if (sig !in usedMethods) {
-                printFM = true
-                findMethod(clazz, sig0)
-                System.err.println("Missed to find dependency of $clazz, $sig0 -> $sig")
-                printUsed(sig)
-                for (user in usedMethods) {
-                    val deps = dIndex.methodDependencies[user] ?: emptySet()
-                    if (sig in deps) {
-                        System.err.println("- used by $user")
-                    }
-                }
-                throw IllegalStateException()
-            }
-        }
-    }*/
 
     ptr = appendStringData(dataPrinter, gIndex) // idx -> string
 
@@ -1294,53 +1232,17 @@ fun main() {
     headerPrinter.append(bodyPrinter)
     headerPrinter.append(") ;; end of module\n")
 
-    // for copying segments to test them
-    // println(printer)
-
-    // print with line numbers
-    /*if (false) println(printer.toString()
-        .split('\n')
-        .map { it.shorten(500) }
-        .withIndex()
-        .joinToString("\n") {
-            "${(it.index + 1).toString().padStart(5, ' ')}: ${it.value}"
-        })*/
-
-    /*println("total size (no comments): ${
-        printer.toString()
-            .split('\n')
-            .joinToString("\n") { it.split(";;")[0].trim() }
-            .length.toLong().formatFileSize(1024)
-    }")*/
     println("total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
 
     /*for (it in gIndex.interfaceIndex.entries.sortedBy { it.value }) {
         println("${it.value}: ${it.key}")
     }*/
 
-    /*val clazz =
-        "me_anno_utils_pooling_Stack_storageXlambdav0_Lme_anno_utils_pooling_StackLme_anno_utils_pooling_StackXLocalStack"
-    println("clazz: $clazz")
-    println("super: ${hIndex.superClass[clazz]}")
-    println("interfaces: ${hIndex.interfaces[clazz]?.joinToString()}")
-    println("methods: ${hIndex.methods[clazz]}")*/
-
-    // problem methods
-    /*val sig0 = MethodSig("java/util/EnumMap", "isValidKey", "(Ljava/lang/Object;)Z")
-    hIndex.printInfo(sig0)
-    println("in methods? ${sig0 in methods}")
-    dIndex.printInfo(sig0)
-    println("depended on? ${methods.filter { sig0 in (dIndex.methodDependencies[it] ?: emptySet()) }}")*/
-
     println("setter/getter: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
 
     compileToWASM(headerPrinter)
 
     println("${dIndex.constructableClasses.size}/${gIndex.classNames.size} classes are constructable")
-    // println("not constructable: ${gIndex.classNames.filter { it !in dIndex.constructableClasses }.sorted()}")
-
-    // printUsed(MethodSig.c("kotlin/reflect/full/KClasses", "getSuperclasses", "(Lkotlin/reflect/KClass)Ljava/util/List"))
-    // printUsed(MethodSig.c("jvm/Kotlin", "KClasses_getSuperclasses", "(Lkotlin/reflect/KClass;)Ljava/util/List;"))
 
     /*for ((name, size) in gIndex.classNames
         .map { it to gIndex.getFieldOffsets(it, false).offset }
