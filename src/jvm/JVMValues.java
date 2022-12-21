@@ -1,0 +1,13 @@
+package jvm;
+
+import static jvm.JVM32.createNativeArray;
+import static jvm.JavaLang.ptrTo;
+
+public class JVMValues {
+    // these must be allocated at the start of the application, so their memory is prepared
+    public static Error
+            reachedMemoryLimit = new OutOfMemoryError("Reached memory limit"),
+            failedToAllocateMemory = new OutOfMemoryError("Failed to allocate more memory");
+
+    public static final Object emptyArray = ptrTo(createNativeArray(0, 1));
+}

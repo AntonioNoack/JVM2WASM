@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="VideoStudio">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../VideoStudio/out/artifacts/EngineWithTests/VideoStudio.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../VideoStudio/test" />
+      <root url="file://$PROJECT_DIR$/../VideoStudio/test/src" />
+      <root url="file://$PROJECT_DIR$/../VideoStudio/src" />
+      <root url="file://$PROJECT_DIR$/../VideoStudio/src" />
+    </SOURCES>
+  </library>
+</component>
