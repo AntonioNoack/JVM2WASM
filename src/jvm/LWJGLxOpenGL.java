@@ -315,21 +315,26 @@ public class LWJGLxOpenGL {
     public static native int fillProgramInfoLog(char[] data, int program);
 
 
-    @Alias(name = "org_lwjgl_opengl_GL20_glGetShaderInfoLog_ILjava_lang_String")
-    public static String org_lwjgl_opengl_GL20_glGetShaderInfoLog_ILjava_lang_String(int shader) {
+    @Alias(name = "org_lwjgl_opengl_GL20C_glGetShaderInfoLog_ILjava_lang_String")
+    public static String GL20_glGetShaderInfoLog(int shader) {
         char[] buffer = FillBuffer.getBuffer();
         int length = fillShaderInfoLog(buffer, shader);
         if (length == 0) return "";
         return new String(buffer, 0, length);
     }
 
-    @Alias(name = "org_lwjgl_opengl_GL20_glGetProgramInfoLog_ILjava_lang_String")
-    public static String org_lwjgl_opengl_GL20_glGetProgramInfoLog_ILjava_lang_String(int program) {
+    @Alias(name = "org_lwjgl_opengl_GL20C_glGetProgramInfoLog_ILjava_lang_String")
+    public static String GL20_glGetProgramInfoLog(int program) {
         char[] buffer = FillBuffer.getBuffer();
         int length = fillProgramInfoLog(buffer, program);
         if (length == 0) return "";
         return new String(buffer, 0, length);
     }
+
+    @NoThrow
+    @JavaScript(code = "return gl.getProgramParameter(unmap(arg0),arg1)")
+    @Alias(name = "org_lwjgl_opengl_GL20C_glGetProgrami_III")
+    public static native int org_lwjgl_opengl_GL20C_glGetProgrami_III(int program, int type);
 
     @Alias(name = "org_lwjgl_opengl_GL_createCapabilities_Lorg_lwjgl_opengl_GLCapabilities")
     public static GLCapabilities org_lwjgl_opengl_GL_createCapabilities() {
@@ -350,8 +355,9 @@ public class LWJGLxOpenGL {
     @Alias(name = "org_lwjgl_opengl_GL11C_glGetInteger_II")
     // 0x826e = max uniform locations; not defined in WebGL
     // 0x8D57 = max samples;
+    // 0x821B, 0x821C = major, minor version
     // @JavaScript(code = "if(arg0 == 0x826E) return 1024; if(arg0 == 0x8D57) return 1; return gl.getParameter(arg0)")
-    @JavaScript(code = "if(arg0 == 0x826E) return 1024; return gl.getParameter(arg0)")
+    @JavaScript(code = "if(arg0 == 0x826E) return 1024; if(arg0 == 0x821B || arg0 == 0x821C) return 0; return gl.getParameter(arg0)")
     public static native int GL11C_glGetInteger(int i);
 
     @Alias(name = "org_lwjgl_opengl_GL11C_glGetIntegerv_IAIV")
@@ -682,9 +688,14 @@ public class LWJGLxOpenGL {
     public static native void org_lwjgl_opengl_GL11C_glDrawElements_IIIJV(int mode, int count, int type, long nullPtr);
 
     @NoThrow
-    @Alias(name = "org_lwjgl_opengl_GL33C_glDrawArrays_IIIV")
     @JavaScript(code = "gl.drawArrays(arg0,arg1,arg2)")
+    @Alias(name = "org_lwjgl_opengl_GL33C_glDrawArrays_IIIV")
     public static native void org_lwjgl_opengl_GL33C_glDrawArrays_IIIV(int mode, int first, int count);
+
+    @NoThrow
+    @JavaScript(code = "gl.drawArraysInstanced(arg0,arg1,arg2,arg3)")
+    @Alias(name = "org_lwjgl_opengl_GL31C_glDrawArraysInstanced_IIIIV|org_lwjgl_opengl_GL33C_glDrawArraysInstanced_IIIIV")
+    public static native void org_lwjgl_opengl_GL33C_glDrawArraysInstanced_IIIIV(int mode, int first, int count, int primCount);
 
     @NoThrow
     @JavaScript(code = "gl.bufferData(arg0,new Uint8Array(memory.buffer,arg1,arg2),arg3)")
@@ -778,6 +789,16 @@ public class LWJGLxOpenGL {
     public static native void org_lwjgl_opengl_GL20C_glVertexAttribPointer_IIIZIJV(int index, int size, int type, boolean normalized, int stride, long ptr);
 
     @NoThrow
+    @JavaScript(code = "gl.vertexAttrib1f(arg0,arg1)")
+    @Alias(name = "org_lwjgl_opengl_GL33C_glVertexAttrib1f_IFV")
+    public static native void org_lwjgl_opengl_GL33C_glVertexAttrib1f_IFV(int index, float value);
+
+    @NoThrow
+    @JavaScript(code = "gl.vertexAttrib1f(arg0,arg1)") // int variant is not supported :/
+    @Alias(name = "org_lwjgl_opengl_GL33C_glVertexAttrib1i_IIV")
+    public static native void org_lwjgl_opengl_GL33C_glVertexAttrib1i_IIV(int index, int value);
+
+    @NoThrow
     @Alias(name = "org_lwjgl_opengl_GL33C_glVertexAttribDivisor_IIV")
     @JavaScript(code = "gl.vertexAttribDivisor(arg0,arg1)")
     public static native void org_lwjgl_opengl_GL33C_glVertexAttribDivisor_IIV(int index, int divisor);
@@ -804,7 +825,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(name = "org_lwjgl_opengl_GL30C_glTexParameteri_IIIV|org_lwjgl_opengl_GL45C_glTexParameteri_IIIV")
-    @JavaScript(code = "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2)") // GL_GENERATE_MIPMAP is not supported :/
+    @JavaScript(code = "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2);") // GL_GENERATE_MIPMAP is not supported :/
     public static native void org_lwjgl_opengl_GL45C_glTexParameteri_IIIV(int a, int b, int c);
 
     @NoThrow

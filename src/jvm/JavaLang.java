@@ -215,8 +215,8 @@ public class JavaLang {
     @Alias(name = "java_lang_System_arraycopy_Ljava_lang_ObjectILjava_lang_ObjectIIV")
     public static void arraycopy(Object src, int srcIndex, Object dst, int dstIndex, int length) {
 
-        if (src == null || dst == null) throw new NullPointerException();
-        if (length < 0) throw new IllegalArgumentException();
+        if (src == null || dst == null) throw new NullPointerException("arraycopy");
+        if (length < 0) throw new IllegalArgumentException("length<0");
         if ((src == dst && srcIndex == dstIndex) || length == 0) return; // done :)
         int src1 = getAddr(src), dst1 = getAddr(dst);
 
@@ -623,7 +623,7 @@ public class JavaLang {
     @Alias(name = "java_lang_Class_getField_Ljava_lang_StringLjava_lang_reflect_Field")
     public static <V> Field Class_getField(Class<V> clazz, String name) throws NoSuchFieldException {
         // using class instance, find fields
-        if (clazz == null || name == null) throw new NullPointerException();
+        if (clazz == null || name == null) throw new NullPointerException("Class.getField()");
         int fields = getFields(clazz);
         int length = fields == 0 ? 0 : arrayLength(fields);
         // log("class for fields", getAddr(clazz));
@@ -726,7 +726,7 @@ public class JavaLang {
         if (Modifier.isStatic(field.getModifiers())) {
             return findStatic(getClassIndex(field.getDeclaringClass()), offset);
         } else {
-            if (instance == null) throw new NullPointerException();
+            if (instance == null) throw new NullPointerException("getFieldAddr");
             return getAddr(instance) + offset;
         }
     }
@@ -1001,6 +1001,7 @@ public class JavaLang {
     @Alias(name = "java_lang_System_identityHashCode_Ljava_lang_ObjectI")
     public static int System_identityHashCode(Object obj) {
         // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
+        // return getAddr(obj); // good for debugging
         int x = getAddr(obj);
         x = ((x >>> 16) ^ x) * 0x45d9f3b;
         x = ((x >>> 16) ^ x) * 0x45d9f3b;
@@ -1056,7 +1057,7 @@ public class JavaLang {
         // should be ok, I think...
         // just nobody must modify our fields
         // todo should not return fields of super class
-        if (clazz == null) throw new NullPointerException();
+        if (clazz == null) throw new NullPointerException("getDeclaredFields");
         int fields = read32(getAddr(clazz) + objectOverhead + 4);
         if (fields == 0) return empty;
         return ptrTo(fields);
@@ -1065,13 +1066,13 @@ public class JavaLang {
     @Alias(name = "java_lang_reflect_Field_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
     public static <V> Object[] Field_getDeclaredAnnotations(Field field) {
         // todo implement annotation instances
-        if (field == null) throw new NullPointerException();
+        if (field == null) throw new NullPointerException("getDeclaredAnnotations");
         return empty;
     }
 
     @Alias(name = "java_lang_reflect_AccessibleObject_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
     public static <V> Object[] AccessibleObject_getDeclaredAnnotations(AccessibleObject object) {
-        if (object == null) throw new NullPointerException();
+        if (object == null) throw new NullPointerException("getDeclaredAnnotations2");
         return empty;
     }
 
@@ -1188,11 +1189,11 @@ public class JavaLang {
     @Alias(name = "java_lang_Thread_sleep_JV")
     public static void java_lang_Thread_sleep_JV(long delay) {
         if (delay > 0) {
-            throw new IllegalArgumentException("Cannot sleep in web!");
+            throwJs("Cannot sleep in web!");
         } else {
             if (sleepCtr++ > 100) {
                 long time = System.currentTimeMillis();
-                if (time == lastSleepTime) throw new IllegalArgumentException("Active waiting is not possible in web!");
+                if (time == lastSleepTime) throwJs("Active waiting is not possible in web!");
                 lastSleepTime = time;
                 sleepCtr = 0;
             }

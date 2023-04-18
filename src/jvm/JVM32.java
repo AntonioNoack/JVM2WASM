@@ -132,8 +132,9 @@ public class JVM32 {
     @Alias(name = "resolveIndirect")
     public static int resolveIndirect(int instance, int methodPtr) {
         if (instance == 0) {
-            log("instance for call is null");
-            throw new NullPointerException("instance for call is null");
+            log("instance for call is null", methodPtr);
+            // throw new NullPointerException("instance for call is null");
+            throwJs();
         }
         invokeBlackMagic();
         return resolveIndirectByClass(readClass(instance), methodPtr);
@@ -283,7 +284,9 @@ public class JVM32 {
 
     @Alias(name = "resolveInterface")
     public static int resolveInterface(int instance, int methodId) {
-        if (instance == 0) throw new NullPointerException();
+        if (instance == 0) {
+            throwJs("resolveInterface is null", instance, methodId);
+        }
         // beware! ++ black magic ++
         invokeBlackMagic();
         // normal code
@@ -750,13 +753,13 @@ public class JVM32 {
 
     @Alias(name = "al")
     public static int arrayLength(int instance) {
-        if (instance == 0) throw new NullPointerException();
+        if (instance == 0) throw new NullPointerException("[].length");
         return read32(instance + objectOverhead);
     }
 
     @Alias(name = "isOOB")
     public static void checkOutOfBounds(int instance, int index) {
-        if (instance == 0) throw new NullPointerException();
+        if (instance == 0) throw new NullPointerException("isOOB");
         // checkAddress(instance);
         int length = read32(instance + objectOverhead);
         if (ge_ub(index, length)) {
@@ -766,7 +769,7 @@ public class JVM32 {
 
     @Alias(name = "isOOB2")
     public static void checkOutOfBounds(int instance, int index, int clazz) {
-        if (instance == 0) throw new NullPointerException();
+        if (instance == 0) throw new NullPointerException("isOOB2");
         // checkAddress(instance);
         if (readClass(instance) != clazz) throwJs("Incorrect clazz!", instance, readClass(instance), clazz);
         int length = read32(instance + objectOverhead);

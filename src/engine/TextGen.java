@@ -6,15 +6,15 @@ import annotations.NoThrow;
 import me.anno.cache.CacheData;
 import me.anno.cache.CacheSection;
 import me.anno.cache.ICacheData;
+import me.anno.fonts.AWTFont;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.keys.TextCacheKey;
 import me.anno.fonts.mesh.AlignmentGroup;
 import me.anno.gpu.GFX;
+import me.anno.gpu.drawing.DrawTexts;
 import me.anno.gpu.drawing.GFXx2D;
-import me.anno.gpu.texture.Clamping;
-import me.anno.gpu.texture.GPUFiltering;
 import me.anno.gpu.texture.Texture2D;
-import org.lwjgl.opengl.GL11C;
+import me.anno.gpu.texture.Texture2DArray;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;
@@ -123,7 +123,7 @@ public class TextGen {
     }
 
     @Alias(name = "me_anno_fonts_WebFonts_getFontMetrics_Ljava_awt_FontLjava_awt_FontMetrics")
-    public static FontMetrics me_anno_fonts_WebFonts_getFontMetrics_Ljava_awt_FontLjava_awt_FontMetrics(Font font) {
+    public static FontMetrics WebFonts_getFontMetrics(Font font) {
         return new FontMetrics(font) {
         };
     }
@@ -132,6 +132,46 @@ public class TextGen {
     public static double AlignmentGroup_getOffset(AlignmentGroup group, FontRenderContext ctx, int charA, int charB) {
         // todo implement properly
         return group.getFont().getSize();
+    }
+
+    @Alias(name = "me_anno_fonts_AWTFont_generateASCIITexture_ZIIILme_anno_gpu_texture_Texture2DArray")
+    public static Texture2DArray generateASCIITexture(AWTFont self, boolean portableImages, int textColor, int backgroundColor, int extraPadding) {
+        int widthLimit = GFX.maxTextureSize;
+        int heightLimit = GFX.maxTextureSize;
+
+        FontRenderContext ctx = new FontRenderContext(null, true, true);
+        AlignmentGroup alignment = AlignmentGroup.Companion.getAlignments(self);
+        double size = alignment.getOffset(ctx, 'w', 'w');
+        int width = Math.min(widthLimit, (int) Math.round(size) + 1 + 2 * extraPadding);
+        int height = Math.min(heightLimit, WebFonts_getFontMetrics(self.getFont()).getHeight() + 2 * extraPadding);
+
+        String[] simpleChars = DrawTexts.INSTANCE.getSimpleChars();
+        Texture2DArray texture = new Texture2DArray("awtAtlas", width, height, simpleChars.length);
+
+        // todo create texture using JavaScript like above
+        /*val image = BufferedImage(texture.w, texture.h * texture.d, 1)
+        val gfx = image.graphics as Graphics2D
+        gfx.prepareGraphics(font, portableImages)
+        if (backgroundColor != 0) {
+            // fill background with that color
+            gfx.color = Color(backgroundColor)
+            gfx.fillRect(0, 0, image.width, image.height)
+        }
+        if (extraPadding != 0) {
+            gfx.translate(extraPadding, extraPadding)
+        }
+        gfx.color = Color(textColor)
+        var y = fontMetrics.ascent.toFloat()
+        val dy = texture.h.toFloat()
+        for (yi in simpleChars.indices) {
+            gfx.drawString(simpleChars[yi], 0f, y)
+            y += dy
+        }
+        gfx.dispose()
+        if (debugJVMResults) debug(image)
+        texture.create(image.toImage(), sync = true)*/
+
+        return texture;
     }
 
 }

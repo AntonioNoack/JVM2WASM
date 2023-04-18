@@ -209,6 +209,12 @@ public class LWJGLxGLFW {
         buffer.put(1, getWindowHeight());
     }
 
+    @Alias(name = "org_lwjgl_glfw_GLFW_glfwGetFramebufferSize_JAIAIV")
+    public static void org_lwjgl_glfw_GLFW_glfwGetFramebufferSize_JAIAIV(long window, int[] w, int[] h) {
+        if (w != null && w.length > 0) w[0] = getWindowWidth();
+        if (h != null && h.length > 0) h[0] = getWindowHeight();
+    }
+
     @Alias(name = "org_lwjgl_glfw_GLFW_glfwSetWindowTitle_JLjava_lang_CharSequenceV")
     public static void setWindowTitle(long window, CharSequence title) {
         setTitle(title.toString());

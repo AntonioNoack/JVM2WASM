@@ -181,20 +181,20 @@ object DependencyIndex {
             newRemaining.clear()
             for (sig in remaining) {
                 if (this.usedMethods.add(sig)) {
-
-                    if (sig.name == "openMenuComplex" ||
-                        sig.name == "openMenu" ||
-                        sig.name == "ask" ||
-                        sig.name == "openMenuByPanels"
-                       // sig.name == "clone" && sig.clazz != "[]" ||
-                       // sig.name == "copy" ||
-
+                    if (
+                    // sig.name == "openMenuComplex" ||
+                    // sig.name == "openMenu" ||
+                    // sig.name == "ask" ||
+                    // sig.name == "openMenuByPanels"
+                    // sig.name == "clone" && sig.clazz != "[]" ||
+                    // sig.name == "copy" ||
+                        false
                     ) {
                         printUsed(sig)
                         throw IllegalStateException()
                     }
 
-                    println("[+dep] $sig")
+                    // println("[+dep] $sig")
 
                     dependencies.clear()
 
@@ -239,7 +239,7 @@ object DependencyIndex {
 
                     val name = methodName(sig)
                     val alias = hIndex.methodAliases[name]
-                    println("[alias] $sig -> $name -> $alias")
+                    // println("[alias] $sig -> $name -> $alias")
                     if (alias != null && alias != sig) {
                         methodDependencies[sig] = methodDependencies[alias] ?: hashSetOf()
                         fieldDependenciesR[sig] = fieldDependenciesR[alias] ?: emptySet()
@@ -271,7 +271,7 @@ object DependencyIndex {
                     checkState(dependencies)
 
                     val md = methodDependencies[sig]
-                    println("[/dep] $sig -> $md")
+                    // println("[/dep] $sig -> $md")
                     when {
                         md != null -> {
                             dependencies.addAll(md)

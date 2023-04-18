@@ -202,7 +202,7 @@ public class StringsUTF8 {
     @Alias(name = "java_lang_String_compareTo_Ljava_lang_StringI")
     public static int String_compareTo(String self, String other) {
         if (self == other) return 0;
-        if (other == null) throw new NullPointerException();
+        if (other == null) throw new NullPointerException("String.compareTo");
         int v0 = getAddr(getValue(self));
         int v1 = getAddr(getValue(other));
         int a0 = v0 + arrayOverhead;

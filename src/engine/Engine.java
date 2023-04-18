@@ -23,6 +23,7 @@ import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
 import me.anno.studio.StudioBase;
 import me.anno.tests.game.Snake;
+import me.anno.tests.ui.AnimTextPanelTest;
 import me.anno.ui.Panel;
 import me.anno.ui.utils.WindowStack;
 import me.anno.utils.Clock;
@@ -35,6 +36,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 
+import static engine.GFXBase2Kt.renderFrame2;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
@@ -109,10 +111,9 @@ public class Engine {
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
         Panel panel;
         panel = new Snake();
-        // panel = new AnimTextPanelTest(true);
-        //panel = me.anno.cellau3d.CellMod.createGame();
+        // panel = new AnimTextPanelTest(false);
+        // panel = CellMod.createGame();
         panel.setWeight(1f);
-        // instance = new TestStudio(() -> Collections.singletonList(panel));
         instance = new SimpleStudio(panel);
         instance.run(false);
 
@@ -140,7 +141,8 @@ public class Engine {
         window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
         GFXBase.updateWindows();
         me.anno.Engine.updateTime(dt, System.nanoTime());
-        GFXBase.renderFrame();
+        // GFXBase.renderFrame();
+        renderFrame2(window); // easier, less stuff from other systems
     }
 
     public static void mouseMove(float mouseX, float mouseY) {
@@ -482,6 +484,7 @@ public class Engine {
     @Alias(name = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image")
     public static Image me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(FileReference path, long timeout, boolean async) {
         // todo create image async using JavaScript
+        log("Todo: create image async using JS", path.getAbsolutePath());
         return null;
     }
 
@@ -542,6 +545,7 @@ public class Engine {
     @Alias(name = "me_anno_gpu_monitor_SubpixelLayout_detect_V")
     public static void me_anno_gpu_monitor_SubpixelLayout_detect_V(Object self) {
         // todo implement this
+        log("Todo: detect subpixel layout");
     }
 
     @NoThrow
@@ -571,6 +575,12 @@ public class Engine {
     // todo this is not creatable... why is it a thing?
     @Alias(name = "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
     public static Object me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable(Object self) {
+        return null;
+    }
+
+    @Alias(name = "me_anno_utils_Sleep_waitForGFXThreadUntilDefined_ZLkotlin_jvm_functions_Function0_Ljava_lang_Object")
+    public static Object waitUntilDefined(boolean killable, Object func) {
+        throwJs("Cannot wait in Browser");
         return null;
     }
 
