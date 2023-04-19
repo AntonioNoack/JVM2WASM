@@ -205,10 +205,13 @@ public class StringsUTF8 {
         if (other == null) throw new NullPointerException("String.compareTo");
         int v0 = getAddr(getValue(self));
         int v1 = getAddr(getValue(other));
-        int a0 = v0 + arrayOverhead;
-        int b0 = v1 + arrayOverhead;
+        int a0 = v0 + objectOverhead;
+        int b0 = v1 + objectOverhead;
         int l0 = read32(a0);
         int l1 = read32(b0);
+        // skip length
+        a0 += 4;
+        b0 += 4;
         int l = Math.min(l0, l1);
         int i = findDiscrepancy(a0, a0 + l, b0) - a0;
         if (i < l) return read8(a0 + i) - read8(b0 + i);
@@ -219,7 +222,11 @@ public class StringsUTF8 {
     public static boolean String_equals(String self, Object other) {
         if (self == other) return true;
         if (other instanceof String) {
-            return String_compareTo(self, (String) other) == 0;
+            String otherS = (String) other;
+            if (self.length() != otherS.length()) return false;
+            if (self.hashCode() != otherS.hashCode()) return false; // slower at first, but faster afterwards :)
+            log("String-compare:", getAddr(self), getAddr(other), String_compareTo(self, otherS));
+            return String_compareTo(self, otherS) == 0;
         } else return false;
     }
 

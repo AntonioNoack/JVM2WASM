@@ -13,8 +13,11 @@ import me.anno.fonts.mesh.AlignmentGroup;
 import me.anno.gpu.GFX;
 import me.anno.gpu.drawing.DrawTexts;
 import me.anno.gpu.drawing.GFXx2D;
+import me.anno.gpu.texture.Clamping;
+import me.anno.gpu.texture.GPUFiltering;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.gpu.texture.Texture2DArray;
+import org.lwjgl.opengl.GL11C;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;
@@ -77,14 +80,14 @@ public class TextGen {
 
     @NoThrow
     @JavaScript(code = "arg2=str(arg2);\n" +
-            "measureText(arg0,arg1,arg2);\n" +
+            "measureText(arg0,arg1,arg2);\n" + // defines tmp
             "var w=Math.max(1,Math.min(arg3,Math.ceil(tmp.width))),h=arg4;\n" +
             "txtCanvas.width=w;txtCanvas.height=h;\n" +
             "ctx.fillStyle='#000'\n" +
             "ctx.fillRect(0,0,w,h)\n" +
             "ctx.fillStyle='#fff'\n" +
             "ctx.textAlign='center'\n" +
-            "ctx.font=(arg1|0)+'px '+str(arg0);\n" + // has to be called again, why ever...
+            "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
             "ctx.fillText(arg2,w/2,1+h/1.3);\n" +
             "gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h).data);\n" +
             "return w;")
@@ -134,44 +137,53 @@ public class TextGen {
         return group.getFont().getSize();
     }
 
+    @NoThrow
+    @JavaScript(code = "var w=arg3,h=arg4,d=arg5;\n" +
+            "txtCanvas.width=w;txtCanvas.height=h*d;\n" +
+            "ctx.fillStyle='#'+arg6.toString(16).padStart(6,'0');\n" +
+            "ctx.fillRect(0,0,w,h)\n" +
+            "ctx.fillStyle='#'+arg7.toString(16).padStart(6,'0');\n" +
+            "ctx.textAlign='center'\n" +
+            "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
+            "for(var i=0;i<d;i++) ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
+            "gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h*d).data);\n" +
+            "return w;")
+    private static native int genASCIITexture(
+            String font, float fontSize, int text0, int width, int height, int depth,
+            int textColor, int backgroundColor, float y0);
+
     @Alias(name = "me_anno_fonts_AWTFont_generateASCIITexture_ZIIILme_anno_gpu_texture_Texture2DArray")
     public static Texture2DArray generateASCIITexture(AWTFont self, boolean portableImages, int textColor, int backgroundColor, int extraPadding) {
-        int widthLimit = GFX.maxTextureSize;
-        int heightLimit = GFX.maxTextureSize;
+        final int widthLimit = GFX.maxTextureSize;
+        final int heightLimit = GFX.maxTextureSize;
 
-        FontRenderContext ctx = new FontRenderContext(null, true, true);
-        AlignmentGroup alignment = AlignmentGroup.Companion.getAlignments(self);
-        double size = alignment.getOffset(ctx, 'w', 'w');
-        int width = Math.min(widthLimit, (int) Math.round(size) + 1 + 2 * extraPadding);
-        int height = Math.min(heightLimit, WebFonts_getFontMetrics(self.getFont()).getHeight() + 2 * extraPadding);
+        final FontRenderContext ctx = new FontRenderContext(null, true, true);
+        final AlignmentGroup alignment = AlignmentGroup.Companion.getAlignments(self);
+        final double size = alignment.getOffset(ctx, 'w', 'w');
+        final int width = Math.min(widthLimit, (int) Math.round(size) + 1 + 2 * extraPadding);
+        final int height = Math.min(heightLimit, WebFonts_getFontMetrics(self.getFont()).getHeight() + 2 * extraPadding);
 
-        String[] simpleChars = DrawTexts.INSTANCE.getSimpleChars();
-        Texture2DArray texture = new Texture2DArray("awtAtlas", width, height, simpleChars.length);
+        final String[] simpleChars = DrawTexts.INSTANCE.getSimpleChars();
+        final Texture2DArray tex = new Texture2DArray("awtAtlas", width, height, simpleChars.length);
 
-        // todo create texture using JavaScript like above
-        /*val image = BufferedImage(texture.w, texture.h * texture.d, 1)
-        val gfx = image.graphics as Graphics2D
-        gfx.prepareGraphics(font, portableImages)
-        if (backgroundColor != 0) {
-            // fill background with that color
-            gfx.color = Color(backgroundColor)
-            gfx.fillRect(0, 0, image.width, image.height)
-        }
-        if (extraPadding != 0) {
-            gfx.translate(extraPadding, extraPadding)
-        }
-        gfx.color = Color(textColor)
-        var y = fontMetrics.ascent.toFloat()
-        val dy = texture.h.toFloat()
-        for (yi in simpleChars.indices) {
-            gfx.drawString(simpleChars[yi], 0f, y)
-            y += dy
-        }
-        gfx.dispose()
-        if (debugJVMResults) debug(image)
-        texture.create(image.toImage(), sync = true)*/
+        tex.ensurePointer();
+        Texture2D.Companion.bindTexture(tex.getTarget(), tex.getPointer());
+        final int mask = (1 << 24) - 1;
+        genASCIITexture(
+                self.getName(), self.getSize(), simpleChars[0].charAt(0), // letters are consecutive, so first letter is enough :)
+                width, height, simpleChars.length,
+                textColor & mask, backgroundColor & mask,
+                1f + height / 1.3f + extraPadding
+        );
 
-        return texture;
+        final long size1 = ((long) width * height * simpleChars.length) << 2;
+        tex.setLocallyAllocated(Texture2D.Companion.allocate(tex.getLocallyAllocated(), size1));
+        tex.setInternalFormat(GL11C.GL_RGBA8);
+        tex.setCreated(true);
+        tex.filtering(GPUFiltering.TRULY_NEAREST);
+        tex.clamping(Clamping.CLAMP);
+
+        return tex;
     }
 
 }

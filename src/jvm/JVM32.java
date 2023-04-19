@@ -8,6 +8,8 @@ import jvm.lang.JavaLangAccessImpl;
 import sun.misc.SharedSecrets;
 
 import java.io.PrintStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 
 import static jvm.GC.largestGaps;
 import static jvm.JVMValues.*;
@@ -82,6 +84,18 @@ public class JVM32 {
     public static native void log(String msg, String param, int param2);
 
     @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
+    public static native void log(String msg, String param, long param2);
+
+    @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
+    public static native void log(String msg, String param, double param2);
+
+    @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
+    public static native void log(String msg, String param, boolean param2);
+
+    @NoThrow
     @JavaScript(code = "console.log(str(arg0), arg1, arg2, arg3);")
     public static native void log(String msg, int param, int param2, int param3);
 
@@ -119,6 +133,54 @@ public class JVM32 {
             throw new ClassCastException();
         }
         return instance;
+    }
+
+    // can be removed in the future, just good for debugging
+    @Alias(name = "debug")
+    public static void debug(Object instance, boolean staticToo) throws IllegalAccessException {
+        if (instance == null) {
+            log("null");
+        } else {
+            Class clazz = instance.getClass();
+            log("Class", clazz.getName());
+            Field[] fields = clazz.getFields();
+            if (fields != null) for (Field f : fields) {
+                if (f == null) continue;
+                if (staticToo || !Modifier.isStatic(f.getModifiers())) {
+                    String name = f.getName();
+                    String type = f.getType().getName();
+                    switch (type) {
+                        case "byte":
+                            log(type, name, f.getByte(instance));
+                            break;
+                        case "short":
+                            log(type, name, f.getShort(instance));
+                            break;
+                        case "char":
+                            log(type, name, f.getChar(instance));
+                            break;
+                        case "int":
+                            log(type, name, f.getInt(instance));
+                            break;
+                        case "long":
+                            log(type, name, f.getLong(instance));
+                            break;
+                        case "float":
+                            log(type, name, f.getFloat(instance));
+                            break;
+                        case "double":
+                            log(type, name, f.getDouble(instance));
+                            break;
+                        case "boolean":
+                            log(type, name, f.getBoolean(instance));
+                            break;
+                        default:
+                            log(type, name, getAddr(f.get(instance)));
+                            break;
+                    }
+                }
+            }
+        }
     }
 
     @NoThrow

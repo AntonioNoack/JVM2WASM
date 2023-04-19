@@ -423,8 +423,7 @@ var ctr = 0
 
     // alpha is disabled, so we get subpixel rendering
     // https://stackoverflow.com/questions/4550926/subpixel-anti-aliased-text-on-html5s-canvas-element
-    window.ctx = txtCanvas.getContext('2d', {alpha: false})
-    window.ctx.willReadFrequently = true
+    window.ctx = txtCanvas.getContext('2d', {alpha: false, willReadFrequently: true})
 
     // querying fonts: console.log(await queryLocalFonts());, works but popup
 

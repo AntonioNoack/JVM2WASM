@@ -392,6 +392,7 @@ fun main() {
     gIndex.stringClass = gIndex.getClassIndex(reb("java/lang/String"))
     gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
 
+    eq(gIndex.getFieldOffset("[]", "length", "I", false), objectOverhead)
     eq(gIndex.getFieldOffset(reb("java/lang/String"), "value", "[C", false), objectOverhead)
     eq(gIndex.getFieldOffset(reb("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
 

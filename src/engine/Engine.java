@@ -10,6 +10,7 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.Build;
+import me.anno.config.DefaultConfig;
 import me.anno.gpu.GFX;
 import me.anno.gpu.GFXBase;
 import me.anno.gpu.OSWindow;
@@ -25,6 +26,7 @@ import me.anno.studio.StudioBase;
 import me.anno.tests.game.Snake;
 import me.anno.tests.ui.AnimTextPanelTest;
 import me.anno.ui.Panel;
+import me.anno.ui.editor.code.CodeEditor;
 import me.anno.ui.utils.WindowStack;
 import me.anno.utils.Clock;
 import me.anno.utils.OS;
@@ -109,8 +111,9 @@ public class Engine {
 
         StudioBase instance;
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
-        Panel panel;
-        panel = new Snake();
+        Panel panel = null;
+        // panel = new Snake();
+        panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
         // panel = new AnimTextPanelTest(false);
         // panel = CellMod.createGame();
         panel.setWeight(1f);

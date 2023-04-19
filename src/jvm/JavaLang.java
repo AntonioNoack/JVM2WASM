@@ -1208,13 +1208,14 @@ public class JavaLang {
     }
 
     @Alias(name = "new_java_lang_Throwable_V")
-    public static void new_java_lang_Throwable_V(Object self) {
+    public static void new_java_lang_Throwable_V(Throwable self) {
         // just an optimization :)
     }
 
     @Alias(name = "new_java_lang_Throwable_Ljava_lang_StringV")
-    public static void new_java_lang_Throwable_Ljava_lang_StringV(Object self) {
+    public static void new_java_lang_Throwable_Ljava_lang_StringV(Throwable self, String message) {
         // just an optimization :)
+        write32(getAddr(self) + objectOverhead, getAddr(message));
     }
 
     @Alias(name = "java_lang_ProcessBuilder_start_Ljava_lang_Process")
