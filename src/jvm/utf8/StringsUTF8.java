@@ -150,7 +150,8 @@ public class StringsUTF8 {
 
     @Alias(name = "java_lang_String_indexOf_Ljava_lang_StringII")
     public static int String_indexOf(String self, String other, int idx) {
-        for (int i = idx, l = self.length() - other.length(); i < l; i++) {
+        if (other.length() == 0) return 0;
+        for (int i = idx, l = self.length() - other.length(); i <= l; i++) {
             if (self.startsWith(other, i)) return i;
         }
         return -1;
@@ -161,10 +162,12 @@ public class StringsUTF8 {
         // return String_regionMatches(self, false, offset, other, 0, other.length());// todo why is this other method not working?
         byte[] v0 = getValue(self);
         byte[] v1 = getValue(other);
-        if (v0.length < v1.length - offset) return false;
+        int l0 = v0.length;
+        int l1 = v1.length;
+        if (l0 - offset < l1) return false;
         int a0 = getAddr(v0) + arrayOverhead + offset;
         int b0 = getAddr(v1) + arrayOverhead;
-        int a1 = a0 + v1.length;
+        int a1 = a0 + l1;
         return findDiscrepancy(a0, a1, b0) == a1;
     }
 
@@ -225,7 +228,6 @@ public class StringsUTF8 {
             String otherS = (String) other;
             if (self.length() != otherS.length()) return false;
             if (self.hashCode() != otherS.hashCode()) return false; // slower at first, but faster afterwards :)
-            log("String-compare:", getAddr(self), getAddr(other), String_compareTo(self, otherS));
             return String_compareTo(self, otherS) == 0;
         } else return false;
     }

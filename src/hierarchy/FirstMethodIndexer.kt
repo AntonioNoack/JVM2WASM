@@ -8,13 +8,7 @@ import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import org.objectweb.asm.*
 import reb
-import utils.single
-import utils.split1
-import utils.split2
-import utils.FieldSig
-import utils.GenericSig
-import utils.MethodSig
-import utils.printUsed
+import utils.*
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
 
@@ -185,50 +179,9 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
             val synthClassName = synthClassName(sig, dst)
             val print = false// calledMethod.name == "<init>"
-
-            val potentialTargets = ArrayList<MethodSig>()
-            fun handle(interfaceI: String) {
-                potentialTargets.addAll(hIndex.methods[interfaceI]!!)
-                val interfaces = hIndex.interfaces[interfaceI]
-                if (interfaces != null) {
-                    for (it in interfaces)
-                        handle(it)
-                }
-            }
-            handle(interface1)
             if (print) println(args.joinToString())
-            val targetDescriptor1 = split2((args[0] as Type).toString())
-            val targetDescriptor2 = split2((args[2] as Type).toString())
-            val implementationTargets = potentialTargets
-                .filter {
-                    if (it.name == name && it !in hIndex.staticMethods && it in hIndex.notImplementedMethods) {
-                        val id = split2(it.descriptor)
-                        (id == targetDescriptor1 || id == targetDescriptor2)
-                    } else false
-                }
-                .groupBy { GenericSig(it) }
-                .entries
-            if (implementationTargets.size != 1) {
-                println(sig)
-                println("----------------------")
-                println(name)
-                println(descriptor)
-                println(method)
-                for (arg in args) {
-                    println("arg: $arg")
-                }
-                println("----------------------")
-                // java.util.stream.StreamSpliterators.IntWrappingSpliterator.initPartialTraversalState()
-                for (sig in implementationTargets) {
-                    printUsed(sig.value.first())
-                }
-                println("others:")
-                for (sig in potentialTargets) {
-                    if (implementationTargets.none { sig in it.value }) printUsed(sig)
-                }
-                throw NotImplementedError("$interface1 -> $implementationTargets, which one?")
-            }
-            val implementationTarget = implementationTargets.first().key
+
+            val implementationTargetDesc = (args[0] as Type).toString()
 
             if (print) {
                 println()
@@ -239,7 +192,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
                 println("dst.tag: ${dst.tag}")
                 println("name: $name")
                 println("desc: $descriptor")
-                println("target: $implementationTarget")
+                println("target: $implementationTargetDesc")
                 println("args: " + args.joinToString())
                 println("----")
                 // throw IllegalStateException()
@@ -258,7 +211,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
             visitMethodInsn(0, dst.owner, dst.name, dst.desc, false)
 
-            val bridge = MethodSig.c(synthClassName, implementationTarget.name, implementationTarget.descriptor)
+            val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc)
             methods.add(bridge)
             hIndex.jvmImplementedMethods.add(bridge)
 
@@ -274,26 +227,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             constructed.add(synthClassName)
 
             hIndex.methods[synthClassName] = hashSetOf(bridge)
-
-            // val linkSrcTypies = utils.genericsTypies(bridge)
-            // linkGenericsByInterfaces(interface1, bridge, linkSrcTypies, synthClassName, calledMethod)
-
-            /*if (synthClassName == "java_lang_System_getProperty_Ljava_lang_StringLjava_lang_String") {
-                println(sig)
-                println("synth class name: $synthClassName")
-                println("name: $name")
-                println("interface: $interface1")
-                println("desc: $descriptor")
-                println("method: $method")
-                println("synth-method: $synthMethod")
-                println("args: " + args.joinToString())
-                // throw java.lang.IllegalStateException("if inside Configuration\$StateInit, find interfaces for inheritance!")
-                println("linked $linkSrc to $calledMethod")
-            }*/
-
-            // we need a new class with three parts:
-            // b) a caller, which implements the interface, and passes the args to @dst
-            // c) fields to hold the arguments
 
         } else {
             DynPrinter.print(name, descriptor, method, args)

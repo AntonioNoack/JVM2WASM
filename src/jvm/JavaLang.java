@@ -783,6 +783,104 @@ public class JavaLang {
         return read32(getFieldAddr(field, instance));
     }
 
+    @Alias(name = "java_lang_reflect_Field_setFloat_Ljava_lang_ObjectFV")
+    public static void Field_setFloat(Field field, Object instance, float value) {
+        Class<?> clazz = field.getType();
+        if (!"float".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a float");
+        write32(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getFloat_Ljava_lang_ObjectF")
+    public static float Field_getFloat(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"float".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a float");
+        return read32f(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setLong_Ljava_lang_ObjectLV")
+    public static void Field_setLong(Field field, Object instance, long value) {
+        Class<?> clazz = field.getType();
+        if (!"int".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");
+        write32(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getLong_Ljava_lang_ObjectL")
+    public static long Field_getLong(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"long".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");
+        return read64(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setDouble_Ljava_lang_ObjectDV")
+    public static void Field_setDouble(Field field, Object instance, double value) {
+        Class<?> clazz = field.getType();
+        if (!"double".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a double");
+        write64(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getDouble_Ljava_lang_ObjectD")
+    public static double Field_getDouble(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"double".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a double");
+        return read64f(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setByte_Ljava_lang_ObjectBV")
+    public static void Field_setByte(Field field, Object instance, byte value) {
+        Class<?> clazz = field.getType();
+        if (!"byte".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a byte");
+        write8(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getByte_Ljava_lang_ObjectB")
+    public static byte Field_getByte(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"byte".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a byte");
+        return read8(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setShort_Ljava_lang_ObjectSV")
+    public static void Field_setShort(Field field, Object instance, short value) {
+        Class<?> clazz = field.getType();
+        if (!"short".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a short");
+        write16(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getShort_Ljava_lang_ObjectS")
+    public static short Field_getShort(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"short".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a short");
+        return read16s(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setChar_Ljava_lang_ObjectCV")
+    public static void Field_setChar(Field field, Object instance, char value) {
+        Class<?> clazz = field.getType();
+        if (!"char".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a char");
+        write16(getFieldAddr(field, instance), value);
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getChar_Ljava_lang_ObjectC")
+    public static char Field_getChar(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"char".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a char");
+        return read16u(getFieldAddr(field, instance));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_setBoolean_Ljava_lang_ObjectZV")
+    public static void Field_setBoolean(Field field, Object instance, boolean value) {
+        Class<?> clazz = field.getType();
+        if (!"boolean".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a boolean");
+        write8(getFieldAddr(field, instance), (byte) (value ? 1 : 0));
+    }
+
+    @Alias(name = "java_lang_reflect_Field_getBoolean_Ljava_lang_ObjectZ")
+    public static boolean Field_getBoolean(Field field, Object instance) {
+        Class<?> clazz = field.getType();
+        if (!"boolean".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a boolean");
+        return read8(getFieldAddr(field, instance)) != 0;
+    }
+
     @Alias(name = "java_lang_Class_forName_Ljava_lang_StringLjava_lang_Class")
     public static <V> Class<V> Class_forName(String name) throws ClassNotFoundException {
         // iterate over all class instances, and get their names
@@ -1123,9 +1221,9 @@ public class JavaLang {
 
     @Alias(name = "java_lang_Class_newInstance_Ljava_lang_Object")
     public static <V> Object java_lang_Class_newInstance_Ljava_lang_Object(Class<V> clazz) {
-        if (clazz == null) return null;
+        if (clazz == null) throwJs();
         int classIndex = getClassIndex(clazz);
-        if (classIndex < 0) return null;
+        if (classIndex < 0) throwJs();
         int instance = create(classIndex);
         int constructorPtr = resolveIndirect(instance, 4); // (id+1)<<2, id = 0
         invoke(instance, constructorPtr);

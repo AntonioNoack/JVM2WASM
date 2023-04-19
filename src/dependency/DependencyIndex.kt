@@ -73,15 +73,15 @@ object DependencyIndex {
                 "java/lang/Class",
                 "java/lang/reflect/Field",
                 "java/lang/reflect/AccessibleObject",// super class of java.lang.reflect.Field
+                "java/lang/reflect/Constructor", // needed for Class.newInstance()
                 "[]", "[I", "[F", "[Z", "[B", "[C", "[S", "[J", "[D",
-                "int", "float", "boolean", "byte", "short", "char", "long", "double"
+                "int", "float", "boolean", "byte", "short", "char", "long", "double",
             )
         )
         constructableClasses.addAll(entryClasses)
 
         var remaining = HashSet<MethodSig>(size)
         var newRemaining = HashSet<MethodSig>(size)
-
 
         remaining.addAll(entryPoints)
         remaining.addAll(usedMethods)

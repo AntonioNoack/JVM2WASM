@@ -762,8 +762,10 @@ fun main() {
         println(fs in dIndex.usedFieldsR)
         println(fs in dIndex.usedFieldsW)
         println(fs in usedFields)
-        TODO()
+        throw IllegalStateException()
     }
+
+    gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
     for ((method, annotation, noinline) in hIndex.annotations.entries
         .mapNotNull { m ->
@@ -893,6 +895,8 @@ fun main() {
         val desc = func.descriptor
         val dx = desc.lastIndexOf(')')
         // export? no, nobody should call these
+        if(methodName(func) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
+            throw IllegalStateException("This function isn't not-implemented/abstract")
         bodyPrinter.append("(func $").append(methodName(func)).append(" (param")
         for (param in split1(desc.substring(1, dx))) {
             bodyPrinter.append(' ').append(jvm2wasm(param))

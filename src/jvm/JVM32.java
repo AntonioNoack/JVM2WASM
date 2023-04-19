@@ -76,6 +76,10 @@ public class JVM32 {
     public static native void log(String msg, int param, int param2);
 
     @NoThrow
+    @JavaScript(code = "console.log(str(arg0), String.fromCharCode(arg1), String.fromCharCode(arg2));")
+    public static native void log(String msg, char param, char param2);
+
+    @NoThrow
     @JavaScript(code = "console.log(str(arg0), str(arg1), str(arg2));")
     public static native void log(String msg, String param, String param2);
 
@@ -106,6 +110,10 @@ public class JVM32 {
     @NoThrow
     @JavaScript(code = "console.log(str(arg0), str(arg1), str(arg2), arg3);")
     public static native void log(String i, String msg, String param, int param2);
+
+    @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2, str(arg3));")
+    public static native void log(String i, String msg, int param, String param2);
 
     @NoThrow
     @JavaScript(code = "console.log(str(arg0), arg1, str(arg2));")
@@ -175,13 +183,25 @@ public class JVM32 {
                             log(type, name, f.getBoolean(instance));
                             break;
                         default:
-                            log(type, name, getAddr(f.get(instance)));
+                            Object value = f.get(instance);
+                            if (value == null) log(type, name, 0);
+                            else if (value instanceof String) log(type, name, getAddr(value), value.toString());
+                            else log(type, name, getAddr(value), value.getClass().getName());
                             break;
                     }
                 }
             }
+            if (instance instanceof Object[]) {
+                debugArray(instance);
+            }
         }
     }
+
+    @NoThrow
+    @JavaScript(code = "var lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
+            "for(var i=0;i<len;i++) arr.push(lib.r32(arg0+arrayOverhead+(i<<2)));\n" +
+            "console.log(arr)")
+    private static native void debugArray(Object instance);
 
     @NoThrow
     @WASM(code = "global.get $M")
@@ -347,7 +367,8 @@ public class JVM32 {
     @Alias(name = "resolveInterface")
     public static int resolveInterface(int instance, int methodId) {
         if (instance == 0) {
-            throwJs("resolveInterface is null", instance, methodId);
+            log("resolveInterface:", instance, methodId);
+            throwJs("resolveInterface is null");
         }
         // beware! ++ black magic ++
         invokeBlackMagic();
@@ -431,11 +452,13 @@ public class JVM32 {
             throwJs();
         }
         // this probably can be removed, as we never used it
-        int methodTable = read32(indirectTable() + (clazz << 2));
+        // needs to be ignored for java.lang.reflect.Constructor;
+        /*int methodTable = read32(indirectTable() + (clazz << 2));
         if (methodTable == 0) {
-            log("class to create:", clazz);
+            Class instance = ptrTo(findClass(clazz));
+            log("Class to instantiate:", clazz, instance.getName());
             throwJs("Class cannot be created");
-        }
+        }*/
         if (trackAllocations) trackCalloc(clazz);
         int instanceSize = getInstanceSize(clazz);
         if (instanceSize <= 0)
@@ -699,33 +722,55 @@ public class JVM32 {
     }
 
     @NoThrow
+    @WASM(code = "i64.ne")
+    private static native boolean neq(long a, long b);
+
+    @NoThrow
+    @WASM(code = "i32.and")
+    private static native boolean and(boolean a, int b);
+
+    @NoThrow
+    @WASM(code = "i32.and")
+    private static native boolean and(boolean a, boolean b);
+
+    @NoThrow
     public static int findDiscrepancy(int start, int end, int start2) {
-        // todo align memory?
+        // align memory
+        while (and(unsignedLessThan(start, end), start & 7)) {
+            if (read8(start) != read8(start2)) return start;
+            start++;
+            start2++;
+        }
+        return findDiscrepancyAligned(start, end, start2);
+    }
+
+    @NoThrow
+    public static int findDiscrepancyAligned(int start, int end, int start2) {
+        // quickly find first different byte
         int end8 = end - 7;
         while (unsignedLessThan(start, end8)) {
-            if (read64(start) != read64(start2)) {
+            if (neq(read64(start), read64(start2))) {
                 break;
             }
             start += 8;
             start2 += 8;
         }
-        if (unsignedLessThan(start, end - 3)) {
-            if (read32(start) == read32(start2)) {
-                start += 4;
-                start2 += 4;
-            }
+        return findDiscrepancyAlignedEnd(start, end, start2);
+    }
+
+    @NoThrow
+    public static int findDiscrepancyAlignedEnd(int start, int end, int start2) {
+        if (and(unsignedLessThan(start, end - 3), read32(start) == read32(start2))) {
+            start += 4;
+            start2 += 4;
         }
-        if (unsignedLessThan(start, end - 1)) {
-            if (read16s(start) == read16s(start2)) {
-                start += 2;
-                start2 += 2;
-            }
+        if (and(unsignedLessThan(start, end - 1), read16s(start) == read16s(start2))) {
+            start += 2;
+            start2 += 2;
         }
-        if (unsignedLessThan(start, end)) {
-            if (read8(start) == read8(start2)) {
-                start++;
-                // start2++;
-            }
+        if (and(unsignedLessThan(start, end), read8(start) == read8(start2))) {
+            start++;
+            // start2++;
         }
         return start;
     }

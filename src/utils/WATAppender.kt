@@ -159,7 +159,11 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
             if (clazz > 0 && gIndex
                     .getFieldOffsets(hIndex.superClass[className]!!, false)
                     .fields.any { it.key !in fields2.map { f2 -> f2.first } }
-            ) throw IllegalStateException("Fields from super class are missing in $className, super: ${hIndex.superClass[className]!!}")
+            ) throw IllegalStateException("Fields from super class are missing in $className, " +
+                    "super: ${hIndex.superClass[className]!!}, " +
+                    "${gIndex
+                        .getFieldOffsets(hIndex.superClass[className]!!, false)
+                        .fields.filter { it.key !in fields2.map { f2 -> f2.first } }}")
 
             // create new fields array
             val arrayPtr = indexStartPtr + classData.size()
@@ -540,15 +544,15 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
         return getDynMethodIdx(gIndex.getClassIndex(hIndex.superClass[gIndex.classNames[clazz]]!!))
     }
 
-    printUsed(MethodSig.c("java/lang/Object", "hashCode", "()I"))
-    printUsed(MethodSig.c("jvm/JavaLang", "Object_hashCode", "(Ljava/lang/Object;)I"))
-    printUsed(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z"))
+    // printUsed(MethodSig.c("java/lang/Object", "hashCode", "()I"))
+    // printUsed(MethodSig.c("jvm/JavaLang", "Object_hashCode", "(Ljava/lang/Object;)I"))
+    // printUsed(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z"))
 
-    var clazz = 39
+    /*var clazz = 39
     while (true) {
         printUsed(MethodSig.c(gIndex.classNames[clazz], "hashCode", "()I"))
         clazz = gIndex.getClassIndex(hIndex.superClass[gIndex.classNames[clazz]] ?: break)
-    }
+    }*/
 
     for (i in 0 until numClasses) {
         val pic = getDynMethodIdx(i)

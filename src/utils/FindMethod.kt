@@ -18,7 +18,7 @@ fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable:
     if (throwNotConstructable && !(isConstructable || isStatic) && method3 in hIndex.methods[clazz]!!) {
         printUsed(method3)
         println("child classes: ${hIndex.superClass.entries.filter { it.value == clazz }.map { it.key }}")
-        throw IllegalArgumentException("Non-constructable classes are irrelevant to be resolved ($clazz): ${dIndex.constructableClasses}")
+        me.anno.utils.LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz): ${dIndex.constructableClasses}")
     }
     val superClass = hIndex.superClass[clazz]
     if ((hIndex.classFlags[clazz] ?: 0).hasFlag(Opcodes.ACC_ABSTRACT) && method3 in hIndex.abstractMethods) {

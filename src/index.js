@@ -76,7 +76,6 @@ var ctr = 0
         if(th == 0) return null
         if(lib.io(th, 14)){// 14 = Throwable
             var clazz = ptr2err(th)
-            var message = str(lib.r32(th + objectOverhead))
             var trace = lib.r32(th + objectOverhead + 4) // first is message
             if(trace && lib.io(trace, 1)){
                 var traceLength = lib.r32(trace + objectOverhead)
@@ -93,7 +92,7 @@ var ctr = 0
                 }
                 trace = trace1
             }
-            console.log(clazz, message, trace)
+            console.log(clazz, trace)
             // if(ctr++ > 3) throw clazz
         } else console.error('Not a Throwable', lib.rCl(th))
         return th

@@ -2,12 +2,12 @@ package graphing
 
 import insn.Drop
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.strings.StringHelper.shorten
 import org.objectweb.asm.Label
 import utils.Builder
 import utils.MethodSig
 import utils.methodName
 import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.min
 
 object StructuralAnalysis {
@@ -261,34 +261,54 @@ object StructuralAnalysis {
 
             var changed2 = false
 
-            fun Builder.blockParams(node: Node, next: Node?, postfix: String, id: String): Builder {
+            fun Builder.blockParams(inputs: List<String>?, outputs: List<String>?, postfix: String): Builder {
                 // write params and result
-                if (node.inputStack?.isNotEmpty() == true) {
+                if (inputs?.isNotEmpty() == true) {
                     append(" (param")
-                    for (input in node.inputStack!!) {
+                    for (input in inputs) {
                         append(' ')
                         append(input)
                     }
                     append(')')
                 }
-                if (next == null) {
-                    // output must be equal to input
-                    if (node.inputStack != node.outputStack && !node.isReturn) {
-                        printState()
-                        println("error in $sig: ${node.inputStack} != ${node.outputStack}, [${node.index}] [$id]")
+               if (outputs != null) {
+                   append(" (result")
+                   for (output in outputs) {
+                       append(' ')
+                       append(output)
+                   }
+                   append(')')
+                }// else if(printOps) append(";; no return values found in ${node.index}\n")
+                append(" ")
+                append(postfix)
+                append('\n')
+                return this
+            }
+
+            fun Builder.blockParams(from: Node, to: Node?, postfix: String, id: String): Builder {
+                // write params and result
+                if (from.inputStack?.isNotEmpty() == true) {
+                    append(" (param")
+                    for (input in from.inputStack!!) {
+                        append(' ')
+                        append(input)
                     }
-                    if (node.inputStack?.isNotEmpty() == true) {
+                    append(')')
+                }
+                if (to == null) {
+                    // output must be equal to input
+                    if (from.inputStack?.isNotEmpty() == true) {
                         append(" (result")
-                        for (input in node.inputStack!!) {
+                        for (input in from.inputStack!!) {
                             append(' ')
                             append(input)
                         }
                         append(')')
                     }
-                } else if (node.outputStack?.isNotEmpty() == true) {
-                    if (!node.isReturn) {
+                } else if (from.outputStack?.isNotEmpty() == true) {
+                    if (!from.isReturn) {
                         append(" (result")
-                        for (output in node.outputStack!!) {
+                        for (output in from.outputStack!!) {
                             append(' ')
                             append(output)
                         }
@@ -745,7 +765,7 @@ object StructuralAnalysis {
 
             // small circle
             // A -> B | C; B -> A
-            if (false) do { // todo this is not working properly... compiler fails with it...
+            do {
                 var changed = false
                 for (i in nodes.indices) {
                     val nA = nodes.getOrNull(i) ?: break
@@ -753,25 +773,26 @@ object StructuralAnalysis {
                         val nI = labelToNode[nA.ifTrue]!!
                         val nJ = nA.ifFalse!!
                         fun handle(insideLoop: Node, other: Node, negate: Boolean) {
-                            // printState()
+
                             changed = true
                             changed2 = true
 
                             val newPrinter = Builder(nA.printer.length + insideLoop.printer.length + 32)
                             val loopIdx = loopIndex++
                             newPrinter.append("  (loop \$b$loopIdx")
-                                .blockParams(nA, insideLoop, "", "l765")
+                                .blockParams(nA.inputStack, nA.outputStack, "")
                                 .appendIndent(nA.printer)
                             nA.printer = newPrinter // replace for speed :)
                             if (negate) nA.printer.append("  i32.eqz\n")
                             nA.printer.append("  (if")
-                                .blockParams(insideLoop, nA, "(then ;; small circle", "l770")
+                                .blockParams(insideLoop.inputStack, insideLoop.inputStack, "(then")
                                 .appendIndent2(insideLoop.printer)
                                 .append("  br \$b$loopIdx)))\n")
                             nA.ifTrue = null
                             nA.ifFalse = other
                             nA.inputs.remove(insideLoop) // it no longer links to next
                             nodes.remove(insideLoop)
+
                         }
 
                         val n2i = !nI.isBranch && !nI.isReturn &&
@@ -779,7 +800,8 @@ object StructuralAnalysis {
                         val n2j = !nJ.isBranch && !nJ.isReturn &&
                                 nJ.next == nA.label && nJ.inputs.size == 1
                         if (n2i && n2j) {
-                            // todo handle infinite loop
+                            // to do handle infinite loop
+                            // not happening in 4.2k classes, so probably not that important...
                         } else if (n2i) {
                             handle(nI, nJ, false)
                         } else if (n2j) {
@@ -956,7 +978,7 @@ object StructuralAnalysis {
     }
 
     private fun graphId(sig: MethodSig, nodes: List<Node>, labelToNode: Map<Label, Node>): String {
-        return methodName(sig).shorten(50).toString() + ".txt"
+        // return methodName(sig).shorten(50).toString() + ".txt"
         val builder = StringBuilder(nodes.size * 5)
         for (node in nodes) {
             builder.append(
@@ -964,17 +986,26 @@ object StructuralAnalysis {
                     node.isAlwaysTrue -> 'T'
                     node.isReturn -> 'R'
                     node.isBranch -> 'B'
-                    else -> '0'
+                    else -> 'N'
                 }
             )
             val a = labelToNode[node.ifTrue]?.index
             val b = node.ifFalse?.index
-            if (a != null) builder.append(a).append(',')
-            if (b != null) builder.append(b).append(',')
+            if (a != null) builder.append(a)
+            if (b != null) {
+                if (a != null) builder.append('-')
+                builder.append(b)
+            }
         }
-        val hash = builder.toString().hashCode()
-        builder.clear()
-        builder.append(hash.toUInt().toString(16))
+        val maxLength = 50
+        if (builder.length > maxLength) {
+            val hash = builder.toString().hashCode()
+            val extra = builder.substring(0, maxLength - 8)
+            builder.clear()
+            builder.append(extra)
+            builder.append('-')
+            builder.append(hash.toUInt().toString(16))
+        }
         builder.append(".txt")
         return builder.toString()
     }
@@ -993,13 +1024,13 @@ object StructuralAnalysis {
             if (printOps) println("${node.index} -> $j")
             node.index = j++
         }
-        if (exitNode != null) exitNode.index = j++
+        if (exitNode != null) exitNode.index = j
     }
 
     private fun createLargeSwitchStatement(sig: MethodSig, nodes0: List<Node>, labelToNode: Map<Label, Node>): String {
         val vs = StackVariables()
         vs.varPrinter.append("(local \$lbl i32)\n")
-        if (false) {
+        if (true) {
             val code = createLargeSwitchStatement1(sig, nodes0, labelToNode, vs)
             for (i in code.lastIndex downTo 0) {
                 vs.varPrinter.append(code[i])
@@ -1030,13 +1061,25 @@ object StructuralAnalysis {
         // create graph id
         // to do store image of graph based on id
         val graphId = graphId(sig, nodes, labelToNode)
-        val file = File(folder, graphId)
-        if (!file.exists()) {
-            val builder = StringBuilder()
-            builder.append(sig).append('\n')
-            builder.append(methodName(sig)).append('\n')
-            printState(nodes, labelToNode) { builder.append(it).append('\n') }
-            file.writeText(builder.toString())
+        if (false) {
+            val file = File(folder, graphId)
+            if (!file.exists()) {
+                val builder = StringBuilder()
+                builder.append(sig).append('\n')
+                builder.append(methodName(sig)).append('\n')
+                printState(nodes, labelToNode) { builder.append(it).append('\n') }
+                file.writeText(builder.toString())
+            } else {
+                val builder = StringBuilder()
+                builder.append(sig).append('\n')
+                builder.append(methodName(sig)).append('\n')
+                val str = builder.toString()
+                if (str !in file.readText()) {
+                    FileOutputStream(file, true).use {
+                        it.write(str.toByteArray())
+                    }
+                }
+            }
         }
 
         // create large switch-case-statement

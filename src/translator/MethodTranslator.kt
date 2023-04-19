@@ -18,6 +18,7 @@ import ignoreNonCriticalNullPointers
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.maths.Maths.hasFlag
+import me.anno.utils.LOGGER
 import me.anno.utils.strings.StringHelper.shorten
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
@@ -28,13 +29,14 @@ import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
 import useWASMExceptions
 import utils.*
+import java.lang.reflect.Modifier
 import kotlin.collections.set
 
 /**
  * convert instructions from JVM into WASM
  * */
 class MethodTranslator(
-    access: Int,
+    val access: Int,
     val clazz: String,
     val name: String,
     val descriptor: String,
@@ -139,6 +141,7 @@ class MethodTranslator(
         resultType = descriptor[descriptor.indexOf(')') + 1]
         val name2 = methodName(sig)
         headPrinter.append("(func $").append(name2)
+
         val mapped = hIndex.methodAliases[name2]
         if (mapped != null && mapped != sig) {
             throw IllegalStateException("Must not translate $sig, because it is mapped to $mapped")
@@ -911,7 +914,7 @@ class MethodTranslator(
         return localVars.getOrPut(Pair(name, wasmType)) {
             // register local variable
             val name2 = "\$l${localVars.size}"
-            if (methodName(sig) == "AW_clone_Ljava_lang_Object" && name2 == "\$l3"){
+            if (methodName(sig) == "AW_clone_Ljava_lang_Object" && name2 == "\$l3") {
                 println(localVars)
                 println(printer)
                 TODO()
@@ -1894,6 +1897,12 @@ class MethodTranslator(
     override fun visitEnd() {
         if (!isAbstract) {
 
+           /* if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                for (node in nodes) {
+                    println("node $node: ${node.printer}")
+                }
+            }*/
+
             val lastNode = nodes.last()
             if (StructuralAnalysis.printOps)
                 println("\n$clazz $name $descriptor: ${nodes.size}")
@@ -1908,6 +1917,10 @@ class MethodTranslator(
             }
 
             var txt = transform(sig, nodes).toString()
+
+         /*   if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                println(txt)
+            }*/
 
             txt = txt.replace(
                 "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
@@ -2149,6 +2162,14 @@ class MethodTranslator(
                 }
                 throw IllegalStateException("$sig shall be aliased")
             }*/
+
+          /*  if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                LOGGER.debug("contents: $headPrinter")
+                LOGGER.debug("old: ${gIndex.translatedMethods[sig]}")
+                println("flags: $access")
+                throw NotImplementedError("What?!?")
+            }*/
+
             gIndex.translatedMethods[sig] = headPrinter.toString()
 
         }

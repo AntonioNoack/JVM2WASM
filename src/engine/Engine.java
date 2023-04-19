@@ -61,11 +61,6 @@ public class Engine {
 
         Build.setShipped(true);
 
-        // create instance
-        if (clazzName == null) {
-            clazzName = "me.anno.engine.RemsEngine";
-        }
-
         // todo test lua :)
         /*LuaValue v = LuaInteger.valueOf(3);
         LuaValue w = LuaInteger.valueOf(15);
@@ -133,10 +128,6 @@ public class Engine {
         tick.stop("Game Init");
 
     }
-
-    /*public static boolean drawLogo(int width, int height, boolean destroy) {
-        return LogoKt.drawLogo(width, height, destroy);
-    }*/
 
     public static void update(int width, int height, float dt) {
         window.setWidth(width);
@@ -566,19 +557,6 @@ public class Engine {
     public static void me_anno_config_DefaultConfig_init_V(Object self) {
         // skippable? depends on config, that we don't save yet
         // todo re-enable, once saving is possible :)
-    }
-
-    // todo why is Panel.clone() still encoded?...
-    // todo this is not creatable... why is it a thing?
-    @Alias(name = "me_anno_io_ISaveableXCompanionXregisterCustomClassX1_invoke_Lme_anno_io_ISaveable")
-    public static Object me_anno_io_ISaveableXCompanionXregisterCustomClassX1_invoke_Lme_anno_io_ISaveable(Object self) {
-        return null;
-    }
-
-    // todo this is not creatable... why is it a thing?
-    @Alias(name = "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
-    public static Object me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable(Object self) {
-        return null;
     }
 
     @Alias(name = "me_anno_utils_Sleep_waitForGFXThreadUntilDefined_ZLkotlin_jvm_functions_Function0_Ljava_lang_Object")
