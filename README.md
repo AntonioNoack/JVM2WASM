@@ -1,8 +1,8 @@
 # JVM2WASM
 
 This project is a compiler from JVM to WASM for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
-It has a garbage collector, and JS bindings for OpenGL via OpenGL ES.
-The target JVM language is Java 8.
+It has a [garbage collector](src/jvm/GC.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
+The target JVM language is Java 8 (lambdas).
 
 The generated code relies heavily on switch-statements, because structural analysis is hard, and I haven't implemented "pattern-independent structuring" (a paper, that solves it) yet.
 This makes it much slower than native code (50x-100x in [SciMark2](https://math.nist.gov/scimark2/)).
@@ -19,7 +19,7 @@ The resulting file is quite large at the moment, partially because a lot of unne
 and because they take up quite a bit of space.
 
 ## Main class
-The main class is "JVM2WASM.kt". It controls, where class indexing should start,
+The main class for translation is [JVM2WASM.kt](src/JVM2WASM.kt). It controls, where class indexing should start,
 and which classes shall be replaced by others (to reduce total executable size).
 
 ## Quirks
