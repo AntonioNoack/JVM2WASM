@@ -9,8 +9,6 @@ import jvm.GC;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
-import me.anno.Build;
-import me.anno.config.DefaultConfig;
 import me.anno.gpu.GFX;
 import me.anno.gpu.GFXBase;
 import me.anno.gpu.OSWindow;
@@ -24,12 +22,9 @@ import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
 import me.anno.studio.StudioBase;
 import me.anno.tests.game.Snake;
-import me.anno.tests.ui.AnimTextPanelTest;
 import me.anno.ui.Panel;
-import me.anno.ui.editor.code.CodeEditor;
 import me.anno.ui.utils.WindowStack;
 import me.anno.utils.Clock;
-import me.anno.utils.OS;
 import org.lwjgl.opengl.GL11C;
 
 import java.io.File;
@@ -52,14 +47,14 @@ public class Engine {
 
     public static void main(String clazzName, boolean fp16, boolean fp32) {
 
-        OS.isAndroid = false;
-        OS.isLinux = false;
-        OS.isWeb = true;
+        //  OS.isAndroid = false;
+        //  OS.isLinux = false;
+        //  OS.isWeb = true;
 
-        GFX.supportsF16Targets = fp16;
-        GFX.supportsF32Targets = fp32;
+        //  GFX.supportsF16Targets = fp16;
+        //  GFX.supportsF32Targets = fp32;
 
-        Build.setShipped(true);
+        // Build.setShipped(true);
 
         // todo test lua :)
         /*LuaValue v = LuaInteger.valueOf(3);
@@ -106,9 +101,9 @@ public class Engine {
 
         StudioBase instance;
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
-        Panel panel = null;
-        // panel = new Snake();
-        panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
+        Panel panel;
+        panel = new Snake();
+        // panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
         // panel = new AnimTextPanelTest(false);
         // panel = CellMod.createGame();
         panel.setWeight(1f);

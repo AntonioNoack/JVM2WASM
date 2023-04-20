@@ -6,7 +6,7 @@ import utils.Builder
 class Node(val label: Label) {
 
     var index = -1
-    val inputs = ArrayList<Node>()
+    val inputs = HashSet<Node>()
 
     var ifFalse: Node? = null
     var ifTrue: Label? = null

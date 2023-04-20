@@ -13,6 +13,8 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.nio.file.spi.FileSystemProvider;
 
+import static jvm.JavaLang.Float_floatToRawIntBits_FI;
+
 public class JavaNIO {
 
     private static Charset cs;
@@ -56,6 +58,12 @@ public class JavaNIO {
     @Alias(name = "java_io_File_toPath_Ljava_nio_file_Path")
     public static Object java_io_File_toPath_Ljava_nio_file_Path(Object file) {
         return file;
+    }
+
+    @NoThrow
+    @Alias(name = "java_nio_FloatBuffer_equals_FFZ")
+    public static boolean java_nio_FloatBuffer_equals_FFZ(float a, float b) {
+        return Float_floatToRawIntBits_FI(a) == Float_floatToRawIntBits_FI(b);
     }
 
     @Alias(name = "java_nio_charset_Charset_forName_Ljava_lang_StringLjava_nio_charset_Charset")

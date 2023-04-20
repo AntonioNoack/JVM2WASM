@@ -2,6 +2,7 @@ package graphing
 
 import insn.Drop
 import me.anno.utils.files.Files.formatFileSize
+import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
 import utils.Builder
 import utils.MethodSig
@@ -72,12 +73,18 @@ object StructuralAnalysis {
             }
             if (compactStatePrinting) {
                 printLine(
-                    "${"${name},".padEnd(15)}#${node.inputs.map { it.index }}, ${node.inputStack} -> ${node.outputStack}, ${
+                    "${"${name},".padEnd(15)}#${
+                        node.inputs.map { it.index }.sorted()
+                    }, ${node.inputStack} -> ${node.outputStack}, ${
                         node.printer.toString().replace('\n', '|')
                     }"
                 )
             } else {
-                printLine("${"${name},".padEnd(15)}#${node.inputs.map { it.index }}, ${node.inputStack} -> ${node.outputStack}")
+                printLine(
+                    "${"${name},".padEnd(15)}#${
+                        node.inputs.map { it.index }.sorted()
+                    }, ${node.inputStack} -> ${node.outputStack}"
+                )
                 printLine("")
                 for (line in node.printer.split('\n')) {
                     var ln = line
@@ -200,6 +207,40 @@ object StructuralAnalysis {
             }
         }
 
+        val uniqueNodes = HashMap<Triple<String, IntPair, List<String>?>, Node>()
+        val nodeMap = HashMap<Node, Node>()
+        for (node in nodes) {
+            val key = Triple(
+                node.printer.toString(),
+                IntPair(
+                    labelToNode[node.ifTrue]?.index ?: -1,
+                    node.ifFalse?.index ?: -1
+                ),
+                node.inputStack
+            )
+            val other = uniqueNodes[key]
+            if (other != null) {
+                nodeMap[node] = other
+                other.inputs.addAll(node.inputs)
+            } else {
+                uniqueNodes[key] = node
+            }
+        }
+        if (nodeMap.isNotEmpty()) {
+            nodes.removeIf { it in nodeMap.keys }
+            for (node in nodes) {
+                node.inputs.addAll(node.inputs.map { nodeMap[it] ?: it })
+                node.inputs.removeIf { it in nodeMap.keys }
+                if (node.ifTrue != null) {
+                    val ifTrue = labelToNode[node.ifTrue]
+                    node.ifTrue = nodeMap[ifTrue]?.label ?: node.ifTrue
+                }
+                if (node.ifFalse in nodeMap) {
+                    node.ifFalse = nodeMap[node.ifFalse]!!
+                }
+            }
+        }
+
         // check input- and output stacks
         val illegals = ArrayList<String>()
         for (node in nodes) {
@@ -271,13 +312,13 @@ object StructuralAnalysis {
                     }
                     append(')')
                 }
-               if (outputs != null) {
-                   append(" (result")
-                   for (output in outputs) {
-                       append(' ')
-                       append(output)
-                   }
-                   append(')')
+                if (outputs != null) {
+                    append(" (result")
+                    for (output in outputs) {
+                        append(' ')
+                        append(output)
+                    }
+                    append(')')
                 }// else if(printOps) append(";; no return values found in ${node.index}\n")
                 append(" ")
                 append(postfix)
@@ -977,8 +1018,71 @@ object StructuralAnalysis {
         throw NotImplementedError()
     }
 
+    val equalPairs = arrayOf(
+        "i32.lt_s\n", "i32.ge_s\n",
+        "i32.le_s\n", "i32.gt_s\n",
+        // todo why is this an issue?
+        // "i32.eq\n", "i32.ne\n",
+        "i64.lt_s\n", "i64.ge_s\n",
+        "i64.le_s\n", "i64.gt_s\n",
+        "i64.eq\n", "i64.ne\n",
+        // nez doesn't exist :/
+        // "i32.eqz\n", "i32.nez\n",
+        // "i64.eqz\n", "i64.nez\n",
+    )
+
+    private fun normalizeGraph(nodes: List<Node>, labelToNode: Map<Label, Node>) {
+        var changed = false
+        // printState(nodes, labelToNode, ::println)
+        for (node in nodes) {
+            if (node.isBranch) {
+                val ifTrue = labelToNode[node.ifTrue]!!
+                val ifFalse = node.ifFalse!!
+                if (ifTrue.index > ifFalse.index) {
+                    swapBranches(node, ifTrue, ifFalse)
+                    changed = true
+                }
+            }
+        }
+        // if (changed) printState(nodes, labelToNode, ::println)
+    }
+
+    fun swapBranches(node: Node, ifTrue: Node, ifFalse: Node) {
+        val printer = node.printer
+        // swap branches :)
+        node.ifTrue = ifFalse.label
+        node.ifFalse = ifTrue
+        // swap conditional
+        fun replace(a: String, b: String) {
+            printer.size -= a.length
+            printer.append(b)
+            printer.size--
+            printer.append(" ;; xxx\n")
+        }
+        for (i in equalPairs.indices step 2) {
+            val a = equalPairs[i]
+            val b = equalPairs[i + 1]
+            if (printer.endsWith(a)) {
+                replace(a, b)
+                return
+            } else if (printer.endsWith(b)) {
+                replace(b, a)
+                return
+            }
+        }
+        /* if (printer.endsWith("i32.eqz\n")) {
+             // already negated :)
+             printer.size -= "i32.eqz\n".length
+             printer.append(" ;; xxx\n")
+             return
+         }*/
+        // negation :)
+        printer.append("  i32.eqz ;; xxx\n")
+    }
+
     private fun graphId(sig: MethodSig, nodes: List<Node>, labelToNode: Map<Label, Node>): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
+        if(false) normalizeGraph(nodes, labelToNode)
         val builder = StringBuilder(nodes.size * 5)
         for (node in nodes) {
             builder.append(
@@ -997,7 +1101,7 @@ object StructuralAnalysis {
                 builder.append(b)
             }
         }
-        val maxLength = 50
+        val maxLength = 80
         if (builder.length > maxLength) {
             val hash = builder.toString().hashCode()
             val extra = builder.substring(0, maxLength - 8)
@@ -1061,7 +1165,7 @@ object StructuralAnalysis {
         // create graph id
         // to do store image of graph based on id
         val graphId = graphId(sig, nodes, labelToNode)
-        if (false) {
+        if (true) {
             val file = File(folder, graphId)
             if (!file.exists()) {
                 val builder = StringBuilder()
@@ -1203,7 +1307,7 @@ object StructuralAnalysis {
         vars: StackVariables
     ): ArrayList<Builder> {
         // find all nodes, that separate the graph
-        if (false) for (separator in nodes0) {
+        if (true) for (separator in nodes0) {
             if (separator !== nodes0.first() && !separator.isReturn) {
 
                 val reached = HashSet<Node>()
@@ -1262,7 +1366,6 @@ object StructuralAnalysis {
                 }
             }
         }
-
         return arrayListOf(createLargeSwitchStatement2(sig, nodes0, labelToNode, null, vars))
 
     }
