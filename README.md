@@ -58,3 +58,10 @@ public static boolean Character_isDigit(int code) {
 public static native boolean unsignedLessThan(int a, int b);
 ```
 
+## Used Libraries / Dependencies
+- [ObjectWeb ASM 5.2](https://asm.ow2.io/)
+- [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)
+
+The system was developed for a sun-based JVM.
+I have implemented stubs for a few methods like `sun.reflect.Reflection.getCallerClass()` and `sun.misc.VM.isSystemDomainLoader()`.
+Other JVMs might implement different backends for classes like java.nio.?Buffer, and might need stubs or implementations for them, too.
