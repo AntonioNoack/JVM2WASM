@@ -59,7 +59,7 @@ public static native boolean unsignedLessThan(int a, int b);
 ```
 
 ## Used Libraries / Dependencies
-- [ObjectWeb ASM 5.2](https://asm.ow2.io/)
+- [ObjectWeb ASM 9.3](https://asm.ow2.io/)
 - [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)
 
 The system was developed for a sun-based JVM.
