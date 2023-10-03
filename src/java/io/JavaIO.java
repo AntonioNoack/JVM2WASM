@@ -48,19 +48,19 @@ public class JavaIO {
         files.put("/user/virtual", new FileInfo(true));
     }
 
-    @Alias(name = "me_anno_io_files_FileFileRef_writeText_Ljava_lang_StringV")
+    @Alias(names = "me_anno_io_files_FileFileRef_writeText_Ljava_lang_StringV")
     public static void me_anno_io_files_FileFileRef_writeText_Ljava_lang_StringV(FileFileRef ref, String content) {
         me_anno_io_files_FileReference_writeText_Ljava_lang_StringV(ref, content);
     }
 
-    @Alias(name = "me_anno_io_files_FileReference_writeText_Ljava_lang_StringV")
+    @Alias(names = "me_anno_io_files_FileReference_writeText_Ljava_lang_StringV")
     public static void me_anno_io_files_FileReference_writeText_Ljava_lang_StringV(FileReference ref, String content) {
         FileInfo fi = new FileInfo(false);
         fi.content2 = content;
         files.put(ref.getAbsolutePath(), fi);
     }
 
-    @Alias(name = "java_io_DefaultFileSystem_getFileSystem_Ljava_io_FileSystem")
+    @Alias(names = "java_io_DefaultFileSystem_getFileSystem_Ljava_io_FileSystem")
     public static FileSystem DefaultFileSystem_getFileSystem() {
         if (fs == null) fs = new FileSystem() {
 
@@ -209,7 +209,7 @@ public class JavaIO {
         return fs;
     }
 
-    @Alias(name = "java_security_AccessController_doPrivileged_Ljava_security_PrivilegedActionLjava_lang_Object")
+    @Alias(names = "java_security_AccessController_doPrivileged_Ljava_security_PrivilegedActionLjava_lang_Object")
     public static <T> T AccessController_doPrivileged(PrivilegedAction<T> action) {
         return action.run();
     }

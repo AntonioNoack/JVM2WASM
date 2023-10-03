@@ -50,7 +50,7 @@ public class TextGen {
         return lineCount;
     }
 
-    @Alias(name = "me_anno_fonts_FontManager_getSize_Lme_anno_fonts_keys_TextCacheKeyI")
+    @Alias(names = "me_anno_fonts_FontManager_getSize_Lme_anno_fonts_keys_TextCacheKeyI")
     public static int me_anno_fonts_FontManager_getSize_Lme_anno_fonts_keys_TextCacheKeyI(TextCacheKey key) {
         // calculate actual size
         // https://www.w3schools.com/tags/canvas_measuretext.asp
@@ -93,7 +93,7 @@ public class TextGen {
             "return w;")
     private static native int genTexTexture(String font, float fontSize, String text, int wl, int h);
 
-    @Alias(name = "me_anno_fonts_FontManagerXgetTextureX1_invoke_Lme_anno_fonts_keys_TextCacheKeyLme_anno_cache_ICacheData")
+    @Alias(names = "me_anno_fonts_FontManagerXgetTextureX1_invoke_Lme_anno_fonts_keys_TextCacheKeyLme_anno_cache_ICacheData")
     public static ICacheData FontManagerXgetTextureX1_invoke_Lme_anno_fonts_keys_TextCacheKeyLme_anno_cache_ICacheData(Object lambda, TextCacheKey key) {
 
         // todo should return the same size as the texture will be...
@@ -125,13 +125,13 @@ public class TextGen {
         return tex;
     }
 
-    @Alias(name = "me_anno_fonts_WebFonts_getFontMetrics_Ljava_awt_FontLjava_awt_FontMetrics")
+    @Alias(names = "me_anno_fonts_WebFonts_getFontMetrics_Ljava_awt_FontLjava_awt_FontMetrics")
     public static FontMetrics WebFonts_getFontMetrics(Font font) {
         return new FontMetrics(font) {
         };
     }
 
-    @Alias(name = "me_anno_fonts_mesh_AlignmentGroup_getOffset_Ljava_awt_font_FontRenderContextIID")
+    @Alias(names = "me_anno_fonts_mesh_AlignmentGroup_getOffset_Ljava_awt_font_FontRenderContextIID")
     public static double AlignmentGroup_getOffset(AlignmentGroup group, FontRenderContext ctx, int charA, int charB) {
         // todo implement properly
         return group.getFont().getSize();
@@ -152,7 +152,7 @@ public class TextGen {
             String font, float fontSize, int text0, int width, int height, int depth,
             int textColor, int backgroundColor, float y0);
 
-    @Alias(name = "me_anno_fonts_AWTFont_generateASCIITexture_ZIIILme_anno_gpu_texture_Texture2DArray")
+    @Alias(names = "me_anno_fonts_AWTFont_generateASCIITexture_ZIIILme_anno_gpu_texture_Texture2DArray")
     public static Texture2DArray generateASCIITexture(AWTFont self, boolean portableImages, int textColor, int backgroundColor, int extraPadding) {
         final int widthLimit = GFX.maxTextureSize;
         final int heightLimit = GFX.maxTextureSize;

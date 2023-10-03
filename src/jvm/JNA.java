@@ -18,7 +18,7 @@ public class JNA {
         }
     };
 
-    @Alias(name = "com_sun_jna_platform_FileUtils_getInstance_Lcom_sun_jna_platform_FileUtils")
+    @Alias(names = "com_sun_jna_platform_FileUtils_getInstance_Lcom_sun_jna_platform_FileUtils")
     public static FileUtils com_sun_jna_platform_FileUtils_getInstance_Lcom_sun_jna_platform_FileUtils() {
         return fu;
     }

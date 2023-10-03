@@ -8,7 +8,7 @@ import static jvm.JVM32.unsignedLessThan;
 
 public class StringsUTF16 {
 
-    @Alias(name = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
     public static String String_toLowerCase(String s, Locale lx) {
         if (s == null) return null;
         char[] lc = null;
@@ -30,7 +30,7 @@ public class StringsUTF16 {
         return new String(lc);
     }
 
-    @Alias(name = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
     public static String String_toUpperCase(String s, Locale lx) {
         if (s == null) return null;
         char[] lc = null;

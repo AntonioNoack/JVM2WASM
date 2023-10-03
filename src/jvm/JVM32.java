@@ -32,7 +32,7 @@ public class JVM32 {
     public static native int inheritanceTable();
 
     @NoThrow
-    @Alias(name = "oo")
+    @Alias(names = "oo")
     public static int getObjectOverhead() {
         return objectOverhead;
     }
@@ -42,18 +42,18 @@ public class JVM32 {
     public static native int staticInstancesOffset();
 
     @NoThrow
-    @Alias(name = "findClass")
+    @Alias(names = "findClass")
     public static int findClass(int idx) {
         return findClass2(idx);
     }
 
     @NoThrow
-    @Alias(name = "findClass2")
+    @Alias(names = "findClass2")
     @WASM(code = "global.get $YS i32.mul global.get $Y i32.add")
     public static native int findClass2(int idx);
 
     @NoThrow
-    @Alias(name = "findStatic")
+    @Alias(names = "findStatic")
     public static int findStatic(int clazz, int offset) {
         // log("finding static", clazz, offset);
         return read32(staticInstancesOffset() + (clazz << 2)) + offset;
@@ -131,7 +131,7 @@ public class JVM32 {
     @JavaScript(code = "console.log(str(arg0), str(arg1));")
     public static native void log(String msg, String param);
 
-    @Alias(name = "cc")
+    @Alias(names = "cc")
     public static int checkCast(int instance, int clazz) {
         if (instance == 0) return 0;
         if (!instanceOf(instance, clazz)) {
@@ -144,7 +144,7 @@ public class JVM32 {
     }
 
     // can be removed in the future, just good for debugging
-    @Alias(name = "debug")
+    @Alias(names = "debug")
     public static void debug(Object instance, boolean staticToo) throws IllegalAccessException {
         if (instance == null) {
             log("null");
@@ -211,7 +211,7 @@ public class JVM32 {
     @WASM(code = "global.get $X")
     public static native int numClasses();
 
-    @Alias(name = "resolveIndirect")
+    @Alias(names = "resolveIndirect")
     public static int resolveIndirect(int instance, int methodPtr) {
         if (instance == 0) {
             log("instance for call is null", methodPtr);
@@ -306,7 +306,7 @@ public class JVM32 {
     public static native void throwJs(int s);
 
     @NoThrow
-    @Alias(name = "panic")
+    @Alias(names = "panic")
     private static void panic(Object throwable) {
         if (throwable != null) {
             throwJs(getAddr(throwable));
@@ -364,7 +364,7 @@ public class JVM32 {
         return -1;
     }
 
-    @Alias(name = "resolveInterface")
+    @Alias(names = "resolveInterface")
     public static int resolveInterface(int instance, int methodId) {
         if (instance == 0) {
             log("resolveInterface:", instance, methodId);
@@ -382,7 +382,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @Alias(name = "io")
+    @Alias(names = "io")
     public static boolean instanceOf(int instance, int clazz) {
         // log("io", instance, clazz);
         if (instance == 0) return false;
@@ -404,7 +404,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @Alias(name = "instanceOfByClass")
+    @Alias(names = "instanceOfByClass")
     public static boolean instanceOfByClass(int instanceClass, int clazz) {
         if (instanceClass == clazz) return true;
         // find super classes in table
@@ -436,7 +436,7 @@ public class JVM32 {
         return read32(tableAddress);
     }
 
-    @Alias(name = "gis")
+    @Alias(names = "gis")
     public static int getInstanceSize(int clazz) {
         // look up class table for size
         if (clazz == 0 || (clazz >= 17 && clazz < 25)) return arrayOverhead;
@@ -444,7 +444,7 @@ public class JVM32 {
         return read32(tableAddress + 4);
     }
 
-    @Alias(name = "cr")
+    @Alias(names = "cr")
     public static int create(int clazz) {
         // log("creating", clazz);
         if (ge_ub(clazz, numClasses())) {
@@ -478,7 +478,7 @@ public class JVM32 {
     @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
     private static native void trackCalloc(int clazz);
 
-    @Alias(name = "ca")
+    @Alias(names = "ca")
     public static int createArray(int length) {
         // probably a bit illegal; should be fine for us, saving allocations :)
         if (length == 0) {
@@ -520,7 +520,7 @@ public class JVM32 {
     @WASM(code = "") // automatically done
     public static native int b2i(boolean flag);
 
-    @Alias(name = "cna")
+    @Alias(names = "cna")
     public static int createNativeArray(int length, int clazz) {
         // log("creating native array", length, clazz);
         if (length < 0) throw new IllegalArgumentException();
@@ -544,7 +544,7 @@ public class JVM32 {
         return newInstance;
     }
 
-    @Alias(name = "cma2")
+    @Alias(names = "cma2")
     public static int createMultiArray(int l0, int l1, int clazz) {
         if (l0 == 0) return 0;
         int array = createNativeArray(l0, 1);
@@ -554,7 +554,7 @@ public class JVM32 {
         return array;
     }
 
-    @Alias(name = "cma3")
+    @Alias(names = "cma3")
     public static int createMultiArray(int l0, int l1, int l2, int clazz) {
         if (l0 == 0) return 0;
         int array = createNativeArray(l0, 1);
@@ -564,7 +564,7 @@ public class JVM32 {
         return array;
     }
 
-    @Alias(name = "cma4")
+    @Alias(names = "cma4")
     public static int createMultiArray(int l0, int l1, int l2, int l3, int clazz) {
         if (l0 == 0) return 0;
         int array = createNativeArray(l0, 1);
@@ -574,7 +574,7 @@ public class JVM32 {
         return array;
     }
 
-    @Alias(name = "cma5")
+    @Alias(names = "cma5")
     public static int createMultiArray(int l0, int l1, int l2, int l3, int l4, int clazz) {
         if (l0 == 0) return 0;
         int array = createNativeArray(l0, 1);
@@ -584,7 +584,7 @@ public class JVM32 {
         return array;
     }
 
-    @Alias(name = "cma6")
+    @Alias(names = "cma6")
     public static int createMultiArray(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
         if (l0 == 0) return 0;
         int array = createNativeArray(l0, 1);
@@ -603,13 +603,13 @@ public class JVM32 {
     public static native int getNextPtr();
 
     @NoThrow
-    @Alias(name = "qa")
+    @Alias(names = "qa")
     public static int queryAllocated() {
         return getNextPtr();
     }
 
     @NoThrow
-    @Alias(name = "qg")
+    @Alias(names = "qg")
     public static int queryGCed() {
         int sum = 0;
         int[] data = largestGaps;
@@ -687,7 +687,7 @@ public class JVM32 {
         return ptr;
     }
 
-    @Alias(name = "_c")
+    @Alias(names = "_c")
     public static int calloc(int size) {
 
         // log("calloc", size);
@@ -858,13 +858,13 @@ public class JVM32 {
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(int a, int b);
 
-    @Alias(name = "al")
+    @Alias(names = "al")
     public static int arrayLength(int instance) {
         if (instance == 0) throw new NullPointerException("[].length");
         return read32(instance + objectOverhead);
     }
 
-    @Alias(name = "isOOB")
+    @Alias(names = "isOOB")
     public static void checkOutOfBounds(int instance, int index) {
         if (instance == 0) throw new NullPointerException("isOOB");
         // checkAddress(instance);
@@ -874,7 +874,7 @@ public class JVM32 {
         }
     }
 
-    @Alias(name = "isOOB2")
+    @Alias(names = "isOOB2")
     public static void checkOutOfBounds(int instance, int index, int clazz) {
         if (instance == 0) throw new NullPointerException("isOOB2");
         // checkAddress(instance);
@@ -886,7 +886,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @Alias(name = "f2i")
+    @Alias(names = "f2i")
     public static int f2i(float v) {
         if (v < -2147483648f) return Integer.MIN_VALUE;
         if (v > 2147483647f) return Integer.MAX_VALUE;
@@ -899,7 +899,7 @@ public class JVM32 {
     public static native int _f2i(float v);
 
     @NoThrow
-    @Alias(name = "f2l")
+    @Alias(names = "f2l")
     public static long f2l(float v) {
         if (v < -9223372036854775808f) return Long.MIN_VALUE;
         if (v > 9223372036854775807f) return Long.MAX_VALUE;
@@ -912,7 +912,7 @@ public class JVM32 {
     public static native long _f2l(float v);
 
     @NoThrow
-    @Alias(name = "d2i")
+    @Alias(names = "d2i")
     public static int d2i(double v) {
         if (v < -2147483648.0) return Integer.MIN_VALUE;
         if (v > 2147483647.0) return Integer.MAX_VALUE;
@@ -925,7 +925,7 @@ public class JVM32 {
     public static native int _d2i(double v);
 
     @NoThrow
-    @Alias(name = "d2l")
+    @Alias(names = "d2l")
     public static long d2l(double v) {
         if (v < -9223372036854775808.0) return Long.MIN_VALUE;
         if (v > 9223372036854775807.0) return Long.MAX_VALUE;
@@ -937,13 +937,13 @@ public class JVM32 {
     @WASM(code = "i64.trunc_f64_s")
     public static native long _d2l(double v);
 
-    @Alias(name = "i64ArrayStore")
+    @Alias(names = "i64ArrayStore")
     public static void arrayStore(int instance, int index, long value) {
         checkOutOfBounds(instance, index, 8);
         write64(instance + arrayOverhead + (index << 3), value);
     }
 
-    @Alias(name = "i32ArrayStore")
+    @Alias(names = "i32ArrayStore")
     public static void arrayStore(int instance, int index, int value) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);
@@ -951,19 +951,19 @@ public class JVM32 {
         write32(instance + arrayOverhead + (index << 2), value);
     }
 
-    @Alias(name = "f64ArrayStore")
+    @Alias(names = "f64ArrayStore")
     public static void arrayStore(int instance, int index, double value) {
         checkOutOfBounds(instance, index, 9);
         write64(instance + arrayOverhead + (index << 3), value);
     }
 
-    @Alias(name = "f32ArrayStore")
+    @Alias(names = "f32ArrayStore")
     public static void arrayStore(int instance, int index, float value) {
         checkOutOfBounds(instance, index, 3);
         write32(instance + arrayOverhead + (index << 2), value);
     }
 
-    @Alias(name = "i16ArrayStore")
+    @Alias(names = "i16ArrayStore")
     public static void arrayStore(int instance, int index, short value) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);
@@ -971,7 +971,7 @@ public class JVM32 {
         write16(instance + arrayOverhead + (index << 1), value);
     }
 
-    @Alias(name = "i8ArrayStore")
+    @Alias(names = "i8ArrayStore")
     public static void arrayStore(int instance, int index, byte value) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);
@@ -979,13 +979,13 @@ public class JVM32 {
         write8(instance + arrayOverhead + index, value);
     }
 
-    @Alias(name = "i64ArrayLoad")
+    @Alias(names = "i64ArrayLoad")
     public static long arrayLoad64(int instance, int index) {
         checkOutOfBounds(instance, index, 8);
         return read64(instance + arrayOverhead + (index << 3));
     }
 
-    @Alias(name = "i32ArrayLoad")
+    @Alias(names = "i32ArrayLoad")
     public static int arrayLoad32(int instance, int index) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);
@@ -993,31 +993,31 @@ public class JVM32 {
         return read32(instance + arrayOverhead + (index << 2));
     }
 
-    @Alias(name = "f64ArrayLoad")
+    @Alias(names = "f64ArrayLoad")
     public static double arrayLoad64f(int instance, int index) {
         checkOutOfBounds(instance, index, 9);
         return read64f(instance + arrayOverhead + (index << 3));
     }
 
-    @Alias(name = "f32ArrayLoad")
+    @Alias(names = "f32ArrayLoad")
     public static float arrayLoad32f(int instance, int index) {
         checkOutOfBounds(instance, index, 3);
         return read32f(instance + arrayOverhead + (index << 2));
     }
 
-    @Alias(name = "u16ArrayLoad")
+    @Alias(names = "u16ArrayLoad")
     public static char arrayLoad16u(int instance, int index) {
         checkOutOfBounds(instance, index, 6);
         return read16u(instance + arrayOverhead + (index << 1));
     }
 
-    @Alias(name = "s16ArrayLoad")
+    @Alias(names = "s16ArrayLoad")
     public static short arrayLoad16s(int instance, int index) {
         checkOutOfBounds(instance, index, 7);
         return read16s(instance + arrayOverhead + (index << 1));
     }
 
-    @Alias(name = "i8ArrayLoad")
+    @Alias(names = "i8ArrayLoad")
     public static byte arrayLoad8(int instance, int index) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);
@@ -1101,34 +1101,34 @@ public class JVM32 {
     @WASM(code = "i64.div_s")
     public static native long div(long a, long b);
 
-    @Alias(name = "safeDiv32")
+    @Alias(names = "safeDiv32")
     public static int safeDiv32(int a, int b) {
         if (b == 0) throw new ArithmeticException();
         if ((a == Integer.MIN_VALUE) & (b == -1)) return Integer.MIN_VALUE;
         return div(a, b);
     }
 
-    @Alias(name = "safeDiv64")
+    @Alias(names = "safeDiv64")
     public static long safeDiv64(long a, long b) {
         if (b == 0) throw new ArithmeticException();
         if ((a == Long.MIN_VALUE) & (b == -1)) return Long.MIN_VALUE;
         return div(a, b);
     }
 
-    @Alias(name = "checkNonZero32")
+    @Alias(names = "checkNonZero32")
     public static int checkNonZero32(int b) {
         if (b == 0) throw new ArithmeticException();
         return b;
     }
 
-    @Alias(name = "checkNonZero64")
+    @Alias(names = "checkNonZero64")
     public static long checkNonZero64(long b) {
         if (b == 0) throw new ArithmeticException();
         return b;
     }
 
     @NoThrow
-    @Alias(name = "stackPush")
+    @Alias(names = "stackPush")
     public static void pushCall(int idx) {
         int stackPointer = getStackPtr() - 4;
         // else stack overflow
@@ -1160,23 +1160,23 @@ public class JVM32 {
     public static native void setStackPtr(int addr);
 
     @NoThrow
-    @Alias(name = "stackPop")
+    @Alias(names = "stackPop")
     public static void popCall() {
         popCall0();
     }
 
     @NoThrow
-    @Alias(name = "stackPop0")
+    @Alias(names = "stackPop0")
     @WASM(code = "global.get $Q i32.const 4 i32.add global.set $Q")
     public static native void popCall0();
 
     @NoThrow
-    @Alias(name = "createNullptr")
+    @Alias(names = "createNullptr")
     public static Throwable createNullptr(String name) {
         return new NullPointerException(name);
     }
 
-    @Alias(name = "checkNotNull")
+    @Alias(names = "checkNotNull")
     public static void checkNotNull(Object obj, String clazzName, String fieldName) {
         if (obj == null) {
             log("NullPointer@class.field:", clazzName, fieldName);
@@ -1185,13 +1185,13 @@ public class JVM32 {
     }
 
     @NoThrow
-    @Alias(name = "cip")
+    @Alias(names = "cip")
     public static <V> int getClassIndexPtr(int classIndex) {// pseudo instance, avoiding allocations
         return findClass(classIndex) + objectOverhead + 12;
     }
 
     @SuppressWarnings("CommentedOutCode")
-    @Alias(name = "init")
+    @Alias(names = "init")
     public static void init() {
         // access static, so it is initialized
         getAddr(System.out);
@@ -1208,7 +1208,7 @@ public class JVM32 {
         SharedSecrets.setJavaLangAccess(new JavaLangAccessImpl());
     }
 
-    @Alias(name = "throwAME")
+    @Alias(names = "throwAME")
     public static void throwAbstractMethodError() {
         throw new AbstractMethodError();
     }

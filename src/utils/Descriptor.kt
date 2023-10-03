@@ -4,6 +4,7 @@ import hIndex
 import me.anno.utils.strings.StringHelper.indexOf2
 import me.anno.utils.types.Booleans.toInt
 import reb
+import java.lang.IllegalStateException
 
 val f32 = "f32"
 val f64 = "f64"
@@ -34,6 +35,7 @@ fun single(d: String, generics: Boolean = false): String {
             val n = d.substring(i - pad, j + pad)
             if (generics) n else reb(n)
         }
+
         else -> throw IllegalArgumentException(d)
     }
 }
@@ -60,6 +62,7 @@ fun split1(d: String, generics: Boolean = false): List<String> {
                     i = j + 1
                     str
                 }
+
                 '[' -> "[${readType()}"
                 else -> throw IllegalArgumentException(d)
             }
@@ -104,6 +107,7 @@ fun genericsTypies(d: String, static: Boolean = true): String {
                     i = d.indexOf(';', i + 1) + 1
                     '?'
                 }
+
                 'V' -> 'V'
                 else -> throw IllegalArgumentException(d)
             }
@@ -128,10 +132,12 @@ fun splitToType(d: String, canThrow: Boolean): String {
                     i = d.indexOf(';', i + 1) + 1
                     if (is32Bits) '0' else '1'
                 }
+
                 '[' -> {
                     readType()
                     if (is32Bits) '0' else '1'
                 }
+
                 '(' -> 'f'
                 ')' -> 'R'
                 'V' -> 'V'
@@ -189,19 +195,20 @@ fun String.escapeChars() = this
 fun methodName(sig: MethodSig): String {
     // check if alias exists
     val alias = hIndex.annotations[sig]?.firstOrNull { it.clazz == "annotations/Alias" }
-    val v = if (alias != null) alias.properties["name"] as String else null
-    return if (v != null) {
-        val idx = v.indexOf('|', 1)
-        if (idx > 0) v.substring(if (v[0] == '|') 1 else 0, idx) else v
-    } else methodName2(sig.clazz, sig.name, sig.descriptor)
+    val v = if (alias != null) {
+        @Suppress("UNCHECKED_CAST")
+        alias.properties["names"] as List<String>
+    } else null
+    return if (!v.isNullOrEmpty()) v[0]
+    else methodName2(sig.clazz, sig.name, sig.descriptor)
 }
 
 fun methodNames(sig: MethodSig): List<String> {
     // check if alias exists
     val alias = hIndex.annotations[sig]?.firstOrNull { it.clazz == "annotations/Alias" }
     return if (alias != null) {
-        val names = alias.properties["name"]!! as String
-        names.split('|')
+        @Suppress("UNCHECKED_CAST")
+        (alias.properties["names"] as List<String>).toList()
     } else listOf(methodName2(sig.clazz, sig.name, sig.descriptor))
 }
 

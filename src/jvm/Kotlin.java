@@ -4,7 +4,6 @@ import annotations.Alias;
 import annotations.NoThrow;
 import annotations.WASM;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
-import kotlin.ranges.IntRange;
 import kotlin.reflect.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -178,25 +177,25 @@ public class Kotlin {
 	}
 
 	@NoThrow
-	@Alias(name = "kotlin_jvm_internal_Reflection_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
+	@Alias(names = "kotlin_jvm_internal_Reflection_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
 	public static <V> KClass<Object> Reflection_getOrCreateKotlinClass(Class<V> clazz) {
 		if (clazz == null) return null;
 		return classes[getClassIndex(clazz)];
 	}
 
-	@Alias(name = "kotlin_jvm_internal_ReflectionFactory_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
+	@Alias(names = "kotlin_jvm_internal_ReflectionFactory_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
 	public static <V> KClass<Object> ReflectionFactory_getOrCreateKotlinClass(Class<V> clazz) {
 		if (clazz == null) return null;
 		return classes[getClassIndex(clazz)];
 	}
 
 	@NoThrow
-	@Alias(name = "kotlin_UnsignedKt_uintToDouble_ID")
+	@Alias(names = "kotlin_UnsignedKt_uintToDouble_ID")
 	@WASM(code = "f64.convert_i32_u")
 	public static native double kotlin_UnsignedKt_uintToDouble_ID(int v);
 
 	@NoThrow
-	@Alias(name = "kotlin_UnsignedKt_ulongToDouble_JD")
+	@Alias(names = "kotlin_UnsignedKt_ulongToDouble_JD")
 	@WASM(code = "f64.convert_i64_u")
 	public static native double kotlin_UnsignedKt_ulongToDouble_JD(long v);
 
@@ -217,17 +216,17 @@ public class Kotlin {
 	}
 
 	@NoThrow
-	@Alias(name = "kotlin_ExceptionsKt__ExceptionsKt_addSuppressed_Ljava_lang_ThrowableLjava_lang_ThrowableV")
+	@Alias(names = "kotlin_ExceptionsKt__ExceptionsKt_addSuppressed_Ljava_lang_ThrowableLjava_lang_ThrowableV")
 	public static void kotlin_ExceptionsKt__ExceptionsKt_addSuppressed_Ljava_lang_ThrowableLjava_lang_ThrowableV(Throwable a, Throwable b) {
 		// whatever this is...
 	}
 
 	@NoThrow
-	@Alias(name = "kotlin_jvm_internal_Intrinsics_checkNotNullParameter_Ljava_lang_ObjectLjava_lang_StringV")
+	@Alias(names = "kotlin_jvm_internal_Intrinsics_checkNotNullParameter_Ljava_lang_ObjectLjava_lang_StringV")
 	@WASM(code = "drop drop")
 	public static native void kotlin_jvm_internal_Intrinsics_checkNotNullParameter_Ljava_lang_ObjectLjava_lang_StringV(Object o, String s);
 
-	@Alias(name = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toFloatOrNull_Ljava_lang_StringLjava_lang_Float")
+	@Alias(names = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toFloatOrNull_Ljava_lang_StringLjava_lang_Float")
 	public static Float toFloatOrNull(String s) {
 		try {
 			return Float.parseFloat(s);
@@ -236,7 +235,7 @@ public class Kotlin {
 		}
 	}
 
-	@Alias(name = "kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List")
+	@Alias(names = "kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List")
 	public static List<KClass<Object>> KClasses_getSuperclasses(KClass<Object> clazz) {
 		Class clazz1 = ((ClassBasedDeclarationContainer) clazz).getJClass();
 		Class superClass = clazz1.getSuperclass();
@@ -244,19 +243,19 @@ public class Kotlin {
 		else return Collections.singletonList(Reflection_getOrCreateKotlinClass(superClass));
 	}
 
-	@Alias(name = "kotlin_reflect_full_KClasses_getDeclaredMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection")
+	@Alias(names = "kotlin_reflect_full_KClasses_getDeclaredMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection")
 	public static <V> Collection<V> kotlin_reflect_full_KClasses_getDeclaredMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(KClass<V> clazz) {
 		// Class c = ((KClassImpl) clazz).getJClass();
 		return Collections.emptyList();
 	}
 
-	@Alias(name = "kotlin_text_StringsKt__StringBuilderJVMKt_clear_Ljava_lang_StringBuilderLjava_lang_StringBuilder")
+	@Alias(names = "kotlin_text_StringsKt__StringBuilderJVMKt_clear_Ljava_lang_StringBuilderLjava_lang_StringBuilder")
 	public static StringBuilder clear(StringBuilder self) {
 		self.setLength(0);
 		return self;
 	}
 
-	@Alias(name = "kotlin_enums_EnumEntriesKt_enumEntries_ALjava_lang_EnumLkotlin_enums_EnumEntries")
+	@Alias(names = "kotlin_enums_EnumEntriesKt_enumEntries_ALjava_lang_EnumLkotlin_enums_EnumEntries")
 	public static Object enumEntries(Enum[] values) {
 		return values;
 	}

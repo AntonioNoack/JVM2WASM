@@ -19,7 +19,7 @@ public class JavaNIO {
 
     private static Charset cs;
 
-    @Alias(name = "java_nio_charset_Charset_defaultCharset_Ljava_nio_charset_Charset")
+    @Alias(names = "java_nio_charset_Charset_defaultCharset_Ljava_nio_charset_Charset")
     public static Charset Charset_defaultCharset() {
         if (cs == null) forName(null);
         return cs;
@@ -27,46 +27,46 @@ public class JavaNIO {
 
     private static FileSystemProvider provider = null;
 
-    @Alias(name = "java_nio_file_FileSystemsXDefaultFileSystemHolder_getDefaultProvider_Ljava_nio_file_spi_FileSystemProvider")
+    @Alias(names = "java_nio_file_FileSystemsXDefaultFileSystemHolder_getDefaultProvider_Ljava_nio_file_spi_FileSystemProvider")
     public static FileSystemProvider FileSystemsXDefaultFileSystemHolder_getDefaultProvider() {
         if (provider == null) provider = new NioFileSystemProvider();
         return provider;
     }
 
-    @Alias(name = "java_nio_ByteOrder_nativeOrder_Ljava_nio_ByteOrder")
+    @Alias(names = "java_nio_ByteOrder_nativeOrder_Ljava_nio_ByteOrder")
     public static ByteOrder ByteOrder_nativeOrder() {
         return ByteOrder.LITTLE_ENDIAN;
     }
 
-    @Alias(name = "java_nio_Bits_byteOrder_Ljava_nio_ByteOrder")
+    @Alias(names = "java_nio_Bits_byteOrder_Ljava_nio_ByteOrder")
     public static ByteOrder Bits_byteOrder() {
         return ByteOrder_nativeOrder();
     }
 
-    @Alias(name = "java_nio_ByteBuffer_allocateDirect_ILjava_nio_ByteBuffer")
+    @Alias(names = "java_nio_ByteBuffer_allocateDirect_ILjava_nio_ByteBuffer")
     public static ByteBuffer ByteBuffer_allocateDirect(int size) {
         return ByteBuffer.allocate(size);
     }
 
     @NoThrow
-    @Alias(name = "java_nio_charset_Charset_atBugLevel_Ljava_lang_StringZ")
+    @Alias(names = "java_nio_charset_Charset_atBugLevel_Ljava_lang_StringZ")
     public static boolean Charset_atBugLevel(String version) {
         return false;
     }
 
     @NoThrow
-    @Alias(name = "java_io_File_toPath_Ljava_nio_file_Path")
+    @Alias(names = "java_io_File_toPath_Ljava_nio_file_Path")
     public static Object java_io_File_toPath_Ljava_nio_file_Path(Object file) {
         return file;
     }
 
     @NoThrow
-    @Alias(name = "java_nio_FloatBuffer_equals_FFZ")
+    @Alias(names = "java_nio_FloatBuffer_equals_FFZ")
     public static boolean java_nio_FloatBuffer_equals_FFZ(float a, float b) {
         return Float_floatToRawIntBits_FI(a) == Float_floatToRawIntBits_FI(b);
     }
 
-    @Alias(name = "java_nio_charset_Charset_forName_Ljava_lang_StringLjava_nio_charset_Charset")
+    @Alias(names = "java_nio_charset_Charset_forName_Ljava_lang_StringLjava_nio_charset_Charset")
     public static Charset forName(String name) {
         // todo implement this properly
         if (cs == null) cs = new Charset("UTF-8", null) {

@@ -267,6 +267,16 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             override fun visit(name: String, value: Any?) {
                 properties[name] = value
             }
+
+            override fun visitArray(name: String): AnnotationVisitor {
+                val values = ArrayList<Any?>()
+                properties[name] = values
+                return object : AnnotationVisitor(api) {
+                    override fun visit(name: String?, value: Any?) {
+                        values.add(value)
+                    }
+                }
+            }
         }
     }
 
@@ -300,15 +310,18 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
                     fieldsR.add(sig)
                     // methods.add(MethodSig.c(owner, "<clinit>", "()V"))
                 }
+
                 0xb3 -> {
                     // put static
                     fieldsW.add(sig)
                     // methods.add(MethodSig.c(owner, "<clinit>", "()V"))
                 }
+
                 0xb4 -> {
                     // get field
                     fieldsR.add(sig)
                 }
+
                 0xb5 -> {
                     // put field
                     fieldsW.add(sig)

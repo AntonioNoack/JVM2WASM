@@ -9,6 +9,7 @@ import jvm.GC;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
+import me.anno.engine.ui.render.SceneView;
 import me.anno.gpu.GFX;
 import me.anno.gpu.GFXBase;
 import me.anno.gpu.OSWindow;
@@ -21,8 +22,8 @@ import me.anno.input.Key;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
+import me.anno.mesh.Shapes;
 import me.anno.studio.StudioBase;
-import me.anno.tests.game.Snake;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
 import me.anno.utils.Clock;
@@ -64,10 +65,11 @@ public class Engine {
 		StudioBase instance;
 		//instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
 		Panel panel;
-		panel = new Snake();
+		// panel = new Snake();
 		// panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
 		// panel = new AnimTextPanelTest(false);
 		// panel = CellMod.createGame();
+		panel = SceneView.Companion.testScene(Shapes.INSTANCE.getFlatCube().getFront(), null);
 		panel.setWeight(1f);
 		instance = new SimpleStudio(panel);
 		instance.run(false);
@@ -157,7 +159,7 @@ public class Engine {
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFX_check_V")
+	@Alias(names = "me_anno_gpu_GFX_check_V")
 	@WASM(code = "")
 	public static native void me_anno_gpu_GFX_check_V();
 
@@ -178,7 +180,7 @@ public class Engine {
 		return baseURL;
 	}
 
-	@Alias(name = "me_anno_io_files_FileReferenceXCompanion_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
+	@Alias(names = "me_anno_io_files_FileReferenceXCompanion_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
 	public static FileReference FileReferenceXCompanion_createReference(Object self, String str) {
 		if (str.isEmpty()) return InvalidRef.INSTANCE;
 		String str2 = str.indexOf('\\') >= 0 ? str.replace('\\', '/') : str;
@@ -191,13 +193,13 @@ public class Engine {
 		return new VirtualFileRef(str);
 	}
 
-	@Alias(name = "me_anno_io_files_FileReferenceXCompanion_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
+	@Alias(names = "me_anno_io_files_FileReferenceXCompanion_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
 	public static FileReference FileReferenceXCompanion_getReference(Object self, String str) {
 		return FileReferenceXCompanion_createReference(self, str);
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFXBase_setIcon_JV")
+	@Alias(names = "me_anno_gpu_GFXBase_setIcon_JV")
 	public static void me_anno_gpu_GFXBase_setIcon_JV(long window) {
 	}
 
@@ -229,13 +231,13 @@ public class Engine {
 			"")
 	private static native void generateTexture(String path, Texture2D texture, kotlin.jvm.functions.Function1 callback);
 
-	@Alias(name = "prepareTexture")
+	@Alias(names = "prepareTexture")
 	public static void prepareTexture(Texture2D texture) {
 		texture.ensurePointer();
 		Texture2D.Companion.bindTexture(texture.getTarget(), texture.getPointer());
 	}
 
-	@Alias(name = "finishTexture")
+	@Alias(names = "finishTexture")
 	public static void finishTexture(Texture2D texture, int w, int h, kotlin.jvm.functions.Function1<Texture2D, Unit> callback) {
 		if (texture != null) {
 			texture.setWidth(w);
@@ -252,7 +254,7 @@ public class Engine {
 		if (callback != null) callback.invoke(texture);
 	}
 
-	@Alias(name = "me_anno_image_ImageGPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_Texture2D")
+	@Alias(names = "me_anno_image_ImageGPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_Texture2D")
 	public static Texture2D ImageGPUCache_get(Object self, FileReference file, long timeout, boolean async) {
 		if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
 		// log("asking for", file.getAbsolutePath());
@@ -277,13 +279,13 @@ public class Engine {
 		return (Texture2D) tex2;
 	}
 
-	@Alias(name = "me_anno_io_files_thumbs_Thumbs_generateSystemIcon_Lme_anno_io_files_FileReferenceLme_anno_io_files_FileReferenceILkotlin_jvm_functions_Function2V")
+	@Alias(names = "me_anno_io_files_thumbs_Thumbs_generateSystemIcon_Lme_anno_io_files_FileReferenceLme_anno_io_files_FileReferenceILkotlin_jvm_functions_Function2V")
 	public static void Thumbs_generateSystemIcon(FileReference src, FileReference dst, int size, Function2<ITexture2D, Exception, Unit> callback) {
 		// saves references to swing
 		callback.invoke(null, exc);
 	}
 
-	@Alias(name = "me_anno_utils_files_FileExplorerSelectWrapper_selectFileOrFolder_Ljava_io_FileZLkotlin_jvm_functions_Function1V")
+	@Alias(names = "me_anno_utils_files_FileExplorerSelectWrapper_selectFileOrFolder_Ljava_io_FileZLkotlin_jvm_functions_Function1V")
 	public static void FileExplorerSelectWrapper_selectFileOrFolder(File file, boolean folder, Function1<File, Unit> callback) {
 		// saves swing.JFileChooser
 		// todo select file by the user
@@ -308,90 +310,90 @@ public class Engine {
 	private static final RuntimeException exc = new RuntimeException("Thumbs.generateSystemIcon is not supported");
 
 	@NoThrow
-	@Alias(name = "me_anno_engine_ui_render_MovingGrid_drawTextMesh_DIV")
+	@Alias(names = "me_anno_engine_ui_render_MovingGrid_drawTextMesh_DIV")
 	public static void me_anno_engine_ui_render_MovingGrid_drawTextMesh_DIV(Object self, double baseSize, int factor) {
 		// todo support text meshes, and implement this :)
 	}
 
-	@Alias(name = "me_anno_audio_openal_AudioManager_checkIsDestroyed_V")
+	@Alias(names = "me_anno_audio_openal_AudioManager_checkIsDestroyed_V")
 	public static void me_anno_audio_openal_AudioManager_checkIsDestroyed_V() {
 		// cannot be destroyed, as far as I know :)
 	}
 
-	@Alias(name = "me_anno_gpu_OSWindow_addCallbacks_V")
+	@Alias(names = "me_anno_gpu_OSWindow_addCallbacks_V")
 	public static void me_anno_gpu_OSWindow_addCallbacks_V(OSWindow self) {
 		// not needed
 	}
 
-	@Alias(name = "me_anno_image_exr_EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image")
+	@Alias(names = "me_anno_image_exr_EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image")
 	public static Object me_anno_image_exr_EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
 		log("EXR is not supported!");
 		stream.close();
 		return null;
 	}
 
-	@Alias(name = "me_anno_image_exr_EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image")
+	@Alias(names = "me_anno_image_exr_EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image")
 	public static Object me_anno_image_exr_EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image(ByteBuffer buffer) {
 		log("EXR is not supported!");
 		return null;
 	}
 
 	// could be disabled, if it really is needed...
-	@Alias(name = "me_anno_image_gimp_GimpImageXCompanion_readAsFolder_Lme_anno_io_files_FileReferenceLkotlin_jvm_functions_Function2V")
+	@Alias(names = "me_anno_image_gimp_GimpImageXCompanion_readAsFolder_Lme_anno_io_files_FileReferenceLkotlin_jvm_functions_Function2V")
 	public static void GimpImageXCompanion_readAsFolder(FileReference src, Function2<GimpImage, Exception, Unit> callback) {
 		callback.invoke(null, new IOException("Gimp Image files are not supported in Web!"));
 	}
 
-	@Alias(name = "me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image")
+	@Alias(names = "me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image")
 	public static Object me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
 		stream.close();
 		throw new IOException("Gimp Image files are not supported in Web!");
 	}
 
-	@Alias(name = "me_anno_gpu_texture_Texture2D_create_Ljava_awt_image_BufferedImageZZV")
+	@Alias(names = "me_anno_gpu_texture_Texture2D_create_Ljava_awt_image_BufferedImageZZV")
 	private static void Texture2D_create_Ljava_awt_image_BufferedImageZZV(Texture2D self, Object img, boolean a, boolean b) {
 		throw new IllegalArgumentException("Cannot create texture from BufferedImage in Web");
 	}
 
 	// for removing a lot of dependencies, e.g., to InnerFolderCache -> SVHMesh -> Prefab
-	@Alias(name = "me_anno_io_files_FileReference_isSerializedFolder_Z")
+	@Alias(names = "me_anno_io_files_FileReference_isSerializedFolder_Z")
 	private static boolean FileReference_isSerializedFolder(FileReference self) {
 		return false;
 	}
 
 	// for removing a lot of dependencies, e.g., to InnerFolderCache -> SVHMesh -> Prefab
-	@Alias(name = "me_anno_io_zip_InnerFile_getChild_Ljava_lang_StringLme_anno_io_files_FileReference")
+	@Alias(names = "me_anno_io_zip_InnerFile_getChild_Ljava_lang_StringLme_anno_io_files_FileReference")
 	private static FileReference InnerFile_getChild(FileReference self, String name) {
 		return InvalidRef.INSTANCE;
 	}
 
 	// for removing a lot of dependencies, e.g., to InnerFolderCache -> SVHMesh -> Prefab
-	@Alias(name = "me_anno_io_zip_InnerFile_getZipFileForDirectory_Lme_anno_io_files_FileReference")
+	@Alias(names = "me_anno_io_zip_InnerFile_getZipFileForDirectory_Lme_anno_io_files_FileReference")
 	private static FileReference InnerFile_getZipFileForDirectory(FileReference self) {
 		return InvalidRef.INSTANCE;
 	}
 
 	// only needs to be re-enabled, when we have controller support; until then, we can save space
 	@NoThrow
-	@Alias(name = "me_anno_input_Input_pollControllers_Lme_anno_gpu_OSWindowV")
+	@Alias(names = "me_anno_input_Input_pollControllers_Lme_anno_gpu_OSWindowV")
 	public static void me_anno_input_Input_pollControllers_Lme_anno_gpu_OSWindowV(Object self, Object window) {
 	}
 
 	// to save space for now
 	@NoThrow
-	@Alias(name = "me_anno_io_config_ConfigBasics_loadConfig_Ljava_lang_StringLme_anno_io_files_FileReferenceLme_anno_io_utils_StringMapZLme_anno_io_utils_StringMap")
+	@Alias(names = "me_anno_io_config_ConfigBasics_loadConfig_Ljava_lang_StringLme_anno_io_files_FileReferenceLme_anno_io_utils_StringMapZLme_anno_io_utils_StringMap")
 	private static StringMap ConfigBasics_loadConfig(String name, FileReference workspace, StringMap defaultValue, boolean saveIfMissing) {
 		return defaultValue;
 	}
 
 	// trying to save space by getting rid of TextWriter (1 MB in wasm text)
-	@Alias(name = "me_anno_io_Saveable_toString_Ljava_lang_String")
+	@Alias(names = "me_anno_io_Saveable_toString_Ljava_lang_String")
 	private static String me_anno_io_Saveable_toString_Ljava_lang_String(Object self) {
 		return self.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(self));
 	}
 
 	// trying to save space by getting rid of TextWriter (1 MB in wasm text)
-	@Alias(name = "me_anno_input_Input_copy_Lme_anno_gpu_OSWindowV")
+	@Alias(names = "me_anno_input_Input_copy_Lme_anno_gpu_OSWindowV")
 	private static void Input_copy(Object self, OSWindow window) {
 		float mouseX = window.getMouseX();
 		float mouseY = window.getMouseY();
@@ -405,7 +407,7 @@ public class Engine {
 		Input.INSTANCE.setClipboardContent(copied.toString());
 	}
 
-	@Alias(name = "kotlin_text_CharsKt__CharJVMKt_checkRadix_II")
+	@Alias(names = "kotlin_text_CharsKt__CharJVMKt_checkRadix_II")
 	private static int checkRadix(int radix) {
 		if (radix < 2 || radix > 36)
 			throw new IllegalArgumentException("Illegal Radix");
@@ -413,37 +415,37 @@ public class Engine {
 	}
 
 	// removing spellchecking for now (600 kiB wasm text)
-	@Alias(name = "me_anno_language_spellcheck_Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List")
+	@Alias(names = "me_anno_language_spellcheck_Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List")
 	public static Object me_anno_language_spellcheck_Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List(
 			CharSequence t, boolean allowFirstLowerCase, boolean async) {
 		return null;
 	}
 
-	@Alias(name = "me_anno_ui_input_components_CorrectingTextInput_getSuggestions_Ljava_util_List")
+	@Alias(names = "me_anno_ui_input_components_CorrectingTextInput_getSuggestions_Ljava_util_List")
 	public static Object me_anno_ui_input_components_CorrectingTextInput_getSuggestions_Ljava_util_List(Object self) {
 		return null;
 	}
 
 	@NoThrow
 	@JavaScript(code = "try { return BigInt(window.performance.memory.usedJSHeapSize); } catch(e){ return 0n; }")
-	@Alias(name = "me_anno_ui_debug_JSMemory_jsUsedMemory_J")
+	@Alias(names = "me_anno_ui_debug_JSMemory_jsUsedMemory_J")
 	public static native long me_anno_ui_debug_JSMemory_jsUsedMemory_J();
 
 	@NoThrow
-	@Alias(name = "me_anno_extensions_ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo")
+	@Alias(names = "me_anno_extensions_ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo")
 	public static Object me_anno_extensions_ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo(Object file) {
 		// there is no Zip, extensions should be loaded directly ^^
 		return null;
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_LogoKt_drawLogo_IIZZ")
+	@Alias(names = "me_anno_gpu_LogoKt_drawLogo_IIZZ")
 	public static boolean me_anno_gpu_LogoKt_drawLogo(int a, int b, boolean c) {
 		return true;
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image")
+	@Alias(names = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image")
 	public static Image me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(FileReference path, long timeout, boolean async) {
 		// todo create image async using JavaScript
 		log("Todo: create image async using JS", path.getAbsolutePath());
@@ -451,90 +453,90 @@ public class Engine {
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image")
+	@Alias(names = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image")
 	public static Image me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image(FileReference path, boolean async) {
 		return me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(path, 10_000, async);
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV")
+	@Alias(names = "me_anno_gpu_GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV")
 	public static void me_anno_gpu_GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV(Object window) {
 		// we'll call it directly, no need for callbacks
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFXBase_close_Lme_anno_gpu_OSWindowV")
+	@Alias(names = "me_anno_gpu_GFXBase_close_Lme_anno_gpu_OSWindowV")
 	public static void me_anno_gpu_GFXBase_close_Lme_anno_gpu_OSWindowV(Object window) {
 		// not really supported
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFXBase_loadRenderDoc_V")
+	@Alias(names = "me_anno_gpu_GFXBase_loadRenderDoc_V")
 	public static void me_anno_gpu_GFXBase_loadRenderDoc_V() {
 		// not supported
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_OSWindow_forceUpdateVsync_V")
+	@Alias(names = "me_anno_gpu_OSWindow_forceUpdateVsync_V")
 	public static void me_anno_gpu_OSWindow_forceUpdateVsync_V(Object self) {
 		// not supported
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_OSWindow_toggleFullscreen_V")
+	@Alias(names = "me_anno_gpu_OSWindow_toggleFullscreen_V")
 	public static void me_anno_gpu_OSWindow_toggleFullscreen_V(Object self) {
 		disableCursor();
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_OSWindow_updateMousePosition_V")
+	@Alias(names = "me_anno_gpu_OSWindow_updateMousePosition_V")
 	public static void me_anno_gpu_OSWindow_updateMousePosition_V(Object self) {
 		// done automatically
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_GFXBase_handleClose_Lme_anno_gpu_OSWindowV")
+	@Alias(names = "me_anno_gpu_GFXBase_handleClose_Lme_anno_gpu_OSWindowV")
 	public static void me_anno_gpu_GFXBase_handleClose_Lme_anno_gpu_OSWindowV(Object window) {
 		// idc really, should not be callable
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_input_Input_setClipboardContent_Ljava_lang_StringV")
+	@Alias(names = "me_anno_input_Input_setClipboardContent_Ljava_lang_StringV")
 	@JavaScript(code = "if(arg1) navigator.clipboard.writeText(str(arg1))")
 	public static native void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(Object self, String txt);
 
 	@NoThrow
-	@Alias(name = "me_anno_gpu_monitor_SubpixelLayout_detect_V")
+	@Alias(names = "me_anno_gpu_monitor_SubpixelLayout_detect_V")
 	public static void me_anno_gpu_monitor_SubpixelLayout_detect_V(Object self) {
 		// todo implement this
 		log("Todo: detect subpixel layout");
 	}
 
 	@NoThrow
-	@Alias(name = "me_anno_extensions_ExtensionLoader_load_V")
+	@Alias(names = "me_anno_extensions_ExtensionLoader_load_V")
 	public static void me_anno_extensions_ExtensionLoader_load_V() {
 		// just skip for now 😄, 8k lines (out of 236k)
 	}
 
-	@Alias(name = "me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process")
+	@Alias(names = "me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process")
 	public static Process me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process(Object self) {
 		throw new RuntimeException("Starting processes is not possible in WASM");
 	}
 
-	@Alias(name = "me_anno_config_DefaultConfig_init_V")
+	@Alias(names = "me_anno_config_DefaultConfig_init_V")
 	public static void me_anno_config_DefaultConfig_init_V(Object self) {
 		// skippable? depends on config, that we don't save yet
 		// todo re-enable, once saving is possible :)
 	}
 
-	@Alias(name = "me_anno_utils_Sleep_waitForGFXThreadUntilDefined_ZLkotlin_jvm_functions_Function0_Ljava_lang_Object")
+	@Alias(names = "me_anno_utils_Sleep_waitForGFXThreadUntilDefined_ZLkotlin_jvm_functions_Function0_Ljava_lang_Object")
 	public static Object waitUntilDefined(boolean killable, Object func) {
 		throwJs("Cannot wait in Browser");
 		return null;
 	}
 
 	@NoThrow
-	@Alias(name = "pds")
+	@Alias(names = "pds")
 	private static void printDynamicStrings(int idx0, int len) {
 		int instance = getAllocationStart();
 		final int endPtr = getNextPtr();

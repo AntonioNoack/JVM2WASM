@@ -168,21 +168,21 @@ public class WebRef2 extends FileReference {
 
     @Export
     @UsedIfIndexed
-    @Alias(name = "invoke2")
+    @Alias(names = "invoke2")
     static <A, B> void invoke2(Function2<A, B, Unit> function, A arg1, B arg2) {
         function.invoke(arg1, arg2);
     }
 
     @Export
     @UsedIfIndexed
-    @Alias(name = "createBytes")
+    @Alias(names = "createBytes")
     public static byte[] createBytes(int length) {
         return new byte[length];
     }
 
     @Export
     @UsedIfIndexed
-    @Alias(name = "createString")
+    @Alias(names = "createString")
     public static String createString(byte[] bytes) {
         if (bytes == null) return null;
         return new String(bytes);
@@ -190,7 +190,7 @@ public class WebRef2 extends FileReference {
 
     @Export
     @UsedIfIndexed
-    @Alias(name = "createByteStream")
+    @Alias(names = "createByteStream")
     public static ByteArrayInputStream createByteStream(byte[] bytes) {
         if (bytes == null) return null;
         return new ByteArrayInputStream(bytes);

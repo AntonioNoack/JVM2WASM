@@ -16,7 +16,7 @@ public class StringsUTF8 {
     static boolean copyToString = false;
     static boolean copyGetBytes = false;
 
-    @Alias(name = "java_lang_String_getBytes_AB")
+    @Alias(names = "java_lang_String_getBytes_AB")
     public static byte[] String_getBytes(String self) {
         byte[] data = getValue(self);
         if (copyGetBytes) {
@@ -27,12 +27,12 @@ public class StringsUTF8 {
         } else return data;
     }
 
-    @Alias(name = "java_lang_String_getBytes_Ljava_nio_charset_CharsetAB")
+    @Alias(names = "java_lang_String_getBytes_Ljava_nio_charset_CharsetAB")
     public static byte[] String_getBytes(String self, Charset cs) {
         return String_getBytes(self);
     }
 
-    @Alias(name = "new_java_lang_String_ACIIV")
+    @Alias(names = "new_java_lang_String_ACIIV")
     public static void new_java_lang_String_ACIIV(String self, char[] chars, int start, int end) {
         // todo if any char is > 127, use a better method
         int l = end - start;
@@ -43,17 +43,17 @@ public class StringsUTF8 {
         setValue(self, v1);
     }
 
-    @Alias(name = "new_java_lang_String_ABLjava_nio_charset_CharsetV")
+    @Alias(names = "new_java_lang_String_ABLjava_nio_charset_CharsetV")
     public static void new_java_lang_String_ABLjava_nio_charset_CharsetV(String self, byte[] bytes, Charset charset) {
         new_java_lang_String_ABV(self, bytes);
     }
 
-    @Alias(name = "new_java_lang_String_ABIILjava_nio_charset_CharsetV")
+    @Alias(names = "new_java_lang_String_ABIILjava_nio_charset_CharsetV")
     public static void new_java_lang_String_ABIILjava_nio_charset_CharsetV(String self, byte[] bytes, int start, int end, Charset charset) {
         new_java_lang_String_ABIIV(self, bytes, start, end);
     }
 
-    @Alias(name = "new_java_lang_String_ABV")
+    @Alias(names = "new_java_lang_String_ABV")
     public static void new_java_lang_String_ABV(String self, byte[] bytes) {
         if (copyToString) {
             int length = bytes.length;
@@ -63,7 +63,7 @@ public class StringsUTF8 {
         } else setValue(self, bytes);
     }
 
-    @Alias(name = "new_java_lang_String_ABIIV")
+    @Alias(names = "new_java_lang_String_ABIIV")
     public static void new_java_lang_String_ABIIV(String self, byte[] bytes, int start, int end) {
         if (start == 0 && end == bytes.length) {
             new_java_lang_String_ABV(self, bytes);
@@ -75,27 +75,27 @@ public class StringsUTF8 {
         }
     }
 
-    @Alias(name = "new_java_lang_String_ACV")
+    @Alias(names = "new_java_lang_String_ACV")
     public static void new_java_lang_String_ACV(String self, char[] chars) {
         new_java_lang_String_ACIIV(self, chars, 0, chars.length);
     }
 
-    @Alias(name = "new_java_lang_String_ACZV")
+    @Alias(names = "new_java_lang_String_ACZV")
     public static void new_java_lang_String_ACZV(String self, char[] chars, boolean ignored) {
         new_java_lang_String_ACIIV(self, chars, 0, chars.length);
     }
 
-    @Alias(name = "java_lang_String_charAt_IC")
+    @Alias(names = "java_lang_String_charAt_IC")
     public static int String_charAt(String str, int index) {
         return getValue(str)[index] & 255;
     }
 
-    @Alias(name = "java_lang_String_regionMatches_ILjava_lang_StringIIZ")
+    @Alias(names = "java_lang_String_regionMatches_ILjava_lang_StringIIZ")
     public static boolean String_regionMatches(String self, int i0, String other, int j0, int length) {
         return String_regionMatches(self, false, i0, other, j0, length);
     }
 
-    @Alias(name = "java_lang_String_regionMatches_ZILjava_lang_StringIIZ")
+    @Alias(names = "java_lang_String_regionMatches_ZILjava_lang_StringIIZ")
     public static boolean String_regionMatches(String self, boolean ignoreCase, int i0, String other, int j0, int length) {
         byte[] v0 = getValue(self);
         byte[] v1 = getValue(other);
@@ -120,7 +120,7 @@ public class StringsUTF8 {
         return false;
     }
 
-    @Alias(name = "java_lang_String_indexOf_III")
+    @Alias(names = "java_lang_String_indexOf_III")
     public static int String_indexOf(String self, int code, int idx) {
         if (code < 128) {
             byte[] v0 = getValue(self);
@@ -134,7 +134,7 @@ public class StringsUTF8 {
         return -1;
     }
 
-    @Alias(name = "java_lang_String_lastIndexOf_III")
+    @Alias(names = "java_lang_String_lastIndexOf_III")
     public static int String_lastIndexOf(String self, int code, int idx) {
         if (code < 128) {
             byte[] v0 = getValue(self);
@@ -148,7 +148,7 @@ public class StringsUTF8 {
         return -1;
     }
 
-    @Alias(name = "java_lang_String_indexOf_Ljava_lang_StringII")
+    @Alias(names = "java_lang_String_indexOf_Ljava_lang_StringII")
     public static int String_indexOf(String self, String other, int idx) {
         if (other.length() == 0) return 0;
         for (int i = idx, l = self.length() - other.length(); i <= l; i++) {
@@ -157,7 +157,7 @@ public class StringsUTF8 {
         return -1;
     }
 
-    @Alias(name = "java_lang_String_startsWith_Ljava_lang_StringIZ")
+    @Alias(names = "java_lang_String_startsWith_Ljava_lang_StringIZ")
     public static boolean String_startsWith(String self, String other, int offset) {
         // return String_regionMatches(self, false, offset, other, 0, other.length());// todo why is this other method not working?
         byte[] v0 = getValue(self);
@@ -171,7 +171,7 @@ public class StringsUTF8 {
         return findDiscrepancy(a0, a1, b0) == a1;
     }
 
-    @Alias(name = "java_lang_String_substring_IILjava_lang_String")
+    @Alias(names = "java_lang_String_substring_IILjava_lang_String")
     public static String String_substring(String self, int start, int end) {
         byte[] v0 = getValue(self);
         if (start == 0 && end == v0.length) return self;
@@ -182,7 +182,7 @@ public class StringsUTF8 {
         return newString(v1);
     }
 
-    @Alias(name = "java_lang_String_substring_ILjava_lang_String")
+    @Alias(names = "java_lang_String_substring_ILjava_lang_String")
     public static String String_substring(String self, int start) {
         return String_substring(self, start, self.length());
     }
@@ -202,7 +202,7 @@ public class StringsUTF8 {
     }
 
     @SuppressWarnings("StringEquality")
-    @Alias(name = "java_lang_String_compareTo_Ljava_lang_StringI")
+    @Alias(names = "java_lang_String_compareTo_Ljava_lang_StringI")
     public static int String_compareTo(String self, String other) {
         if (self == other) return 0;
         if (other == null) throw new NullPointerException("String.compareTo");
@@ -221,7 +221,7 @@ public class StringsUTF8 {
         return l0 - l1;
     }
 
-    @Alias(name = "java_lang_String_equals_Ljava_lang_ObjectZ")
+    @Alias(names = "java_lang_String_equals_Ljava_lang_ObjectZ")
     public static boolean String_equals(String self, Object other) {
         if (self == other) return true;
         if (other instanceof String) {
@@ -232,7 +232,7 @@ public class StringsUTF8 {
         } else return false;
     }
 
-    @Alias(name = "java_lang_String_getChars_IIACIV")
+    @Alias(names = "java_lang_String_getChars_IIACIV")
     public static void String_getChars(String str, int start, int end, char[] dst, int dstStart) {
         byte[] data = str.getBytes();
         int length = end - start;
@@ -241,7 +241,7 @@ public class StringsUTF8 {
         }
     }
 
-    @Alias(name = "java_lang_String_toCharArray_AC")
+    @Alias(names = "java_lang_String_toCharArray_AC")
     public static char[] String_toCharArray(String str) {
         byte[] data = str.getBytes();
         int length = data.length;
@@ -262,7 +262,7 @@ public class StringsUTF8 {
     }
 
     // most critical, will break switch-case statements, if not ascii
-    @Alias(name = "java_lang_String_hashCode_I")
+    @Alias(names = "java_lang_String_hashCode_I")
     public static int String_hashCode_I(String str) {
         int hashPtr = getAddr(str) + objectOverhead + 4;
         int hash = read32(hashPtr);
@@ -285,7 +285,7 @@ public class StringsUTF8 {
         return value;
     }
 
-    @Alias(name = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
     public static String String_toLowerCase(String s, Locale lx) {
         if (s == null) return null;
         byte[] lc = null;
@@ -306,7 +306,7 @@ public class StringsUTF8 {
         return newString(lc);
     }
 
-    @Alias(name = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
     public static String String_toUpperCase(String s, Locale lx) {
         if (s == null) return null;
         byte[] lc = null;
@@ -327,7 +327,7 @@ public class StringsUTF8 {
         return newString(lc);
     }
 
-    @Alias(name = "java_lang_CharSequence_codePoints_Ljava_util_stream_IntStream")
+    @Alias(names = "java_lang_CharSequence_codePoints_Ljava_util_stream_IntStream")
     public static IntStreamV2 java_lang_CharSequence_codePoints_Ljava_util_stream_IntStream(String str) {
         return new IntStreamV2(str);
     }

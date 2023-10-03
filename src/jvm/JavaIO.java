@@ -61,7 +61,7 @@ public class JavaIO {
 
     private static int lockFieldOffset = 0;
 
-    @Alias(name = "new_java_io_InputStreamReader_Ljava_io_InputStreamV")
+    @Alias(names = "new_java_io_InputStreamReader_Ljava_io_InputStreamV")
     public static void new_java_io_InputStreamReader_Ljava_io_InputStreamV(InputStreamReader reader, InputStream stream) throws NoSuchFieldException, IllegalAccessException {
         Class clazz = reader.getClass();
         Field field = clazz.getField("lock");
@@ -69,13 +69,13 @@ public class JavaIO {
         field.set(reader, stream);
     }
 
-    @Alias(name = "java_io_InputStreamReader_read_I")
+    @Alias(names = "java_io_InputStreamReader_read_I")
     public static int java_io_InputStreamReader_read_I(InputStreamReader reader) throws IOException {
         InputStream stream = ptrTo(read32(getAddr(reader) + lockFieldOffset));
         return stream.read();
     }
 
-    @Alias(name = "java_io_InputStreamReader_read_ACIII")
+    @Alias(names = "java_io_InputStreamReader_read_ACIII")
     public static int java_io_InputStreamReader_read_ACIII(InputStreamReader reader, char[] chars, int start, int length) throws IOException {
         InputStream stream = ptrTo(read32(getAddr(reader) + lockFieldOffset));
         for (int i = 0; i < length; i++) {

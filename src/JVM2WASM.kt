@@ -612,10 +612,11 @@ fun main() {
     val nameToMethod0 = nameToMethod
     for ((sig, annotations) in hIndex.annotations) {
         val alias = annotations.firstOrNull { it.clazz == "annotations/Alias" }
-        //val wasm = annotations.firstOrNull { it.clazz == "annotations/WASM" }
         if (alias != null) {
-            val aliasNames = alias.properties["name"] as String
-            for (aliasName in aliasNames.split('|')) {
+            @Suppress("UNCHECKED_CAST")
+            val aliasNames = alias.properties["names"] as List<String>
+            for (aliasName in aliasNames) {
+                if('|' in aliasName) throw IllegalStateException(aliasName)
                 // val aliasName = alias.properties["name"] as String
                 if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
                 if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")

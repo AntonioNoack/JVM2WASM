@@ -30,7 +30,7 @@ public class GC {
     @JavaScript(code = "markJSReferences()")
     private static native void markJSReferences();
 
-    @Alias(name = "gc")
+    @Alias(names = "gc")
     public static void invokeGC() {
         // log("Running GC");
         GCX.isInited = false;
