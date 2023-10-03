@@ -17,13 +17,14 @@ import me.anno.image.Image;
 import me.anno.image.ImageGPUCache;
 import me.anno.image.gimp.GimpImage;
 import me.anno.input.Input;
+import me.anno.input.Key;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
 import me.anno.studio.StudioBase;
 import me.anno.tests.game.Snake;
 import me.anno.ui.Panel;
-import me.anno.ui.utils.WindowStack;
+import me.anno.ui.WindowStack;
 import me.anno.utils.Clock;
 import org.lwjgl.opengl.GL11C;
 
@@ -111,7 +112,7 @@ public class Engine {
         instance.run(false);
 
         Clock tick = new Clock();
-        window = new WebGLWindow(me.anno.Engine.projectName);
+        window = new WebGLWindow(me.anno.Engine.getProjectName());
         GFXBase.createWindow(window, tick);
 
         GFXBase.prepareForRendering(tick);
@@ -129,7 +130,7 @@ public class Engine {
         window.setHeight(height);
         window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
         GFXBase.updateWindows();
-        me.anno.Engine.updateTime(dt, System.nanoTime());
+        me.anno.Time.updateTime(dt, System.nanoTime());
         // GFXBase.renderFrame();
         renderFrame2(window); // easier, less stuff from other systems
     }
@@ -141,17 +142,17 @@ public class Engine {
 
     public static void keyDown(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyPressed(window, key);
+        Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key));
     }
 
     public static void keyUp(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyReleased(window, key);
+        Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key));
     }
 
     public static void keyTyped(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyTyped(window, key);
+        Input.INSTANCE.onKeyTyped(window, Key.Companion.byId(key));
     }
 
     public static void charTyped(int key, int mods) {
@@ -161,12 +162,12 @@ public class Engine {
 
     public static void mouseDown(int key) {
         if (window == null) return;
-        Input.INSTANCE.onMousePress(window, key);
+        Input.INSTANCE.onMousePress(window, Key.Companion.byId(key));
     }
 
     public static void mouseUp(int key) {
         if (window == null) return;
-        Input.INSTANCE.onMouseRelease(window, key);
+        Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key));
     }
 
     public static void mouseWheel(float dx, float dy) {
@@ -265,8 +266,8 @@ public class Engine {
     @Alias(name = "finishTexture")
     public static void finishTexture(Texture2D texture, int w, int h, kotlin.jvm.functions.Function1<Texture2D, Unit> callback) {
         if (texture != null) {
-            texture.setW(w);
-            texture.setH(h);
+            texture.setWidth(w);
+            texture.setHeight(h);
             texture.setCreatedW(w);
             texture.setCreatedH(h);
             texture.setLocallyAllocated(Texture2D.Companion.allocate(texture.getLocallyAllocated(), ((long) w * h) << 2));

@@ -124,6 +124,7 @@ fun cannotUseClass(clazz: String): Boolean {
             clazz.startsWith("com/github/junrar/") || // not needed
             clazz.startsWith("java/util/concurrent/") || // not useful without threading
             clazz.startsWith("java/awt/image/") || // not available anyway
+            clazz.startsWith("java/awt/Component") || // not available anyway
             clazz.startsWith("javax/imageio/") || // not available anyway
             clazz.startsWith("java/util/regex/") || // let's see how much space it takes -> 2.2 MB wasm text out of 70
             sin(0f) < 0f // false

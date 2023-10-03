@@ -10,6 +10,7 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 import static jvm.JVM32.log;
+import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 
 public class LWJGLxGLFW {
@@ -347,5 +348,27 @@ public class LWJGLxGLFW {
     @Alias(name = "org_lwjgl_glfw_GLFW_glfwDefaultWindowHints_V")
     public static void org_lwjgl_glfw_GLFW_glfwDefaultWindowHints_V() {
     }
+
+	@NoThrow
+	@Alias(name = "new_org_lwjgl_glfw_GLFWErrorCallback_V")
+	public static void new_org_lwjgl_glfw_GLFWErrorCallback_V(Object self) {
+	}
+
+	@NoThrow
+	@Alias(name = "org_lwjgl_system_CallbackI_address_J")
+	public static long org_lwjgl_system_CallbackI_address_J(Object self) {
+		return getAddr(self);
+	}
+
+	@NoThrow
+	@Alias(name = "org_lwjgl_system_Callback_free_V")
+	public static void org_lwjgl_system_Callback_free_V(Object self) {
+	}
+
+	@NoThrow
+	@Alias(name = "org_lwjgl_system_Callback_hashCode_I")
+	public static int org_lwjgl_system_Callback_hashCode_I(Object self) {
+		return System.identityHashCode(self);
+	}
 
 }
