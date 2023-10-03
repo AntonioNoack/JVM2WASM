@@ -31,7 +31,6 @@ import kotlin.math.sin
 
 const val api = ASM9
 
-// todo why is LoggerImpl.interleave not working?
 // todo test LuaScripts -> magically not working :/
 
 // todo combine non-exported functions with the same content :3
