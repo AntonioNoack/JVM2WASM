@@ -126,8 +126,8 @@ public class LWJGLxOpenGL {
 	@Alias(names = "org_lwjgl_opengl_GL20C_glUniform4i_IIIIIV")
 	public static native void org_lwjgl_opengl_GL20C_glUniform4i(int location, int x, int y, int z, int w);
 
-	@NoThrow // 34895 = GL_TEXTURE_CUBE_MAP_SEAMLESS, not supported
-	@JavaScript(code = "if(arg0 != 34895) gl.enable(arg0)")
+	@NoThrow // 34895 = GL_TEXTURE_CUBE_MAP_SEAMLESS, 2848 = GL_LINE_SMOOTH, not supported
+	@JavaScript(code = "if(arg0 != 34895 && arg0 != 2848) gl.enable(arg0)")
 	@Alias(names = {
 			"org_lwjgl_opengl_GL11C_glEnable_IV",
 			"org_lwjgl_opengl_GL20C_glEnable_IV",
@@ -137,7 +137,7 @@ public class LWJGLxOpenGL {
 	public static native void GLXXC_glEnable(int mode);
 
 	@NoThrow
-	@JavaScript(code = "gl.disable(arg0)")
+	@JavaScript(code = "if(arg0 != 34895 && arg0 != 2848) gl.disable(arg0)")
 	@Alias(names = {
 			"org_lwjgl_opengl_GL11C_glDisable_IV",
 			"org_lwjgl_opengl_GL20C_glDisable_IV",
@@ -359,7 +359,7 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
-	@Alias(names = "org_lwjgl_opengl_GL45C_glGenerateMipmap_IV")
+	@Alias(names = {"org_lwjgl_opengl_GL30C_glGenerateMipmap_IV", "org_lwjgl_opengl_GL45C_glGenerateMipmap_IV"})
 	@JavaScript(code = "gl.generateMipmap(arg0)")
 	public static native void org_lwjgl_opengl_GL45C_glGenerateMipmap_IV(int target);
 

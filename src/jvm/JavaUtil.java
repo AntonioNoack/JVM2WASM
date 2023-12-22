@@ -324,7 +324,7 @@ public class JavaUtil {
 
 	@Alias(names = "java_util_ArrayList_copyInto_ALjava_lang_ObjectV")
 	public static <V> void Stack_copyInto(ArrayList<V> self, Object[] dst) throws NoSuchFieldException, IllegalAccessException {
-		Object[] src = (Object[]) ArrayList.class.getField("elementData").get(self);
+		Object[] src = (Object[]) ArrayList.class.getDeclaredField("elementData").get(self);
 		System.arraycopy(src, 0, dst, 0, self.size());
 	}
 

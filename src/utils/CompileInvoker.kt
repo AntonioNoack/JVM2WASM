@@ -75,7 +75,7 @@ fun printUsed(sig: MethodSig) {
     if (sig in dIndex.usedMethods) usedBy = usedBy.filter { it in dIndex.usedMethods }
     if (usedBy.isNotEmpty()) builder.append(" used-by: ").append(usedBy.subList(0, min(usedBy.size, 10)))
     val uses = dIndex.methodDependencies[sig]
-    if (uses != null && uses.isNotEmpty()) builder.append(" uses: ").append(uses)
+    if (!uses.isNullOrEmpty()) builder.append(" uses: ").append(uses)
     if (builder.endsWith(":")) {
         val str = sig.toString()
         val closestMatch = hIndex.methods.values.flatten().minByOrNull { str.distance(it.toString()) }
@@ -89,10 +89,9 @@ fun printUsed(sig: MethodSig) {
 
 fun compileToWASM(printer: StringBuilder2) {
 
-    val tmp = OS.documents.getChild("jvm2wasm.wat")
-    tmp.outputStream().use { // saves toString()
-        // todo make this more efficient :)
-        it.write(printer.toString().toByteArray(), 0, printer.size)
+    val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/jvm2wasm.wat")
+    tmp.outputStream().use {
+        it.write(printer.array ?: ByteArray(0), 0, printer.size)
     }
 
     println("#strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize}")

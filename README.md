@@ -34,7 +34,7 @@ and which classes shall be replaced by others (to reduce total executable size).
 The runtime is defined in [index.js](src/index.js). It is defined like that for Rem's Engine.
 It calls into [Engine.java](src/engine/Engine.java), first main() and then update() is called every frame. MouseMove(), keyDown() etc are called on their respective DOM-events.
 
-index0.js is the file of JavaScript bindings, that is automatically generated from the source code.
+tmp/index0.js is the file of JavaScript bindings, that is automatically generated from the source code.
 Entries can be added using the @JavaScript(code="") annotation within Java source code. If a method is missing,
 but depended on, e.g., because it is native to the JVM or blacklisted, it will throw an exception if called.
 @Alias(name="") can be used to make the function name on the JavaScript side explicit and shorter, or to implement such a blacklisted method:

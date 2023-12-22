@@ -301,7 +301,7 @@ public class JavaLang {
 	@JavaScript(code = "return BigInt(Math.round(performance.now()*1e6));")
 	public static native long java_lang_System_nanoTime_J();
 
-	private static final int stackReportLimit = 64;
+	private static final int stackReportLimit = 256;
 
 	@Alias(names = "java_lang_Throwable_getStackTraceDepth_I")
 	public static int Throwable_getStackTraceDepth_I(Throwable th) {
@@ -346,11 +346,14 @@ public class JavaLang {
 			insideFIST = false;
 			return th;
 		}
+
+		// todo there is a leak somewhere: Engine.update() and GFXBase2Kt.renderFrame2 are put onto the stack every frame, but not taken off.
 		boolean reachedLimit = false;
 		if (stackLength >= stackReportLimit) {
 			stackLength = stackReportLimit;
 			reachedLimit = true;
 		}
+
 		int lookupBasePtr = getLookupBasePtr();
 		if (lookupBasePtr <= 0) {
 			insideFIST = false;

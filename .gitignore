@@ -24,4 +24,4 @@ hs_err_pid*
 
 *.7z
 *.wasm
-src/index0.js
+src/tmp/index0.js

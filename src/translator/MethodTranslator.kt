@@ -989,7 +989,8 @@ class MethodTranslator(
         val meth = hIndex.methods.getOrPut(owner) { HashSet() }
         if (sig == sig0 && meth.add(sig0)) {
             if (static) hIndex.staticMethods.add(sig0)
-            throw IllegalStateException("Discovered method $sig0 in ${this.sig}")
+            // todo re-enable???
+            // throw IllegalStateException("Discovered method $sig0 in ${this.sig}")
         }
 
         var calledCanThrow = canThrowError(sig)

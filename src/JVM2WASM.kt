@@ -95,7 +95,9 @@ val classReplacements = hashMapOf(
     "java/net/URLClassLoader" to "jvm/custom/URLClassLoader2",
     "java/util/Vector" to "java/util/ArrayList", // only difference is synchronization
     "java/util/Stack" to "java/util/ArrayList", // just a few extra functions
-    "java/awt/Font" to "jvm/custom/Font2",
+    "java/awt/Font" to "jvm/custom/awt/Font",
+    "java/awt/Toolkit" to "jvm/custom/awt/Toolkit",
+    "java/awt/Dimension" to "jvm/custom/awt/Dimension",
     "java/lang/ThreadLocal" to "jvm/custom/ThreadLocal2",
     "java/lang/RuntimePermission" to "jvm/custom/RTPermission",
 )
@@ -148,7 +150,6 @@ val resources = cl.getResourceAsStream("resources.txt")!!.readText()
     .split("\n").map { it.trim() }.filter { !it.startsWith("//") && it.isNotBlank() }
     .map { Pair(it, (cl.getResourceAsStream(it) ?: throw FileNotFoundException("Missing $it")).readBytes()) }
 
-@Suppress("unused_parameter")
 fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
     // constructable classes still don't seem to be fully correct...

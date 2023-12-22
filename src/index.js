@@ -1,9 +1,13 @@
 
-var module = null
-var instance = null
-var startTime = Date.now()
+// not really well supported yet
+let useWebGPU = true
 
-import { autoJS } from "./index0.js";
+let module = null
+let instance = null
+let startTime = Date.now()
+
+import { autoJS } from "./tmp/index0.js";
+import { webGPU } from './webgpu.js';
 
 window.inited = false
 
@@ -157,7 +161,7 @@ var ctr = 0
     window.stop = false
     var t0 = new Date().getTime()
     window.gcCtr = 0
-    window.startEngine = function() {
+    async function startEngine() {
 
         if(window.inited) return
 
@@ -165,8 +169,10 @@ var ctr = 0
 
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
-        window.gl = canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
-        if(!gl) h1.innerText = "WebGL is not supported!"
+        window.gl = useWebGPU ?
+        	await webGPU.init(canvas.getContext("webgpu")) :
+        	canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
+        if(!gl) pleaseWait.innerText = "WebGL is not supported!"
 
         // console.log("Starting Engine", 1)
 
@@ -343,7 +349,7 @@ var ctr = 0
 
     window.ec = 0
     window.lib = 0
-    var fetched = fetch("linux.wasm")
+    var fetched = fetch("tmp/linux.wasm")
 	fetched
         .then(response => response.arrayBuffer())
         .then(buffer => WebAssembly.instantiate(buffer, imports))

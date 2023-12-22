@@ -9,6 +9,10 @@ import jvm.GC;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
+import me.anno.config.DefaultConfig;
+import me.anno.ecs.components.mesh.Mesh;
+import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
+import me.anno.engine.ui.render.RenderMode;
 import me.anno.engine.ui.render.SceneView;
 import me.anno.gpu.GFX;
 import me.anno.gpu.GFXBase;
@@ -22,7 +26,6 @@ import me.anno.input.Key;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
-import me.anno.mesh.Shapes;
 import me.anno.studio.StudioBase;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
@@ -69,7 +72,12 @@ public class Engine {
 		// panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
 		// panel = new AnimTextPanelTest(false);
 		// panel = CellMod.createGame();
-		panel = SceneView.Companion.testScene(Shapes.INSTANCE.getFlatCube().getFront(), null);
+		// todo styling is broken, everything is just white...
+		DefaultConfig.INSTANCE.getStyle(); // load style
+		panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, new Mesh()), sceneView -> {
+			sceneView.getRenderer().setRenderMode(RenderMode.Companion.getNORMAL());
+			return Unit.INSTANCE;
+		});
 		panel.setWeight(1f);
 		instance = new SimpleStudio(panel);
 		instance.run(false);
@@ -80,6 +88,8 @@ public class Engine {
 
 		GFXBase.prepareForRendering(tick);
 		GFX.setup(tick);
+		GFX.maxSamples = 1;
+		GFX.supportsDepthTextures = true;// todo true??
 		GFX.check();
 		tick.stop("Render step zero");
 
@@ -182,14 +192,13 @@ public class Engine {
 
 	@Alias(names = "me_anno_io_files_FileReferenceXCompanion_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
 	public static FileReference FileReferenceXCompanion_createReference(Object self, String str) {
-		if (str.isEmpty()) return InvalidRef.INSTANCE;
 		String str2 = str.indexOf('\\') >= 0 ? str.replace('\\', '/') : str;
 		if (str.startsWith("https://") || str.startsWith("http://")) return new WebRef2(str2);
 		if (str.startsWith("res://")) {
 			String url = getBaseURL() + str2.substring(6);
 			return new WebRef2(url);
 		}
-		if (str.endsWith("/")) str = str.substring(0, str.length() - 1);
+		while (str.endsWith("/")) str = str.substring(0, str.length() - 1);
 		return new VirtualFileRef(str);
 	}
 
@@ -521,12 +530,6 @@ public class Engine {
 	@Alias(names = "me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process")
 	public static Process me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process(Object self) {
 		throw new RuntimeException("Starting processes is not possible in WASM");
-	}
-
-	@Alias(names = "me_anno_config_DefaultConfig_init_V")
-	public static void me_anno_config_DefaultConfig_init_V(Object self) {
-		// skippable? depends on config, that we don't save yet
-		// todo re-enable, once saving is possible :)
 	}
 
 	@Alias(names = "me_anno_utils_Sleep_waitForGFXThreadUntilDefined_ZLkotlin_jvm_functions_Function0_Ljava_lang_Object")

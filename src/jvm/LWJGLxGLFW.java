@@ -197,11 +197,11 @@ public class LWJGLxGLFW {
 
     @NoThrow
     @JavaScript(code = "return canvas.width")
-    private static native int getWindowWidth();
+    public static native int getWindowWidth();
 
     @NoThrow
     @JavaScript(code = "return canvas.height")
-    private static native int getWindowHeight();
+    public static native int getWindowHeight();
 
     @Alias(names = "org_lwjgl_glfw_GLFW_nglfwGetFramebufferSize_JJJV")
     public static void nglfwGetFramebufferSize(long window, long width, long height) {
