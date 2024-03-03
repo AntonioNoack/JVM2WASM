@@ -18,7 +18,6 @@ import ignoreNonCriticalNullPointers
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.maths.Maths.hasFlag
-import me.anno.utils.LOGGER
 import me.anno.utils.strings.StringHelper.shorten
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
@@ -29,7 +28,6 @@ import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
 import useWASMExceptions
 import utils.*
-import java.lang.reflect.Modifier
 import kotlin.collections.set
 
 /**
@@ -1367,7 +1365,9 @@ class MethodTranslator(
 
                     if (i == 0) {
                         handler.printer.append(" ")
-                        for (e in stack) handler.printer.append(" drop")
+                        for (e in stack) {
+                            handler.printer.append(" drop")
+                        }
                         handler.printer.append(" local.get ").append(throwable).append('\n')
                     }
 
@@ -1898,11 +1898,11 @@ class MethodTranslator(
     override fun visitEnd() {
         if (!isAbstract) {
 
-           /* if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                for (node in nodes) {
-                    println("node $node: ${node.printer}")
-                }
-            }*/
+            /* if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                 for (node in nodes) {
+                     println("node $node: ${node.printer}")
+                 }
+             }*/
 
             val lastNode = nodes.last()
             if (StructuralAnalysis.printOps)
@@ -1919,9 +1919,9 @@ class MethodTranslator(
 
             var txt = transform(sig, nodes).toString()
 
-         /*   if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                println(txt)
-            }*/
+            /*   if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                   println(txt)
+               }*/
 
             txt = txt.replace(
                 "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
@@ -2080,8 +2080,9 @@ class MethodTranslator(
             txt = txt.replace("i64.load\n  drop", "drop")
             txt = txt.replace("f32.load\n  drop", "drop")
             txt = txt.replace("f64.load\n  drop", "drop")
-            txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
-            txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
+            // these two don't exist!
+            // txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
+            // txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
             txt = txt.replace(
                 "call \$dupi32 (if (param i32) (then i32.const 0 call \$swapi32i32 return) (else drop))\n" +
                         "  i32.const 0\n" +
@@ -2164,12 +2165,12 @@ class MethodTranslator(
                 throw IllegalStateException("$sig shall be aliased")
             }*/
 
-          /*  if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                LOGGER.debug("contents: $headPrinter")
-                LOGGER.debug("old: ${gIndex.translatedMethods[sig]}")
-                println("flags: $access")
-                throw NotImplementedError("What?!?")
-            }*/
+            /*  if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
+                  LOGGER.debug("contents: $headPrinter")
+                  LOGGER.debug("old: ${gIndex.translatedMethods[sig]}")
+                  println("flags: $access")
+                  throw NotImplementedError("What?!?")
+              }*/
 
             gIndex.translatedMethods[sig] = headPrinter.toString()
 

@@ -74,7 +74,7 @@ public class Engine {
 		// panel = CellMod.createGame();
 		// todo styling is broken, everything is just white...
 		DefaultConfig.INSTANCE.getStyle(); // load style
-		panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, new Mesh()), sceneView -> {
+		panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, 1f, new Mesh()), sceneView -> {
 			sceneView.getRenderer().setRenderMode(RenderMode.Companion.getNORMAL());
 			return Unit.INSTANCE;
 		});

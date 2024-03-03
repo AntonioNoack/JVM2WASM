@@ -1,6 +1,6 @@
 
 // not really well supported yet
-let useWebGPU = true
+let useWebGPU = false
 
 let module = null
 let instance = null

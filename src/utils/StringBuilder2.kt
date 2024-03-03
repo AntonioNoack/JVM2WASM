@@ -1,7 +1,6 @@
 package utils
 
 import me.anno.utils.structures.arrays.ExpandingByteArray
-import me.anno.utils.types.Booleans.toInt
 
 class StringBuilder2(initCapacity: Int) : ExpandingByteArray(initCapacity) {
 
@@ -81,35 +80,24 @@ class StringBuilder2(initCapacity: Int) : ExpandingByteArray(initCapacity) {
         return true
     }
 
-    fun endsWith(end: String): Boolean {
-        val i0 = length - end.length
+    fun endsWith(end: String, endIndex: Int = length): Boolean {
+        val i0 = endIndex - end.length
         if (i0 < 0) return false
         for (i in end.indices) {
-            if (end[i].code != this[i0 + i].toInt())
+            if (end[i].code != this[i0 + i].toInt()) {
                 return false
+            }
         }
         return true
     }
 
     fun contains(start: String, i0: Int = 0, i1: Int = length - start.length): Boolean {
         for (i in i0 until i1) {
-            if (startsWith(start, i))
+            if (startsWith(start, i)) {
                 return true
+            }
         }
         return false
-    }
-
-    fun count(symbol: Char): Int {
-        return count(symbol.code.toByte())
-    }
-
-    fun count(symbol: Byte): Int {
-        val array = array ?: return 0
-        var ctr = 0
-        for (i in array.indices) {
-            ctr += (array[i] == symbol).toInt()
-        }
-        return ctr
     }
 
     override fun equals(other: Any?): Boolean {

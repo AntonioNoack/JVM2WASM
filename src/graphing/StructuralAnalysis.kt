@@ -113,9 +113,15 @@ object StructuralAnalysis {
     }
 
     /**
-     * transform all nodes into some nice if-else-tre
+     * transform all nodes into some nice if-else-tree
      * */
     fun transform(sig: MethodSig, nodes: MutableList<Node>): String {
+
+        val isLookingAtSpecial = false
+        if (isLookingAtSpecial) {
+            prettyPrint = true
+            printOps = true
+        }
 
         lastSize = nodes.size
 
@@ -298,7 +304,7 @@ object StructuralAnalysis {
             checkState(nodes, labelToNode)
         }
 
-        do {
+        while (true) {
 
             var changed2 = false
 
@@ -457,8 +463,9 @@ object StructuralAnalysis {
 
             checkState()
 
-            if (nodes.size == 1 && nodes[0].inputs.isEmpty())
+            if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
                 return nodes[0].printer.toString()
+            }
 
             if (true) {
                 // remove dead ends by finding what is reachable
@@ -1006,16 +1013,12 @@ object StructuralAnalysis {
 
             if (printOps) printState()
 
+            if (isLookingAtSpecial) {
+                throw IllegalStateException("Looking at something")
+            }
+
             return createLargeSwitchStatement(sig, nodes, labelToNode)
-
-            // to do circles are dangerous;
-            // if not, this is a simple end
-
-        } while (changed2)
-
-        printState()
-
-        throw NotImplementedError()
+        }
     }
 
     val equalPairs = arrayOf(
@@ -1082,7 +1085,7 @@ object StructuralAnalysis {
 
     private fun graphId(sig: MethodSig, nodes: List<Node>, labelToNode: Map<Label, Node>): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
-        if(false) normalizeGraph(nodes, labelToNode)
+        if (false) normalizeGraph(nodes, labelToNode)
         val builder = StringBuilder(nodes.size * 5)
         for (node in nodes) {
             builder.append(
@@ -1197,11 +1200,20 @@ object StructuralAnalysis {
                 // todo if either one is exitNode, jump to end of switch() block
                 if (node.isBranch) {
                     // set end label
-                    printer.append("  (if (result i32) (then i32.const ")
-                        .append(labelToNode[node.ifTrue]!!.index)
-                        .append(") (else i32.const ")
-                        .append(node.ifFalse!!.index)
-                        .append(")) local.set \$lbl\n")
+                    val trueIndex = labelToNode[node.ifTrue]!!.index
+                    val falseIndex = node.ifFalse!!.index
+                    // todo check, which one is faster ^^ (no, implement the paper, so we don't have to use hundreds of switch-statements)
+                    if (false) {// use a "branch-less" formula ^^, probably useless
+                        printer.append("  i32.const 0 i32.ne i32.const ").append(trueIndex - falseIndex)
+                            .append(" i32.mul i32.const ").append(falseIndex)
+                            .append(" i32.add local.set \$lbl\n")
+                    } else {
+                        printer.append("  (if (result i32) (then i32.const ")
+                            .append(trueIndex)
+                            .append(") (else i32.const ")
+                            .append(falseIndex)
+                            .append(")) local.set \$lbl\n")
+                    }
                 } else {
                     // set end label
                     val next = labelToNode[node.next]!!.index
@@ -1209,7 +1221,7 @@ object StructuralAnalysis {
                 }
                 // store stack
                 val outputs = node.outputStack
-                if (outputs != null && outputs.isNotEmpty()) {
+                if (!outputs.isNullOrEmpty()) {
                     if (comments) printer.append("  ;; store stack\n")
                     for ((idx, type) in outputs.withIndex().reversed()) {
                         printer.append("  local.set ").append(vars.getStackVarName(idx, type)).append('\n')

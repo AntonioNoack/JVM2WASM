@@ -365,11 +365,12 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL11C_glGetInteger_II")
-	// 0x826e = max uniform locations; not defined in WebGL
 	// 0x8D57 = max samples;
-	// 0x821B, 0x821C = major, minor version
-	// @JavaScript(code = "if(arg0 == 0x826E) return 1024; if(arg0 == 0x8D57) return 1; return gl.getParameter(arg0)")
-	@JavaScript(code = "if(arg0 == 0x826E) return 1024; if(arg0 == 0x821B || arg0 == 0x821C) return 0; return gl.getParameter(arg0)")
+	@JavaScript(code = "" +
+			"if(arg0 == 0x826E) return 1024;\n" + // max uniform locations; not defined in WebGL
+			"if(arg0 == 0x821B || arg0 == 0x821C) return 0;\n" + // 0x821B, 0x821C = major, minor version
+			"if(arg0 == 0x8CDF) return 1;\n" + // max color attachments
+			"return gl.getParameter(arg0)")
 	public static native int GL11C_glGetInteger(int i);
 
 	@Alias(names = "org_lwjgl_opengl_GL11C_glGetIntegerv_IAIV")
@@ -465,7 +466,7 @@ public class LWJGLxOpenGL {
 	private static native void org_lwjgl_opengl_GL11C_glFinish_V();
 
 	@NoThrow
-	@JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
+	@JavaScript(code = "console.log('glReadPixelsI', arguments);gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
 	public static native void org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int data, int length);
 
 	@Alias(names = "org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV")
@@ -474,7 +475,7 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
-	@JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
+	@JavaScript(code = "console.log('glReadPixelsF', arguments);gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
 	public static native void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, int dataPtr, int length);
 
 	@Alias(names = "org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAFV")

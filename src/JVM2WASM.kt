@@ -35,7 +35,7 @@ const val api = ASM9
 
 // todo combine non-exported functions with the same content :3
 
-// todo often, there is local.getXX before drop -> remove those
+// todo often, there is local.getXX or i32.const before drop -> remove those
 
 // do we already replace dependencies before resolving them? probably could save us tons of space (and wabt compile time 😁)
 // todo mark empty functions as such, and skip them; e.g. new_java_lang_Object_V, new_java_lang_Number_V
