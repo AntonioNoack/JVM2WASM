@@ -1,7 +1,6 @@
 package jvm;
 
 import annotations.Alias;
-import me.anno.fonts.AWTFont;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;
@@ -126,11 +125,6 @@ public class JavaAWT {
 
 	@Alias(names = "static_java_awt_datatransfer_DataFlavor_V")
 	public static void static_java_awt_datatransfer_DataFlavor_V() {
-	}
-
-	@Alias(names = "new_me_anno_fonts_AWTFont_Ljava_awt_FontV")
-	public static void new_me_anno_fonts_AWTFont_Ljava_awt_FontV(AWTFont self, Font font) throws NoSuchFieldException, IllegalAccessException {
-		AWTFont.class.getDeclaredField("font").set(self, font);
 	}
 
 }

@@ -1,10 +1,10 @@
 package binary
 
 import me.anno.maths.Maths.hasFlag
-import me.anno.utils.structures.arrays.ExpandingByteArray
+import me.anno.utils.structures.arrays.ByteArrayList
 
 class BinaryWriter(
-    val stream: ExpandingByteArray,
+    val stream: ByteArrayList,
     val module: Module
 ) {
 
@@ -12,15 +12,15 @@ class BinaryWriter(
         val kInvalidIndex = -1
     }
 
-    fun ExpandingByteArray.write(v: Int) {
+    fun ByteArrayList.write(v: Int) {
         add(v.toByte())
     }
 
-    fun ExpandingByteArray.write(v: ByteArray) {
-        addAll(v)
+    fun ByteArrayList.write(v: ByteArray) {
+        addAll(v, 0, v.size)
     }
 
-    fun ExpandingByteArray.writeLE32(v: Int) {
+    fun ByteArrayList.writeLE32(v: Int) {
         ensureExtra(4)
         addUnsafe(v.toByte())
         addUnsafe((v ushr 8).toByte())

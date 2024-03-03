@@ -4,10 +4,11 @@ import dIndex
 import gIndex
 import hIndex
 import me.anno.utils.OS
-import me.anno.utils.process.BetterProcessBuilder
-import me.anno.utils.strings.StringHelper.distance
 import me.anno.utils.types.Floats.f3
+import me.anno.utils.types.Strings.distance
 import t0
+import java.io.InputStream
+import kotlin.concurrent.thread
 import kotlin.math.min
 
 val builder = Builder(512)
@@ -91,7 +92,7 @@ fun compileToWASM(printer: StringBuilder2) {
 
     val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/jvm2wasm.wat")
     tmp.outputStream().use {
-        it.write(printer.array ?: ByteArray(0), 0, printer.size)
+        it.write(printer.array, 0, printer.size)
     }
 
     println("#strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize}")
@@ -99,7 +100,9 @@ fun compileToWASM(printer: StringBuilder2) {
     val t1 = System.nanoTime()
     println("total Kotlin time: ${((t1 - t0) * 1e-9).f3()}s")
 
-    val process = BetterProcessBuilder("wsl", 1, false).startAndPrint()
+    val process = Runtime.getRuntime().exec("wsl")
+    printAsync(process.inputStream, false)
+    printAsync(process.errorStream, true)
     val stream = process.outputStream
     stream.write("cd ~\n".toByteArray())
     stream.write("./comp.sh\n".toByteArray())
@@ -109,4 +112,19 @@ fun compileToWASM(printer: StringBuilder2) {
     val t2 = System.nanoTime()
     println("total time: ${((t2 - t0) * 1e-9).f3()}s")
 
+}
+
+private fun printAsync(input: InputStream, err: Boolean) {
+    thread {
+        val reader = input.bufferedReader()
+        while (true) {
+            var line = reader.readLine() ?: break
+            line = " - $line"
+            if (err) {
+                System.err.println(line)
+            } else {
+                println(line)
+            }
+        }
+    }
 }

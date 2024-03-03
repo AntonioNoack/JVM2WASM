@@ -18,9 +18,9 @@ import ignoreNonCriticalNullPointers
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.maths.Maths.hasFlag
-import me.anno.utils.strings.StringHelper.shorten
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import reb
@@ -99,16 +99,12 @@ class MethodTranslator(
             if (name == "<clinit>") {
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
-                printer.append("  global.get \$Z\n")
-                    .append("  i32.const $clazz1 i32.add\n")
-                    .append("  i32.load8_u\n")
-                printer.append(
-                    if (canThrowError) "  (if (then i32.const 0 return))\n"
-                    else "  (if (then return))\n"
-                )
-                printer.append("  global.get \$Z\n")
-                    .append("  i32.const $clazz1 i32.add\n")
-                    .append("  i32.const 1 i32.store8\n") // mark as being loaded
+                printer.append("  i32.const ").append(clazz1)
+                    .append(" call \$shallInitStatic\n")
+                    .append(
+                        if (canThrowError) "  (if (then i32.const 0 return))\n"
+                        else "  (if (then return))\n"
+                    )
             }
         }
     }
@@ -451,7 +447,7 @@ class MethodTranslator(
                     currentNode.outputStack = listOf(ptrType)
                 }
 
-                if (canThrowError(sig)) {
+                if (canThrowError(sig) && !useWASMExceptions) {
                     printer.append("  ").append(ptrType).append(".const 0\n") // no Throwable, normal exit
                 }
 
@@ -662,6 +658,7 @@ class MethodTranslator(
             0x98 -> printer.pop(f64).pop(f64).push(i32).append("  call \$dcmpg\n") // +1 if NaN
 
             0xbe -> {
+                // array length
                 stackPush()
                 printer.pop(ptrType).push(i32).append("  call \$al\n")
                 stackPop()
@@ -723,7 +720,7 @@ class MethodTranslator(
             printer.push(ptrType).append(" call \$cr")
             if (comments) printer.append(" ;; ").append(synthClassName)
             printer.append('\n')
-            stackPush()
+            stackPop()
             handleThrowable()
         }
 
@@ -939,13 +936,13 @@ class MethodTranslator(
     }
 
     private fun checkNotNull0(clazz: String, name: String, getCaller: () -> Unit) {
-        stackPush()
+        // stackPush()
         getCaller()
         printer.append(" i32.const ").append(gIndex.getString(clazz))
         printer.append(" i32.const ").append(gIndex.getString(name))
         printer.append(" call \$checkNotNull\n")
         handleThrowable()
-        stackPop()
+        // stackPop()
     }
 
     override fun visitMethodInsn(
@@ -1041,6 +1038,7 @@ class MethodTranslator(
 
                         getCaller()
 
+                        // todo store this index in a table instead?
                         printer.append(" i32.const ")
                             .append(-gIndex.getString(methodName(sig)))
                             // instance, function index -> function-ptr
@@ -1089,7 +1087,9 @@ class MethodTranslator(
                                 calledCanThrow = false
                             }
                             else -> {
-                                if (!ignoreNonCriticalNullPointers) checkNotNull0(owner, name, ::getCaller)
+                                if (!ignoreNonCriticalNullPointers) {
+                                    checkNotNull0(owner, name, ::getCaller)
+                                }
                                 pop(splitArgs, false, ret)
                                 // final, so not actually virtual;
                                 // can be directly called
@@ -1128,6 +1128,7 @@ class MethodTranslator(
                             // instance, function index -> function-ptr
                             .append(" call \$resolveIndirect\n")
                             .push(i32)
+                        stackPop()
                         handleThrowable()
                         printer.pop(i32)
                         pop(splitArgs, false, ret)
@@ -1135,7 +1136,6 @@ class MethodTranslator(
                             .append("  call_indirect (type ")
                             .append(gIndex.getType(descriptor, calledCanThrow))
                             .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
-                        stackPop()
                     }
                 }
                 // typically, <init>, but also can be private or super function; -> no resolution required
@@ -1192,13 +1192,15 @@ class MethodTranslator(
     }
 
     private fun stackPush() {
-        if (canThrowError && enableTracing)
+        if (canThrowError && enableTracing) {
             printer.append("  i32.const ").append(getCallIndex()).append(" call \$stackPush\n")
+        }
     }
 
     private fun stackPop() {
-        if (canThrowError && enableTracing)
+        if (canThrowError && enableTracing) {
             printer.append("  call \$stackPop\n")
+        }
     }
 
     @Boring
@@ -1314,14 +1316,15 @@ class MethodTranslator(
     private var thIndex = -10
     fun handleThrowable(mustThrow: Boolean = false) {
 
-        // if (line == 371 && sig.clazz == "me/anno/gpu/GFXBase") TODO()
-
         if (useWASMExceptions) {
+            // todo catch exceptions to handle them...
             if (mustThrow) {
                 // throw :)
                 printer.append("  throw \$exTag\n")
+                printer.append("  unreachable\n")
+                currentNode.isReturn = true // kind of
             } else {
-                // todo nothing will be here :)
+                // nothing will be here :)
             }
             return
         }
@@ -1334,7 +1337,6 @@ class MethodTranslator(
         val catchers = catchers.filter { c ->
             nodes.any { it.label == c.start } && nodes.none { it.label == c.end }
         }
-
         if (catchers.isNotEmpty()) {
 
             if (printOps) println("found catcher $catchers")
@@ -1448,7 +1450,6 @@ class MethodTranslator(
                     mainHandler.ifTrue = catchers[0].handler
                     nodes.add(mainHandler)
                 }
-
             }
 
             stack.clear()
@@ -1465,7 +1466,6 @@ class MethodTranslator(
             // easy, inline, without graph :)
             returnIfThrowable(mustThrow)
         }
-
     }
 
     private fun returnIfThrowable(
@@ -1482,8 +1482,9 @@ class MethodTranslator(
                     .append(".const 0 call \$swapi32").append(retType)
                     .append(" return\n")
             }
-            if (!printer.endsWith("return\n") && !printer.endsWith("unreachable\n"))
+            if (!printer.endsWith("return\n") && !printer.endsWith("unreachable\n")) {
                 printer.append("  unreachable\n")
+            }
             currentNode.isReturn = true
         } else {
             val tmp = tmpI32
@@ -1690,8 +1691,17 @@ class MethodTranslator(
         else -> if (is32Bits) "i32.load" else "i64.load"
     }
 
-    private fun getStoreInstr(descriptor: String) =
-        getStoreInstr2(single(descriptor))
+    private fun getStoreInstr(descriptor: String) = getStoreInstr2(single(descriptor))
+
+    private fun getStoreSymbol(descriptor: String) = when (single(descriptor)) {
+        "Z", "B" -> "I8"
+        "S", "C" -> "I16"
+        "I" -> "I32"
+        "J" -> "I64"
+        "F" -> "F32"
+        "D" -> "F64"
+        else -> if (is32Bits) "I32" else "I64"
+    }
 
     private fun getStoreInstr2(descriptor: String) = when (descriptor) {
         "Z", "B" -> "i32.store8"
@@ -1718,7 +1728,9 @@ class MethodTranslator(
         stackPush()
         printer.append("  call $").append(clInitName).append('\n')
         stackPop()
-        if (canThrowError(sig)) handleThrowable()
+        if (canThrowError(sig)) {
+            handleThrowable()
+        }
     }
 
     private val precalculateStaticFields = true
@@ -1868,26 +1880,46 @@ class MethodTranslator(
             0xb5 -> {
                 // set field
                 // second part of check is <self>
-                if (checkNull && !(!isStatic && printer.endsWith("local.get 0\n  local.get 1\n"))) {
+                if (checkNull &&
+                    !(!isStatic && printer.endsWith("local.get 0\n  local.get 1\n")) &&
+                    !(!isStatic && printer.endsWith("local.get 0\n  i32.const 0\n"))
+                ) {
                     checkNotNull0(owner, name) {
                         printer.append("  call $").append(gIndex.getNth(listOf(ptrType, wasmType)))
                     }
                 }
                 printer.pop(wasmType).pop(ptrType)
                 if (fieldOffset != null) {
-                    printer.append("  call \$swap$ptrType$wasmType \n") // value <-> instance
-                        .append("  i32.const ").append(fieldOffset)
-                        .append(" i32.add call \$swap$wasmType$ptrType ") // instance <-> value
-                        .append(getStoreInstr(descriptor))
+
+                    // if endsWith local.get x2,
+                    //  then optimize this to not use swaps
+                    val suffix = "  local.get 0\n  local.get 1\n"
+                    if (printer.endsWith(suffix)) {
+                        printer.size -= suffix.length
+                        printer.append("  local.get 0")
+                            .append(" i32.const ").append(fieldOffset)
+                            .append(" i32.add local.get 1 ")
+                            .append(getStoreInstr(descriptor))
+                    } else {
+                        // todo instead of calling a function twice, we could also create generic functions for this :)
+                        printer.append("  i32.const ").append(fieldOffset)
+                            .append(" call \$setField${getStoreSymbol(descriptor)}")
+                        /*printer.append("  call \$swap$ptrType$wasmType\n") // value <-> instance
+                            .append("  i32.const ").append(fieldOffset)
+                            .append(" i32.add call \$swap$wasmType$ptrType ") // instance <-> value
+                            .append(getStoreInstr(descriptor))*/
+                    }
                     if (comments) {
                         if (owner == clazz) printer.append(" ;; set field '$name'\n")
                         else printer.append(" ;; set field '$owner.$name'\n")
                     } else printer.append('\n')
+
                 } else {
                     if (comments) {
                         printer.append("  drop drop ;; dropped putting $name\n")
                     } else {
-                        printer.append("  drop drop\n")
+                        printer.drop()
+                        printer.drop()
                     }
                 }
             }
@@ -1897,12 +1929,6 @@ class MethodTranslator(
 
     override fun visitEnd() {
         if (!isAbstract) {
-
-            /* if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                 for (node in nodes) {
-                     println("node $node: ${node.printer}")
-                 }
-             }*/
 
             val lastNode = nodes.last()
             if (StructuralAnalysis.printOps)
@@ -1917,11 +1943,7 @@ class MethodTranslator(
                 }
             }
 
-            var txt = transform(sig, nodes).toString()
-
-            /*   if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                   println(txt)
-               }*/
+            var txt = transform(sig, nodes)
 
             txt = txt.replace(
                 "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +

@@ -1,26 +1,79 @@
 package utils
 
-import me.anno.utils.structures.arrays.ExpandingByteArray
+import me.anno.utils.structures.arrays.ByteArrayList
 
-class StringBuilder2(initCapacity: Int) : ExpandingByteArray(initCapacity) {
+class StringBuilder2(initCapacity: Int) : ByteArrayList(initCapacity) {
+
+    companion object {
+        private val droppable = listOf("i32.const", "local.get")
+    }
 
     constructor(base: CharSequence) : this(base.length) {
         append(base)
     }
 
     override fun toString(): String {
-        val array = array ?: return ""
         return String(array, 0, size)
     }
 
+    fun toString(i0: Int, i1: Int): String {
+        return String(array, i0, i1 - i0)
+    }
+
     fun append(str: CharSequence): StringBuilder2 {
-        ensureExtra(str.length)
-        for (i in str.indices) {
-            val c = str[i]
-            if (c.code > 127) throw IllegalArgumentException("Character must be ascii: '$c'")
-            add(c.code.toByte())
+        if (str == "drop drop") {
+            drop()
+            drop()
+        } else {
+            ensureExtra(str.length)
+            for (i in str.indices) {
+                val c = str[i]
+                if (c.code > 127) throw IllegalArgumentException("Character must be ascii: '$c'")
+                add(c.code.toByte())
+            }
         }
         return this
+    }
+
+    fun drop() {
+        // if endsWith number and \n, and before that i32.const or local.get,
+        //  then remove that instead of dropping
+        var i = trimSpacesAtEnd(size - 1)
+        i = endsWithNumber(i)
+        if (i >= 0) {
+            if (this[i].toInt() == ' '.code) {
+                for (drop in droppable) {
+                    if (endsWith(drop, i)) {
+                        size = i - drop.length
+                        // if there is only spaces, remove until \n
+                        while (size > 0 && this[size - 1].toInt() == ' '.code) {
+                            size--
+                        }
+                        return // done :)
+                    }
+                }
+            }
+        }
+        append("drop ")
+    }
+
+    fun trimSpacesAtEnd(i0: Int): Int {
+        var i = i0
+        while (i >= 0 && this[i].toInt().toChar() in " \n") {
+            i--
+        }
+        return i
+    }
+
+    fun endsWithNumber(i0: Int): Int {
+        var i = i0
+        if (this[i] in '0'.code..'9'.code) {
+            while (i >= 0 && this[i] in '0'.code..'9'.code) {
+                i--
+            }
+            return i
+        }
+        return -1
     }
 
     fun append(c: Char): StringBuilder2 {

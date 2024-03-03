@@ -1,3 +1,3 @@
 package annotations
 
-annotation class UsedIfIndexed()
+annotation class UsedIfIndexed

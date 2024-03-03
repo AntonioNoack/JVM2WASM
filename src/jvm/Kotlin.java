@@ -256,8 +256,8 @@ public class Kotlin {
 	}
 
 	@Alias(names = "kotlin_enums_EnumEntriesKt_enumEntries_ALjava_lang_EnumLkotlin_enums_EnumEntries")
-	public static Object enumEntries(Enum[] values) {
-		return values;
+	public static List<Object> enumEntries(Enum[] values) {
+		return new ArrayWrapper<>(values, 0, values.length);
 	}
 
 }

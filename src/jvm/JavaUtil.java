@@ -72,6 +72,16 @@ public class JavaUtil {
 		// Locale.ROOT = new Locale("");
 	}
 
+	@Alias(names = "java_util_Locale_initDefault_Ljava_util_LocaleXCategoryLjava_util_Locale")
+	public static Object Locale_initDefault(Object category) {
+		return null;
+	}
+
+	@Alias(names = "java_util_Calendar_createCalendar_Ljava_util_TimeZoneLjava_util_LocaleLjava_util_Calendar")
+	public static Object Calendar_createCalendar(Object timeZone, Object locale) {
+		return null;
+	}
+
 	public static Object toFixed2(Object obj, int v) {
 		if (obj instanceof BigDecimal) {
 			// new DecimalFormat("0.00").format(obj);

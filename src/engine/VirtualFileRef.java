@@ -1,10 +1,9 @@
 package engine;
 
-import kotlin.Unit;
-import kotlin.jvm.functions.Function2;
 import me.anno.io.files.FileReference;
+import me.anno.io.files.InvalidRef;
+import me.anno.utils.structures.Callback;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.*;
@@ -35,12 +34,17 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
+	public long getCreationTime() {
+		return 0L;
+	}
+
+	@Override
 	public long getLastModified() {
 		JavaIO.FileInfo fi = JavaIO.files.get(getAbsolutePath());
 		return fi != null ? fi.lastModified : 0;
 	}
 
-	@Nullable
+	@NotNull
 	@Override
 	public List<FileReference> listChildren() {
 		JavaIO.FileInfo fi = JavaIO.files.get(getAbsolutePath());
@@ -63,54 +67,54 @@ public class VirtualFileRef extends FileReference {
 
 	private FileReference parent;
 
-	@Nullable
+	@NotNull
 	@Override
 	public FileReference getParent() {
 		String path = getAbsolutePath();
 		int lix = path.lastIndexOf('/');
-		if (lix < 0) return null;
+		if (lix < 0) return InvalidRef.INSTANCE;
 		if (parent == null) parent = new VirtualFileRef(path.substring(0, lix));
 		return parent;
 	}
 
 	@Override
-	public void inputStream(long l, @NotNull Function2<? super InputStream, ? super Exception, Unit> callback) {
+	public void inputStream(long l, @NotNull Callback<InputStream> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
-			if (fi.children != null) callback.invoke(null, new IOException("Cannot read directory"));
+			if (fi.children != null) callback.err(new IOException("Cannot read directory"));
 			else {
 				byte[] bytes = fi.content;
 				if (bytes == null) bytes = fi.content2.getBytes();
-				callback.invoke(new ByteArrayInputStream(bytes), null);
+				callback.ok(new ByteArrayInputStream(bytes));
 			}
-		} else callback.invoke(null, new FileNotFoundException(path));
+		} else callback.err(new FileNotFoundException(path));
 	}
 
 	@NotNull
 	@Override
-	public InputStream inputStreamSync() throws IOException {
+	public InputStream inputStreamSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
 			if (fi.children != null) {
-				throw new IOException("Cannot read directory");
+				throw new RuntimeException("Cannot read directory");
 			} else {
 				byte[] bytes = fi.content;
 				if (bytes == null) bytes = fi.content2.getBytes();
 				return new ByteArrayInputStream(bytes);
 			}
-		} else throw new FileNotFoundException(path);
+		} else throw new RuntimeException("Missing file " + path);
 	}
 
 	@NotNull
 	@Override
-	public String readTextSync() throws IOException {
+	public String readTextSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
 			if (fi.children != null) {
-				throw new IOException("Cannot read directory");
+				throw new RuntimeException("Cannot read directory");
 			} else {
 				String str = fi.content2;
 				if (str != null) return str;
@@ -119,35 +123,35 @@ public class VirtualFileRef extends FileReference {
 				fi.content2 = str;
 				return str;
 			}
-		} else throw new FileNotFoundException(path);
+		} else throw new RuntimeException("Missing file " + path);
 	}
 
 	@Override
-	public void readText(@NotNull Function2<? super String, ? super Exception, Unit> callback) {
+	public void readText(@NotNull Callback<String> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
 			if (fi.children != null) {
-				callback.invoke(null, new IOException("Cannot read directory"));
+				callback.err(new IOException("Cannot read directory"));
 			} else {
 				String str = fi.content2;
 				if (str == null) {
 					str = new String(fi.content);
 					fi.content2 = str;
 				}
-				callback.invoke(str, null);
+				callback.ok(str);
 			}
-		} else callback.invoke(null, new FileNotFoundException(path));
+		} else callback.err(new FileNotFoundException(path));
 	}
 
 	@NotNull
 	@Override
-	public byte[] readBytesSync() throws IOException {
+	public byte[] readBytesSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
 			if (fi.children != null) {
-				throw new IOException("Cannot read directory");
+				throw new RuntimeException("Cannot read directory");
 			} else {
 				byte[] bytes = fi.content;
 				if (bytes == null) {
@@ -156,32 +160,32 @@ public class VirtualFileRef extends FileReference {
 				}
 				return bytes;
 			}
-		} else throw new FileNotFoundException(path);
+		} else throw new RuntimeException("Missing path " + path);
 	}
 
 	@Override
-	public void readBytes(@NotNull Function2<? super byte[], ? super Exception, Unit> callback) {
+	public void readBytes(@NotNull Callback<byte[]> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
 			if (fi.children != null) {
-				callback.invoke(null, new IOException("Cannot read directory"));
+				callback.err(new IOException("Cannot read directory"));
 			} else {
 				byte[] bytes = fi.content;
 				if (bytes == null) {
 					bytes = fi.content2.getBytes();
 					fi.content = bytes;
 				}
-				callback.invoke(bytes, null);
+				callback.ok(bytes);
 			}
-		} else callback.invoke(null, new FileNotFoundException(path));
+		} else callback.err(new FileNotFoundException(path));
 	}
 
 	@Override
-	public long length() throws FileNotFoundException {
+	public long length() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.remove(path);
-		if (fi == null) throw new FileNotFoundException(path);
+		if (fi == null) throw new RuntimeException("Missing path " + path);
 		return fi.length();
 	}
 

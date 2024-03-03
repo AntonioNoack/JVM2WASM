@@ -270,7 +270,7 @@ object StructuralAnalysis {
             for (ill in illegals) {
                 println(ill)
             }
-            throw IllegalStateException()
+            throw IllegalStateException("Illegal node in $sig")
         }
 
         if (printOps) printState()

@@ -11,10 +11,8 @@ import me.anno.ecs.prefab.Prefab
 import me.anno.engine.ECSRegistry
 import me.anno.engine.ScenePrefab
 import me.anno.gpu.texture.Clamping
-import me.anno.io.ISaveable.Companion.registerCustomClass
 import me.anno.io.SaveableArray
 import me.anno.io.base.BaseReader.Companion.getNewClassInstance
-import me.anno.io.serialization.CachedReflections
 import me.anno.io.utils.StringMap
 import me.anno.ui.UIRegistry
 import org.jbox2d.collision.shapes.ShapeType

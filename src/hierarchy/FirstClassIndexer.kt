@@ -54,7 +54,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         }
 
         fun String.readType(i: Int): Int {
-            if (this[i] == '[') return readType(i + 1)
+            if (this[i] == '[' || this[i] == '*') return readType(i + 1)
             when (this[i]) {
                 'L', 'T' -> {} // fine :)
                 'Z', 'B', 'S', 'C', 'I', 'J', 'F', 'D' -> return i + 1 // native types or arrays

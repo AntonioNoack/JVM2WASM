@@ -1,3 +1,3 @@
 package annotations
 
-annotation class Boring()
+annotation class Boring

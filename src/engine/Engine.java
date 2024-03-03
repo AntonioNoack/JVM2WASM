@@ -1,32 +1,33 @@
 package engine;
 
-import annotations.Alias;
-import annotations.JavaScript;
-import annotations.NoThrow;
-import annotations.WASM;
+import annotations.*;
 import jvm.FillBuffer;
 import jvm.GC;
 import kotlin.Unit;
+import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.config.DefaultConfig;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
+import me.anno.engine.EngineBase;
 import me.anno.engine.ui.render.RenderMode;
 import me.anno.engine.ui.render.SceneView;
+import me.anno.fonts.Font;
+import me.anno.fonts.FontManager;
+import me.anno.fonts.FontStats;
 import me.anno.gpu.GFX;
 import me.anno.gpu.GFXBase;
 import me.anno.gpu.OSWindow;
 import me.anno.gpu.texture.*;
+import me.anno.graph.render.RenderGraph;
 import me.anno.image.Image;
-import me.anno.image.ImageGPUCache;
-import me.anno.image.gimp.GimpImage;
+import me.anno.input.Clipboard;
 import me.anno.input.Input;
 import me.anno.input.Key;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
 import me.anno.io.utils.StringMap;
-import me.anno.studio.StudioBase;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
 import me.anno.utils.Clock;
@@ -36,6 +37,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.List;
 
 import static engine.GFXBase2Kt.renderFrame2;
@@ -49,6 +51,18 @@ public class Engine {
 	// todo we could order the fields within Matrix types automatically, so we could upload them without any intermediate copying steps :3
 
 	private static OSWindow window;
+
+	private static void init() {
+		// todo setup everything that JVMPlugin would do...
+		FontStats.INSTANCE.setQueryInstalledFontsImpl(Collections::emptyList);
+		FontStats.INSTANCE.setGetFontHeightImpl(font -> (double) font.getSize());
+		FontStats.INSTANCE.setGetTextGeneratorImpl(font -> new TextGeneratorImpl(new Font(
+				font.getName(),
+				FontManager.INSTANCE.getAvgFontSize(font.getSizeIndex()),
+				font.getBold(),
+				font.getItalic())));
+		FontStats.INSTANCE.setGetTextLengthImpl((font, text) -> 100.0);
+	}
 
 	@SuppressWarnings("ConfusingMainMethod")
 	public static void main(String clazzName, boolean fp16, boolean fp32) {
@@ -65,7 +79,9 @@ public class Engine {
 		// LuaTest.test();
 		// SciMark.test();
 
-		StudioBase instance;
+		init();
+
+		EngineBase instance;
 		//instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
 		Panel panel;
 		// panel = new Snake();
@@ -88,8 +104,8 @@ public class Engine {
 
 		GFXBase.prepareForRendering(tick);
 		GFX.setup(tick);
-		GFX.maxSamples = 1;
-		GFX.supportsDepthTextures = true;// todo true??
+		GFX.supportsDepthTextures = false;// todo true??
+		RenderGraph.INSTANCE.setThrowExceptions(true);
 		GFX.check();
 		tick.stop("Render step zero");
 
@@ -115,7 +131,7 @@ public class Engine {
 
 	public static void keyDown(int key) {
 		if (window == null) return;
-		Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key));
+		Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key), System.nanoTime());
 	}
 
 	public static void keyUp(int key) {
@@ -214,8 +230,8 @@ public class Engine {
 
 	@JavaScript(code = "" +
 			"var img = new Image();\n" +
-			"jsRefs[arg1]=1;\n" +
-			"jsRefs[arg2]=1;\n" +
+			"gcLock(arg1);\n" +
+			"gcLock(arg2);\n" +
 			"img.onload=function(){\n" +
 			"   var w=img.width,h=img.height;\n" +
 			"   var canvas=document.createElement('canvas')\n" +
@@ -227,14 +243,14 @@ public class Engine {
 			"   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h).data);\n" +
 			"   x=window.lib.finishTexture(arg1,w,h,arg2);\n" +
 			"   if(x) throw x;\n" +
-			"   delete jsRefs[arg1];\n" +
-			"   delete jsRefs[arg2];" +
+			"   gcUnlock(arg1);\n" +
+			"   gcUnlock(arg2);\n" +
 			"}\n" +
 			"lib.onerror=function(){\n" +
 			"   var x=window.lib.finishTexture(0,-1,-1,arg2);\n" +
 			"   if(x) throw x;\n" +
-			"   delete jsRefs[arg1];\n" +
-			"   delete jsRefs[arg2];\n" +
+			"   gcUnlock(arg1);\n" +
+			"   gcUnlock(arg2);\n" +
 			"}\n" +
 			"img.src = str(arg0);\n" +
 			"")
@@ -255,10 +271,10 @@ public class Engine {
 			texture.setCreatedH(h);
 			texture.setLocallyAllocated(Texture2D.Companion.allocate(texture.getLocallyAllocated(), ((long) w * h) << 2));
 			texture.setInternalFormat(GL11C.GL_RGB8);
-			texture.setCreated(true);
-			texture.setFiltering(GPUFiltering.TRULY_NEAREST);
-			texture.setClamping(null);
-			texture.ensureFilterAndClamping(GPUFiltering.NEAREST, Clamping.CLAMP);
+			texture.setWasCreated(true);
+			texture.setFiltering(Filtering.TRULY_NEAREST);
+			texture.setClamping(Clamping.REPEAT);
+			texture.ensureFilterAndClamping(Filtering.NEAREST, Clamping.CLAMP);
 		}
 		if (callback != null) callback.invoke(texture);
 	}
@@ -267,7 +283,7 @@ public class Engine {
 	public static Texture2D ImageGPUCache_get(Object self, FileReference file, long timeout, boolean async) {
 		if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
 		// log("asking for", file.getAbsolutePath());
-		LateinitTexture tex = ImageGPUCache.INSTANCE.getLateinitTexture(file, timeout, false, (callback) -> {
+		LateinitTexture tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, false, (callback) -> {
 			if (file instanceof WebRef2) {
 				// call JS to generate a texture for us :)
 				Texture2D tex3 = new Texture2D(file.getName(), 1, 1, 1);
@@ -348,10 +364,10 @@ public class Engine {
 	}
 
 	// could be disabled, if it really is needed...
-	@Alias(names = "me_anno_image_gimp_GimpImageXCompanion_readAsFolder_Lme_anno_io_files_FileReferenceLkotlin_jvm_functions_Function2V")
+	/*@Alias(names = "me_anno_image_gimp_GimpImageXCompanion_readAsFolder_Lme_anno_io_files_FileReferenceLkotlin_jvm_functions_Function2V")
 	public static void GimpImageXCompanion_readAsFolder(FileReference src, Function2<GimpImage, Exception, Unit> callback) {
 		callback.invoke(null, new IOException("Gimp Image files are not supported in Web!"));
-	}
+	}*/
 
 	@Alias(names = "me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image")
 	public static Object me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
@@ -413,7 +429,7 @@ public class Engine {
 		if (inFocus.isEmpty()) return;
 		Object copied = inFocus0.onCopyRequested(mouseX, mouseY);
 		if (copied == null) return;
-		Input.INSTANCE.setClipboardContent(copied.toString());
+		Clipboard.INSTANCE.setClipboardContent(copied.toString());
 	}
 
 	@Alias(names = "kotlin_text_CharsKt__CharJVMKt_checkRadix_II")
@@ -538,7 +554,10 @@ public class Engine {
 		return null;
 	}
 
-	@NoThrow
+	/**
+	 * for debugging, prints all strings that were generated at runtime
+	 */
+	@NoThrow // todo what are idx0 and len???
 	@Alias(names = "pds")
 	private static void printDynamicStrings(int idx0, int len) {
 		int instance = getAllocationStart();
@@ -592,5 +611,28 @@ public class Engine {
 			instance += size;
 		}
 		log("clazz (last)", lastClass, lastSize, instanceCtr);
+	}
+
+	@NoThrow
+	@JavaScript(code = "gcLock(arg0);\n" +
+			"let name = str(arg1);\n" +
+			"setTimeout(() => {\n" +
+			"	console.log('running thread', name, arg0);\n" +
+			"	safe(window.lib.runRunnable(arg0));\n" +
+			"	gcUnlock(arg0);\n" +
+			"});\n")
+	private static native void runAsyncImpl(Function0<Object> runnable, String name);
+
+	@Export
+	@Alias(names = "runRunnable")
+	private static void runRunnable(Function0<Object> runnable) {
+		runnable.invoke();
+	}
+
+	@NoThrow
+	@Alias(names = "me_anno_cache_CacheSection_runAsync_Ljava_lang_StringLkotlin_jvm_functions_Function0V")
+	public static void runAsync(Object self, String name, Function0<Object> runnable) {
+		if (false) runRunnable(runnable); // mark as used
+		runAsyncImpl(runnable, name);
 	}
 }

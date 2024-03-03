@@ -376,6 +376,7 @@ var ctr = 0
             throw trace(x)
         }
     }
+    window.safe = safe
 
     function onLoaded(results){
        // try {
@@ -420,6 +421,13 @@ var ctr = 0
     }
 
     var refs = window.jsRefs = {}
+    window.gcLock = function(ref){
+    	jsRefs[ref] = (jsRefs[ref]||0)+1;
+    }
+    window.gcUnlock = function(ref){
+    	if(jsRefs[ref] == 1) delete jsRefs[ref];
+        else jsRefs[ref] = (jsRefs[ref]||0)-1;
+    }
     window.markJSReferences = function(){
         for(var ref in jsRefs){
             lib.gcMarkUsed(ref)

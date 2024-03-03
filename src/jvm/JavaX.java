@@ -11,7 +11,7 @@ public class JavaX {
 	@JavaScript(code = "var d = new Date();var h=d.getHours(),m=d.getMinutes(),s=d.getSeconds();return fill(arg0, (h<10?'0'+h:h)+':'+(m<10?'0'+m:m)+':'+(s<10?'0'+s:s))")
 	public static native int fillDate(char[] chr);
 
-	@Alias(names = {"org_apache_logging_log4j_LoggerImpl_getTimeStamp_Ljava_lang_String", "org_apache_logging_log4j_LoggerImplXCompanion_getTimeStamp_Ljava_lang_String"})
+	@Alias(names = {"org_apache_logging_log4j_LoggerImplXCompanion_getTimeStamp_Ljava_lang_CharSequence"})
 	public static String LoggerImpl_getTimeStamp(LoggerImpl impl) {
 		char[] builder = FillBuffer.getBuffer();
 		int length = fillDate(builder);

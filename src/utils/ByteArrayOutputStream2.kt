@@ -1,11 +1,11 @@
 package utils
 
-import me.anno.utils.structures.arrays.ExpandingByteArray
+import me.anno.utils.structures.arrays.ByteArrayList
 import java.io.OutputStream
 
 class ByteArrayOutputStream2(capacity: Int = 16) : OutputStream() {
 
-    val data = ExpandingByteArray(capacity)
+    val data = ByteArrayList(capacity)
 
     var position: Int
         get() = data.size

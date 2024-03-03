@@ -1,8 +1,8 @@
 package utils
 
 import hIndex
-import me.anno.utils.strings.StringHelper.indexOf2
 import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Strings.indexOf2
 import reb
 import java.lang.IllegalStateException
 
@@ -12,6 +12,7 @@ val i32 = "i32"
 val i64 = "i64"
 
 // could be changed to i64 in the future, if more browsers support 64 bit wasm
+// quite a few bits expect i32 though...
 val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
 

@@ -1,4 +1,3 @@
 package annotations
 
-annotation class NoThrow {
-}
+annotation class NoThrow

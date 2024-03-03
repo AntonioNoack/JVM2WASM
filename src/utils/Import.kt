@@ -2,6 +2,7 @@ package utils
 
 import canThrowError
 import hIndex
+import useWASMExceptions
 
 fun StringBuilder2.import1(name: String, inputs: List<String>, outputs: List<String>) {
     if (name == "kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List") TODO()
@@ -37,7 +38,7 @@ fun StringBuilder2.import2(sig: MethodSig) {
                 name,
                 (if (sig in hIndex.staticMethods) emptyList() else listOf(ptrType)) +
                         split1(desc.substring(1, di)).map { jvm2wasm(it) },
-                if (canThrowError(sig)) {
+                if (canThrowError(sig) && !useWASMExceptions) {
                     if (desc.endsWith(")V")) {
                         listOf(ptrType)
                     } else {

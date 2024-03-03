@@ -35,8 +35,6 @@ const val api = ASM9
 
 // todo combine non-exported functions with the same content :3
 
-// todo often, there is local.getXX or i32.const before drop -> remove those
-
 // do we already replace dependencies before resolving them? probably could save us tons of space (and wabt compile time 😁)
 // todo mark empty functions as such, and skip them; e.g. new_java_lang_Object_V, new_java_lang_Number_V
 
@@ -54,6 +52,7 @@ const val api = ASM9
 var exportAll = true // 15% space-saving; 10% in compressed
 var exportHelpers = exportAll
 
+// todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
@@ -66,9 +65,10 @@ val byteStrings = useUTF8Strings || replaceStringInternals
 var disableAudio = true
 
 // todo doesn't work yet, missing functions :/
+// if this flag is true, fields that aren't read won't be written
 var fieldsRWRequired = false
 
-val stackSize = if (enableTracing) 1024 * 1024 else 0
+val stackSize = if (enableTracing) 1024 * 32 else 0
 
 val classReplacements = hashMapOf(
     "java/util/concurrent/ConcurrentHashMap" to "java/util/HashMap",
@@ -617,7 +617,7 @@ fun main() {
             @Suppress("UNCHECKED_CAST")
             val aliasNames = alias.properties["names"] as List<String>
             for (aliasName in aliasNames) {
-                if('|' in aliasName) throw IllegalStateException(aliasName)
+                if ('|' in aliasName) throw IllegalStateException(aliasName)
                 // val aliasName = alias.properties["name"] as String
                 if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
                 if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
@@ -638,9 +638,6 @@ fun main() {
             else println("Skipped $sig -> $aliasName, because unknown")
         }
     }
-
-    if ("org_lwjgl_opengl_GL45C_glEnable_IV" !in hIndex.methodAliases)
-        throw IllegalStateException()
 
     /**
      * collect all entry point methods
@@ -769,7 +766,7 @@ fun main() {
 
     gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
-    for ((method, annotation, noinline) in hIndex.annotations.entries
+    for ((method, code, noinline) in hIndex.annotations.entries
         .mapNotNull { m ->
             val wasm = m.value.firstOrNull { it.clazz == "annotations/WASM" }
             if (wasm != null)
@@ -778,13 +775,17 @@ fun main() {
             else null
         }) {
         if (noinline) {
-            hIndex.wasmNative[method] = annotation
+            hIndex.wasmNative[method] = code
         } else {
-            hIndex.inlined[method] = annotation
+            hIndex.inlined[method] = code
         }
     }
 
     headerPrinter.append("(module\n")
+
+    if (useWASMExceptions) {
+        importPrinter.append("(import \"extmod\" \"exttag\" (tag \$exTag (param i32)))\n")
+    }
 
     importPrinter.import1("fcmpl", listOf(f32, f32), listOf(i32))
     importPrinter.import1("fcmpg", listOf(f32, f32), listOf(i32))
@@ -897,7 +898,7 @@ fun main() {
         val desc = func.descriptor
         val dx = desc.lastIndexOf(')')
         // export? no, nobody should call these
-        if(methodName(func) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
+        if (methodName(func) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
             throw IllegalStateException("This function isn't not-implemented/abstract")
         bodyPrinter.append("(func $").append(methodName(func)).append(" (param")
         for (param in split1(desc.substring(1, dx))) {

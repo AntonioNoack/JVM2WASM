@@ -1,3 +1,3 @@
 package annotations
 
-annotation class NotCalled()
+annotation class NotCalled

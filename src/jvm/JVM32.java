@@ -214,8 +214,8 @@ public class JVM32 {
 	public static int resolveIndirect(int instance, int methodPtr) {
 		if (instance == 0) {
 			log("instance for call is null", methodPtr);
-			// throw new NullPointerException("instance for call is null");
-			throwJs();
+			throw new NullPointerException("instance for call is null");
+			// throwJs();
 		}
 		invokeBlackMagic();
 		return resolveIndirectByClass(readClass(instance), methodPtr);

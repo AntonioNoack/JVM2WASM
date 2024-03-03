@@ -7,5 +7,5 @@ import me.anno.input.Input
 fun renderFrame2(window: OSWindow) {
     Input.pollControllers(window)
     GFX.activeWindow = window
-    GFX.renderStep(window)
+    GFX.renderStep(window, true)
 }

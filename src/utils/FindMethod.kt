@@ -3,7 +3,10 @@ package utils
 import dIndex
 import hIndex
 import me.anno.maths.Maths.hasFlag
+import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes
+
+private val LOGGER = LogManager.getLogger("FindMethod")
 
 fun findMethod(clazz: String, sig: MethodSig): MethodSig? {
     return findMethod(clazz, sig.name, sig.descriptor)
@@ -18,7 +21,7 @@ fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable:
     if (throwNotConstructable && !(isConstructable || isStatic) && method3 in hIndex.methods[clazz]!!) {
         printUsed(method3)
         println("child classes: ${hIndex.superClass.entries.filter { it.value == clazz }.map { it.key }}")
-        me.anno.utils.LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz)") // : ${dIndex.constructableClasses}
+        LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz)") // : ${dIndex.constructableClasses}
     }
     val superClass = hIndex.superClass[clazz]
     if ((hIndex.classFlags[clazz] ?: 0).hasFlag(Opcodes.ACC_ABSTRACT) && method3 in hIndex.abstractMethods) {

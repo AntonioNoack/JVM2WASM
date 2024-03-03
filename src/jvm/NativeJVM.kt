@@ -42,6 +42,14 @@ fun appendNativeHelperFunctions(printer: StringBuilder2) {
         forAll2("(func \$swapv1v2 (param v1 v2) (result v2 v1) local.get 1 local.get 0)\n")
     }
 
+    // instance, value, offset
+    printer.append("(func \$setFieldI8 (param i32 i32 i32) (result) local.get 0 local.get 2 i32.add local.get 1 i32.store8)\n")
+    printer.append("(func \$setFieldI16 (param i32 i32 i32) (result) local.get 0 local.get 2 i32.add local.get 1 i32.store16)\n")
+    printer.append("(func \$setFieldI32 (param i32 i32 i32) (result) local.get 0 local.get 2 i32.add local.get 1 i32.store)\n")
+    printer.append("(func \$setFieldI64 (param i32 i64 i32) (result) local.get 0 local.get 2 i32.add local.get 1 i64.store)\n")
+    printer.append("(func \$setFieldF32 (param i32 f32 i32) (result) local.get 0 local.get 2 i32.add local.get 1 f32.store)\n")
+    printer.append("(func \$setFieldF64 (param i32 f64 i32) (result) local.get 0 local.get 2 i32.add local.get 1 f64.store)\n")
+
     forAll2(
         "(func \$dup_x1v1v2 (export \"dup_x1v1v2\") (param v2 v1) (result v1 v2 v1) local.get 1 local.get 0 local.get 1)\n",
         gIndex.usedDup_x1
@@ -83,5 +91,11 @@ fun appendNativeHelperFunctions(printer: StringBuilder2) {
     // to do implement this, when we have multi-threading
     printer.append("(func \$monitorEnter (param $ptrType))\n")
     printer.append("(func \$monitorExit (param $ptrType))\n")
-
+    printer.append("(func \$shallInitStatic (param i32) (result i32)\n" +
+            "  (local \$addr i32)\n" +
+            "  global.get \$Z local.get 0 i32.add local.set \$addr\n" + // calculate flag address
+            "  local.get \$addr i32.load8_u\n" + // push result onto stack
+            "  local.get \$addr i32.const 1 i32.store8\n" + // set flag no matter what
+            // return result
+            ")\n")
 }
