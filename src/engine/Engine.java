@@ -91,9 +91,8 @@ public class Engine {
 		// panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
 		// panel = new AnimTextPanelTest(false);
 		// panel = CellMod.createGame();
-		// todo styling is broken, everything is just white...
 		panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, 1f, new Mesh()), sceneView -> {
-			sceneView.getRenderer().setRenderMode(RenderMode.Companion.getNORMAL());
+			sceneView.getRenderer().setRenderMode(RenderMode.Companion.getDEFAULT());
 			return Unit.INSTANCE;
 		});
 		panel.setWeight(1f);

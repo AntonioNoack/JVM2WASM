@@ -21,10 +21,7 @@ import java.util.function.Consumer;
 
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
-import static org.lwjgl.opengl.GL11C.GL_RGBA;
-import static org.lwjgl.opengl.GL11C.GL_VERSION;
-import static org.lwjgl.opengl.GL12C.GL_BGRA;
-import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
+import static org.lwjgl.opengl.GL46C.*;
 
 public class LWJGLxOpenGL {
 
@@ -50,51 +47,47 @@ public class LWJGLxOpenGL {
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glCreateProgram_I")
 	@JavaScript(code = "return map(gl.createProgram())")
-	public static native int GL20C_glCreateProgram_I();
+	public static native int glCreateProgram_I();
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glCreateShader_II")
 	@JavaScript(code = "return map(gl.createShader(arg0))")
-	public static native int GL20C_glCreateShader_II(int type);
+	public static native int glCreateShader_II(int type);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glCompileShader_IV")
 	@JavaScript(code = "gl.compileShader(unmap(arg0))")
-	public static native void GL20C_glCompileShader_IV(int shader);
+	public static native void glCompileShader_IV(int shader);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glLinkProgram_IV")
 	@JavaScript(code = "gl.linkProgram(unmap(arg0))")
-	public static native void GL20C_glLinkProgram_IV(int program);
+	public static native void glLinkProgram_IV(int program);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glAttachShader_IIV")
 	@JavaScript(code = "gl.attachShader(unmap(arg0), unmap(arg1))")
-	public static native void GL20C_glAttachShader_IIV(int program, int shader);
+	public static native void glAttachShader_IIV(int program, int shader);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glUseProgram_IV")
 	@JavaScript(code = "gl.useProgram(unmap(arg0))")
-	public static native void GL20C_glUseProgram_IV(int program);
+	public static native void glUseProgram_IV(int program);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glValidateProgram_IV")
 	@JavaScript(code = "gl.validateProgram(unmap(arg0))")
-	public static native void GL20C_glValidateProgram_IV(int program);
-
-	@NoThrow
-	@JavaScript(code = "return map(gl.getUniformLocation(unmap(arg0), str(arg1)))")
-	public static native int GL20C_glGetUniformLocation2(int program, CharSequence name);
+	public static native void glValidateProgram_IV(int program);
 
 	@NoThrow
 	@JavaScript(code = "gl.uniform1f(unmap(arg0),arg1)")
 	@Alias(names = "org_lwjgl_opengl_GL46C_glUniform1f_IFV")
-	public static native void org_lwjgl_opengl_GL20C_glUniform1f(int location, float x);
+	public static native void glUniform1f(int location, float x);
 
 	@NoThrow
 	@JavaScript(code = "gl.uniform1i(unmap(arg0),arg1)")
 	@Alias(names = "org_lwjgl_opengl_GL46C_glUniform1i_IIV")
-	public static native void org_lwjgl_opengl_GL20C_glUniform1i(int location, int x);
+	public static native void glUniform1i(int location, int x);
 
 	@NoThrow
 	@JavaScript(code = "gl.uniform2f(unmap(arg0),arg1,arg2)")
@@ -137,9 +130,13 @@ public class LWJGLxOpenGL {
 	public static native void glDisable(int mode);
 
 	@NoThrow
+	@JavaScript(code = "return map(gl.getUniformLocation(unmap(arg0), str(arg1)))")
+	public static native int glGetUniformLocationString(int program, String name);
+
+	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glGetUniformLocation_ILjava_lang_CharSequenceI")
 	public static int glGetUniformLocation(int program, CharSequence name) {
-		return GL20C_glGetUniformLocation2(program, name.toString());
+		return glGetUniformLocationString(program, name.toString());
 	}
 
 	@NoThrow
@@ -161,6 +158,12 @@ public class LWJGLxOpenGL {
 	@Alias(names = "org_lwjgl_opengl_GL46C_glBindRenderbuffer_IIV")
 	@JavaScript(code = "gl.bindRenderbuffer(arg0,unmap(arg1))")
 	public static native void glBindRenderbuffer_IIV(int type, int ptr);
+
+	@NoThrow
+	@Alias(names = "org_lwjgl_opengl_GL46C_glBlitFramebuffer_IIIIIIIIIIV")
+	@JavaScript(code = "gl.blitFramebuffer(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9)")
+	public static native void glBlitFramebuffer_10xI_V(int a, int b, int c, int d, int e,
+													   int f, int g, int h, int i, int j);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glViewport_IIIIV")
@@ -324,15 +327,20 @@ public class LWJGLxOpenGL {
 	public static String GL20_glGetShaderInfoLog(int shader) {
 		char[] buffer = FillBuffer.getBuffer();
 		int length = fillShaderInfoLog(buffer, shader);
-		if (length == 0) return "";
-		return new String(buffer, 0, length);
+		if (length == 0) return null;
+		String s = new String(buffer, 0, length);
+		if (s.contains("floating point division by zero")) {
+			log(s);
+			return null;
+		}
+		return s;
 	}
 
 	@Alias(names = "org_lwjgl_opengl_GL46C_glGetProgramInfoLog_ILjava_lang_String")
 	public static String GL20_glGetProgramInfoLog(int program) {
 		char[] buffer = FillBuffer.getBuffer();
 		int length = fillProgramInfoLog(buffer, program);
-		if (length == 0) return "";
+		if (length == 0) return null;
 		return new String(buffer, 0, length);
 	}
 
@@ -358,8 +366,8 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glGetInteger_II")
-	// 0x8D57 = max samples;
 	@JavaScript(code = "" +
+			"if(arg0 == 0x8D57) return 1;\n" + // multisampled texture aren't supported, multisampled renderbuffers would be
 			"if(arg0 == 0x826E) return 1024;\n" + // max uniform locations; not defined in WebGL
 			"if(arg0 == 0x821B || arg0 == 0x821C) return 0;\n" + // 0x821B, 0x821C = major, minor version
 			"if(arg0 == 0x8CDF) return 1;\n" + // max color attachments
@@ -384,11 +392,13 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
-	@JavaScript(code = "console.log('glTexImage2D', arguments);gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)") // null is needed why-ever...
+	@JavaScript(code = "console.log('glTexImage2D', arguments);gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
+	// null is needed why-ever...
 	private static native void GL11C_glTexImage2D(int target, int level, int format, int w, int h, int border, int dataFormat, int dataType);
 
 	@NoThrow
-	@JavaScript(code = "console.log('glTexImage3D', arguments);gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)") // null is needed why-ever...
+	@JavaScript(code = "console.log('glTexImage3D', arguments);gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
+	// null is needed why-ever...
 	private static native void GL11C_glTexImage3D(int target, int level, int format, int w, int h, int d, int border, int dataFormat, int dataType);
 
 	@NoThrow
@@ -687,6 +697,12 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
+	@Alias(names = "org_lwjgl_opengl_GL46C_glUniform4fv_IAFV")
+	public static void glUniform4fv(int location, float[] data) {
+		glUniform4fv(location, getAddr(data) + arrayOverhead, data.length);
+	}
+
+	@NoThrow
 	@JavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
 	public static native void glUniformMatrix4x3fv(int location, boolean transpose, int addr, int length);
 
@@ -703,7 +719,7 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4fv_IZLjava_nio_FloatBufferV")
-	public static void GL20C_glUniformMatrix4fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
+	public static void glUniformMatrix4fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
 		int addr = getBufferAddr(data);
 		glUniformMatrix4fv(location, transpose, addr, data.remaining());
 	}
