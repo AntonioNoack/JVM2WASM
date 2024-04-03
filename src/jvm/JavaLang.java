@@ -1308,17 +1308,6 @@ public class JavaLang {
 		// might prevent HashTable from being used
 	}
 
-	@Alias(names = "new_java_lang_Throwable_V")
-	public static void new_java_lang_Throwable_V(Throwable self) {
-		// just an optimization :)
-	}
-
-	@Alias(names = "new_java_lang_Throwable_Ljava_lang_StringV")
-	public static void new_java_lang_Throwable_Ljava_lang_StringV(Throwable self, String message) {
-		// just an optimization :)
-		write32(getAddr(self) + objectOverhead, getAddr(message));
-	}
-
 	@Alias(names = "java_lang_ProcessBuilder_start_Ljava_lang_Process")
 	public static Process java_lang_ProcessBuilder_start_Ljava_lang_Process(ProcessBuilder self) {
 		throw new RuntimeException("Starting processes is not possible in WASM");

@@ -33,14 +33,13 @@ public class StringsUTF8 {
 	}
 
 	@Alias(names = "new_java_lang_String_ACIIV")
-	public static void new_java_lang_String_ACIIV(String self, char[] chars, int start, int end) {
+	public static void new_java_lang_String_ACIIV(String self, char[] chars, int start, int length) {
 		// todo if any char is > 127, use a better method
-		int l = end - start;
-		byte[] v1 = new byte[l];
-		for (int i = 0; i < l; i++) {
-			v1[i] = (byte) chars[i + start];
+		byte[] bytes = new byte[length];
+		for (int i = 0; i < length; i++) {
+			bytes[i] = (byte) chars[i + start];
 		}
-		setValue(self, v1);
+		setValue(self, bytes);
 	}
 
 	@Alias(names = "new_java_lang_String_ABLjava_nio_charset_CharsetV")

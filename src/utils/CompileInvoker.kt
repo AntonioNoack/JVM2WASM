@@ -92,7 +92,7 @@ fun compileToWASM(printer: StringBuilder2) {
 
     val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/jvm2wasm.wat")
     tmp.outputStream().use {
-        it.write(printer.array, 0, printer.size)
+        it.write(printer.values, 0, printer.size)
     }
 
     println("#strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize}")

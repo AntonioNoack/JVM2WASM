@@ -666,12 +666,7 @@ class MethodTranslator(
             }
             0xbf -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
-                stackPush()
                 dupI32()
-                printer.append(" call \$fIST") // fill in stack trace
-                if (comments) printer.append(" ;; athrow\n")
-                else printer.append('\n')
-                stackPop()
                 handleThrowable(true)
                 printer.pop(ptrType)
             }

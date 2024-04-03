@@ -36,6 +36,6 @@ fun createJSImports(
     jsFileText.append("  initialMemorySize: ").append(numPages).append('\n')
     jsFileText.append("}\nexport { lib as \"autoJS\" }")
     OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/index0.js").outputStream().use {
-        it.write(jsFileText.array!!, 0, jsFileText.size)
+        it.write(jsFileText.values, 0, jsFileText.size)
     }
 }

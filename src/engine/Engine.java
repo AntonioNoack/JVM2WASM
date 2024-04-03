@@ -7,6 +7,7 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
+import me.anno.cache.AsyncCacheData;
 import me.anno.config.DefaultConfig;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
@@ -31,6 +32,7 @@ import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
 import me.anno.utils.Clock;
+import me.anno.utils.structures.Callback;
 import org.lwjgl.opengl.GL11C;
 
 import java.io.File;
@@ -254,7 +256,7 @@ public class Engine {
 			"}\n" +
 			"img.src = str(arg0);\n" +
 			"")
-	private static native void generateTexture(String path, Texture2D texture, kotlin.jvm.functions.Function1 callback);
+	private static native void generateTexture(String path, Texture2D texture, Callback<ITexture2D> callback);
 
 	@Alias(names = "prepareTexture")
 	public static void prepareTexture(Texture2D texture) {
@@ -263,7 +265,7 @@ public class Engine {
 	}
 
 	@Alias(names = "finishTexture")
-	public static void finishTexture(Texture2D texture, int w, int h, kotlin.jvm.functions.Function1<Texture2D, Unit> callback) {
+	public static void finishTexture(Texture2D texture, int w, int h, Callback<ITexture2D> callback) {
 		if (texture != null) {
 			texture.setWidth(w);
 			texture.setHeight(h);
@@ -276,14 +278,14 @@ public class Engine {
 			texture.setClamping(Clamping.REPEAT);
 			texture.ensureFilterAndClamping(Filtering.NEAREST, Clamping.CLAMP);
 		}
-		if (callback != null) callback.invoke(texture);
+		if (callback != null) callback.ok(texture);
 	}
 
 	@Alias(names = "me_anno_image_ImageGPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_Texture2D")
 	public static Texture2D ImageGPUCache_get(Object self, FileReference file, long timeout, boolean async) {
 		if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
 		// log("asking for", file.getAbsolutePath());
-		LateinitTexture tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, false, (callback) -> {
+		AsyncCacheData<ITexture2D> tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, false, (callback) -> {
 			if (file instanceof WebRef2) {
 				// call JS to generate a texture for us :)
 				Texture2D tex3 = new Texture2D(file.getName(), 1, 1, 1);
@@ -294,12 +296,12 @@ public class Engine {
 				generateTexture(file.getAbsolutePath(), tex3, callback);
 			} else {
 				log("Reading local images hasn't been implemented yet", file.getAbsolutePath());
-				callback.invoke(null);
+				callback.err(new IOException("Reading local images hasn't been implemented yet"));
 			}
 			return Unit.INSTANCE;
 		});
 		if (tex == null) return null;
-		ITexture2D tex2 = tex.getTexture();
+		ITexture2D tex2 = tex.getValue();
 		if (!(tex2 instanceof Texture2D)) return null;
 		return (Texture2D) tex2;
 	}

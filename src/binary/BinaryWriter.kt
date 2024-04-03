@@ -185,7 +185,7 @@ class BinaryWriter(
             if (delta != 0) {
                 val srcOffset = offset + lebSizeGuess
                 val dstOffset = offset + lebSize
-                System.arraycopy(stream.array!!, srcOffset, stream.array!!, dstOffset, size)
+                System.arraycopy(stream.values, srcOffset, stream.values, dstOffset, size)
             }
             writeU32Leb128At(offset, size)
             stream.size += delta

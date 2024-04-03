@@ -13,11 +13,11 @@ class StringBuilder2(initCapacity: Int) : ByteArrayList(initCapacity) {
     }
 
     override fun toString(): String {
-        return String(array, 0, size)
+        return toString(0, size)
     }
 
     fun toString(i0: Int, i1: Int): String {
-        return String(array, i0, i1 - i0)
+        return String(values, i0, i1 - i0)
     }
 
     fun append(str: CharSequence): StringBuilder2 {
@@ -88,8 +88,7 @@ class StringBuilder2(initCapacity: Int) : ByteArrayList(initCapacity) {
     }
 
     fun prepend(str: StringBuilder2): StringBuilder2 {
-        val data = str.array ?: return this
-        return prepend(data, str.length)
+        return prepend(str.values, str.length)
     }
 
     fun prepend(str: String): StringBuilder2 {
@@ -99,9 +98,9 @@ class StringBuilder2(initCapacity: Int) : ByteArrayList(initCapacity) {
 
     private fun prepend(data: ByteArray, strLength: Int): StringBuilder2 {
         ensureExtra(strLength)
-        val array = array!!
-        System.arraycopy(array, 0, array, strLength, length) // move back
-        System.arraycopy(data, 0, array, 0, strLength) // insert new data
+        val values = values
+        System.arraycopy(values, 0, values, strLength, length) // move back
+        System.arraycopy(data, 0, values, 0, strLength) // insert new data
         size += strLength
         return this
     }
