@@ -223,25 +223,29 @@ public class WebRef2 extends FileReference {
 	@NotNull
 	@Override
 	public InputStream inputStreamSync() {
-		throw new RuntimeException("Web cannot request files synchronously");
+		throw warnSyncAccess();
+	}
+
+	private RuntimeException warnSyncAccess() {
+		return new RuntimeException("Web cannot request files synchronously: " + getAbsolutePath());
 	}
 
 	@NotNull
 	@Override
 	public String readTextSync() {
-		throw new RuntimeException("Web cannot request files synchronously");
+		throw warnSyncAccess();
 	}
 
 	@NotNull
 	@Override
 	public byte[] readBytesSync() {
-		throw new RuntimeException("Web cannot request files synchronously");
+		throw warnSyncAccess();
 	}
 
 	@NotNull
 	@Override
 	public ByteBuffer readByteBufferSync(boolean b) {
-		throw new RuntimeException("Web cannot request files synchronously");
+		throw warnSyncAccess();
 	}
 
 	@Override

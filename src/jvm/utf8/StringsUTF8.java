@@ -95,28 +95,24 @@ public class StringsUTF8 {
 	}
 
 	@Alias(names = "java_lang_String_regionMatches_ZILjava_lang_StringIIZ")
-	public static boolean String_regionMatches(String self, boolean ignoreCase, int i0, String other, int j0, int length) {
-		byte[] v0 = getValue(self);
-		byte[] v1 = getValue(other);
-		int a0 = getAddr(v0) + arrayOverhead;
-		int a1 = getAddr(v1) + arrayOverhead + j0;
-		int e0 = a0 + v0.length;
-		int i = i0;
-		if (j0 >= 0 && i0 >= 0 && (long) i0 <= (long) v0.length - (long) length && (long) j0 <= (long) v1.length - (long) length) {
-			byte b0;
-			byte b1;
-			do {
-				final int discrepancy = findDiscrepancy(a0 + i, e0, a1 + i);
-				if (unsignedLessThanEqual(discrepancy, e0)) return true;// they are the same :)
-				if (!ignoreCase) return false;
-				i = discrepancy - a0;
-				final byte b0i = read8(discrepancy);
-				final byte b1i = read8(a1 + i);
-				b0 = toUpperCase(b0i);
-				b1 = toUpperCase(b1i);
-			} while (b0 == b1 || toLowerCase(b0) == toLowerCase(b1));
+	public static boolean String_regionMatches(String str0, boolean ignoreCase, int offset0, String str1, int offset1, int charsToCompare) {
+		byte[] v0 = getValue(str0);
+		byte[] v1 = getValue(str1);
+		if (offset0 < 0 || offset0 + charsToCompare > v0.length) return false;
+		if (offset1 < 0 || offset1 + charsToCompare > v1.length) return false;
+		int a0 = getAddr(v0) + arrayOverhead + offset0;
+		int a1 = getAddr(v1) + arrayOverhead + offset1;
+		int e0 = a0 + charsToCompare;
+		while (true) {
+			final int diff0 = findDiscrepancy(a0, e0, a1);
+			if (unsignedGreaterThanEqual(diff0, e0)) return true;// they are the same :) -> match
+			if (!ignoreCase) return false; // they are different -> no match
+			a1 += (diff0 - a0); // advance a1
+			a0 = diff0;
+			byte b0 = toUpperCase(read8(a0));
+			byte b1 = toUpperCase(read8(a1));
+			if (b0 != b1) return false; // even with ignored case, they are different -> no match
 		}
-		return false;
 	}
 
 	@Alias(names = "java_lang_String_indexOf_III")
@@ -158,16 +154,7 @@ public class StringsUTF8 {
 
 	@Alias(names = "java_lang_String_startsWith_Ljava_lang_StringIZ")
 	public static boolean String_startsWith(String self, String other, int offset) {
-		// return String_regionMatches(self, false, offset, other, 0, other.length());// todo why is this other method not working?
-		byte[] v0 = getValue(self);
-		byte[] v1 = getValue(other);
-		int l0 = v0.length;
-		int l1 = v1.length;
-		if (l0 - offset < l1) return false;
-		int a0 = getAddr(v0) + arrayOverhead + offset;
-		int b0 = getAddr(v1) + arrayOverhead;
-		int a1 = a0 + l1;
-		return findDiscrepancy(a0, a1, b0) == a1;
+		return String_regionMatches(self, false, offset, other, 0, other.length());
 	}
 
 	@Alias(names = "java_lang_String_substring_IILjava_lang_String")

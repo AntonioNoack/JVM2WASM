@@ -305,7 +305,10 @@ public class LWJGLxOpenGL {
 	}
 
 	@Alias(names = "org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV")
-	@JavaScript(code = "gl.shaderSource(unmap(arg0),str(arg1).split('#extension').join('// #ext'))")
+	@JavaScript(code = "gl.shaderSource(unmap(arg0),str(arg1)" +
+			".split('#extension').join('// #ext')" +
+			".split('gl_SampleID').join('0')" + // todo why is this not supported???
+			")")
 	public static native void glShaderSource_ILjava_lang_CharSequenceV(int shader, CharSequence source);
 
 	@NoThrow

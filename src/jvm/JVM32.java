@@ -213,11 +213,8 @@ public class JVM32 {
 	@Alias(names = "resolveIndirect")
 	public static int resolveIndirect(int instance, int methodPtr) {
 		if (instance == 0) {
-			log("instance for call is null", methodPtr);
-			throw new NullPointerException("instance for call is null");
-			// throwJs();
+			throw new NullPointerException("Instance for resolveIndirect is null");
 		}
-		invokeBlackMagic();
 		return resolveIndirectByClass(readClass(instance), methodPtr);
 	}
 
@@ -366,18 +363,10 @@ public class JVM32 {
 	@Alias(names = "resolveInterface")
 	public static int resolveInterface(int instance, int methodId) {
 		if (instance == 0) {
-			log("resolveInterface:", instance, methodId);
-			throwJs("resolveInterface is null");
+			throw new NullPointerException("Instance for resolveInterface is null");
+		} else {
+			return resolveInterfaceByClass(readClass(instance), methodId);
 		}
-		// beware! ++ black magic ++
-		invokeBlackMagic();
-		// normal code
-		int clazz = readClass(instance);
-		return resolveInterfaceByClass(clazz, methodId);
-	}
-
-	@NoThrow
-	private static void invokeBlackMagic() {
 	}
 
 	@NoThrow
@@ -732,6 +721,10 @@ public class JVM32 {
 	@WASM(code = "i32.and")
 	private static native boolean and(boolean a, boolean b);
 
+	/**
+	 * finds the position of the next different byte;
+	 * in start
+	 */
 	@NoThrow
 	public static int findDiscrepancy(int start, int end, int start2) {
 		// align memory
@@ -744,7 +737,7 @@ public class JVM32 {
 	}
 
 	@NoThrow
-	public static int findDiscrepancyAligned(int start, int end, int start2) {
+	private static int findDiscrepancyAligned(int start, int end, int start2) {
 		// quickly find first different byte
 		int end8 = end - 7;
 		while (unsignedLessThan(start, end8)) {
@@ -757,8 +750,11 @@ public class JVM32 {
 		return findDiscrepancyAlignedEnd(start, end, start2);
 	}
 
+	/**
+	 * finds the position of the next different byte
+	 */
 	@NoThrow
-	public static int findDiscrepancyAlignedEnd(int start, int end, int start2) {
+	private static int findDiscrepancyAlignedEnd(int start, int end, int start2) {
 		if (and(unsignedLessThan(start, end - 3), read32(start) == read32(start2))) {
 			start += 4;
 			start2 += 4;

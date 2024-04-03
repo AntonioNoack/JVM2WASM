@@ -8,7 +8,6 @@ import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.cache.AsyncCacheData;
-import me.anno.config.DefaultConfig;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
@@ -28,6 +27,8 @@ import me.anno.input.Input;
 import me.anno.input.Key;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
+import me.anno.io.files.Reference;
+import me.anno.io.files.inner.temporary.InnerTmpFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
@@ -91,7 +92,6 @@ public class Engine {
 		// panel = new AnimTextPanelTest(false);
 		// panel = CellMod.createGame();
 		// todo styling is broken, everything is just white...
-		DefaultConfig.INSTANCE.getStyle(); // load style
 		panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, 1f, new Mesh()), sceneView -> {
 			sceneView.getRenderer().setRenderMode(RenderMode.Companion.getNORMAL());
 			return Unit.INSTANCE;
@@ -208,21 +208,40 @@ public class Engine {
 		return baseURL;
 	}
 
-	@Alias(names = "me_anno_io_files_FileReferenceXCompanion_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
-	public static FileReference FileReferenceXCompanion_createReference(Object self, String str) {
+	@Alias(names = "me_anno_io_files_Reference_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
+	public static FileReference Reference_createReference(String str) {
 		String str2 = str.indexOf('\\') >= 0 ? str.replace('\\', '/') : str;
-		if (str.startsWith("https://") || str.startsWith("http://")) return new WebRef2(str2);
+
+		if (str.startsWith("https://") || str.startsWith("http://")) {
+			return new WebRef2(str2);
+		}
+
 		if (str.startsWith("res://")) {
 			String url = getBaseURL() + str2.substring(6);
 			return new WebRef2(url);
 		}
+
+		if (str.startsWith("tmp://")) {
+			FileReference tmpRef = InnerTmpFile.find(str);
+			if (tmpRef == null) {
+				log("Missing temporary file {}, probably GCed", str);
+				return InvalidRef.INSTANCE;
+			}
+			return tmpRef;
+		}
+
+		FileReference staticRef = Reference.queryStatic(str);
+		if (staticRef != null) {
+			return staticRef;
+		}
+
 		while (str.endsWith("/")) str = str.substring(0, str.length() - 1);
 		return new VirtualFileRef(str);
 	}
 
-	@Alias(names = "me_anno_io_files_FileReferenceXCompanion_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
-	public static FileReference FileReferenceXCompanion_getReference(Object self, String str) {
-		return FileReferenceXCompanion_createReference(self, str);
+	@Alias(names = "me_anno_io_files_Reference_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
+	public static FileReference Reference_getReference(String str) {
+		return Reference_createReference(str);
 	}
 
 	@NoThrow
@@ -637,4 +656,7 @@ public class Engine {
 		if (false) runRunnable(runnable); // mark as used
 		runAsyncImpl(runnable, name);
 	}
+
+	@Alias(names = "me_anno_engine_OfficialExtensions_register_V")
+	private static void me_anno_engine_OfficialExtensions_register_V(Object self) {}
 }
