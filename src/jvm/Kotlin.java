@@ -20,6 +20,7 @@ import static jvm.JVM32.numClasses;
 import static jvm.JavaLang.getClassIndex;
 import static jvm.JavaLang.ptrTo;
 
+@SuppressWarnings("rawtypes")
 public class Kotlin {
 
 	static class WASMKotlin<V> implements KClass<V>, KType, ClassBasedDeclarationContainer {
@@ -235,6 +236,7 @@ public class Kotlin {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	@Alias(names = "kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List")
 	public static List<KClass<Object>> KClasses_getSuperclasses(KClass<Object> clazz) {
 		Class clazz1 = ((ClassBasedDeclarationContainer) clazz).getJClass();

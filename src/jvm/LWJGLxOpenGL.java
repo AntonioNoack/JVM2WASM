@@ -327,21 +327,60 @@ public class LWJGLxOpenGL {
 	public static String GL20_glGetShaderInfoLog(int shader) {
 		char[] buffer = FillBuffer.getBuffer();
 		int length = fillShaderInfoLog(buffer, shader);
-		if (length == 0) return null;
-		String s = new String(buffer, 0, length);
-		if (s.contains("floating point division by zero")) {
-			log(s);
-			return null;
-		}
-		return s;
+		return filterErrors(buffer, length);
 	}
 
 	@Alias(names = "org_lwjgl_opengl_GL46C_glGetProgramInfoLog_ILjava_lang_String")
 	public static String GL20_glGetProgramInfoLog(int program) {
 		char[] buffer = FillBuffer.getBuffer();
 		int length = fillProgramInfoLog(buffer, program);
+		return filterErrors(buffer, length);
+	}
+
+	private static String filterErrors(char[] buffer, int length) {
 		if (length == 0) return null;
-		return new String(buffer, 0, length);
+		String s = new String(buffer, 0, length);
+		// check each line of the message
+		String[] lines = split(s, '\n');
+		StringBuilder result = new StringBuilder(s.length());
+		for (String line : lines) {
+			if (!line.isEmpty() && needsToPrintError(line)) {
+				if (result.length() > 0) {
+					result.append('\n');
+				}
+				result.append(line);
+			}
+		}
+		return result.length() > 0 ? result.toString() : null;
+	}
+
+	private static int count(String s, char c) {
+		int count = 0;
+		for (int i = 0; i < s.length(); i++) {
+			count += (s.charAt(i) == c) ? 1 : 0;
+		}
+		return count;
+	}
+
+	@SuppressWarnings("SameParameterValue")
+	private static String[] split(String s, char separator) {
+		String[] result = new String[count(s, separator) + 1];
+		int i = 0, k = 0;
+		while (true) {
+			int j = s.indexOf(separator, i);
+			if (j < 0) break;
+			result[k++] = s.substring(i, j);
+			i = j + 1;
+		}
+		result[k] = s.substring(i);
+		return result;
+	}
+
+	private static boolean needsToPrintError(String s) {
+		if (s.contains("warning")) {
+			log(s);
+			return false;
+		} else return true;
 	}
 
 	@NoThrow
@@ -392,18 +431,18 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
-	@JavaScript(code = "console.log('glTexImage2D', arguments);gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
+	@JavaScript(code = "/*console.log('glTexImage2D', arguments);*/gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
 	// null is needed why-ever...
 	private static native void GL11C_glTexImage2D(int target, int level, int format, int w, int h, int border, int dataFormat, int dataType);
 
 	@NoThrow
-	@JavaScript(code = "console.log('glTexImage3D', arguments);gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
+	@JavaScript(code = "/*console.log('glTexImage3D', arguments);*/gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
 	// null is needed why-ever...
 	private static native void GL11C_glTexImage3D(int target, int level, int format, int w, int h, int d, int border, int dataFormat, int dataType);
 
 	@NoThrow
 	@JavaScript(code = "" +
-			"console.log('glTexImage2D', arguments);\n" +
+			"/*console.log('glTexImage2D', arguments);*/\n" +
 			"gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
 			"   arg7 == gl.UNSIGNED_INT ?" +
 			"   new Uint32Array(memory.buffer, arg8, arg9>>2):" +
@@ -423,7 +462,7 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@JavaScript(code = "" +
-			"console.log('glTexImage3D', arguments);\n" +
+			"/*console.log('glTexImage3D', arguments);*/\n" +
 			"gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
 			"   arg8 == gl.UNSIGNED_INT ?" +
 			"   new Uint32Array(memory.buffer, arg9, arg10>>2):" +
@@ -435,7 +474,7 @@ public class LWJGLxOpenGL {
 	@NoThrow
 	@JavaScript(code = "" +
 			// fps panel is ignored for now
-			"if(arg4 != 250 || arg5 != 1) console.log('glTexSubImage2D', arguments);\n" +
+			"/*if(arg4 != 250 || arg5 != 1) console.log('glTexSubImage2D', arguments);*/\n" +
 			"gl.texSubImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
 			"   arg7 == gl.UNSIGNED_INT ?" +
 			"   new Uint32Array(memory.buffer, arg8, arg9>>2):" +
@@ -473,7 +512,7 @@ public class LWJGLxOpenGL {
 	private static native void org_lwjgl_opengl_GL11C_glFinish_V();
 
 	@NoThrow
-	@JavaScript(code = "console.log('glReadPixelsI', arguments);gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
+	@JavaScript(code = "/*console.log('glReadPixelsI', arguments);*/gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
 	public static native void org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int data, int length);
 
 	@Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV")
@@ -482,7 +521,7 @@ public class LWJGLxOpenGL {
 	}
 
 	@NoThrow
-	@JavaScript(code = "console.log('glReadPixelsF', arguments);gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
+	@JavaScript(code = "/*console.log('glReadPixelsF', arguments);*/gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
 	public static native void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, int dataPtr, int length);
 
 	@Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV")
@@ -892,22 +931,22 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV")
-	@JavaScript(code = "console.log('glFramebufferTexture2D', arguments);gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
+	@JavaScript(code = "/*console.log('glFramebufferTexture2D', arguments);*/gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
 	public static native void glFramebufferTexture2D_IIIIIV(int a, int b, int c, int d, int e);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV")
-	@JavaScript(code = "console.log('glRenderbufferStorage', arguments);gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
+	@JavaScript(code = "/*console.log('glRenderbufferStorage', arguments);*/gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
 	public static native void glRenderbufferStorage(int target, int format, int width, int height);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV")
-	@JavaScript(code = "console.log('glFramebufferRenderbuffer', arguments);gl.framebufferRenderbuffer(arg0,arg1,arg2,unmap(arg3))")
+	@JavaScript(code = "/*console.log('glFramebufferRenderbuffer', arguments);*/gl.framebufferRenderbuffer(arg0,arg1,arg2,unmap(arg3))")
 	public static native void glFramebufferRenderbuffer(int target, int attachment, int target1, int ptr);
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glDrawBuffer_IV")
-	@JavaScript(code = "console.log('glDrawBuffer',arguments);gl.drawBuffers([arg0])")
+	@JavaScript(code = "/*console.log('glDrawBuffer',arguments);*/gl.drawBuffers([arg0])")
 	public static native void glDrawBuffer_IV(int mode);
 
 	@NoThrow
@@ -944,7 +983,7 @@ public class LWJGLxOpenGL {
 	private static native void drawBuffersPush(int mode);
 
 	@NoThrow
-	@JavaScript(code = "console.log('glDrawBuffers', window.tmp);gl.drawBuffers(window.tmp);delete window.tmp")
+	@JavaScript(code = "/*console.log('glDrawBuffers', window.tmp);*/gl.drawBuffers(window.tmp);delete window.tmp")
 	private static native void drawBuffersExec();
 
 	@NoThrow
@@ -965,7 +1004,7 @@ public class LWJGLxOpenGL {
 
 	@NoThrow
 	@Alias(names = "org_lwjgl_opengl_GL46C_glCheckFramebufferStatus_II")
-	@JavaScript(code = "console.log('glCheckFramebufferStatus');return gl.checkFramebufferStatus(arg0)")
+	@JavaScript(code = "/*console.log('glCheckFramebufferStatus');*/return gl.checkFramebufferStatus(arg0)")
 	public static native int glCheckFramebufferStatus_II(int target);
 
 	@NoThrow

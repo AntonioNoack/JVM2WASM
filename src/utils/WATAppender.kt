@@ -161,9 +161,12 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                     .fields.any { it.key !in fields2.map { f2 -> f2.first } }
             ) throw IllegalStateException("Fields from super class are missing in $className, " +
                     "super: ${hIndex.superClass[className]!!}, " +
-                    "${gIndex
-                        .getFieldOffsets(hIndex.superClass[className]!!, false)
-                        .fields.filter { it.key !in fields2.map { f2 -> f2.first } }}")
+                    "${
+                        gIndex
+                            .getFieldOffsets(hIndex.superClass[className]!!, false)
+                            .fields.filter { it.key !in fields2.map { f2 -> f2.first } }
+                    }"
+            )
 
             // create new fields array
             val arrayPtr = indexStartPtr + classData.size()
@@ -364,10 +367,10 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
             // filter for existing interfaces :)
             val interfaces = HashSet<String>()
             fun addI(clazz: String) {
-                val infs = hIndex.interfaces[clazz]
-                if (infs != null) {
-                    interfaces.addAll(infs.toList())
-                    for (inf in infs) addI(inf)
+                val classInterfaces = hIndex.interfaces[clazz] ?: emptyList()
+                interfaces.addAll(classInterfaces)
+                for (interfaceI in classInterfaces) {
+                    addI(interfaceI)
                 }
                 addI(hIndex.superClass[clazz] ?: return)
             }

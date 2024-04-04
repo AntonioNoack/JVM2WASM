@@ -65,6 +65,7 @@ package jvm.custom;
  *
  * @author Based on Sun's java.util.HashMap (modified by koliver)
  */
+@SuppressWarnings("unused")
 public class IntHashSet {
 
     private static final int DEFAULT_CAPACITY = 101;

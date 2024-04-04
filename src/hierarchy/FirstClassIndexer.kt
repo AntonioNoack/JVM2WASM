@@ -100,7 +100,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
     ) {
 
         val name = reb(name0)
-        val interfaces = interfaces0.map { reb(it) }.toTypedArray()
+        val interfaces = interfaces0.map { reb(it) }
 
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //     println("[C] $name ($signature): $superName, ${interfaces.joinToString()}")

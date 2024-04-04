@@ -40,27 +40,22 @@ try {
         // convert Java string into JavaScript string
         if(x == 0) return null
         if(lib.rCl(x) == 10) {
-            var chars = lib.r32(x + objectOverhead)
+            let chars = lib.r32(x + objectOverhead)
             if(chars == 0) return null
-            var cl = lib.rCl(chars)
+            let cl = lib.rCl(chars)
             if(cl == 6) {
-                var length = lib.r32(chars + objectOverhead)
+                let length = lib.r32(chars + objectOverhead)
                 if(length < 0 || length > 65535) return "STRING TOO LONG OR SHORT11!!: "+length
-                var str = []
+                let str = []
                 for(var i=0;i<length;i++){
                     str.push(String.fromCharCode(lib.r16(chars + arrayOverhead + (i+i))))
                 }
                 return str.join("")
             } else if(cl == 5) {
-                var length = lib.r32(chars + objectOverhead)
+                let length = lib.r32(chars + objectOverhead)
                 if(length < 0 || length > 65535) return "STRING TOO LONG OR SHORT11!!: "+length
-                var str = []
-                for(var i=0;i<length;i++){
-                    str.push(String.fromCharCode(lib.r8(chars + arrayOverhead + i)))
-                }
-                return str.join("")
-            } else  return "INCORRECT CLASS IN STRING.CHARS!!!"
-
+                return new TextDecoder().decode(new Uint8Array(memory.buffer, chars + arrayOverhead, length));
+            } else return "INCORRECT CLASS IN STRING.CHARS!!!"
         } else return "INVALID_STRING!!1! at "+x
         return x;
     }
@@ -165,8 +160,6 @@ var ctr = 0
 
         if(window.inited) return
 
-        // console.log("Starting Engine", 0)
-
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
         window.gl = useWebGPU ?
@@ -174,17 +167,11 @@ var ctr = 0
         	canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
         if(!gl) pleaseWait.innerText = "WebGL is not supported!"
 
-        // console.log("Starting Engine", 1)
-
         var supportsFP16 = !!gl.getExtension("EXT_color_buffer_half_float")
         var supportsFP32 = !!gl.getExtension("EXT_color_buffer_float")
         gl.getExtension('WEBGL_color_buffer_float')
 
-        // console.log("Starting Engine", 1.5)
-
         safe(lib.engine_Engine_main_Ljava_lang_StringZZV(0, supportsFP16, supportsFP32))
-
-        console.log("Starting Engine", 2)
 
         var fi = 0
         var lastTime = 0
@@ -208,7 +195,6 @@ var ctr = 0
             if(!window.stop) requestAnimationFrame(render)
         }
         requestAnimationFrame(render)
-
     }
 
     window.mouseX = 0
@@ -220,13 +206,6 @@ var ctr = 0
     }
 
     document.onmousedown = function(e){
-        // https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/button
-        /*0: Main button pressed, usually the left button or the un-initialized state             | ok
-          1: Auxiliary button pressed, usually the wheel button or the middle button (if present) | ok
-          2: Secondary button pressed, usually the right button                                   | ok
-          3: Fourth button, typically the Browser Back button                                     | ok
-          4: Fifth button, typically the Browser Forward button                                   | ok
-          */
         if(lib && inited) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
             lib.engine_Engine_mouseDown_IV(e.button)
@@ -354,16 +333,6 @@ var ctr = 0
         .then(response => response.arrayBuffer())
         .then(buffer => WebAssembly.instantiate(buffer, imports))
         .then(data => setTimeout(x => onLoaded(data), 0))
-    /*WebAssembly.instantiateStreaming(fetched, imports)
-        .then(onLoaded)
-        .catch(function(e){
-			console.log('')
-            console.error(e)
-            fetched
-                .then(response => response.arrayBuffer())
-                .then(buffer => WebAssembly.instantiate(buffer, imports))
-                .then(onLoaded)
-        })*/
 
     window.measureText = function(font,size,text){
         window.ctx.font=(size|0)+'px '+str(font)
@@ -379,23 +348,18 @@ var ctr = 0
     window.safe = safe
 
     function onLoaded(results){
-       // try {
-            window.results = results
-            window.module = results.module
-            window.instance = results.instance
-            window.lib = results.instance.exports
-            pleaseWait.style.display='none'
-            window.objectOverhead = lib.oo()
-        	window.arrayOverhead = objectOverhead + 4
-        	// console.log(objectOverhead)
-            safe(lib.init())
-            safe(lib.gc())
-            var sleep = Math.max(0, startTime - Date.now() + 300)
-            console.log('Showing logo for '+sleep+' ms')
-            setTimeout(startEngine, sleep)
-       /* } catch(e){
-            console.error(e)
-        }*/
+        window.results = results
+        window.module = results.module
+        window.instance = results.instance
+        window.lib = results.instance.exports
+        pleaseWait.style.display='none'
+        window.objectOverhead = lib.oo()
+    	window.arrayOverhead = objectOverhead + 4
+    	safe(lib.init())
+        safe(lib.gc())
+        var sleep = Math.max(0, startTime - Date.now() + 300)
+        console.log('Showing logo for '+sleep+' ms')
+        setTimeout(startEngine, sleep)
     }
 
     window.calloc = {}
@@ -429,7 +393,7 @@ var ctr = 0
         else jsRefs[ref] = (jsRefs[ref]||0)-1;
     }
     window.markJSReferences = function(){
-        for(var ref in jsRefs){
+        for(var ref in jsRefs) {
             lib.gcMarkUsed(ref)
         }
     }

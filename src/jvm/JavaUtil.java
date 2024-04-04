@@ -346,4 +346,10 @@ public class JavaUtil {
 		new_java_util_HashMap_IFIV(self, initialCapacity, loadFactor);
 	}
 
+	@NoThrow // why does this exist? probably an optimization of some kind
+	@Alias(names = "java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class")
+	public static Object java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class(Object instance) {
+		return null;
+	}
+
 }

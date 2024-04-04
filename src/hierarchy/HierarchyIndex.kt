@@ -12,7 +12,7 @@ object HierarchyIndex {
 
     val superClass = HashMap<String, String>(cap)
     val childClasses = HashMap<String, HashSet<String>>(cap)
-    val interfaces = HashMap<String, Array<String>>(cap)
+    val interfaces = HashMap<String, List<String>>(cap)
     val methods = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
 

@@ -200,8 +200,9 @@ object DependencyIndex {
 
                     checkState(dependencies)
 
-                    if (sig !in hIndex.staticMethods)
+                    if (sig !in hIndex.staticMethods) {
                         usedByClass.getOrPut(sig.clazz) { HashSet() }.add(sig)
+                    }
 
                     checkState(dependencies)
 

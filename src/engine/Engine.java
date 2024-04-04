@@ -634,7 +634,8 @@ public class Engine {
 	}
 
 	@NoThrow
-	@JavaScript(code = "gcLock(arg0);\n" +
+	@JavaScript(code = "" +
+			"gcLock(arg0);\n" +
 			"let name = str(arg1);\n" +
 			"setTimeout(() => {\n" +
 			"	console.log('running thread', name, arg0);\n" +
