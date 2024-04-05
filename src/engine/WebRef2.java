@@ -75,25 +75,25 @@ public class WebRef2 extends FileReference {
 
 	@NoThrow
 	@JavaScript(code = "" +
-			"var x = new XMLHttpRequest();\n" +
+			"let x = new XMLHttpRequest();\n" +
 			// todo implement args properly
-			"var url = str(arg0);\n" +
-			"var args={};\n" +
+			"let url = str(arg0);\n" +
+			"let args={};\n" +
 			"gcLock(arg1);\n" +
 			"x.open('POST', url);\n" +
 			"x.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');\n" +
 			"x.onreadystatechange = function(){\n" +
 			"   if(x.readyState==4){\n" +
 			"       if(x.status==200){\n" +
-			"           var data = x.response;\n" +
-			"           var dst = window.lib.createBytes(data.length);\n" +
+			"           let data = x.response;\n" +
+			"           let dst = window.lib.createBytes(data.length);\n" +
 			"           if(dst[1]) throw dst[1];\n" +
 			"           dst = dst[0];\n" +
 			"           const byteArray = new Uint8Array(data);\n" +
 			"           byteArray.forEach((element, index) => {\n" +
 			"               window.lib.w8(dst+arrayOverhead+index, element);\n" +
 			"           });\n" +
-			"           var dst2 = window.lib.createString(dst);\n" +
+			"           let dst2 = window.lib.createString(dst);\n" +
 			"           if(dst2[1]) throw dst2[1];\n" +
 			"           window.lib.invoke2(arg1, dst2[0], 0);\n" +
 			"       } else {\n" +
@@ -108,18 +108,18 @@ public class WebRef2 extends FileReference {
 
 	@NoThrow
 	@JavaScript(code = "" +
-			"var x = new XMLHttpRequest();\n" +
+			"let x = new XMLHttpRequest();\n" +
 			// todo implement args properly
-			"var url = str(arg0);\n" +
-			"var args={};\n" +
+			"let url = str(arg0);\n" +
+			"let args={};\n" +
 			"gcLock(arg1);\n" +
 			"x.open('POST', url);\n" +
 			"x.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');\n" +
 			"x.onreadystatechange = function(){\n" +
 			"   if(x.readyState==4){\n" +
 			"       if(x.status==200){\n" +
-			"           var data = x.response;\n" +
-			"           var dst = window.lib.createBytes(data.length);\n" +
+			"           let data = x.response;\n" +
+			"           let dst = window.lib.createBytes(data.length);\n" +
 			"           if(dst[1]) throw dst[1];\n" +
 			"           dst = dst[0];\n" +
 			"           const byteArray = new Uint8Array(data);\n" +
@@ -139,21 +139,21 @@ public class WebRef2 extends FileReference {
 
 	@NoThrow
 	@JavaScript(code = "" +
-			"var x = new XMLHttpRequest();\n" +
+			"let x = new XMLHttpRequest();\n" +
 			// todo implement args properly
-			"var url = str(arg0);\n" +
-			"var args={};\n" +
+			"let url = str(arg0);\n" +
+			"let args={};\n" +
 			"gcLock(arg1);\n" +
 			"x.open('POST', url);\n" +
 			"x.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');\n" +
 			"x.onreadystatechange = function(){\n" +
 			"   if(x.readyState==4){\n" +
 			"       if(x.status==200){" +
-			"           var data = x.response;\n" +
-			"           var dst = window.lib.createBytes(data.length);\n" +
+			"           let data = x.response;\n" +
+			"           let dst = window.lib.createBytes(data.length);\n" +
 			"           if(dst[1]) throw dst[1];\n" +
 			"           dst = dst[0];\n" +
-			"           var dst2 = window.lib.createByteStream(dst);\n" +
+			"           let dst2 = window.lib.createByteStream(dst);\n" +
 			"           if(dst2[1]) throw dst2[1];\n" +
 			"           dst2 = dst2[0];\n" +
 			"           const byteArray = new Uint8Array(data);\n" +

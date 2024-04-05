@@ -197,8 +197,8 @@ public class JVM32 {
 	}
 
 	@NoThrow
-	@JavaScript(code = "var lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
-			"for(var i=0;i<len;i++) arr.push(lib.r32(arg0+arrayOverhead+(i<<2)));\n" +
+	@JavaScript(code = "let lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
+			"for(let i=0;i<len;i++) arr.push(lib.r32(arg0+arrayOverhead+(i<<2)));\n" +
 			"console.log(arr)")
 	private static native void debugArray(Object instance);
 
@@ -774,9 +774,9 @@ public class JVM32 {
 	public static void fill64(int start, int end, long value) {
 
 		// benchmark:
-		// var t0 = window.performance.now()
-		// for(var i=0;i<100000;i++) instance.exports._c(65536)
-		// var t1 = window.performance.now()
+		// let t0 = window.performance.now()
+		// for(let i=0;i<100000;i++) instance.exports._c(65536)
+		// let t1 = window.performance.now()
 
 		// check extra performance of that
 		// -> 6x total performance improvement :D
@@ -1185,18 +1185,10 @@ public class JVM32 {
 		return findClass(classIndex) + objectOverhead + 12;
 	}
 
-	@SuppressWarnings("CommentedOutCode")
 	@Alias(names = "init")
 	public static void init() {
 		// access static, so it is initialized
 		getAddr(System.out);
-        /*try { // class has been replaced :)
-            // reduce this, as it's probably pretty useless in the browser, and memory is valuable
-            // default: 8192, so 16 kiB
-            BufferedWriter.class.getDeclaredField("defaultCharBufferSize").setInt(null, 64);
-        } catch (IllegalAccessException | NoSuchFieldException e) {
-            e.printStackTrace();
-        }*/
 		// could be used to initialize classes or io
 		System.setOut(new PrintStream(new JavaLang.JSOutputStream(true)));
 		System.setErr(new PrintStream(new JavaLang.JSOutputStream(false)));

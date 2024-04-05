@@ -15,7 +15,6 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import ignoreNonCriticalNullPointers
-import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.maths.Maths.hasFlag
 import me.anno.utils.structures.lists.Lists.pop
@@ -28,6 +27,7 @@ import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
 import useWASMExceptions
 import utils.*
+import java.util.regex.Pattern
 import kotlin.collections.set
 
 /**
@@ -2046,17 +2046,6 @@ class MethodTranslator(
             txt = txt.replace("call \$lcmp\n  i32.const 0 i32.le_s", "i64.le_s")
             txt = txt.replace("call \$lcmp\n  i32.const 0 i32.eq", "i64.eq")
 
-            // todo would need a lot more combinations...
-            txt = txt.replace(
-                "f32.const 0\n" +
-                        "  local.get 0\n" +
-                        "  f32.sub", "local.get 0 f32.neg"
-            )
-            txt = txt.replace(
-                "f64.const 0\n" +
-                        "  local.get 0\n" +
-                        "  f64.sub", "local.get 0 f64.neg"
-            )
             txt = txt.replace("local.get 0\n  drop", "")
             txt = txt.replace("local.get 1\n  drop", "")
             txt = txt.replace(
@@ -2161,36 +2150,11 @@ class MethodTranslator(
                         "  i32.eqz", "f64.eq"
             )
 
-            if (repKey in txt) for (r in repSetter) {
-                if (r.first in txt) {
-                    txt = txt.replace(r.first, r.second)
-                }
-            }
-
             // then add the result to the actual printer
             headPrinter.append(txt)
             headPrinter.append(")\n")
-            // java_lang_Class_desiredAssertionStatus_Z
-            /*val sig = MethodSig.c(clazz, name, descriptor)
-            if (clazz == "java/lang/Class" && name == "desiredAssertionStatus") {
-                printUsed(sig)
-                println("aliases:")
-                for ((alias, sig1) in hIndex.methodAliases.toSortedMap()
-                    .filter { it.key.startsWith("java_lang_Class") }) {
-                    println("$alias -> $sig1")
-                }
-                throw IllegalStateException("$sig shall be aliased")
-            }*/
-
-            /*  if (methodName(sig) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable") {
-                  LOGGER.debug("contents: $headPrinter")
-                  LOGGER.debug("old: ${gIndex.translatedMethods[sig]}")
-                  println("flags: $access")
-                  throw NotImplementedError("What?!?")
-              }*/
 
             gIndex.translatedMethods[sig] = headPrinter.toString()
-
         }
     }
 
@@ -2208,19 +2172,6 @@ class MethodTranslator(
     companion object {
         val callTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
-        const val repKey = "local.get 0\n" +
-                "  local.get 1\n" +
-                "  call \$swapi32i32 \n" +
-                "  i32.const "
-        val repSetter = Array(128) {
-            val j = it + objectOverhead
-            "" +
-                    "local.get 0\n" +
-                    "  local.get 1\n" +
-                    "  call \$swapi32i32 \n" +
-                    "  i32.const $j i32.add call \$swapi32i32 i32.store" to
-                    "local.get 0 i32.const $j i32.add local.get 1 i32.store"
-        }
     }
 
 }

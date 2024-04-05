@@ -23,6 +23,21 @@ import static jvm.Utils.cl;
 public class JavaLang {
 
 	@NoThrow
+	@Alias(names = {"java_lang_StrictMath_floor_DD", "java_lang_Math_floor_DD"})
+	@WASM(code = "f64.floor")
+	public static native double java_lang_StrictMath_floor_DD(double x);
+
+	@NoThrow
+	@Alias(names = {"java_lang_StrictMath_ceil_DD", "java_lang_Math_ceil_DD"})
+	@WASM(code = "f64.ceil")
+	public static native double java_lang_StrictMath_ceil_DD(double x);
+
+	@NoThrow
+	@Alias(names = {"java_lang_StrictMath_rint_DD", "java_lang_Math_rint_DD"})
+	@WASM(code = "f64.nearest")
+	public static native double java_lang_StrictMath_rint_DD(double x);
+
+	@NoThrow
 	@Alias(names = {"java_lang_StrictMath_sin_DD", "java_lang_Math_sin_DD"})
 	@JavaScript(code = "return Math.sin(arg0);")
 	public static native double java_lang_StrictMath_sin_DD(double x);
@@ -100,7 +115,6 @@ public class JavaLang {
 	@NoThrow
 	@Alias(names = {"java_lang_StrictMath_sqrt_DD", "java_lang_Math_sqrt_DD"})
 	@WASM(code = "f64.sqrt")
-	// doesn't work yet, and finding the candidates is quite expensive -> hardcoded, it's a utils.single example only
 	public static native double java_lang_StrictMath_sqrt_DD(double x);
 
 	@NoThrow
@@ -120,7 +134,7 @@ public class JavaLang {
 
 	@NoThrow
 	@Alias(names = "java_lang_Math_round_FI")
-	@JavaScript(code = "return Math.round(arg0)")
+	@WASM(code = "return Math.round(arg0)")
 	public static native int java_lang_Math_round_FI(float f);
 
 	@NoThrow
@@ -185,8 +199,6 @@ public class JavaLang {
 	public static boolean isNaN(float d) {
 		return d != d;
 	}
-
-	/* java_lang_StrictMath_sqrt_DD(arg0) { throw 'Not implemented'; },*/
 
 	@NoThrow
 	@Alias(names = "java_lang_ClassLoader_desiredAssertionStatus_Ljava_lang_StringZ")
@@ -530,7 +542,7 @@ public class JavaLang {
 	public static native void printByte(int i, boolean justLog);
 
 	@NoThrow
-	@JavaScript(code = "var c=commandLine[arg0];if(c.length>0){if(!arg0)ec++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
+	@JavaScript(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)ec++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
 	public static native void printFlush(boolean justLog);
 
 	@NoThrow
@@ -1050,7 +1062,7 @@ public class JavaLang {
 
 
 	@NoThrow
-	@JavaScript(code = "var s=arg1+'';if(s.indexOf('.')<0)s+='.0';return fill(arg0,s)")
+	@JavaScript(code = "let s=arg1+'';if(s.indexOf('.')<0)s+='.0';return fill(arg0,s)")
 	public static native int fillD2S(char[] chr, double v);
 
 	@Alias(names = "java_lang_Double_toString_DLjava_lang_String")

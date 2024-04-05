@@ -65,7 +65,7 @@ public class TextGen {
 	@NoThrow
 	@JavaScript(code = "arg2=str(arg2);\n" +
 			"measureText(arg0,arg1,arg2);\n" + // defines tmp
-			"var w=Math.max(1,Math.min(arg3,Math.ceil(tmp.width))),h=arg4;\n" +
+			"let w=Math.max(1,Math.min(arg3,Math.ceil(tmp.width))),h=arg4;\n" +
 			"txtCanvas.width=w;txtCanvas.height=h;\n" +
 			"ctx.fillStyle='#000'\n" +
 			"ctx.fillRect(0,0,w,h)\n" +
@@ -117,14 +117,14 @@ public class TextGen {
 	}
 
 	@NoThrow
-	@JavaScript(code = "var w=arg3,h=arg4,d=arg5;\n" +
+	@JavaScript(code = "let w=arg3,h=arg4,d=arg5;\n" +
 			"txtCanvas.width=w;txtCanvas.height=h*d;\n" +
 			"ctx.fillStyle='#'+arg6.toString(16).padStart(6,'0');\n" +
 			"ctx.fillRect(0,0,w,h)\n" +
 			"ctx.fillStyle='#'+arg7.toString(16).padStart(6,'0');\n" +
 			"ctx.textAlign='center'\n" +
 			"ctx.font=(arg1|0)+'px '+str(arg0);\n" +
-			"for(var i=0;i<d;i++) ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
+			"for(let i=0;i<d;i++) ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
 			"gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h*d).data);\n" +
 			"return w;")
 	public static native int genASCIITexture(

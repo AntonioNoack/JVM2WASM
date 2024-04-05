@@ -191,8 +191,8 @@ public class Engine {
 	public static native void me_anno_gpu_GFX_check_V();
 
 	@NoThrow
-	@JavaScript(code = "var loc = window.location.href;\n" +
-			"var dir = loc.substring(0, loc.lastIndexOf('/'));" +
+	@JavaScript(code = "let loc = window.location.href;\n" +
+			"let dir = loc.substring(0, loc.lastIndexOf('/'));" +
 			"return fill(arg0,dir+'/assets/')")
 	private static native int fillURL(char[] chars);
 
@@ -249,16 +249,16 @@ public class Engine {
 	}
 
 	@JavaScript(code = "" +
-			"var img = new Image();\n" +
+			"let img = new Image();\n" +
 			"gcLock(arg1);\n" +
 			"gcLock(arg2);\n" +
 			"img.onload=function(){\n" +
-			"   var w=img.width,h=img.height;\n" +
-			"   var canvas=document.createElement('canvas')\n" +
+			"   let w=img.width,h=img.height;\n" +
+			"   let canvas=document.createElement('canvas')\n" +
 			"   canvas.width=w;canvas.height=h;\n" +
-			"   var ctx=canvas.getContext('2d')\n" +
+			"   let ctx=canvas.getContext('2d')\n" +
 			"   ctx.drawImage(img,0,0,w,h);\n" +
-			"   var x=window.lib.prepareTexture(arg1);\n" +
+			"   let x=window.lib.prepareTexture(arg1);\n" +
 			"   if(x) throw x;\n" +
 			"   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h).data);\n" +
 			"   x=window.lib.finishTexture(arg1,w,h,arg2);\n" +
@@ -267,7 +267,7 @@ public class Engine {
 			"   gcUnlock(arg2);\n" +
 			"}\n" +
 			"lib.onerror=function(){\n" +
-			"   var x=window.lib.finishTexture(0,-1,-1,arg2);\n" +
+			"   let x=window.lib.finishTexture(0,-1,-1,arg2);\n" +
 			"   if(x) throw x;\n" +
 			"   gcUnlock(arg1);\n" +
 			"   gcUnlock(arg2);\n" +

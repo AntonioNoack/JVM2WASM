@@ -31,6 +31,9 @@ import kotlin.math.sin
 
 const val api = ASM9
 
+// todo Companion-objects are unique, so make all their fields and themselves static;
+//  we don't need them to be instances
+
 // todo test LuaScripts -> magically not working :/
 
 // todo combine non-exported functions with the same content :3
