@@ -7,8 +7,8 @@ import utils.methodName
 
 object HierarchyIndex {
 
-    private val cap = 4096
-    private val cap2 = 256
+    private const val cap = 4096
+    private const val cap2 = 256
 
     val superClass = HashMap<String, String>(cap)
     val childClasses = HashMap<String, HashSet<String>>(cap)
@@ -51,10 +51,9 @@ object HierarchyIndex {
     val exportedMethods = HashSet<MethodSig>(cap)
     val usesSelf = HashMap<MethodSig, Boolean>(cap)
 
-    // todo support static methods as well :3
+    // todo support static setter/getter methods as well :3
     val setterMethods = HashMap<MethodSig, FieldSig>(cap2)
     val getterMethods = HashMap<MethodSig, FieldSig>(cap2)
-    val emptyMethods = HashSet<MethodSig>(cap2) // todo use this to skip invocations
     // todo inline functions, which consist of a constant only
 
 }

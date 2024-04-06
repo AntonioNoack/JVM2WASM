@@ -40,8 +40,8 @@ class MethodTranslator(
     val descriptor: String,
 ) : MethodVisitor(api) {
 
-    var printOps = false
-    var comments = false
+    private var printOps = false
+    private var comments = false
 
     private var isAbstract = false
     private val stack = ArrayList<String>()
@@ -75,7 +75,7 @@ class MethodTranslator(
         val index: Int
     )
 
-    val isStatic = access.hasFlag(ACC_STATIC)
+    private val isStatic = access.hasFlag(ACC_STATIC)
 
     init {
         if (access.hasFlag(ACC_NATIVE) || access.hasFlag(ACC_ABSTRACT) /*|| access.hasFlag(ACC_INTERFACE)*/) {
@@ -542,7 +542,6 @@ class MethodTranslator(
                     stack.add(v3)
                     stack.add(v2)
                     stack.add(v1)
-                    // todo implement this
                     printer.append("  call \$dup2_x1")
                         .append(v1).append(v2).append(v3).append('\n')
                     gIndex.usedDup2_x1[tri(v1, v2, v3)] = true
@@ -557,7 +556,7 @@ class MethodTranslator(
                 printer.append("  call \$dup2_x2\n")
                 // if (x != null) log("mouseX", x[0] = getMouseX());
                 // if (y != null) log("mouseY", y[0] = getMouseY());
-                TODO()
+                TODO("Implement dup2_x2 instruction")
             }
             0x5f -> { // swap
                 val type1 = stack.last()
@@ -904,11 +903,6 @@ class MethodTranslator(
         return localVars.getOrPut(Pair(name, wasmType)) {
             // register local variable
             val name2 = "\$l${localVars.size}"
-            if (methodName(sig) == "AW_clone_Ljava_lang_Object" && name2 == "\$l3") {
-                println(localVars)
-                println(printer)
-                TODO()
-            }
             headPrinter.append("  (local $name2 $wasmType)\n")
             name2
         }
@@ -931,13 +925,11 @@ class MethodTranslator(
     }
 
     private fun checkNotNull0(clazz: String, name: String, getCaller: () -> Unit) {
-        // stackPush()
         getCaller()
         printer.append(" i32.const ").append(gIndex.getString(clazz))
         printer.append(" i32.const ").append(gIndex.getString(name))
         printer.append(" call \$checkNotNull\n")
         handleThrowable()
-        // stackPop()
     }
 
     override fun visitMethodInsn(
@@ -977,210 +969,187 @@ class MethodTranslator(
         val sig = hIndex.alias(sig0)
 
         val meth = hIndex.methods.getOrPut(owner) { HashSet() }
-        if (sig == sig0 && meth.add(sig0)) {
-            if (static) hIndex.staticMethods.add(sig0)
-            // todo re-enable???
-            // throw IllegalStateException("Discovered method $sig0 in ${this.sig}")
+        if (sig == sig0 && meth.add(sig0) && static) {
+            hIndex.staticMethods.add(sig0)
         }
 
         var calledCanThrow = canThrowError(sig)
-        if (false && sig0 in hIndex.emptyMethods) {
-            println("skipping $sig")
-            pop(splitArgs, static, ret)
-            if (splitArgs.size + (!static).toInt() > 0) {
-                printer.append(" ")
-                for (j in splitArgs.indices) {
-                    printer.append(" drop")
-                }
-                if (!static) printer.append(" drop")
-                printer.append('\n')
-            }
-        } else {
 
-            fun getCaller() {
-                if (splitArgs.isNotEmpty()) {
-                    printer.append("  call $").append(gIndex.getNth(listOf(ptrType) + splitArgs))
-                } else dupI32()
-            }
+        fun getCaller() {
+            if (splitArgs.isNotEmpty()) {
+                printer.append("  call $").append(gIndex.getNth(listOf(ptrType) + splitArgs))
+            } else dupI32()
+        }
 
-            when (opcode0) {
-                0xb9 -> { // invoke interface
-                    // load interface/function index
-                    getCaller()
-                    printer.append(" i32.const ").append(gIndex.getInterfaceIndex(owner, name, descriptor))
-                    // looks up class, goes to interface list, binary searches function, returns func-ptr
-                    // instance, function index -> instance, function-ptr
-                    printer.push(i32).append(" call \$resolveInterface\n")
-                    handleThrowable() // if it's not found or nullptr
-                    printer.pop(i32) // pop instance (?)
-                    pop(splitArgs, false, ret)
+        when (opcode0) {
+            0xb9 -> { // invoke interface
+                // load interface/function index
+                getCaller()
+                printer.append(" i32.const ").append(gIndex.getInterfaceIndex(owner, name, descriptor))
+                // looks up class, goes to interface list, binary searches function, returns func-ptr
+                // instance, function index -> instance, function-ptr
+                printer.push(i32).append(" call \$resolveInterface\n")
+                handleThrowable() // if it's not found or nullptr
+                printer.pop(i32) // pop instance (?)
+                pop(splitArgs, false, ret)
+
+                stackPush()
+
+                printer
+                    .append("  call_indirect (type ")
+                    .append(gIndex.getType(descriptor, calledCanThrow))
+                if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
+                else printer.append(")\n")
+
+                stackPop()
+
+            }
+            0xb6 -> { // invoke virtual
+                if (owner[0] != '[' && owner !in dIndex.constructableClasses) {
 
                     stackPush()
+
+                    getCaller()
+
+                    // todo store this index in a table instead?
+                    printer.append(" i32.const ")
+                        .append(-gIndex.getString(methodName(sig)))
+                        // instance, function index -> function-ptr
+                        .append(" call \$resolveIndirect ;; not constructable class\n")
+                        .push(i32)
+                    handleThrowable()
+                    printer.pop(i32)
+                    pop(splitArgs, false, ret)
 
                     printer
                         .append("  call_indirect (type ")
                         .append(gIndex.getType(descriptor, calledCanThrow))
-                    if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
-                    else printer.append(")\n")
+                        .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
 
                     stackPop()
 
-                }
-                0xb6 -> { // invoke virtual
-                    if (owner[0] != '[' && owner !in dIndex.constructableClasses) {
+                    /*if (canThrowError) {
+                        pop(splitArgs, false, "V")
+                        visitLdcInsn("Class not constructable!: $owner")
+                        printer.append("  call \$createNullptr\n")
+                        visitInsn(0x101) // return error
+                        // handleThrowable(true)
+                    } else throw IllegalStateException()*/
+                } else if (sig0 in hIndex.finalMethods) {
 
-                        stackPush()
+                    val setter = hIndex.setterMethods[sig]
+                    val getter = hIndex.getterMethods[sig]
 
-                        getCaller()
-
-                        // todo store this index in a table instead?
-                        printer.append(" i32.const ")
-                            .append(-gIndex.getString(methodName(sig)))
-                            // instance, function index -> function-ptr
-                            .append(" call \$resolveIndirect ;; not constructable class\n")
-                            .push(i32)
-                        handleThrowable()
-                        printer.pop(i32)
-                        pop(splitArgs, false, ret)
-
-                        printer
-                            .append("  call_indirect (type ")
-                            .append(gIndex.getType(descriptor, calledCanThrow))
-                            .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
-
-                        stackPop()
-
-                        /*if (canThrowError) {
-                            pop(splitArgs, false, "V")
-                            visitLdcInsn("Class not constructable!: $owner")
-                            printer.append("  call \$createNullptr\n")
-                            visitInsn(0x101) // return error
-                            // handleThrowable(true)
-                        } else throw IllegalStateException()*/
-                    } else if (sig0 in hIndex.finalMethods) {
-
-                        val setter = hIndex.setterMethods[sig]
-                        val getter = hIndex.getterMethods[sig]
-
-                        fun isStatic(field: FieldSig): Boolean {
-                            return field.name in gIndex.getFieldOffsets(field.clazz, true).fields
-                        }
-
-                        when {
-                            setter != null -> {
-                                visitFieldInsn2(
-                                    if (isStatic(setter)) 0xb3 else 0xb5,
-                                    setter.clazz, setter.name, setter.descriptor, true
-                                )
-                                calledCanThrow = false
-                            }
-                            getter != null -> {
-                                visitFieldInsn2(
-                                    if (isStatic(getter)) 0xb2 else 0xb4,
-                                    getter.clazz, getter.name, getter.descriptor, true
-                                )
-                                calledCanThrow = false
-                            }
-                            else -> {
-                                if (!ignoreNonCriticalNullPointers) {
-                                    checkNotNull0(owner, name, ::getCaller)
-                                }
-                                pop(splitArgs, false, ret)
-                                // final, so not actually virtual;
-                                // can be directly called
-                                val inline = hIndex.inlined[sig]
-                                if (inline != null) {
-                                    printer.append("  ").append(inline).append('\n')
-                                } else {
-                                    stackPush()
-                                    val name2 = methodName(sig)
-                                    val name3 = methodName(sig0)
-                                    if (name3 == "java_lang_Object_hashCode_I" ||
-                                        name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
-                                        name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
-                                    ) throw IllegalStateException("$sig0 -> $sig must not be final!!!")
-                                    if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                                    gIndex.actuallyUsed.add(this.sig, name2)
-                                    printer.append("  call \$").append(name2).append('\n')
-                                    stackPop()
-                                }
-                            }
-                        }
-                    } else {
-
-                        // method can have well-defined place in class :) -> just precalculate that index
-                        // looks up the class, and in the class-function lut, it looks up the function ptr
-                        // get the Nth element on the stack, where N = |args|
-                        // problem: we don't have generic functions, so we need all combinations
-                        getCaller()
-                        // +1 for internal VM offset
-                        // << 2 for access without shifting
-                        // println("$clazz/${this.name}/${this.descriptor} -> $sig0 -> $sig")
-                        // printUsed(MethodSig(clazz, this.name, this.descriptor))
-                        stackPush()
-                        val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
-                        printer.append(" i32.const ").append(funcPtr)
-                            // instance, function index -> function-ptr
-                            .append(" call \$resolveIndirect\n")
-                            .push(i32)
-                        stackPop()
-                        handleThrowable()
-                        printer.pop(i32)
-                        pop(splitArgs, false, ret)
-                        printer
-                            .append("  call_indirect (type ")
-                            .append(gIndex.getType(descriptor, calledCanThrow))
-                            .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
+                    fun isStatic(field: FieldSig): Boolean {
+                        return field.name in gIndex.getFieldOffsets(field.clazz, true).fields
                     }
-                }
-                // typically, <init>, but also can be private or super function; -> no resolution required
-                0xb7 -> {
-                    if (!ignoreNonCriticalNullPointers) checkNotNull0(owner, name, ::getCaller)
+
+                    when {
+                        setter != null -> {
+                            visitFieldInsn2(
+                                if (isStatic(setter)) 0xb3 else 0xb5,
+                                setter.clazz, setter.name, setter.descriptor, true
+                            )
+                            calledCanThrow = false
+                        }
+                        getter != null -> {
+                            visitFieldInsn2(
+                                if (isStatic(getter)) 0xb2 else 0xb4,
+                                getter.clazz, getter.name, getter.descriptor, true
+                            )
+                            calledCanThrow = false
+                        }
+                        else -> {
+                            if (!ignoreNonCriticalNullPointers) {
+                                checkNotNull0(owner, name, ::getCaller)
+                            }
+                            pop(splitArgs, false, ret)
+                            // final, so not actually virtual;
+                            // can be directly called
+                            val inline = hIndex.inlined[sig]
+                            if (inline != null) {
+                                printer.append("  ").append(inline).append('\n')
+                            } else {
+                                stackPush()
+                                val name2 = methodName(sig)
+                                val name3 = methodName(sig0)
+                                if (name3 == "java_lang_Object_hashCode_I" ||
+                                    name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
+                                    name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
+                                ) throw IllegalStateException("$sig0 -> $sig must not be final!!!")
+                                if (sig in hIndex.abstractMethods) throw IllegalStateException()
+                                gIndex.actuallyUsed.add(this.sig, name2)
+                                printer.append("  call \$").append(name2).append('\n')
+                                stackPop()
+                            }
+                        }
+                    }
+                } else {
+
+                    // method can have well-defined place in class :) -> just precalculate that index
+                    // looks up the class, and in the class-function lut, it looks up the function ptr
+                    // get the Nth element on the stack, where N = |args|
+                    // problem: we don't have generic functions, so we need all combinations
+                    getCaller()
+                    // +1 for internal VM offset
+                    // << 2 for access without shifting
+                    // println("$clazz/${this.name}/${this.descriptor} -> $sig0 -> $sig")
+                    // printUsed(MethodSig(clazz, this.name, this.descriptor))
+                    stackPush()
+                    val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
+                    printer.append(" i32.const ").append(funcPtr)
+                        // instance, function index -> function-ptr
+                        .append(" call \$resolveIndirect\n")
+                        .push(i32)
+                    stackPop()
+                    handleThrowable()
+                    printer.pop(i32)
                     pop(splitArgs, false, ret)
-                    val inline = hIndex.inlined[sig]
-                    if (inline != null) {
-                        printer.append("  ").append(inline).append('\n')
-                    } else {
-                        stackPush()
-                        val name2 = methodName(sig)
-                        if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                        if (name2 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV") {
-                            printUsed(sig)
-                            throw IllegalStateException()
-                        }
-                        gIndex.actuallyUsed.add(this.sig, name2)
-                        if (name2 == "me_anno_gpu_OSWindow_addCallbacks_V")
-                            throw IllegalStateException()
-                        printer.append("  call \$").append(name2).append('\n')
-                        stackPop()
-                    }
+                    printer
+                        .append("  call_indirect (type ")
+                        .append(gIndex.getType(descriptor, calledCanThrow))
+                        .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
                 }
-                // static, no resolution required
-                0xb8 -> {
-                    pop(splitArgs, true, ret)
-                    val inline = hIndex.inlined[sig]
-                    if (inline != null) {
-                        printer.append("  ").append(inline).append('\n')
-                    } else {
-                        stackPush()
-                        val name2 = methodName(sig)
-                        if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                        if (name2 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV") {
-                            printUsed(sig)
-                            throw IllegalStateException()
-                        }
-                        gIndex.actuallyUsed.add(this.sig, name2)
-                        printer.append("  call \$").append(name2)
-                        if (comments) printer.append(" ;; static call\n")
-                        else printer.append('\n')
-                        stackPop()
-                    }
+            }
+            // typically, <init>, but also can be private or super function; -> no resolution required
+            0xb7 -> {
+                if (!ignoreNonCriticalNullPointers) checkNotNull0(owner, name, ::getCaller)
+                pop(splitArgs, false, ret)
+                val inline = hIndex.inlined[sig]
+                if (inline != null) {
+                    printer.append("  ").append(inline).append('\n')
+                } else {
+                    stackPush()
+                    val name2 = methodName(sig)
+                    if (sig in hIndex.abstractMethods) throw IllegalStateException()
+                    gIndex.actuallyUsed.add(this.sig, name2)
+                    if (name2 == "me_anno_gpu_OSWindow_addCallbacks_V")
+                        throw IllegalStateException()
+                    printer.append("  call \$").append(name2).append('\n')
+                    stackPop()
                 }
-                else -> throw NotImplementedError("unknown call ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface\n")
             }
-            if (calledCanThrow && checkThrowable) {
-                handleThrowable()
+            // static, no resolution required
+            0xb8 -> {
+                pop(splitArgs, true, ret)
+                val inline = hIndex.inlined[sig]
+                if (inline != null) {
+                    printer.append("  ").append(inline).append('\n')
+                } else {
+                    stackPush()
+                    val name2 = methodName(sig)
+                    if (sig in hIndex.abstractMethods) throw IllegalStateException()
+                    gIndex.actuallyUsed.add(this.sig, name2)
+                    printer.append("  call \$").append(name2)
+                    if (comments) printer.append(" ;; static call\n")
+                    else printer.append('\n')
+                    stackPop()
+                }
             }
+            else -> throw NotImplementedError("unknown call ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface\n")
+        }
+        if (calledCanThrow && checkThrowable) {
+            handleThrowable()
         }
 
         return calledCanThrow

@@ -353,11 +353,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             if (isSetter) hIndex.setterMethods[sig] = lastField!!
         }
 
-        if (instructionIndex == 1) {
-            // only return
-            hIndex.emptyMethods.add(sig)
-        }
-
         hIndex.usesSelf[sig] = usesSelf
     }
 

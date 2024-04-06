@@ -37,6 +37,10 @@ const val api = ASM9
 // call_indirect/interface is more complicated... all methods need to have the same signature
 // todo if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead (-> modify findUniquelyImplemented())
 
+// todo on each branch, mark which classes have been static-initialized,
+//  and remove those on all necessarily following branches
+
+
 // todo Companion-objects are unique, so make all their fields and themselves static;
 //  we don't need them to be instances
 
