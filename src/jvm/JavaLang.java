@@ -134,7 +134,7 @@ public class JavaLang {
 
 	@NoThrow
 	@Alias(names = "java_lang_Math_round_FI")
-	@WASM(code = "return Math.round(arg0)")
+	@JavaScript(code = "return Math.round(arg0)")
 	public static native int java_lang_Math_round_FI(float f);
 
 	@NoThrow
