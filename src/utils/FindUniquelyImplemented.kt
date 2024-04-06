@@ -18,12 +18,10 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
     var finalMethods = 0
     for (clazz in gIndex.classNames) {
         if (hIndex.childClasses[clazz]?.any { it in dIndex.constructableClasses } != true) {
-            val methods = hIndex.methods[clazz]
-            if (methods != null) {
-                for (m in methods) {
-                    if (hIndex.finalMethods.add(m)) {
-                        finalMethods++
-                    }
+            val methods = hIndex.methods[clazz] ?: continue
+            for (method in methods) {
+                if (hIndex.finalMethods.add(method)) { // finding new final methods :)
+                    finalMethods++
                 }
             }
         }
@@ -32,40 +30,35 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
     val methodCounter = CountMap<GenericSig>(usedMethods.size)
     for (sig in usedMethods) {
         if (
-            sig.name != "<init>" && // cannot be invoked dynamically, as far as I know
+            sig.name != "<init>" && // cannot be invoked dynamically
             sig.clazz != "?" &&
             methodName(sig) !in hIndex.methodAliases && // just the same
             sig !in hIndex.staticMethods &&
             sig !in hIndex.abstractMethods && // we can ignore that one
             sig in implementedMethods
         ) {
-            val key = GenericSig(sig)
-            val v = methodCounter.incAndGet(key)
-            if (v == 1) finalMethods++
-            else if (v == 2) finalMethods--
+            when (methodCounter.incAndGet(GenericSig(sig))) {
+                1 -> finalMethods++
+                2 -> finalMethods--
+            }
         }
     }
 
-    if (finalMethods > 0) {
-        val toBeMarkedAsFinal = HashSet<GenericSig>(methodCounter.values.size)
-        for ((sig, counter) in methodCounter.values) {
-            if (counter.value == 1) {
-                toBeMarkedAsFinal.add(sig)
-            }
+    val toBeMarkedAsFinal = HashSet<GenericSig>(finalMethods)
+    for ((sig, counter) in methodCounter.values) {
+        if (counter.value == 1) {
+            toBeMarkedAsFinal.add(sig)
         }
+    }
 
-        // mark all those methods as final
-        if (toBeMarkedAsFinal.isNotEmpty()) {
-            for (sig in usedMethods) {
-                if (methodName(sig) !in hIndex.methodAliases && // just the same
-                    sig !in hIndex.staticMethods &&
-                    sig !in hIndex.abstractMethods && // we can ignore that one
-                    sig !in hIndex.finalMethods &&
-                    GenericSig(sig) in toBeMarkedAsFinal
-                ) {
-                    hIndex.finalMethods.add(sig)
-                }
-            }
+    // mark all those methods as final
+    for (sig in usedMethods) {
+        if (methodName(sig) !in hIndex.methodAliases && // just the same
+            sig !in hIndex.staticMethods &&
+            sig !in hIndex.abstractMethods && // we can ignore that one
+            GenericSig(sig) in toBeMarkedAsFinal
+        ) {
+            hIndex.finalMethods.add(sig)
         }
     }
 

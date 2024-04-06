@@ -7,7 +7,7 @@ import java.lang.ref.ReferenceQueue;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 
-public class WeakRef {
+public class WeakRef<V> {
 
     // will grow theoretically a lot...
     public static final IntHashMap lastDeleted = new IntHashMap(256);
@@ -15,18 +15,18 @@ public class WeakRef {
 
     private final int address, generation;
 
-    public WeakRef(Object instance) {
+    public WeakRef(V instance) {
         address = getAddr(instance);
         generation = GC.generation;
         ofInterest.add(address);
     }
 
-    public WeakRef(Object instance, ReferenceQueue q) {
+    public WeakRef(V instance, ReferenceQueue q) {
         this(instance);
         // idk what to do about this ref queue...
     }
 
-    public Object get() {
+    public V get() {
         int ld = lastDeleted.get(address, 0);
         if (ld < generation) return ptrTo(address);// everything is fine :)
         else return null;// it was deleted

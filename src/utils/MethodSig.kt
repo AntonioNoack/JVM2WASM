@@ -2,6 +2,7 @@ package utils
 
 import reb
 
+@Suppress("DataClassPrivateConstructor")
 data class MethodSig private constructor(val clazz: String, val name: String, val descriptor: String) {
 
     init {

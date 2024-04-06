@@ -19,11 +19,10 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
     private val annotations = ArrayList<Annota>()
     private val interfaceCalls = HashSet<MethodSig>()
-    // private val interfaceCalls = HashSet<Pair<String,String>>()
 
-    var usesSelf = false
+    private var usesSelf = false
 
-    var instructionIndex = 0
+    private var instructionIndex = 0
 
     // not static,
     // local.get 0
@@ -31,13 +30,13 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     // field.set
     // return nothing
     val args = split2(sig.descriptor)
-    var isSetter = args.size == 2 && args.last() == "V"
+    private var isSetter = args.size == 2 && args.last() == "V"
 
     // not static,
     // local.get 0
     // field.get
     // return sth
-    var isGetter = args.size == 1 && args.last() != "V"
+    private var isGetter = args.size == 1 && args.last() != "V"
 
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         isSetter = false
@@ -287,8 +286,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (type != null) clazz.dep(reb(type))
     }
 
-    var lastField: FieldSig? = null
-
+    private var lastField: FieldSig? = null
     override fun visitFieldInsn(opcode: Int, owner0: String, name: String, descriptor: String) {
 
         if (instructionIndex != 1 && isGetter) isGetter = false

@@ -104,18 +104,6 @@ public class TextGen {
 		return tex;
 	}
 
-	@Alias(names = "me_anno_fonts_WebFonts_getFontMetrics_Ljava_awt_FontLjava_awt_FontMetrics")
-	public static FontMetrics WebFonts_getFontMetrics(Font font) {
-		return new FontMetrics(font) {
-		};
-	}
-
-	@Alias(names = "me_anno_fonts_mesh_AlignmentGroup_getOffset_Ljava_awt_font_FontRenderContextIID")
-	public static double AlignmentGroup_getOffset(CharacterOffsetCache group, FontRenderContext ctx, int charA, int charB) {
-		// todo implement properly
-		return group.getFont().getSize();
-	}
-
 	@NoThrow
 	@JavaScript(code = "let w=arg3,h=arg4,d=arg5;\n" +
 			"txtCanvas.width=w;txtCanvas.height=h*d;\n" +

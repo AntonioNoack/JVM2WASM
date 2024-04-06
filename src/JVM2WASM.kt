@@ -31,7 +31,11 @@ import kotlin.math.sin
 
 const val api = ASM9
 
-// todo if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead
+// optimizations:
+// done when there is no child implementations for a non-final, non-static function, call it directly
+// todo also track, which methods theoretically can throw errors: mark them, and all their callers; -> optimization
+// call_indirect/interface is more complicated... all methods need to have the same signature
+// todo if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead (-> modify findUniquelyImplemented())
 
 // todo Companion-objects are unique, so make all their fields and themselves static;
 //  we don't need them to be instances
@@ -68,6 +72,8 @@ var replaceStringInternals = true // another way for UTF-8 strings
 val byteStrings = useUTF8Strings || replaceStringInternals
 
 var disableAudio = true
+
+var addDebugMethods = false
 
 // todo doesn't work yet, missing functions :/
 // if this flag is true, fields that aren't read won't be written
@@ -157,92 +163,20 @@ val resources = cl.getResourceAsStream("resources.txt")!!.readText()
 
 fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
-    // constructable classes still don't seem to be fully correct...
-    // Non-constructable classes are irrelevant to be resolved (kotlin/collections/CollectionsKt___CollectionsKt)
-
-    // those two unlock 1.7M lines of wasm, why ever...
-    // clazz("me/anno/ecs/Component")
-    // clazz("me/anno/ecs/Entity")
-    // clazz("me/anno/engine/RemsEngine") // our final goal :3
-    clazz("engine/Engine") // even better goal ;)
-
-    // needed for Kotlin reflection to work
-    // to do check that this works...
-    // todo this loaded 40MB extra, which is INSANE!
-    // clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
-
-    // clazz("com/github/junrar/io/ReadOnlyAccessFile")
-
-    // clazz("test/HashMapTest")
-    // clazz("test/Animal")
-    // clazz("test/Cat")
-    // clazz("test/Dog")
-    // clazz("test/Fish")
-    // clazz("test/SiameseCat")
-    // clazz("test/HashCat")
-
-    // method(MethodSig("java/lang/Process", "waitFor", "(JLjava/util/concurrent/TimeUnit;)Z")) // small bug in structural analysis
-    // clazz("java/lang/String")
-    // clazz("java/lang/Float")
-    // method(MethodSig("java/util/regex/Pattern","sequence","(Ljava/util/regex/Pattern\$Node;)Ljava/util/regex/Pattern\$Node;"))
-    // method(MethodSig("java/util/HashMap","putMapEntries","(Ljava/util/Map;Z)V"))
-    // method(MethodSig("java/util/regex/Pattern","append","(II)V"))
-    // clazz("java/util/regex/Pattern") // exception issues
-    // clazz("java/lang/Double")
-    // clazz("me/anno/gpu/GFX")
-    // clazz("javax/vecmath/VecMathUtil") // too old Java
-    // method(MethodSig("org/luaj/vm2/Varargs","checkvalue","(I)Lorg/luaj/vm2/LuaValue;")) // stack issues
-    // clazz("test/InlineIfTest")
-    // method(MethodSig("me/anno/io/text/TextReaderBase","readProperty","(Lme/anno/io/ISaveable;Ljava/lang/String;)Lme/anno/io/ISaveable;"))
-    // clazz("test/SwitchTest")
-
-    // this should be the first one, always
-    // this causes 1004 classes to be loaded
-    // -> because we had duplicates, then it was only 900 😉
-    // clazz("java/lang/Object")
-
-    // this is just one extra, as you'd expect
-    // clazz("test/TestClass")
-    //clazz("test/LambdaTest")
-    //clazz("test/EnumTest")
-    //clazz("test/CatchTest")
-    //clazz("test/BaseTest")
-    //clazz("test/InvokeTest")
-    //clazz("test/A")
-    //clazz("test/B")
+    clazz("engine/Engine")
 
     clazz("jvm/JVM32")
     clazz("jvm/GC")
     clazz("jvm/MemDebug")
 
     // for debugging
-    method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;"))
-    method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
-    method(MethodSig.c("java/lang/Thread", "<init>", "()V"))
+    if (addDebugMethods) {
+        method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;"))
+        method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
+        method(MethodSig.c("java/lang/Thread", "<init>", "()V"))
+    }
 
     clazz("jvm/Boxing")
-
-    // method(MethodSig("java/io/ObjectStreamClass","processQueue","(Ljava/lang/ref/ReferenceQueue;Ljava/util/concurrent/ConcurrentMap;)V"))
-
-    /*clazz("java/lang/System")
-    clazz("java/nio/Buffer")
-    clazz("java/nio/ByteBuffer")
-    clazz("java/nio/CharBuffer")
-    clazz("java/util/EnumMap")
-    clazz("java/util/Hashtable")*/
-    // clazz("java/util/Formatter\$FormatSpecifier")
-
-    // method(MethodSig("java/util/AbstractMap","put","(Ljava/lang/Object;)Ljava/lang/Object;"))
-    // clazz("java/lang/CharSequence")
-    // clazz("java/lang/Integer")
-
-    // needed for environment
-    // clazz("java/lang/NullPointerException")
-
-    // optimizations:
-    // done when there is no child implementations for a non-final, non-static function, call it directly
-    // todo also track, which methods theoretically can throw errors: mark them, and all their callers; -> optimization
-    // call_indirect/interface is more complicated... all methods need to have the same signature
 
 }
 
@@ -390,9 +324,8 @@ fun main() {
         gIndex.classNames.add(clazz)
     }
 
-    val idx = gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V"))
-    if (idx != 0) throw IllegalStateException()
-    if (gIndex.getType("()V", true) != "\$fRV0") throw IllegalStateException(gIndex.getType("()V", true))
+    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
+    eq(gIndex.getType("()V", true), "\$fRV0")
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(reb("java/lang/String"))
@@ -403,6 +336,8 @@ fun main() {
     eq(gIndex.getFieldOffset(reb("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
 
     hIndex.superClass["java/lang/reflect/Field"] = "java/lang/reflect/AccessibleObject"
+    hIndex.superClass["java/lang/reflect/Executable"] = "java/lang/reflect/AccessibleObject"
+    hIndex.superClass["java/lang/reflect/Constructor"] = "java/lang/reflect/Executable"
 
     gIndex.getFieldOffset("java/lang/System", "in", "Ljava/io/InputStream;", true)
     gIndex.getFieldOffset("java/lang/System", "out", "Ljava/io/PrintStream;", true)
@@ -445,9 +380,8 @@ fun main() {
     hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "I", true)] = arrayOverhead
     hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "Z", true)] = trackAllocations
 
-    if (gIndex.getInterfaceIndex("", "<clinit>", "()V") != 0) {
-        throw IllegalStateException("Modify code to adjust!")
-    }
+    eq(gIndex.getInterfaceIndex("", "<clinit>", "()V"), 0)
+    gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
     listEntryPoints { clazz ->
         if (hIndex.doneClasses.add(clazz)) {
@@ -726,12 +660,6 @@ fun main() {
             dlu.indexFields()
     }
 
-    val testSig = MethodSig.c("java/lang/StackTraceElement", "equals", "(Ljava/lang/Object;)Z")
-    if (testSig !in dIndex.usedMethods) {
-        printUsed(testSig)
-        throw IllegalStateException()
-    }
-
     /**
      * calculate the field offsets right here :)
      * */
@@ -756,20 +684,6 @@ fun main() {
         }
     }
     gIndex.lockFields = true
-
-    if ((gIndex.getFieldOffset("java/lang/System", "out", "Ljava/lang/Object", true) != null) !=
-        (MethodSig.c("java/lang/System", "<clinit>", "()V") in dIndex.usedMethods)
-    ) {
-        println(gIndex.getFieldOffsets("java/lang/System", true))
-        printUsed(MethodSig.c("java/lang/System", "<clinit>", "()V"))
-        val fs = FieldSig("java/lang/System", "out", "Ljava/lang/Object", true)
-        println(fs in dIndex.usedFieldsR)
-        println(fs in dIndex.usedFieldsW)
-        println(fs in usedFields)
-        throw IllegalStateException()
-    }
-
-    gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
     for ((method, code, noinline) in hIndex.annotations.entries
         .mapNotNull { m ->
@@ -886,7 +800,6 @@ fun main() {
         if (name in jsImplemented) continue
         jsPseudoImplemented[name] = sig
         implementedMethods[name] = sig
-        // printer.import2(sig)
     }
 
     bodyPrinter.append(";; not implemented, abstract\n")
@@ -903,8 +816,6 @@ fun main() {
         val desc = func.descriptor
         val dx = desc.lastIndexOf(')')
         // export? no, nobody should call these
-        if (methodName(func) == "me_anno_io_ISaveableXCompanionXregisterCustomClassX2_invoke_Lme_anno_io_ISaveable")
-            throw IllegalStateException("This function isn't not-implemented/abstract")
         bodyPrinter.append("(func $").append(methodName(func)).append(" (param")
         for (param in split1(desc.substring(1, dx))) {
             bodyPrinter.append(' ').append(jvm2wasm(param))
@@ -1018,7 +929,6 @@ fun main() {
                                     val owner = reb(owner0)
                                     val sig0 = MethodSig.c(owner, name, descriptor)
                                     // just for checking if abstract
-                                    // val sig2 = hIndex.methodAliases[utils.methodName(sig0)] ?: sig0
                                     if (sig0 !in hIndex.finalMethods) {
                                         // check if method is defined in parent class
                                         fun add(clazz: String) {
@@ -1171,20 +1081,7 @@ fun main() {
 
     usedButNotImplemented.retainAll(resolved)
     if (usedButNotImplemented.isNotEmpty()) {
-        println("\nMissing functions:\n")
-        val nameToMethod = nameToMethod
-        for (name in usedButNotImplemented) {
-            println(name)
-            println(name in resolved)
-            val sig = hIndex.methodAliases[name] ?: nameToMethod[name]
-            if (sig != null) {
-                println(hIndex.methodAliases[name])
-                println(nameToMethod[name])
-                println(sig in gIndex.translatedMethods)
-                printUsed(sig)
-            }
-        }
-        throw IllegalStateException("Missing functions")
+        printMissingFunctions(usedButNotImplemented, resolved)
     }
 
     for ((sig, impl) in gIndex.translatedMethods.entries.sortedBy { it.value }) {
@@ -1268,4 +1165,21 @@ fun main() {
         )
     }*/
 
+}
+
+fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>): Nothing {
+    println("\nMissing functions:\n")
+    val nameToMethod = nameToMethod
+    for (name in usedButNotImplemented) {
+        println(name)
+        println(name in resolved)
+        val sig = hIndex.methodAliases[name] ?: nameToMethod[name]
+        if (sig != null) {
+            println(hIndex.methodAliases[name])
+            println(nameToMethod[name])
+            println(sig in gIndex.translatedMethods)
+            printUsed(sig)
+        }
+    }
+    throw IllegalStateException("Missing functions")
 }
