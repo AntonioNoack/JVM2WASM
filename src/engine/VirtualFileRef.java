@@ -2,12 +2,10 @@ package engine;
 
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
-import me.anno.utils.structures.Callback;
+import me.anno.utils.async.Callback;
 import org.jetbrains.annotations.NotNull;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.*;
-import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
@@ -61,7 +59,7 @@ public class VirtualFileRef extends FileReference {
 
 	@NotNull
 	@Override
-	public FileReference getChild(@NotNull String s) {
+	public FileReference getChildImpl(@NotNull String s) {
 		return new VirtualFileRef(getAbsolutePath() + '/' + s);
 	}
 
@@ -78,7 +76,7 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
-	public void inputStream(long l, @NotNull Callback<InputStream> callback) {
+	public void inputStream(long lengthLimit, boolean close, @NotNull Callback<InputStream> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
@@ -217,12 +215,16 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
-	public void writeText(@NotNull String text) {
+	public void writeText(@NotNull String text, int offset, int length) {
+		assert offset == 0;
+		assert text.length() == length;
 		JavaIO.files.put(getAbsolutePath(), new JavaIO.FileInfo(text, System.currentTimeMillis()));
 	}
 
 	@Override
-	public void writeBytes(@NotNull byte[] bytes) {
+	public void writeBytes(@NotNull byte[] bytes, int offset, int length) {
+		assert offset == 0;
+		assert bytes.length == length;
 		JavaIO.files.put(getAbsolutePath(), new JavaIO.FileInfo(bytes, System.currentTimeMillis()));
 	}
 
@@ -233,12 +235,5 @@ public class VirtualFileRef extends FileReference {
 			JavaIO.files.put(dst.getAbsolutePath(), fi);
 			return true;
 		} else return false;
-	}
-
-	@NotNull
-	@Override
-	public URI toUri() {
-		throw new NotImplementedException();
-		// return null;
 	}
 }

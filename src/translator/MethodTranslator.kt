@@ -16,9 +16,8 @@ import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
-import me.anno.maths.Maths.hasFlag
 import me.anno.utils.structures.lists.Lists.pop
-import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
@@ -27,7 +26,6 @@ import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
 import useWASMExceptions
 import utils.*
-import java.util.regex.Pattern
 import kotlin.collections.set
 
 /**
@@ -1895,20 +1893,22 @@ class MethodTranslator(
         if (!isAbstract) {
 
             val lastNode = nodes.last()
-            if (StructuralAnalysis.printOps)
+            if (StructuralAnalysis.printOps) {
                 println("\n$clazz $name $descriptor: ${nodes.size}")
+            }
 
             // jnt.scimark2.FFT.log2(0);
 
             if (nodes.size > 1 && lastNode.next == null && !lastNode.isReturn) {
                 nodes.removeAt(nodes.lastIndex)
                 for (it in nodes) {
-                    if (it.ifFalse == lastNode) it.ifFalse = null
+                    if (it.ifFalse == lastNode) {
+                        it.ifFalse = null
+                    }
                 }
             }
 
             var txt = transform(sig, nodes)
-
             txt = txt.replace(
                 "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
                         "  i32.const 0\n" +

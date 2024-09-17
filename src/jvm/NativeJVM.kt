@@ -86,7 +86,7 @@ fun appendNativeHelperFunctions(printer: StringBuilder2) {
 
     printer.append("(func \$i32neg (param i32) (result i32) i32.const 0 local.get 0 i32.sub)\n")
     printer.append("(func \$i64neg (param i64) (result i64) i64.const 0 local.get 0 i64.sub)\n")
-    printer.append("(func \$lcmp (param i64 i64) (result i32) (i32.sub (i64.gt_s (local.get 0) (local.get 1)) (i64.lt_s (local.get 0) (local.get 1))))\n")
+    printer.append("(func \$lcmp (param i64 i64) (result i32) local.get 0 local.get 1 i64.gt_s local.get 0 local.get 1 i64.lt_s i32.sub)\n")
 
     // to do implement this, when we have multi-threading
     printer.append("(func \$monitorEnter (param $ptrType))\n")

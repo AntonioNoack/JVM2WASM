@@ -2,10 +2,10 @@ package engine
 
 import me.anno.gpu.GFX
 import me.anno.gpu.OSWindow
-import me.anno.input.Input
+import me.anno.gpu.RenderStep
 
 fun renderFrame2(window: OSWindow) {
-    Input.pollControllers(window)
+    // GLFWController.pollControllers(window)
     GFX.activeWindow = window
-    GFX.renderStep(window, true)
+    RenderStep.renderStep(window, true)
 }

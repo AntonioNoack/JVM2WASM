@@ -2,7 +2,7 @@ package utils
 
 import dIndex
 import hIndex
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes
 

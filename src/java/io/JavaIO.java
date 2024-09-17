@@ -65,6 +65,11 @@ public class JavaIO {
 			}
 
 			@Override
+			public boolean isInvalid(File f) {
+				return false;
+			}
+
+			@Override
 			public char getPathSeparator() {
 				return '/';
 			}

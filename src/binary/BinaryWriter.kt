@@ -1,6 +1,6 @@
 package binary
 
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.structures.arrays.ByteArrayList
 
 class BinaryWriter(

@@ -3,8 +3,8 @@ package utils
 import me.anno.utils.OS
 
 fun createJSImports(
-    jsImplemented: HashMap<String, Pair<MethodSig, String>>,
-    jsPseudoImplemented: HashMap<String, MethodSig>,
+    jsImplemented: Map<String, Pair<MethodSig, String>>,
+    jsPseudoImplemented: Map<String, MethodSig>,
     numPages: Int
 ) {
     val jsFileText = StringBuilder2(256)
@@ -35,7 +35,6 @@ fun createJSImports(
     jsFileText.append("  \n  // Initially required memory in 64 kiB pages:\n")
     jsFileText.append("  initialMemorySize: ").append(numPages).append('\n')
     jsFileText.append("}\nexport { lib as \"autoJS\" }")
-    OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/index0.js").outputStream().use {
-        it.write(jsFileText.values, 0, jsFileText.size)
-    }
+    OS.documents.getChild("IdeaProjects/JVM2WASM/tmp/index0.js")
+        .writeBytes(jsFileText.values, 0, jsFileText.size)
 }

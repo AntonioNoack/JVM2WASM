@@ -6,7 +6,7 @@ import hIndex
 import jvm.JVM32.arrayOverhead
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.Color
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.toInt

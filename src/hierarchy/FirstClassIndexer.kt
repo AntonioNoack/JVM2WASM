@@ -2,7 +2,7 @@ package hierarchy
 
 import api
 import hIndex
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor

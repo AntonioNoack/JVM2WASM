@@ -1,12 +1,12 @@
-package utils
+package test
 
 import me.anno.utils.OS.documents
 import me.anno.utils.types.Strings.indexOf2
 
 fun main() {
-    // todo there is more pushes than pops...
+    // there was more pushes than pops...
     //  find out why, and fix it
-    val text = documents.getChild("IdeaProjects/JVM2WASM/src/tmp/jvm2wasm.wat").readTextSync()
+    val text = documents.getChild("IdeaProjects/JVM2WASM/tmp/jvm2wasm.wat").readTextSync()
     var i = 0
     val prefix = "call \$stackPush"
     while (true) {

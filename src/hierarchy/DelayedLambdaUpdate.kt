@@ -3,7 +3,7 @@ package hierarchy
 import dIndex
 import gIndex
 import hIndex
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import utils.methodName2
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes.ACC_INTERFACE

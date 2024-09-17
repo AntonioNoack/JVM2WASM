@@ -1,32 +1,19 @@
 import dependency.ActuallyUsedIndex
 import dependency.DependencyIndex
 import hierarchy.DelayedLambdaUpdate
-import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
-import hierarchy.FirstClassIndexer
-import hierarchy.FirstClassIndexer.Companion.readType
 import hierarchy.HierarchyIndex
 import jvm.JVM32
-import jvm.JVM32.*
 import jvm.appendNativeHelperFunctions
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
-import me.anno.maths.Maths.hasFlag
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.structures.Compare.ifSame
-import me.anno.utils.structures.lists.Lists.sortedByTopology
-import me.anno.utils.types.Booleans.toInt
-import me.anno.utils.types.Floats.f3
-import org.objectweb.asm.*
-import org.objectweb.asm.Opcodes.ACC_INTERFACE
 import org.objectweb.asm.Opcodes.ASM9
-import translator.ClassTranslator
 import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
 import java.io.FileNotFoundException
-import java.io.IOException
 import kotlin.math.sin
 
 const val api = ASM9
@@ -284,10 +271,6 @@ fun isRootType(clazz: String): Boolean {
     }
 }
 
-fun <V> eq(a: V, b: V) {
-    if (a != b) throw IllegalStateException("$a != $b")
-}
-
 val entrySig = MethodSig.c("", "entry", "")
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
@@ -319,390 +302,44 @@ fun main() {
     )
 
     for (i in 1 until 13) {
-        hIndex.superClass[predefinedClasses[i]] = predefinedClasses[0]
-        hIndex.childClasses.getOrPut(predefinedClasses[0]) { HashSet() }.add(predefinedClasses[i])
+        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[0])
     }
 
-    for ((i, clazz) in predefinedClasses.withIndex()) {
+    for (i in predefinedClasses.indices) {
+        val clazz = predefinedClasses[i]
         gIndex.classIndex[clazz] = i
         gIndex.classNames.add(clazz)
     }
 
-    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
-    eq(gIndex.getType("()V", true), "\$fRV0")
-
-    // prepare String properties
-    gIndex.stringClass = gIndex.getClassIndex(reb("java/lang/String"))
-    gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
-
-    eq(gIndex.getFieldOffset("[]", "length", "I", false), objectOverhead)
-    eq(gIndex.getFieldOffset(reb("java/lang/String"), "value", "[C", false), objectOverhead)
-    eq(gIndex.getFieldOffset(reb("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
-
-    hIndex.superClass["java/lang/reflect/Field"] = "java/lang/reflect/AccessibleObject"
-    hIndex.superClass["java/lang/reflect/Executable"] = "java/lang/reflect/AccessibleObject"
-    hIndex.superClass["java/lang/reflect/Constructor"] = "java/lang/reflect/Executable"
-
-    gIndex.getFieldOffset("java/lang/System", "in", "Ljava/io/InputStream;", true)
-    gIndex.getFieldOffset("java/lang/System", "out", "Ljava/io/PrintStream;", true)
-    gIndex.getFieldOffset("java/lang/System", "err", "Ljava/io/PrintStream;", true)
-    eq(gIndex.getFieldOffset("java/lang/Throwable", "detailMessage", "Ljava/lang/String;", false), objectOverhead + 0)
-    eq(
-        gIndex.getFieldOffset("java/lang/Throwable", "stackTrace", "[Ljava/lang/StackTraceElement;", false),
-        objectOverhead + 4
-    )
-
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "declaringClass", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "methodName", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "fileName", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "I", false)
-
-    eq(gIndex.getFieldOffset("java/lang/Class", "name", "Ljava/lang/String", false), objectOverhead + 0)
-    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[Ljava/lang/reflect/Field", false), objectOverhead + 4)
-    eq(gIndex.getFieldOffset("java/lang/Class", "methods", "[Ljava/lang/reflect/Method", false), objectOverhead + 8)
-    eq(gIndex.getFieldOffset("java/lang/Class", "index", "I", false), objectOverhead + 12)
-
-    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "securityCheckCache", "Ljava/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "Z", false) // 4
-    gIndex.getFieldOffset("java/lang/reflect/Field", "securityCheckCache", "Ljava/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/Field", "override", "Z", false) // 4
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "name", "Ljava/lang/String", false), objectOverhead + 5)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "slot", "I", false), objectOverhead + 9)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "type", "Ljava/lang/Class", false), objectOverhead + 13)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "modifiers", "I", false), objectOverhead + 17)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "clazz", "Ljava/lang/Class", false), objectOverhead + 21)
-
-    // for sun/misc
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSeed", "J", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSecondarySeed", "J", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomProbe", "I", false)
-
-    gIndex.getFieldOffset("java/lang/Class", "enumConstants", "[]", false)
-
-    // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
-    hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "I", true)] = objectOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "I", true)] = arrayOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "Z", true)] = trackAllocations
-
-    eq(gIndex.getInterfaceIndex("", "<clinit>", "()V"), 0)
-    gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
-
-    listEntryPoints { clazz ->
-        if (hIndex.doneClasses.add(clazz)) {
-            ClassReader(clazz)
-                .accept(FirstClassIndexer(hIndex, clazz), 0)
-        }
-    }
-
-    listLibrary { clazz ->
-        if (hIndex.doneClasses.add(clazz)) {
-            try {
-                ClassReader(clazz)
-                    .accept(FirstClassIndexer(hIndex, clazz), 0)
-            } catch (e: Exception) {
-                throw RuntimeException(clazz, e)
-            }
-        }
-    }
+    registerDefaultOffsets()
+    listEntryPoints()
 
     hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
     hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
     hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
 
-    /**
-     * generics-mapping-pass
-     * */
-    for ((clazz, superTypes) in hIndex.genericSuperTypes) {
-        val baseMethods = hIndex.methods[clazz] ?: continue
-        val ownGenerics = hIndex.generics[clazz]
-        for (superType in superTypes) {
-
-            // todo map all its generic methods
-            val clearSuperType = single(descWithoutGenerics(superType))
-            val generics = hIndex.generics[clearSuperType]
-
-            if (generics == null) {
-                println("Missing generics of $clearSuperType by $superType")
-                continue
-            }
-
-            var i = superType.indexOf('<') + 1
-            val params = ArrayList<String>(generics.size)
-            for (j in generics.indices) {
-                // extract next param from generics
-                val k = superType.readType(i)
-                params.add(descWithoutGenerics(superType.substring(i, k)))
-                i = if (superType[k] == '>') superType.indexOf('<', k + 1) + 1 else k
-                if (i == 0) break
-            }
-
-            // to do find all abstract methods in superType to be mapped
-            // to do all parent classes as well (?)
-            val abstractMethods = hIndex.methods[clearSuperType]
-                ?.filter { it in hIndex.abstractMethods && it in hIndex.genericMethodSigs }
-                ?: continue
-
-            for (method in abstractMethods) {
-
-                // first test, that there is valid candidates?
-                // same name, same number of params, not abstract
-                val typies = genericsTypies(method) // abstract method cannot be static
-                val candidates = baseMethods.filter {
-                    it.name == method.name &&
-                            it.descriptor != method.descriptor &&
-                            it !in hIndex.abstractMethods &&
-                            // test for same number of arguments & same-typy return type
-                            genericsTypies(it) == typies
-                }
-                if (candidates.isNotEmpty()) {
-
-                    // remove generics from call (for now)
-                    val desc2 = hIndex.genericMethodSigs[method]!!
-                    val desc2i = descWithoutGenerics(desc2)
-                    // if so, no base-type generics are present -> nothing needs to be replaced or mapped
-                    if (method.descriptor == desc2i) continue
-
-                    /*if (!hasPrintedHeader) {
-                        println("mapping task [$clazz]: $generics to $superType by $params")
-                        hasPrintedHeader = true
-                    }
-
-                    println(" - ${method.name}, ${method.descriptor}, $desc2i")
-                    println("   candidates: ${candidates.map { it.descriptor }}")
-                    if (ownGenerics != null) println("   own generics: $ownGenerics")*/
-
-                    if (params.size != generics.size) {
-                        if (candidates.size == 1) {
-                            // a guess 😅
-                            val sig2 = MethodSig.c(clazz, method.name, method.descriptor)
-                            val sig3 = candidates.first()
-                            if (sig2 == sig3) throw NotImplementedError()
-                            hIndex.methodAliases[methodName(sig2)] = sig3
-                            println("Arguments mismatch!, assumed only viable to match")
-                        } else println("Arguments mismatch!")
-                        continue
-                    }
-
-                    val mappedParams = params.mapNotNull { p ->
-                        if (p[0] == 'T') {
-                            (generics.firstOrNull { it.name == p }
-                                ?: ownGenerics?.firstOrNull { it.name == p }
-                                    // ?: throw NullPointerException("Didn't find mapping for $p, own generics: $ownGenerics")
-                                    )?.descriptor
-                        } else p
-                    }
-
-                    if (mappedParams.size != params.size) {
-                        if (candidates.size == 1) {
-                            // map candidate
-                            println("Using only candidate, bc didn't find all mappings for $clazz, $method")
-                            val sig2 = MethodSig.c(clazz, method.name, method.descriptor)
-                            val sig3 = candidates.first()
-                            if (sig2 == sig3) throw NotImplementedError()
-                            hIndex.methodAliases[methodName(sig2)] = sig3
-                        } else {
-                            println("Didn't find all mappings for $clazz, $method!")
-                        }
-                        continue
-                    }
-
-                    val desc2j = split2(desc2i, true)
-                    val mappedDesc = desc2j.map { p ->
-                        if (p[0] == 'T') {
-                            mappedParams[generics.indexOfFirst { it.name == p }]
-                        } else p
-                    }
-
-                    // generate a new signature
-                    val newDescBuilder = Builder(mappedDesc.sumOf { it.length } + 2)
-                    newDescBuilder.append('(')
-                    for (j in 0 until mappedDesc.size - 1) {
-                        newDescBuilder.append(mappedDesc[j])
-                    }
-                    newDescBuilder.append(')')
-                    newDescBuilder.append(mappedDesc.last())
-                    val newDesc = newDescBuilder.toString()
-
-                    // check if this newly generated signature is implemented
-                    val implMethod = candidates.firstOrNull { it.descriptor == newDesc }
-                    if (implMethod != null) {
-                        // define mapping
-                        val sig2 = MethodSig.c(clazz, method.name, method.descriptor)
-                        if (sig2 == implMethod) throw NotImplementedError()
-                        hIndex.methodAliases[methodName(sig2)] = implMethod
-                    } else println("warn! no mapping found for [$clazz]: $generics to $superType by $params, $candidates")
-
-                }
-            }
-        }
-    }
-
-    /**
-     * find NoThrow annotations
-     * */
-    for ((sig, annotations) in hIndex.annotations) {
-        if (annotations.any { it.clazz == "annotations/NoThrow" }) {
-            cannotThrow.add(methodName(sig))
-        }
-    }
+    genericMappingPass()
+    findNoThrowMethods()
 
     // java_lang_StrictMath_sqrt_DD
     hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = "f64.sqrt"
     hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = "f64.sqrt"
 
-    /**
-     * find aliases
-     * */
-    val nameToMethod0 = nameToMethod
-    for ((sig, annotations) in hIndex.annotations) {
-        val alias = annotations.firstOrNull { it.clazz == "annotations/Alias" }
-        if (alias != null) {
-            @Suppress("UNCHECKED_CAST")
-            val aliasNames = alias.properties["names"] as List<String>
-            for (aliasName in aliasNames) {
-                if ('|' in aliasName) throw IllegalStateException(aliasName)
-                // val aliasName = alias.properties["name"] as String
-                if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
-                if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-                if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-                val previous = hIndex.methodAliases[aliasName]
-                if (previous != null && previous != sig) throw IllegalStateException("Cannot replace $aliasName -> $previous with -> $sig")
-                hIndex.methodAliases[aliasName] = sig
-            }
-        }
-        val revAlias = annotations.firstOrNull { it.clazz == "annotations/RevAlias" }
-        if (revAlias != null) {
-            val aliasName = revAlias.properties["name"] as String
-            if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
-            if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-            if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-            val sig1 = nameToMethod0[aliasName]
-            if (sig1 != null) hIndex.methodAliases[methodName(sig)] = sig1
-            else println("Skipped $sig -> $aliasName, because unknown")
-        }
-    }
+    findAliases()
 
-    /**
-     * collect all entry point methods
-     * */
-    val entryPoints = HashSet<MethodSig>()
-    val entryClasses = HashSet<String>()
-    fun entryClass(clazz: String) {
-        entryClasses.add(clazz)
-        val superClass = hIndex.superClass[clazz]
-        if (superClass != null) entryClass(superClass)
-        val interfaces = hIndex.interfaces[clazz]
-        if (interfaces != null) for (interfaceI in interfaces)
-            entryClass(interfaceI)
-    }
-    listEntryPoints({ clazz ->
-        // all implemented methods
-        entryPoints.addAll(hIndex.methods[clazz] ?: emptySet())
-        entryClass(clazz)
-    }) {
-        if (it.name == "<init>")
-            entryClass(it.clazz)
-        entryPoints.add(it)
-    }
+    val (entryPoints, entryClasses) = collectEntryPoints()
 
-    listEntryPoints(
-        { hIndex.exportedMethods.addAll(hIndex.methods[it] ?: emptySet()) },
-        { hIndex.exportedMethods.add(it) })
-
-    for ((sig, a) in hIndex.annotations) {
-        if (a.any { it.clazz == "annotations/Export" }) {
-            hIndex.exportedMethods.add(sig)
-        }
-    }
+    findExportedMethods()
 
     // unknown (because idk where [] is implemented), can cause confusion for my compiler
     hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
 
-    // replace dependencies to get rid of things
-    val methodNameToSig = HashMap<String, MethodSig>()
-    for (sig in hIndex.methods.map { it.value }.flatten()) {
-        methodNameToSig[methodName2(sig.clazz, sig.name, sig.descriptor)] = sig
-    }
-    for ((src, dst) in hIndex.methodAliases) {
-        val src1 = methodNameToSig[src] ?: continue
-        dIndex.methodDependencies[src1] = dIndex.methodDependencies[dst] ?: HashSet()
-        dIndex.fieldDependenciesR[src1] = dIndex.fieldDependenciesR[dst] ?: HashSet()
-        dIndex.fieldDependenciesW[src1] = dIndex.fieldDependenciesW[dst] ?: HashSet()
-        dIndex.constructorDependencies[src1] = dIndex.constructorDependencies[dst] ?: HashSet()
-        dIndex.interfaceDependencies[src1] = dIndex.interfaceDependencies[dst] ?: HashSet()
-    }
-
-    // resolve a lot of methods for better dependencies
-    dIndex.methodDependencies = HashMap(
-        dIndex.methodDependencies
-            .mapValues { (_, deps) ->
-                deps.map {
-                    resolvedMethods.getOrPut(it) {
-                        val found = findMethod(it.clazz, it.name, it.descriptor, false) ?: it
-                        if (found != it) hIndex.methodAliases[methodName(it)] = found
-                        if ((found in hIndex.staticMethods) == (it in hIndex.staticMethods)) found else it
-                    }
-                }.toHashSet()
-            }
-    )
-
-    for (clazz in hIndex.methods.keys) {
-        val superClass = hIndex.superClass[clazz] ?: continue
-        if (clazz !in (hIndex.childClasses[superClass] ?: emptySet()))
-            throw IllegalStateException("Missing $clazz in $superClass")
-    }
-
-    println("// starting resolve")
-    val t0 = System.nanoTime()
-    dIndex.resolve(entryClasses, entryPoints, ::cannotUseClass)
-    val t1 = System.nanoTime()
-    println("// finished resolve in ${((t1 - t0) * 1e-9).f3()}s")
-
-    // build synthetic methods
-    for ((name, dlu) in DelayedLambdaUpdate.needingBridgeUpdate) {
-        if (name in dIndex.constructableClasses)
-            dlu.indexFields()
-    }
-
-    /**
-     * calculate the field offsets right here :)
-     * */
-    val usedFields = HashSet(dIndex.usedFieldsR)
-    if (fieldsRWRequired) {
-        usedFields.retainAll(dIndex.usedFieldsW)
-    } else {
-        usedFields.addAll(dIndex.usedFieldsW)
-    }
-    val nativeClasses = listOf("I", "F", "B", "S", "Z", "J", "C", "D")
-    val fieldsByClass = usedFields.groupBy { it.clazz }
-    for (clazz in fieldsByClass.keys.sortedByTopology {
-        listSuperClasses(it, HashSet())
-    }) {
-        for (field in fieldsByClass[clazz]!!
-            .sortedWith { a, b ->
-                storageSize(b.descriptor).compareTo(storageSize(a.descriptor))
-                    .ifSame { (a.clazz in nativeClasses).toInt().compareTo((b.clazz in nativeClasses).toInt()) }
-                    .ifSame { a.name.compareTo(b.name) }
-            }) { // sort by size && is-ptr | later we even could respect alignment and fill gaps where possible :)
-            gIndex.getFieldOffset(field.clazz, field.name, field.descriptor, field.static)
-        }
-    }
-    gIndex.lockFields = true
-
-    for ((method, code, noinline) in hIndex.annotations.entries
-        .mapNotNull { m ->
-            val wasm = m.value.firstOrNull { it.clazz == "annotations/WASM" }
-            if (wasm != null)
-                Triple(m.key, wasm.properties["code"] as String,
-                    m.value.any { it.clazz == "annotations/NoInline" })
-            else null
-        }) {
-        if (noinline) {
-            hIndex.wasmNative[method] = code
-        } else {
-            hIndex.inlined[method] = code
-        }
-    }
+    replaceRenamedDependencies()
+    checkMissingClasses()
+    resolveAll(entryClasses, entryPoints)
+    indexFieldsInSyntheticMethods()
+    calculateFieldOffsets()
+    assignNativeCode()
 
     headerPrinter.append("(module\n")
 
@@ -717,51 +354,12 @@ fun main() {
 
     // this should be empty, and replaced using functions with JavaScript-pseudo implementations
     val missingMethods = HashSet<MethodSig>(4096)
-    importPrinter.append(";; forbidden\n")
-    loop@ for (sig in dIndex.methodsWithForbiddenDependencies
-        .filter { it in dIndex.usedMethods }
-        .sortedBy { methodName(it) }) {
-        val name = methodName(sig)
-        var sig2: MethodSig
-        while (true) {
-            sig2 = hIndex.methodAliases[name] ?: sig
-            if (sig2 != sig) {
-                if (sig2 !in dIndex.usedMethods) {
-                    throw NotImplementedError("$sig was used, but $sig2 wasn't")
-                }
-                continue@loop
-            } else break
-        }
-        importPrinter.import2(sig)
-        if (!missingMethods.add(sig))
-            throw IllegalStateException()
-    }
+    printForbiddenMethods(importPrinter, missingMethods)
 
     // only now usedMethods is complete
     printMethodFieldStats()
 
-    importPrinter.append(";; not implemented, not forbidden\n")
-    for (sig in dIndex.usedMethods
-        .filter {
-            it in hIndex.hasSuperMaybeMethods &&
-                    it !in dIndex.methodsWithForbiddenDependencies &&
-                    it !in hIndex.jvmImplementedMethods
-        }
-        .sortedBy { methodName(it) }) {
-        val superMethod = dIndex.findSuperMethod(sig.clazz, sig)
-        if (superMethod != null) {
-            if (sig != superMethod)
-                hIndex.methodAliases[methodName(sig)] = superMethod
-        } else {
-            if (hIndex.classFlags[sig.clazz]?.hasFlag(ACC_INTERFACE) == true) {
-                println("Skipping $sig")
-                continue
-            }
-            importPrinter.import2(sig)
-            if (!missingMethods.add(sig))
-                throw IllegalStateException()
-        }
-    }
+    printNotImplementedMethods(importPrinter, missingMethods)
 
     for (sig in dIndex.usedMethods
         .filter { it in hIndex.nativeMethods }) {
@@ -771,70 +369,12 @@ fun main() {
         }
     }
 
-    importPrinter.append(";; not implemented, native\n")
-    for (func in dIndex.usedMethods
-        .filter {
-            it in hIndex.nativeMethods &&
-                    it !in missingMethods &&
-                    it !in hIndex.jvmImplementedMethods
-        }
-        .sortedBy { methodName(it) }) {
-        importPrinter.import2(func)
-        missingMethods.add(func)
-    }
+    printNativeMethods(importPrinter, missingMethods)
 
-    // generate JavaScript file
-    val jsImplemented = HashMap<String, Pair<MethodSig, String>>() // name -> sig, impl
-    for (sig in dIndex.usedMethods) {
-        val annot = hIndex.annotations[sig] ?: continue
-        val js = annot.firstOrNull { it.clazz == "annotations/JavaScript" } ?: continue
-        val code = js.properties["code"] as String
-        missingMethods.remove(sig)
-        for (name in methodNames(sig)) {
-            jsImplemented[name] = Pair(sig, code)
-            implementedMethods[name] = sig
-        }
-    }
+    val jsImplemented = generateJavaScriptFile(missingMethods)
+    val jsPseudoImplemented = createPseudoJSImplementations(jsImplemented, missingMethods)
 
-    // create a pseudo-implementation for all imported methods without implementation
-    val jsPseudoImplemented = HashMap<String, MethodSig>()
-    for (sig in missingMethods) {
-        if ((hIndex.annotations[sig] ?: emptyList()).any { it.clazz == "annotations/WASM" }) continue
-        val name = methodName(sig)
-        if (name in jsImplemented) continue
-        jsPseudoImplemented[name] = sig
-        implementedMethods[name] = sig
-    }
-
-    bodyPrinter.append(";; not implemented, abstract\n")
-    for (func in dIndex.usedMethods
-        .filter {
-            it in hIndex.abstractMethods &&
-                    it !in dIndex.methodsWithForbiddenDependencies &&
-                    !(hIndex.classFlags[it.clazz] ?: 0).hasFlag(ACC_INTERFACE) &&
-                    it !in missingMethods
-        }
-        .sortedBy { methodName(it) }
-    ) {
-        val canThrow = canThrowError(func)
-        val desc = func.descriptor
-        val dx = desc.lastIndexOf(')')
-        // export? no, nobody should call these
-        bodyPrinter.append("(func $").append(methodName(func)).append(" (param")
-        for (param in split1(desc.substring(1, dx))) {
-            bodyPrinter.append(' ').append(jvm2wasm(param))
-        }
-        bodyPrinter.append(") (result")
-        val hasReturnType = !desc.endsWith(")V")
-        if (hasReturnType) bodyPrinter.append(' ').append(jvm2wasm1(desc[dx + 1]))
-        if (canThrow) bodyPrinter.append(' ').append(ptrType)
-        bodyPrinter.append(")")
-        if (hasReturnType || canThrow) {
-            if (hasReturnType) bodyPrinter.append(" ").append(jvm2wasm1(desc[dx + 1])).append(".const 0")
-            if (canThrow) bodyPrinter.append(" call \$throwAME")
-        }
-        bodyPrinter.append(")\n")
-    }
+    printAbstractMethods(bodyPrinter, missingMethods)
 
     for (sig in dIndex.usedMethods) {
         if (sig in hIndex.jvmImplementedMethods) {
@@ -858,143 +398,10 @@ fun main() {
         return !clazz.startsWith("[")
     }
 
-    val classesToLoad = (dIndex.usedMethods + aliasedMethods)
-        .map { it.clazz }
-        .filter { clazz ->
-            clazz != "?" &&
-                    clazz !in hIndex.syntheticClasses &&
-                    clazz !in hIndex.missingClasses
-        }
-        .toSet() // filter duplicates
-        // super classes and interfaces first
-        .sortedByTopology {
-            listSuperClasses(it, HashSet())
-        }
-
-    /**
-     * create the dynamic index for the gIndex methods
-     * */
-    val dynIndex = HashMap<String, HashSet<MethodSig>>()
-    for (clazz in classesToLoad) {
-        if (filterClass(clazz)) try {
-            ClassReader(clazz).accept(
-                object : ClassVisitor(api) {
-                    override fun visitMethod(
-                        access: Int,
-                        name: String,
-                        descriptor: String,
-                        signature: String?,
-                        exceptions: Array<out String>?
-                    ): MethodVisitor? {
-                        val sig1 = MethodSig.c(clazz, name, descriptor)
-                        val map = hIndex.methodAliases[methodName(sig1)]
-                        return if (sig1 !in dIndex.methodsWithForbiddenDependencies && sig1 in dIndex.usedMethods &&
-                            (map == null || map == sig1)
-                        ) object : MethodVisitor(api) {
-
-                            override fun visitInvokeDynamicInsn(
-                                name: String?,
-                                descriptor: String?,
-                                bootstrapMethodHandle: Handle?,
-                                vararg args: Any?
-                            ) {
-                                val dst = args[1] as Handle
-                                val synthClassName = synthClassName(sig1, dst)
-                                // println("lambda: $sig1 -> $synthClassName")
-                                gIndex.getClassIndex(synthClassName) // add class to index
-                                val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
-                                dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
-                            }
-
-                            override fun visitTypeInsn(opcode: Int, type: String) {
-                                gIndex.getClassIndex(reb(type)) // add class to index
-                            }
-
-                            override fun visitTryCatchBlock(start: Label, end: Label, handler: Label, type: String?) {
-                                if (type != null) {
-                                    gIndex.getClassIndex(reb(type)) // add class to index
-                                }
-                            }
-
-                            override fun visitLdcInsn(value: Any?) {
-                                if (value is Type) { // add class to index
-                                    gIndex.getClassIndex(reb(single(value.descriptor)))
-                                }
-                            }
-
-                            override fun visitMethodInsn(
-                                opcode: Int,
-                                owner0: String,
-                                name: String,
-                                descriptor: String,
-                                isInterface: Boolean
-                            ) {
-                                if (opcode == 0xb6) { // invoke virtual
-                                    val owner = reb(owner0)
-                                    val sig0 = MethodSig.c(owner, name, descriptor)
-                                    // just for checking if abstract
-                                    if (sig0 !in hIndex.finalMethods) {
-                                        // check if method is defined in parent class
-                                        fun add(clazz: String) {
-                                            val superClass = hIndex.superClass[clazz]
-                                            if (superClass != null &&
-                                                MethodSig.c(
-                                                    superClass,
-                                                    name, descriptor
-                                                ) in hIndex.methods[superClass]!!
-                                            ) {
-                                                add(superClass)
-                                            } else {
-                                                dynIndex.getOrPut(clazz) { HashSet() }.add(sig0)
-                                            }
-                                        }
-                                        add(owner)
-                                    }
-                                }
-                            }
-                        } else null
-                    }
-                }, 0 // no stack-frames are needed
-            )
-        } catch (e: IOException) {
-            throw IOException(clazz, e)
-        }
-    }
-
-    // going from parent classes to children, index all methods in gIndex
-    for (clazz in classesToLoad) {
-        gIndex.getDynMethodIdx(clazz)
-        val idx1 = dynIndex[clazz] ?: continue
-        for (sig in idx1) {
-            gIndex.getDynMethodIdx(clazz, sig.name, sig.descriptor)
-        }
-    }
-
-    for (clazz in predefinedClasses) {
-        if (!(hIndex.classFlags[clazz] ?: 0).hasFlag(ACC_INTERFACE))
-            gIndex.getDynMethodIdx(clazz)
-    }
-
-    gIndex.lockedDynIndex = true
-
-    for (clazz in dIndex.constructableClasses) {
-        val interfaces = hIndex.interfaces[clazz] ?: continue
-        for (interfaceI in interfaces) {
-            gIndex.getClassIndex(interfaceI)
-        }
-    }
-
-    // ensure all interfaces and super classes have their dedicated index
-    var i = 0
-    while (i < gIndex.classNames.size) {
-        val clazzName = gIndex.classNames[i++]
-        val superClass = hIndex.superClass[clazzName]
-        if (superClass != null) gIndex.getClassIndex(superClass)
-        val interfaces = hIndex.interfaces[clazzName]
-        if (interfaces != null) for (interfaceI in interfaces) {
-            gIndex.getClassIndex(interfaceI)
-        }
-    }
+    val classesToLoad = findClassesToLoad(aliasedMethods)
+    indexMethodsIntoGIndex(classesToLoad, predefinedClasses, ::filterClass)
+    ensureIndexForConstructableClasses()
+    ensureIndexForInterfacesAndSuperClasses()
 
     /**
      * calculate static layout and then set string start
@@ -1005,34 +412,8 @@ fun main() {
     ptr = appendStaticInstanceTable(dataPrinter, ptr, numClasses)
     stringStart = ptr
 
-    /**
-     * translate all required methods
-     * */
-    for (clazz in classesToLoad) {
-        if (filterClass(clazz)) try {
-            ClassReader(clazz).accept(
-                ClassTranslator(clazz),
-                ClassReader.EXPAND_FRAMES
-            )
-        } catch (e: ClassTranslator.FoundBetterReader) {
-            try {
-                e.reader.accept(
-                    ClassTranslator(clazz),
-                    ClassReader.EXPAND_FRAMES
-                )
-            } catch (e: IOException) {
-                throw IOException(clazz, e)
-            }
-        } catch (e: IOException) {
-            throw IOException(clazz, e)
-        }
-    }
-
-    // build synthetic methods
-    for ((name, dlu) in DelayedLambdaUpdate.needingBridgeUpdate) {
-        if (name in dIndex.constructableClasses)
-            dlu.generateSyntheticMethod()
-    }
+    translateMethods(classesToLoad, ::filterClass)
+    buildSyntheticMethods()
 
     ptr = appendStringData(dataPrinter, gIndex) // idx -> string
 
@@ -1051,9 +432,7 @@ fun main() {
 
     // must come after invoke dynamic
     appendDynamicFunctionTable(dataPrinter, implementedMethods) // idx -> function
-
     appendFunctionTypes(dataPrinter)
-
     appendNativeHelperFunctions(dataPrinter)
 
     val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
@@ -1088,17 +467,7 @@ fun main() {
         printMissingFunctions(usedButNotImplemented, resolved)
     }
 
-    for ((sig, impl) in gIndex.translatedMethods.entries.sortedBy { it.value }) {
-        val name = methodName(sig)
-        // not truly used, even tho marked as such...
-        if (name in resolved) {
-            bodyPrinter.append(impl)
-        } else if (!name.startsWith("new_") && !name.startsWith("static_") &&
-            sig !in hIndex.getterMethods && sig !in hIndex.setterMethods
-        ) {
-            println("Not actually used: $name")
-        }// else we don't care we didn't use it
-    }
+    printMethodImplementations(bodyPrinter, resolved)
 
     fun global(name: String, type: String, type2: String, value: Int) {
         // can be mutable...
@@ -1171,19 +540,21 @@ fun main() {
 
 }
 
-fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>): Nothing {
-    println("\nMissing functions:\n")
+fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
+    println("\nMissing functions:")
     val nameToMethod = nameToMethod
     for (name in usedButNotImplemented) {
-        println(name)
-        println(name in resolved)
+        println("  $name")
+        println("    resolved: ${name in resolved}")
         val sig = hIndex.methodAliases[name] ?: nameToMethod[name]
         if (sig != null) {
-            println(hIndex.methodAliases[name])
-            println(nameToMethod[name])
-            println(sig in gIndex.translatedMethods)
+            println("    alias: " + hIndex.methodAliases[name])
+            println("    name2method: " + nameToMethod[name])
+            println("    translated: " + (sig in gIndex.translatedMethods))
+            print("    ")
             printUsed(sig)
         }
     }
+    println()
     throw IllegalStateException("Missing functions")
 }

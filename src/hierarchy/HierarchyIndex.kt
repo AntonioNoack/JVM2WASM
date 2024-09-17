@@ -38,6 +38,11 @@ object HierarchyIndex {
         return if (sig1 != sig) alias(sig1) else sig
     }
 
+    fun registerSuperClass(clazz: String, superClazz: String) {
+        superClass[clazz] = superClazz
+        childClasses.getOrPut(superClazz, ::HashSet).add(clazz)
+    }
+
     val inlined = HashMap<MethodSig, String>(cap2)
     val wasmNative = HashMap<MethodSig, String>(cap2)
 

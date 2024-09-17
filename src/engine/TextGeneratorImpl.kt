@@ -11,6 +11,7 @@ import me.anno.gpu.texture.ITexture2D
 import me.anno.gpu.texture.Texture2D.Companion.allocate
 import me.anno.gpu.texture.Texture2D.Companion.bindTexture
 import me.anno.gpu.texture.Texture2DArray
+import me.anno.utils.async.Callback
 import org.lwjgl.opengl.GL11C
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -23,10 +24,11 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
 
     override fun generateASCIITexture(
         portableImages: Boolean,
+        callback: Callback<Texture2DArray>,
         textColor: Int,
         backgroundColor: Int,
         extraPadding: Int
-    ): Texture2DArray {
+    ) {
         val widthLimit: Int = maxTextureSize
         val heightLimit: Int = maxTextureSize
 
@@ -60,8 +62,7 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         tex.wasCreated = true
         tex.filtering(Filtering.TRULY_NEAREST)
         tex.clamping(Clamping.CLAMP)
-
-        return tex
+        callback.ok(tex)
     }
 
     override fun generateTexture(
@@ -69,10 +70,11 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         widthLimit: Int,
         heightLimit: Int,
         portableImages: Boolean,
+        callback: Callback<ITexture2D>,
         textColor: Int,
         backgroundColor: Int,
         extraPadding: Int
-    ): ITexture2D? {
-        return TextGen.generateTexture(font.name, text, font.size, widthLimit)
+    ) {
+        TextGen.generateTexture(font.name, text, font.size, widthLimit)
     }
 }

@@ -3,7 +3,7 @@ package dependency
 import fieldsRWRequired
 import gIndex
 import hIndex
-import me.anno.maths.Maths.hasFlag
+import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
 import utils.*
 

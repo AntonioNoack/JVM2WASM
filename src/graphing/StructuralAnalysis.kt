@@ -135,7 +135,7 @@ object StructuralAnalysis {
             node.hasNoCode = node.calcHasNoCode()
             if (node.isBranch) {
                 while (node.printer.endsWith("i32.eqz\n")) {// remove unnecessary null check before branch
-                    node.printer.size = node.printer.size - "i32.eqz\n".length
+                    node.printer.size -= "i32.eqz\n".length
                     while (node.printer.endsWith(" ")) node.printer.size-- // remove spaces
                     val t = node.ifTrue!!
                     val f = node.ifFalse!!

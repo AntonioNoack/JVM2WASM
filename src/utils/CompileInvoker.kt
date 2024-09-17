@@ -90,7 +90,7 @@ fun printUsed(sig: MethodSig) {
 
 fun compileToWASM(printer: StringBuilder2) {
 
-    val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/src/tmp/jvm2wasm.wat")
+    val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/tmp/jvm2wasm.wat")
     tmp.outputStream().use {
         it.write(printer.values, 0, printer.size)
     }
@@ -115,7 +115,7 @@ fun compileToWASM(printer: StringBuilder2) {
 }
 
 private fun printAsync(input: InputStream, err: Boolean) {
-    thread {
+    thread(name = "CompilerInvoker-async") {
         val reader = input.bufferedReader()
         while (true) {
             var line = reader.readLine() ?: break

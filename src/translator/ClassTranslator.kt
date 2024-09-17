@@ -66,9 +66,12 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
         val writer = writer
         return if (writer == null) {
             val sig = MethodSig.c(clazz, name, descriptor)
-            val map = hIndex.methodAliases[methodName(sig)] ?: sig
-            if (sig !in dIndex.methodsWithForbiddenDependencies &&
-                sig in dIndex.usedMethods && map == sig
+            val methodName = methodName(sig)
+            val map = hIndex.methodAliases[methodName] ?: sig
+            if ((sig !in dIndex.methodsWithForbiddenDependencies &&
+                        sig in dIndex.usedMethods && map == sig) ||
+                // todo why is this not in usedMethods??? it's shown to be actually-used
+                methodName == "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter"
             ) {
                 MethodTranslator(access, clazz, name, descriptor)
             } else null

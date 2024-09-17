@@ -49,77 +49,6 @@ public class SunMisc {
 
     }
 
-    @Alias(names = "java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV")
-    public static <A, B> void java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV(Object self, Class<A> clazz, Class<B> clazz2, Object obj, int x) {
-    }
-
-    @Alias(names = "java_lang_Class_reflectionData_Ljava_lang_ClassXReflectionData")
-    public static Object java_lang_Class_reflectionData_Ljava_lang_ClassXReflectionData(Object self) {
-        throw new RuntimeException("Cannot ask for reflection data, won't work");
-    }
-
-    @Alias(names = "java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method")
-    public static Object[] java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Object self) {
-        return empty;// todo
-    }
-
-    @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method")
-    public static Object[] java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method(Object self, boolean sth) {
-        return empty;// todo
-    }
-
-    private static Constructor<Object>[] constructors;
-
-    @Alias(names = "java_lang_Class_getConstructor_ALjava_lang_ClassLjava_lang_reflect_Constructor")
-    public static <V> Constructor<V> getConstructor(Class<V> self, Object[] args) throws NoSuchFieldException, IllegalAccessException {
-        if (args == null) {
-            throwJs("Arguments was null?");
-            return null;
-        }
-        if (args.length > 0) {
-            throwJs("Cannot access constructors with arguments");
-            return null;
-        }
-        if (constructors == null) {
-            constructors = new Constructor[numClasses()];
-        }
-        int idx = getClassIndex(self);
-        Constructor<Object> cs = constructors[idx];
-        if (cs == null) {
-            cs = ptrTo(create(getClassIndex(Constructor.class)));
-            Constructor.class.getDeclaredField("clazz").set(cs, self);
-            constructors[idx] = cs;
-        }
-        return (Constructor<V>) cs;
-    }
-
-    @Alias(names = "java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ")
-    public static boolean java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ(Object self, Object other) {
-        return self == other;
-    }
-
-    @Alias(names = "java_lang_reflect_Constructor_toString_Ljava_lang_String")
-    public static String java_lang_reflect_Constructor_toString_Ljava_lang_String(Object self) {
-        return self.getClass().getName();
-    }
-
-    @Alias(names = "java_lang_reflect_Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
-    public static Object java_lang_reflect_Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
-        return null;
-    }
-
-    @Alias(names = "java_lang_reflect_Constructor_newInstance_ALjava_lang_ObjectLjava_lang_Object")
-    public static <V> V java_lang_reflect_Constructor_newInstance_ALjava_lang_ObjectLjava_lang_Object(Constructor<V> self, Object[] args) throws InstantiationException, IllegalAccessException {
-        if (args != null && args.length != 0)
-            throw new IllegalArgumentException("Constructors with arguments aren't yet supported in WASM");
-        return self.getDeclaringClass().newInstance();
-    }
-
-    @Alias(names = "java_lang_Class_getInterfaces_ALjava_lang_Class")
-    public static Object[] java_lang_Class_getInterfaces_ALjava_lang_Class(Object self) {
-        return empty;// todo
-    }
-
     @Alias(names = "static_sun_misc_Unsafe_V")
     public static void static_sun_misc_Unsafe_V() {
     }
@@ -139,37 +68,6 @@ public class SunMisc {
     @Alias(names = "sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe")
     public static void sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe() {
         throw new RuntimeException("Unsafe is not supported!");
-    }
-
-    @Alias(names = "static_java_lang_ClassLoaderXParallelLoaders_V")
-    public static void static_java_lang_ClassLoaderXParallelLoaders_V() {
-    }
-
-    private static final Object[] empty = new Object[0];
-
-    @Alias(names = "java_lang_ClassLoaderXParallelLoaders_register_Ljava_lang_ClassZ")
-    public static boolean java_lang_ClassLoaderXParallelLoaders_register_Ljava_lang_ClassZ(Object clazz) {
-        // idc
-        return false;
-    }
-
-    @Alias(names = "java_lang_Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
-    public static Annotation java_lang_Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object annotClass) {
-        // todo implement properly
-        return null;
-    }
-
-    @Alias(names = "java_lang_ClassLoader_loadLibrary0_Ljava_lang_ClassLjava_io_FileZ")
-    public static boolean java_lang_ClassLoader_loadLibrary0_Ljava_lang_ClassLjava_io_FileZ(Object clazz, File file) {
-        return false;
-    }
-
-    @Alias(names = "java_lang_ClassLoaderXNativeLibrary_finalize_V")
-    public static void java_lang_ClassLoaderXNativeLibrary_finalize_V(Object self) {
-    }
-
-    @Alias(names = "java_lang_ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV")
-    public static void java_lang_ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV(Object clazz, String file, boolean sth) {
     }
 
 }
