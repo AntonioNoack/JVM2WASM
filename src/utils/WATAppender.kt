@@ -6,9 +6,9 @@ import hIndex
 import jvm.JVM32.arrayOverhead
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
-import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.Color
 import me.anno.utils.structures.Compare.ifSame
+import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import org.objectweb.asm.Opcodes.*
 import resources
@@ -558,25 +558,30 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
     }*/
 
     for (i in 0 until numClasses) {
-        val pic = getDynMethodIdx(i)
+        val dynMethods = getDynMethodIdx(i)
         val clazz = gIndex.classNames[i]
+
+        val print = i == 1929
+        // could be written to a file for debugging
+        if (print) println("dynMethodIndex[$i: $clazz]: $dynMethods")
+
         if (gIndex.classNames[i] !in dIndex.constructableClasses) {
-            // println("writing $i: $clazz to null, because not constructable")
+            if (print) println("writing $i: $clazz to null, because not constructable")
             methodTable.writeLE32(0)
         } else {
             // todo: if all is the same as the parent class, we could link to the parent class :)
             methodTable.writeLE32(ptr)
-            val revPic = arrayOfNulls<GenericSig>(pic.size)
-            table2.writeLE32(pic.size * 4)
-            for ((m, idx) in pic) {
-                if (revPic[idx] != null) throw IllegalStateException("Index must not appear twice in pic! $pic")
-                revPic[idx] = m
+            val dynIndexToMethod = arrayOfNulls<GenericSig>(dynMethods.size)
+            table2.writeLE32(dynMethods.size * 4)
+            for ((m, idx) in dynMethods) {
+                if (dynIndexToMethod[idx] != null) throw IllegalStateException("Index must not appear twice in pic! $dynMethods")
+                dynIndexToMethod[idx] = m
             }
-            val print = i == 39
-            // if (print || aidtCtr < 50) println("writing $i: $clazz to $ptr, ${revPic.toList()}")
-            for (idx in revPic.indices) {
+            // val print = i == 39
+            if (print || aidtCtr < 50) println("writing $i: $clazz to $ptr, ${dynIndexToMethod.toList()}")
+            for (idx in dynIndexToMethod.indices) {
 
-                val sig0 = revPic[idx]!!
+                val sig0 = dynIndexToMethod[idx]!!
                 val sig = MethodSig.c(clazz, sig0.name, sig0.descriptor)
 
                 fun methodIsAbstract(sig: MethodSig): Boolean {
@@ -591,7 +596,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                 val name = methodName(impl)
                 // if method is missing, find replacement
                 val mapped = hIndex.methodAliases[name]
-                // if (print) println("$idx, $sig0 -> $sig, $impl, $mapped")
+                if (print) println("$idx, $sig0 -> $sig, $impl, $mapped")
                 val dynIndexI = dynIndex[name]
                 if (dynIndexI != null) {
                     numOk++
@@ -601,7 +606,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                     numAbstract++
                     // to do redirect to an error function or to -1; don't warn then
                     table2.writeLE32(-1)
-                    if (i == 14 && sig.name == "append") {
+                    if (i == 14 && sig.name == "get") {
                         printUsed(sig)
                         if (mapped != null) printUsed(mapped)
                     }
@@ -624,37 +629,41 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                     } else {
                         numBroken++
                         table2.writeLE32(-1)
-                        if (print || aidtCtr++ < 50) {
+                        if (true) {
 
                             println("[WARN] $sig ($i/$idx) is missing from dynIndex")
                             printUsed(sig)
                             println("  $idx -> -1*")
 
-                            // to do check if any super class or interface is being used...
-                            fun checkChildren(clazz: String) {
-                                if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
-                                    printUsed(sig)
-                                    throw IllegalStateException("$sig is being used by super class $clazz")
+                            if (false) {
+                                // to do check if any super class or interface is being used...
+                                fun checkChildren(clazz: String) {
+                                    if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
+                                        printUsed(sig)
+                                        throw IllegalStateException("$sig is being used by super class $clazz")
+                                    }
+                                    for (child in hIndex.childClasses[clazz] ?: return) {
+                                        checkChildren(child)
+                                    }
                                 }
-                                for (child in hIndex.childClasses[clazz] ?: return) {
-                                    checkChildren(child)
-                                }
-                            }
 
-                            fun checkSuper(clazz: String) {
-                                if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
-                                    printUsed(sig)
-                                    throw IllegalStateException("$sig is being used by super class $clazz")
+                                fun checkSuper(clazz: String) {
+                                    if (clazz == "java/lang/Object") return
+                                    if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
+                                        printUsed(sig)
+                                        throw IllegalStateException("$sig is being used by super class $clazz")
+                                    }
+                                    checkSuper(hIndex.superClass[clazz] ?: return)
                                 }
-                                checkSuper(hIndex.superClass[clazz] ?: return)
+
+                                checkSuper(sig.clazz)
+                                checkChildren(sig.clazz)
                             }
-                            checkSuper(sig.clazz)
-                            checkChildren(sig.clazz)
                         }
                     }
                 }
             }
-            ptr += 4 + 4 * revPic.size
+            ptr += 4 + 4 * dynIndexToMethod.size
             // if (print) throw IllegalStateException("debug")
         }
     }

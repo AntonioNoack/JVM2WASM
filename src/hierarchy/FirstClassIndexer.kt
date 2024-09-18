@@ -11,11 +11,7 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
 import reb
 import rep
-import utils.single
-import utils.split1
-import utils.FieldSig
-import utils.GenericSig
-import utils.MethodSig
+import utils.*
 import java.io.IOException
 
 /**
@@ -114,8 +110,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         var superName = rep(superName0)
         if (superName == null && name != "java/lang/Object") superName = "java/lang/Object"
         if (superName != null) {
-            index.superClass[name] = superName
-            index.childClasses.getOrPut(superName) { HashSet() }.add(name)
+            index.registerSuperClass(name, superName)
         }
 
         index.interfaces[name] = interfaces

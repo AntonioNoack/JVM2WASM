@@ -12,6 +12,8 @@ import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.*;
+import java.util.Collection;
+import java.util.Collections;
 
 import static jvm.JVM32.*;
 import static jvm.Utils.cl;
@@ -666,6 +668,8 @@ public class JavaLang {
         return read32(getAddr(clazz) + objectOverhead + 8);
     }
 
+    private static final NoSuchMethodException noSuchMethodEx = new NoSuchMethodException();
+
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class[] parameters) throws NoSuchMethodException {
         if (name == null) return null;
@@ -673,7 +677,7 @@ public class JavaLang {
         for (Method method : methods) {
             if (matches(method, name, parameters)) return method;
         }
-        throw new NoSuchMethodException(name);
+        throw noSuchMethodEx;
     }
 
     @Alias(names = "java_lang_Class_getDeclaredMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
@@ -1199,6 +1203,11 @@ public class JavaLang {
     @Alias(names = "kotlin_reflect_jvm_internal_KClassImpl_getSimpleName_Ljava_lang_String")
     public static <V> String KClassImpl_getSimpleName(ClassBasedDeclarationContainer c) {
         return c.getJClass().getSimpleName();
+    }
+
+    @Alias(names = "kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection")
+    public static Collection<Object> KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(ClassBasedDeclarationContainer clazz) {
+        return Collections.emptyList();
     }
 
     @Alias(names = "java_lang_Class_getSimpleName_Ljava_lang_String")

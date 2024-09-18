@@ -198,8 +198,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             }
 
             hIndex.classFlags[synthClassName] = 0
-            hIndex.superClass[synthClassName] = baseClass
-            hIndex.childClasses.getOrPut(baseClass) { HashSet() }.add(synthClassName)
+            hIndex.registerSuperClass(synthClassName, baseClass)
             hIndex.childClasses.getOrPut(interface1) { HashSet() }.add(synthClassName)
             hIndex.interfaces[synthClassName] = listOf(interface1)
             hIndex.doneClasses.add(synthClassName)

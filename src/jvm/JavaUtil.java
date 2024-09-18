@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.ToIntFunction;
 
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
@@ -17,130 +18,130 @@ import static jvm.JavaLang.toFixed;
 
 public class JavaUtil {
 
-	@Alias(names = "java_util_concurrent_atomic_AtomicInteger_getAndAdd_II")
-	public static int java_util_concurrent_atomic_AtomicInteger_getAndAdd_II(AtomicInteger v, int added) {
-		int value = read32(getAddr(v) + objectOverhead) + added;
-		write32(getAddr(v) + objectOverhead, value);
-		return value;
-	}
+    @Alias(names = "java_util_concurrent_atomic_AtomicInteger_getAndAdd_II")
+    public static int java_util_concurrent_atomic_AtomicInteger_getAndAdd_II(AtomicInteger v, int added) {
+        int value = read32(getAddr(v) + objectOverhead) + added;
+        write32(getAddr(v) + objectOverhead, value);
+        return value;
+    }
 
-	@Alias(names = "java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone")
-	public static TimeZone java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone() {
-		return TimeZone.getTimeZone("GMT");
-	}
+    @Alias(names = "java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone")
+    public static TimeZone java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone() {
+        return TimeZone.getTimeZone("GMT");
+    }
 
-	private static TimeZone gmt;
+    private static TimeZone gmt;
 
-	@Alias(names = "java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone")
-	public static TimeZone java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone(String name, boolean stuff) {
-		if (gmt == null) gmt = new TimeZone() {
-			@Override
-			public int getOffset(int era, int year, int month, int day, int dayOfWeek, int millis) {
-				return 0;
-			}
+    @Alias(names = "java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone")
+    public static TimeZone java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone(String name, boolean stuff) {
+        if (gmt == null) gmt = new TimeZone() {
+            @Override
+            public int getOffset(int era, int year, int month, int day, int dayOfWeek, int millis) {
+                return 0;
+            }
 
-			@Override
-			public void setRawOffset(int i) {
+            @Override
+            public void setRawOffset(int i) {
 
-			}
+            }
 
-			@Override
-			public int getRawOffset() {
-				return 0;
-			}
+            @Override
+            public int getRawOffset() {
+                return 0;
+            }
 
-			@Override
-			public boolean useDaylightTime() {
-				return false;
-			}
+            @Override
+            public boolean useDaylightTime() {
+                return false;
+            }
 
-			@Override
-			public boolean inDaylightTime(Date date) {
-				return false;
-			}
+            @Override
+            public boolean inDaylightTime(Date date) {
+                return false;
+            }
 
-			@Override
-			public Object clone() {
-				return this;
-			}
-		};
-		return gmt;
-	}
+            @Override
+            public Object clone() {
+                return this;
+            }
+        };
+        return gmt;
+    }
 
-	@Alias(names = "static_java_util_Locale_V")
-	public static void static_java_util_Locale_V() {
-		// Locale.ROOT = new Locale("");
-	}
+    @Alias(names = "static_java_util_Locale_V")
+    public static void static_java_util_Locale_V() {
+        // Locale.ROOT = new Locale("");
+    }
 
-	@Alias(names = "java_util_Locale_initDefault_Ljava_util_LocaleXCategoryLjava_util_Locale")
-	public static Object Locale_initDefault(Object category) {
-		return null;
-	}
+    @Alias(names = "java_util_Locale_initDefault_Ljava_util_LocaleXCategoryLjava_util_Locale")
+    public static Object Locale_initDefault(Object category) {
+        return null;
+    }
 
-	@Alias(names = "java_util_Calendar_createCalendar_Ljava_util_TimeZoneLjava_util_LocaleLjava_util_Calendar")
-	public static Object Calendar_createCalendar(Object timeZone, Object locale) {
-		return null;
-	}
+    @Alias(names = "java_util_Calendar_createCalendar_Ljava_util_TimeZoneLjava_util_LocaleLjava_util_Calendar")
+    public static Object Calendar_createCalendar(Object timeZone, Object locale) {
+        return null;
+    }
 
-	public static Object toFixed2(Object obj, int v) {
-		if (obj instanceof BigDecimal) {
-			// new DecimalFormat("0.00").format(obj);
-			// suboptimal solution
-			String str = obj.toString();
-			int j = str.indexOf('.');
-			int k = j + v;
-			return j >= 0 && k < str.length() ? str.substring(0, k) : str;
-		} else {
-			return toFixed(((Number) obj).doubleValue(), v);
-		}
-	}
+    public static Object toFixed2(Object obj, int v) {
+        if (obj instanceof BigDecimal) {
+            // new DecimalFormat("0.00").format(obj);
+            // suboptimal solution
+            String str = obj.toString();
+            int j = str.indexOf('.');
+            int k = j + v;
+            return j >= 0 && k < str.length() ? str.substring(0, k) : str;
+        } else {
+            return toFixed(((Number) obj).doubleValue(), v);
+        }
+    }
 
-	private static int formatFloat(int i, int l, String format, StringBuilder result, Object obj) {
-		if (i < l && obj instanceof Number) {
-			char c = format.charAt(i++);
-			if (c >= '0' && c <= '9' && i < l) {
-				char d = format.charAt(i++);
-				int v = c - '0';
-				if (d >= '0' && d <= '9' && i < l) {
-					v = v * 10 + d - '0';
-					i++;
-				}
-				obj = toFixed2(obj, v);
-			}
-		}
-		result.append(obj);
-		return i;
-	}
+    private static int formatFloat(int i, int l, String format, StringBuilder result, Object obj) {
+        if (i < l && obj instanceof Number) {
+            char c = format.charAt(i++);
+            if (c >= '0' && c <= '9' && i < l) {
+                char d = format.charAt(i++);
+                int v = c - '0';
+                if (d >= '0' && d <= '9' && i < l) {
+                    v = v * 10 + d - '0';
+                    i++;
+                }
+                obj = toFixed2(obj, v);
+            }
+        }
+        result.append(obj);
+        return i;
+    }
 
-	private static Object formatHex(Object obj) {
-		if (obj instanceof Integer) {
-			return Integer.toHexString((int) obj);
-		} else if (obj instanceof Long) {
-			return Long.toHexString((long) obj);
-		} else if (obj instanceof Byte) {
-			return Integer.toHexString((byte) obj);
-		} else if (obj instanceof Short) {
-			return Integer.toHexString((short) obj);
-		} else if (obj instanceof BigInteger) {
-			return ((BigInteger) obj).toString(16);
-		} else return obj;
-	}
+    private static Object formatHex(Object obj) {
+        if (obj instanceof Integer) {
+            return Integer.toHexString((int) obj);
+        } else if (obj instanceof Long) {
+            return Long.toHexString((long) obj);
+        } else if (obj instanceof Byte) {
+            return Integer.toHexString((byte) obj);
+        } else if (obj instanceof Short) {
+            return Integer.toHexString((short) obj);
+        } else if (obj instanceof BigInteger) {
+            return ((BigInteger) obj).toString(16);
+        } else return obj;
+    }
 
-	@Alias(names = "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringALjava_lang_ObjectLjava_lang_String")
-	public static String String_format(Locale locale, String format, Object[] args) {
-		int idx = 0;
-		StringBuilder result = new StringBuilder(format.length());
-		for (int i = 0, l = format.length(); i < l; ) {
-			char c = format.charAt(i++);
-			if (c == '%' && i < l) {
-				c = format.charAt(i++);
-				Object obj = args != null && idx < args.length ? args[idx++] : null;
-				// https://www.javatpoint.com/java-string-format
-				switch (c) {
-					case '.':
-						i = formatFloat(i, l, format, result, obj);
-						break;
-					// todo respect digit limit and such :)
+    @Alias(names = "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringALjava_lang_ObjectLjava_lang_String")
+    public static String String_format(Locale locale, String format, Object[] args) {
+        int idx = 0;
+        StringBuilder result = new StringBuilder(format.length());
+        for (int i = 0, l = format.length(); i < l; ) {
+            char c = format.charAt(i++);
+            if (c == '%' && i < l) {
+                c = format.charAt(i++);
+                Object obj = args != null && idx < args.length ? args[idx++] : null;
+                // https://www.javatpoint.com/java-string-format
+                switch (c) {
+                    case '.':
+                        i = formatFloat(i, l, format, result, obj);
+                        break;
+                    // todo respect digit limit and such :)
                     /*case 'f':
                         result.append(obj);
                         break;
@@ -151,205 +152,229 @@ public class JavaUtil {
                     case 'd':
                         result.append(obj);
                         break;*/
-					case 'x':
-						result.append(formatHex(obj));
-						break;
-					case 'h':
-						result.append(obj == null ? null : obj.hashCode());
-						break;
-					case 'n':
-						result.append('\n');
-						idx--;
-						break;
-					case 'c':
-						if (obj instanceof Character) {
-							result.append((char) obj);
-						} else result.append(obj);
-						break;
-					default:
-						result.append('%');
-						result.append(c);
-						break;
-				}
-			} else result.append(c);
-		}
-		return result.toString();
-	}
+                    case 'x':
+                        result.append(formatHex(obj));
+                        break;
+                    case 'h':
+                        result.append(obj == null ? null : obj.hashCode());
+                        break;
+                    case 'n':
+                        result.append('\n');
+                        idx--;
+                        break;
+                    case 'c':
+                        if (obj instanceof Character) {
+                            result.append((char) obj);
+                        } else result.append(obj);
+                        break;
+                    default:
+                        result.append('%');
+                        result.append(c);
+                        break;
+                }
+            } else result.append(c);
+        }
+        return result.toString();
+    }
 
-	@Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV")
-	public static <V> void Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV(V[] o, int start, int end, Comparator<V> c) {
-		InPlaceStableSort.sort(start, end, o, c);
-	}
+    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV")
+    public static <V> void Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV(V[] o, int start, int end, Comparator<V> c) {
+        InPlaceStableSort.sort(start, end, o, c);
+    }
 
-	@Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectLjava_util_ComparatorV")
-	public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o, Comparator<V> c) {
-		InPlaceStableSort.sort(0, o.length, o, c);
-	}
+    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectLjava_util_ComparatorV")
+    public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o, Comparator<V> c) {
+        InPlaceStableSort.sort(0, o.length, o, c);
+    }
 
-	private static Comparator<Object> comparator;
+    private static Comparator<Object> comparator;
 
-	@Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectV")
-	public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o) {
-		if (comparator == null) //noinspection unchecked
-			comparator = (a, b) -> ((Comparable<Object>) a).compareTo(b);
-		InPlaceStableSort.sort(0, o.length, o, comparator);
-	}
+    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectV")
+    public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o) {
+        if (comparator == null) //noinspection unchecked
+            comparator = (a, b) -> ((Comparable<Object>) a).compareTo(b);
+        InPlaceStableSort.sort(0, o.length, o, comparator);
+    }
 
-	@NoThrow
-	@Alias(names = "static_java_util_ArraysXLegacyMergeSort_V")
-	public static void static_java_util_ArraysXLegacyMergeSort_V() {
-	}
+    @NoThrow
+    @Alias(names = "static_java_util_ArraysXLegacyMergeSort_V")
+    public static void static_java_util_ArraysXLegacyMergeSort_V() {
+    }
 
-	@Alias(names = "java_util_concurrent_locks_ReentrantLock_lock_V")
-	public static void java_util_concurrent_locks_ReentrantLock_lock_V(ReentrantLock lock) {
-	}
+    @Alias(names = "java_util_concurrent_locks_ReentrantLock_lock_V")
+    public static void java_util_concurrent_locks_ReentrantLock_lock_V(ReentrantLock lock) {
+    }
 
-	@Alias(names = "java_util_concurrent_locks_ReentrantLock_unlock_V")
-	public static void java_util_concurrent_locks_ReentrantLock_unlock_V(ReentrantLock lock) {
-	}
+    @Alias(names = "java_util_concurrent_locks_ReentrantLock_unlock_V")
+    public static void java_util_concurrent_locks_ReentrantLock_unlock_V(ReentrantLock lock) {
+    }
 
-	@Alias(names = "java_util_concurrent_locks_ReentrantLock_tryLock_Z")
-	public static boolean java_util_concurrent_locks_ReentrantLock_tryLock_Z(ReentrantLock lock) {
-		return true;
-	}
+    @Alias(names = "java_util_concurrent_locks_ReentrantLock_tryLock_Z")
+    public static boolean java_util_concurrent_locks_ReentrantLock_tryLock_Z(ReentrantLock lock) {
+        return true;
+    }
 
-	@NoThrow
-	@JavaScript(code = "return Math.random()")
-	public static native double seedUniquifier();
+    @NoThrow
+    @JavaScript(code = "return Math.random()")
+    public static native double seedUniquifier();
 
-	@NoThrow
-	@Alias(names = "java_util_Random_seedUniquifier_J")
-	public static long java_util_Random_seedUniquifier_J() {
-		return (long) (seedUniquifier() * 8e18);// must not be negative, or it will complain
-	}
+    @NoThrow
+    @Alias(names = "java_util_Random_seedUniquifier_J")
+    public static long java_util_Random_seedUniquifier_J() {
+        return (long) (seedUniquifier() * 8e18);// must not be negative, or it will complain
+    }
 
-	// these functions cause illegal memory accesses :/
-	private static void rangeCheck(int length, int start, int end) {
-		if (start > end) {
-			throw new IllegalArgumentException("fromIndex(" + start + ") > toIndex(" + end + ")");
-		} else if (start < 0) {
-			throw new ArrayIndexOutOfBoundsException(start);
-		} else if (end > length) {
-			throw new ArrayIndexOutOfBoundsException(end);
-		}
-	}
+    // these functions cause illegal memory accesses :/
+    private static void rangeCheck(int length, int start, int end) {
+        if (start > end) {
+            throw new IllegalArgumentException("fromIndex(" + start + ") > toIndex(" + end + ")");
+        } else if (start < 0) {
+            throw new ArrayIndexOutOfBoundsException(start);
+        } else if (end > length) {
+            throw new ArrayIndexOutOfBoundsException(end);
+        }
+    }
 
-	@Alias(names = "java_util_Arrays_fill_AZIIZV")
-	public static void Arrays_fill(boolean[] data, int start, int end, boolean value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill32(ptr + start, ptr + end, b2i(value) * 0x1010101);
-	}
+    @Alias(names = "java_util_Arrays_fill_AZIIZV")
+    public static void Arrays_fill(boolean[] data, int start, int end, boolean value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill32(ptr + start, ptr + end, b2i(value) * 0x1010101);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_ABIIBV")
-	public static void Arrays_fill(byte[] data, int start, int end, byte value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill8(ptr + start, ptr + end, value);
-	}
+    @Alias(names = "java_util_Arrays_fill_ABIIBV")
+    public static void Arrays_fill(byte[] data, int start, int end, byte value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill8(ptr + start, ptr + end, value);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_ACIICV")
-	public static void Arrays_fill(char[] data, int start, int end, char value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill16(ptr + (start << 1), ptr + (end << 1), (short) value);
-	}
+    @Alias(names = "java_util_Arrays_fill_ACIICV")
+    public static void Arrays_fill(char[] data, int start, int end, char value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill16(ptr + (start << 1), ptr + (end << 1), (short) value);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_ASIISV")
-	public static void Arrays_fill(short[] data, int start, int end, short value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill16(ptr + (start << 1), ptr + (end << 1), value);
-	}
+    @Alias(names = "java_util_Arrays_fill_ASIISV")
+    public static void Arrays_fill(short[] data, int start, int end, short value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill16(ptr + (start << 1), ptr + (end << 1), value);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_AFIIFV")
-	public static void Arrays_fill(float[] data, int start, int end, float value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill32(ptr + (start << 2), ptr + (end << 2), Float.floatToRawIntBits(value));
-	}
+    @Alias(names = "java_util_Arrays_fill_AFIIFV")
+    public static void Arrays_fill(float[] data, int start, int end, float value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill32(ptr + (start << 2), ptr + (end << 2), Float.floatToRawIntBits(value));
+    }
 
-	@Alias(names = "java_util_Arrays_fill_AIIIIV")
-	public static void Arrays_fill(int[] data, int start, int end, int value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill32(ptr + (start << 2), ptr + (end << 2), value);
-	}
+    @Alias(names = "java_util_Arrays_fill_AIIIIV")
+    public static void Arrays_fill(int[] data, int start, int end, int value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill32(ptr + (start << 2), ptr + (end << 2), value);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_ADIIDV")
-	public static void Arrays_fill(double[] data, int start, int end, double value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill64(ptr + (start << 3), ptr + (end << 3), Double.doubleToRawLongBits(value));
-	}
+    @Alias(names = "java_util_Arrays_fill_ADIIDV")
+    public static void Arrays_fill(double[] data, int start, int end, double value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill64(ptr + (start << 3), ptr + (end << 3), Double.doubleToRawLongBits(value));
+    }
 
-	@Alias(names = "java_util_Arrays_fill_AJIIJV")
-	public static void Arrays_fill(long[] data, int start, int end, long value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill64(ptr + (start << 3), ptr + (end << 3), value);
-	}
+    @Alias(names = "java_util_Arrays_fill_AJIIJV")
+    public static void Arrays_fill(long[] data, int start, int end, long value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill64(ptr + (start << 3), ptr + (end << 3), value);
+    }
 
-	@Alias(names = "java_util_Arrays_fill_ALjava_lang_ObjectIILjava_lang_ObjectV")
-	public static void Arrays_fill(Object[] data, int start, int end, Object value) {
-		rangeCheck(data.length, start, end);
-		int ptr = getAddr(data) + arrayOverhead;
-		fill32(ptr + (start << 2), ptr + (end << 2), getAddr(value));
-	}
+    @Alias(names = "java_util_Arrays_fill_ALjava_lang_ObjectIILjava_lang_ObjectV")
+    public static void Arrays_fill(Object[] data, int start, int end, Object value) {
+        rangeCheck(data.length, start, end);
+        int ptr = getAddr(data) + arrayOverhead;
+        fill32(ptr + (start << 2), ptr + (end << 2), getAddr(value));
+    }
 
-	@Alias(names = "static_java_util_BitSet_V")
-	public static void static_java_util_BitSet_V() {
-	}
+    @Alias(names = "static_java_util_BitSet_V")
+    public static void static_java_util_BitSet_V() {
+    }
 
-	@Alias(names = {"java_util_Stack_addElement_Ljava_lang_ObjectV", "java_util_ArrayList_addElement_Ljava_lang_ObjectV"})
-	public static <V> void Stack_addElement(ArrayList<V> self, V sth) {
-		self.add(sth);
-	}
+    @Alias(names = {"java_util_Stack_addElement_Ljava_lang_ObjectV", "java_util_ArrayList_addElement_Ljava_lang_ObjectV"})
+    public static <V> void Stack_addElement(ArrayList<V> self, V sth) {
+        self.add(sth);
+    }
 
-	@Alias(names = "java_util_Stack_elementAt_ILjava_lang_Object")
-	public static <V> Object Stack_elementAt(ArrayList<V> self, int index) {
-		return self.get(index);
-	}
+    @Alias(names = "java_util_Stack_elementAt_ILjava_lang_Object")
+    public static <V> Object Stack_elementAt(ArrayList<V> self, int index) {
+        return self.get(index);
+    }
 
-	@Alias(names = "java_util_Stack_removeElementAt_IV")
-	public static <V> void Stack_removeElementAt(ArrayList<V> self, int index) {
-		self.remove(index);
-	}
+    @Alias(names = "java_util_Stack_removeElementAt_IV")
+    public static <V> void Stack_removeElementAt(ArrayList<V> self, int index) {
+        self.remove(index);
+    }
 
-	@Alias(names = "java_util_ArrayList_push_Ljava_lang_ObjectLjava_lang_Object")
-	public static <V> Object ArrayList_push(ArrayList<V> self, V element) {
-		self.add(element);
-		return element;
-	}
+    @Alias(names = "java_util_ArrayList_push_Ljava_lang_ObjectLjava_lang_Object")
+    public static <V> Object ArrayList_push(ArrayList<V> self, V element) {
+        self.add(element);
+        return element;
+    }
 
-	@Alias(names = "java_util_ArrayList_pop_Ljava_lang_Object")
-	public static <V> Object ArrayList_pop(ArrayList<V> self) {
-		return self.remove(self.size() - 1);
-	}
+    @Alias(names = "java_util_ArrayList_pop_Ljava_lang_Object")
+    public static <V> Object ArrayList_pop(ArrayList<V> self) {
+        return self.remove(self.size() - 1);
+    }
 
-	@Alias(names = "java_util_ArrayList_peek_Ljava_lang_Object")
-	public static <V> Object ArrayList_peek(ArrayList<V> self) {
-		return self.get(self.size() - 1);
-	}
+    @Alias(names = "java_util_ArrayList_peek_Ljava_lang_Object")
+    public static <V> Object ArrayList_peek(ArrayList<V> self) {
+        return self.get(self.size() - 1);
+    }
 
-	@Alias(names = "java_util_ArrayList_copyInto_ALjava_lang_ObjectV")
-	public static <V> void Stack_copyInto(ArrayList<V> self, Object[] dst) throws NoSuchFieldException, IllegalAccessException {
-		Object[] src = (Object[]) ArrayList.class.getDeclaredField("elementData").get(self);
-		System.arraycopy(src, 0, dst, 0, self.size());
-	}
+    @Alias(names = "java_util_ArrayList_copyInto_ALjava_lang_ObjectV")
+    public static <V> void Stack_copyInto(ArrayList<V> self, Object[] dst) throws NoSuchFieldException, IllegalAccessException {
+        Object[] src = (Object[]) ArrayList.class.getDeclaredField("elementData").get(self);
+        System.arraycopy(src, 0, dst, 0, self.size());
+    }
 
-	@RevAlias(name = "new_java_util_HashMap_IFV")
-	public static native void new_java_util_HashMap_IFIV(Object self, int initialCapacity, float loadFactor);
+    @RevAlias(name = "new_java_util_HashMap_IFV")
+    public static native void new_java_util_HashMap_IFIV(Object self, int initialCapacity, float loadFactor);
 
-	@Alias(names = "new_java_util_HashMap_IFIV")
-	public static void new_java_util_HashMap_IFIV(Object self, int initialCapacity, float loadFactor, int concurrencyLevel) {
-		new_java_util_HashMap_IFIV(self, initialCapacity, loadFactor);
-	}
+    @Alias(names = "new_java_util_HashMap_IFIV")
+    public static void new_java_util_HashMap_IFIV(Object self, int initialCapacity, float loadFactor, int concurrencyLevel) {
+        new_java_util_HashMap_IFIV(self, initialCapacity, loadFactor);
+    }
 
-	@NoThrow // why does this exist? probably an optimization of some kind
-	@Alias(names = "java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class")
-	public static Object java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class(Object instance) {
-		return null;
-	}
+    @NoThrow // why does this exist? probably an optimization of some kind
+    @Alias(names = "java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class")
+    public static Object java_util_HashMap_comparableClassFor_Ljava_lang_ObjectLjava_lang_Class(Object instance) {
+        return null;
+    }
+
+    // this was weird, requiring that the comparator is serializable..., and failing on that,
+    // because my lambdas aren't serializable out of the box
+    // todo can we find out what tells us that it needs to be serialize???
+    @Alias(names = "java_util_Comparator_comparingInt_Ljava_util_function_ToIntFunctionLjava_util_Comparator")
+    public static <V> Comparator<V> Comparator_comparingInt(ToIntFunction<V> func) {
+        return new IntComparator<>(func);
+    }
+
+    private static final class IntComparator<V> implements Comparator<V> {
+        private final ToIntFunction<V> map;
+
+        private IntComparator(ToIntFunction<V> map) {
+            this.map = map;
+        }
+
+        @Override
+        public int compare(V o1, V o2) {
+            return Integer.compare(
+                    map.applyAsInt(o1),
+                    map.applyAsInt(o2)
+            );
+        }
+    }
 
 }

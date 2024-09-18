@@ -38,9 +38,6 @@ class MethodTranslator(
     val descriptor: String,
 ) : MethodVisitor(api) {
 
-    private var printOps = false
-    private var comments = false
-
     private var isAbstract = false
     private val stack = ArrayList<String>()
     private val argsMapping = HashMap<Int, Int>()
@@ -1013,7 +1010,7 @@ class MethodTranslator(
                     printer.append(" i32.const ")
                         .append(-gIndex.getString(methodName(sig)))
                         // instance, function index -> function-ptr
-                        .append(" call \$resolveIndirect ;; not constructable class\n")
+                        .append(" call \$resolveIndirect ;; not constructable class, $sig\n")
                         .push(i32)
                     handleThrowable()
                     printer.pop(i32)
@@ -1097,7 +1094,7 @@ class MethodTranslator(
                     val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
                     printer.append(" i32.const ").append(funcPtr)
                         // instance, function index -> function-ptr
-                        .append(" call \$resolveIndirect\n")
+                        .append(" call \$resolveIndirect ;; $sig0\n")
                         .push(i32)
                     stackPop()
                     handleThrowable()
@@ -2141,6 +2138,9 @@ class MethodTranslator(
     companion object {
         val callTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
+
+        private var printOps = false
+        private var comments = true
     }
 
 }

@@ -44,6 +44,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static engine.GFXBase2Kt.renderFrame2;
+import static engine.TestSceneKt.testScene;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
@@ -82,7 +83,9 @@ public class Engine {
         // LuaTest.test();
         // SciMark.test();
 
+        log("Calling init()");
         init();
+        log("Called init()");
 
         EngineBase instance;
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
@@ -91,27 +94,58 @@ public class Engine {
         // panel = new CodeEditor(DefaultConfig.INSTANCE.getStyle());
         // panel = new AnimTextPanelTest(false);
         // panel = CellMod.createGame();
-        panel = SceneView.Companion.testScene(IcosahedronModel.INSTANCE.createIcosphere(4, 1f, new Mesh()), sceneView -> {
+
+        Mesh icoSphere = IcosahedronModel.INSTANCE.createIcosphere(1, 1f, new Mesh());
+
+        log("Created IcoSphere");
+
+        panel = testScene(icoSphere, sceneView -> {
             sceneView.getRenderView().setRenderMode(RenderMode.Companion.getDEFAULT());
             return Unit.INSTANCE;
         });
+
+        log("Created panel");
+
         panel.setWeight(1f);
         instance = new SimpleStudio(panel);
+
+        log("Created Studio-instance");
+
         instance.run(false);
 
+        log("Called instance.run");
+
         Clock tick = new Clock("Engine");
+
+        log("Created clock");
+
         window = new WebGLWindow(me.anno.Engine.getProjectName());
         WindowManagement.createWindow(window, tick);
 
+        log("Created window");
+
         WindowManagement.prepareForRendering(tick);
+
+        log("Prepared for rendering");
+
         GFX.setupBasics(tick);
+
+        log("Setup basics");
+
         GFX.supportsDepthTextures = false;// todo true??
         RenderGraph.INSTANCE.setThrowExceptions(true);
+
+        log("Checking for exceptions");
+
         GFX.check();
         tick.stop("Render step zero");
 
+        log("Calling gameInit()");
+
         instance.gameInit();
         tick.stop("Game Init");
+
+        log("Finished main");
 
     }
 

@@ -3,3 +3,4 @@ shaders/fsr1/ffx_fsr1.h
 lang/en.lang
 lang/de.lang
 meshes/arrowX.obj
+saveables.yaml

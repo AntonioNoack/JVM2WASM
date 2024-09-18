@@ -2,8 +2,11 @@ package jvm;
 
 import annotations.Alias;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.charset.Charset;
 
 import static jvm.JVM32.read32;
 import static jvm.JavaLang.*;
@@ -62,11 +65,18 @@ public class JavaIO {
     private static int lockFieldOffset = 0;
 
     @Alias(names = "new_java_io_InputStreamReader_Ljava_io_InputStreamV")
-    public static void new_java_io_InputStreamReader_Ljava_io_InputStreamV(InputStreamReader reader, InputStream stream) throws NoSuchFieldException, IllegalAccessException {
+    public static void new_java_io_InputStreamReader_Ljava_io_InputStreamV(
+            InputStreamReader reader, InputStream stream) throws NoSuchFieldException, IllegalAccessException {
         Class clazz = reader.getClass();
         Field field = clazz.getField("lock");
         lockFieldOffset = getFieldOffset(field);
         field.set(reader, stream);
+    }
+
+    @Alias(names = "new_java_io_InputStreamReader_Ljava_io_InputStreamLjava_nio_charset_CharsetV")
+    public static void new_java_io_InputStreamReader_Ljava_io_InputStreamLjava_nio_charset_CharsetV(
+            InputStreamReader reader, InputStream stream, Charset cs) throws NoSuchFieldException, IllegalAccessException {
+        new_java_io_InputStreamReader_Ljava_io_InputStreamV(reader, stream);
     }
 
     @Alias(names = "java_io_InputStreamReader_read_I")

@@ -70,7 +70,6 @@ try {
         return str(lib.java_lang_Class_getName_Ljava_lang_String(lib.findClass(cls))[0])
     }
 
-var ctr = 0
     window.trace = function(th){
         if(th == 0) return null
         if(lib.io(th, 14)){// 14 = Throwable
@@ -92,7 +91,6 @@ var ctr = 0
                 trace = trace1
             }
             console.log(clazz, trace)
-            // if(ctr++ > 3) throw clazz
         } else console.error('Not a Throwable', lib.rCl(th))
         return th
     }
@@ -160,6 +158,7 @@ var ctr = 0
 
         if(window.inited) return
 
+        console.log("Starting engine")
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
         window.gl = useWebGPU ?
@@ -171,25 +170,31 @@ var ctr = 0
         var supportsFP32 = !!gl.getExtension("EXT_color_buffer_float")
         gl.getExtension('WEBGL_color_buffer_float')
 
+        console.log("Calling main function")
         safe(lib.engine_Engine_main_Ljava_lang_StringZZV(0, supportsFP16, supportsFP32))
+        console.log("Called main function")
 
         var fi = 0
         var lastTime = 0
         var fakeFpsMultiplier = 1 // not really working, the engine is rendering only necessary frames 😅
         window.inited = true
         function render(time) {
+            console.log("Rendering frame", time)
             if(window.ec > 20) window.stop = true
-            if(canvas.width != innerWidth || canvas.height != innerHeight){
+            if(canvas.width != innerWidth || canvas.height != innerHeight) {
+                console.log("Resolution changed")
                 canvas.width = innerWidth
                 canvas.height = innerHeight
             }
             var dt = (time-lastTime)*1e-3/fakeFpsMultiplier
             for(var i=0;i<fakeFpsMultiplier;i++) {
+                console.log("Calling Engine.update")
                 safe(lib.engine_Engine_update_IIFV(innerWidth, innerHeight, dt))
             }
             lastTime = time
             if(window.gcCtr++ >= 200) {
                 window.gcCtr = 0
+                console.log("Running GC")
                 safe(lib.gc())
             }
             if(!window.stop) requestAnimationFrame(render)
@@ -355,7 +360,9 @@ var ctr = 0
         pleaseWait.style.display='none'
         window.objectOverhead = lib.oo()
     	window.arrayOverhead = objectOverhead + 4
+    	console.log("calling lib.init()")
     	safe(lib.init())
+    	console.log("calling lib.gc()")
         safe(lib.gc())
         var sleep = Math.max(0, startTime - Date.now() + 300)
         console.log('Showing logo for '+sleep+' ms')
@@ -366,7 +373,7 @@ var ctr = 0
     window.findClass = function(id){
         return str(lib.java_lang_Class_getName_Ljava_lang_String(lib.findClass(id))[0])
     }
-    window.sortCalloc = function sortCalloc(){
+    window.sortCalloc = function(){
         var entries = []
         var total = 0
         for(var k in window.calloc){

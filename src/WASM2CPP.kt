@@ -5,9 +5,9 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.structures.arrays.IntArrayList
+import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
-import sun.reflect.generics.reflectiveObjects.NotImplementedException
 import utils.StringBuilder2
 import kotlin.math.min
 
@@ -364,8 +364,6 @@ class LocalVariable(val name: String, val type: String)
 
 data class FunctionBlock(val i: Int, val instructions: List<Instruction>)
 
-class BlockInstruction(val instructions: List<Instruction>) : Instruction
-
 class ParamGet(val index: Int) : Instruction {
     val name = "p$index"
     override fun toString(): String = "local.get $index"
@@ -458,10 +456,12 @@ class CompareInstr(name: String, val operator: String, val castType: String? = n
 val I32Add = BinaryInstruction("i32.add", "+")
 val I32Sub = BinaryInstruction("i32.sub", "-")
 val I32Mul = BinaryInstruction("i32.mul", "*")
+val I32_DIVS = BinaryInstruction("i32.div_s", "/")
 
 val I64Add = BinaryInstruction("i64.add", "+")
 val I64Sub = BinaryInstruction("i64.sub", "-")
 val I64Mul = BinaryInstruction("i64.mul", "*")
+val I64_DIVS = BinaryInstruction("i64.div_s", "/")
 
 val F32Add = BinaryInstruction("f32.add", "+")
 val F32Sub = BinaryInstruction("f32.sub", "-")
@@ -489,9 +489,6 @@ val I64Load = SimpleInstr("i64.load")
 val F32Load = SimpleInstr("f32.load")
 val F64Load = SimpleInstr("f64.load")
 
-val I32_DIVS = SimpleInstr("i32.div_s")
-val I64_DIVS = SimpleInstr("i64.div_s")
-
 val F32Trunc = UnaryInstruction("f32.trunc", "std::trunc")
 val F64Trunc = UnaryInstruction("f64.trunc", "std::trunc")
 
@@ -515,16 +512,16 @@ val I64_TRUNC_F32S = UnaryInstruction2("i64.trunc_f32_s", "static_cast<i64>(std:
 val I64_TRUNC_F64S = UnaryInstruction2("i64.trunc_f64_s", "static_cast<i64>(std::trunc(", "))", "f64")
 val F64_PROMOTE_F32 = UnaryInstruction2("f64.promote_f32", "static_cast<f64>(", ")", "f32")
 val F32_DEMOTE_F64 = UnaryInstruction2("f32.demote_f64", "static_cast<f32>(", ")", "f64")
-val I64_EXTEND_I32S = SimpleInstr("i64.extend_i32_s")
-val I32_WRAP_I64 = SimpleInstr("i32.wrap_i64")
-val F64_CONVERT_I32S = SimpleInstr("f64.convert_i32_s")
-val F64_CONVERT_I64S = SimpleInstr("f64.convert_i64_s")
-val F32_CONVERT_I32S = SimpleInstr("f32.convert_i32_s")
-val F32_CONVERT_I64S = SimpleInstr("f32.convert_i64_s")
-val I64_REINTERPRET_F64 = SimpleInstr("i64.reinterpret_f64")
-val F64_REINTERPRET_I64 = SimpleInstr("f64.reinterpret_i64")
-val I32_REINTERPRET_F32 = SimpleInstr("i32.reinterpret_f32")
-val F32_REINTERPRET_I32 = SimpleInstr("f32.reinterpret_i32")
+val I64_EXTEND_I32S = UnaryInstruction2("i64.extend_i32_s", "static_cast<i64>(", ")", "i32")
+val I32_WRAP_I64 = UnaryInstruction2("i32.wrap_i64", "static_cast<i32>(", ")", "i64")
+val F32_CONVERT_I32S = UnaryInstruction2("f32.convert_i32_s", "static_cast<f32>(", ")", "i32")
+val F32_CONVERT_I64S = UnaryInstruction2("f32.convert_i64_s", "static_cast<f32>(", ")", "i64")
+val F64_CONVERT_I32S = UnaryInstruction2("f64.convert_i32_s", "static_cast<f64>(", ")", "i32")
+val F64_CONVERT_I64S = UnaryInstruction2("f64.convert_i64_s", "static_cast<f64>(", ")", "i64")
+val I32_REINTERPRET_F32 = UnaryInstruction2("i32.reinterpret_f32", "std::bit_cast<i32>(", ")", "f32")
+val F32_REINTERPRET_I32 = UnaryInstruction2("f32.reinterpret_i32", "std::bit_cast<f32>(", ")", "i32")
+val I64_REINTERPRET_F64 = UnaryInstruction2("i64.reinterpret_f64", "std::bit_cast<i64>(", ")", "f64")
+val F64_REINTERPRET_I64 = UnaryInstruction2("f64.reinterpret_i64", "std::bit_cast<f64>(", ")", "i64")
 
 val I32GES = CompareInstr("i32.ge_s", ">=")
 val I32GTS = CompareInstr("i32.gt_s", ">")
@@ -549,18 +546,25 @@ val I32NE = CompareInstr("i32.ne", "!=")
 val I64EQ = CompareInstr("i64.eq", "==")
 val I64NE = CompareInstr("i64.ne", "!=")
 
-val I32_REM_S = SimpleInstr("i32.rem_s")
-val I64_REM_S = SimpleInstr("i64.rem_s")
+// according to ChatGPT, they have the same behaviour
+val I32_REM_S = BinaryInstruction("i32.rem_s", "%")
+val I64_REM_S = BinaryInstruction("i64.rem_s", "%")
 
 val Return = SimpleInstr("return")
 val Unreachable = SimpleInstr("unreachable")
 
-val I32Shl = BinaryInstruction("i32.shl", "<<")
-val I32ShrU = SimpleInstr("i32.shr_u")
-val I32ShrS = SimpleInstr("i32.shr_s")
-val I64Shl = SimpleInstr("i64.shl")
-val I64ShrU = SimpleInstr("i64.shr_u")
-val I64ShrS = SimpleInstr("i64.shr_s")
+class ShiftInstr(name: String) : SimpleInstr(name) {
+    val type = name.substring(0, 3)
+    val isRight get() = name[6] == 'r'
+    val isU get() = name[8] == 'u'
+}
+
+val I32Shl = ShiftInstr("i32.shl")
+val I32ShrU = ShiftInstr("i32.shr_u")
+val I32ShrS = ShiftInstr("i32.shr_s")
+val I64Shl = ShiftInstr("i64.shl")
+val I64ShrU = ShiftInstr("i64.shr_u")
+val I64ShrS = ShiftInstr("i64.shr_s")
 
 val I32And = BinaryInstruction("i32.and", "&")
 val I64And = BinaryInstruction("i64.and", "&")
@@ -573,10 +577,10 @@ val F32_ABS = UnaryInstruction("f32.abs", "std::abs")
 val F64_ABS = UnaryInstruction("f64.abs", "std::abs")
 val F32_NEG = UnaryInstruction("f32.neg", "-")
 val F64_NEG = UnaryInstruction("f64.neg", "-")
-val F32_MIN = SimpleInstr("f32.min")
-val F64_MIN = SimpleInstr("f64.min")
-val F32_MAX = SimpleInstr("f32.max")
-val F64_MAX = SimpleInstr("f64.max")
+val F32_MIN = BinaryInstruction("f32.min", "std::min(")
+val F64_MIN = BinaryInstruction("f64.min", "std::min(")
+val F32_MAX = BinaryInstruction("f32.max", "std::max(")
+val F64_MAX = BinaryInstruction("f64.max", "std::max(")
 val F32_SQRT = UnaryInstruction("f32.sqrt", "std::sqrt")
 val F64_SQRT = UnaryInstruction("f64.sqrt", "std::sqrt")
 val F32_FLOOR = UnaryInstruction("f32.floor", "std::floor")
@@ -586,16 +590,20 @@ val F64_CEIL = UnaryInstruction("f64.ceil", "std::ceil")
 val F32_NEAREST = UnaryInstruction("f32.nearest", "std::round")
 val F64_NEAREST = UnaryInstruction("f64.nearest", "std::round")
 
-val I32_ROTL = SimpleInstr("i32.rotl")
-val I64_ROTL = SimpleInstr("i64.rotl")
+val I32_ROTL = BinaryInstruction("i32.rotl", "std::rotl(")
+val I64_ROTL = BinaryInstruction("i64.rotl", "std::rotl(")
 
-val I32_ROTR = SimpleInstr("i32.rotr")
-val I64_ROTR = SimpleInstr("i64.rotr")
+val I32_ROTR = BinaryInstruction("i32.rotr", "std::rotr(")
+val I64_ROTR = BinaryInstruction("i64.rotr", "std::rotr(")
 
 val Drop = SimpleInstr("drop")
 
 fun getStackDepth(): Int {
     return RuntimeException().stackTrace.size
+}
+
+fun makeFloat(str: String): String {
+    return if ('.' !in str) "$str.0" else str
 }
 
 fun parseFunctionBlock(list: TokenList, i0: Int): FunctionBlock {
@@ -747,7 +755,8 @@ val tmp = documents.getChild("IdeaProjects/JVM2WASM/tmp")
 
 fun defineTypes() {
     writer.append("// types\n")
-    writer.append("#include <cstdint>\n")
+    writer.append("#include <cstdint>\n") // for number types
+    writer.append("#include <bit>\n") // bitcast from C++20
     val map = listOf(
         "i32" to "int32_t",
         "i64" to "int64_t",
@@ -863,14 +872,14 @@ fun defineFunctionImplementation(function: FunctionImpl) {
     fun gen(): String = "tmp${genI++}"
     fun pop(type: String): String {
         val i0 = stack.removeLast()
-        println("pop -> $i0 + $stack")
+        // println("pop -> $i0 + $stack")
         assertEquals(type, i0.type)
         return i0.name
     }
 
     fun push(type: String, name: String = gen()): String {
         stack.add(StackElement(type, name))
-        println("push -> $stack")
+        // println("push -> $stack")
         return name
     }
 
@@ -901,6 +910,51 @@ fun defineFunctionImplementation(function: FunctionImpl) {
         val ptr = pop("i32")
         begin().append("((").append(memoryType).append("*) memory)[(u32) ").append(ptr)
             .append(" >> ").append(shift(type)).append("] = ").append(value).append(";\n")
+    }
+
+    fun writeCall(funcName: String, params: List<String>, results: List<String>) {
+
+        if (funcName.startsWith("getNth_")) {
+            stack.add(stack[stack.size - params.size])
+            return
+        }
+
+        if (funcName == "stackPush" || funcName == "stackPop") {
+            if (funcName == "stackPush") pop("i32")
+            return
+        }
+
+        if (funcName.startsWith("swap")) {
+            stack.add(stack.size - 2, stack.removeLast())
+            return
+        }
+
+        val tmp = if (results.isNotEmpty()) gen() else ""
+        begin()
+        if (results.isNotEmpty()) {
+            for (ri in results.indices) {
+                writer.append(results[ri])
+            }
+            writer.append(" ").append(tmp).append(" = ")
+        }
+
+        writer.append(funcName).append('(')
+        val popped = params.reversed().map { pop(it) }
+        for (pi in popped.reversed()) {
+            if (!writer.endsWith("(")) writer.append(", ")
+            writer.append(pi)
+        }
+        writer.append(')').end()
+
+        when (results.size) {
+            0 -> {}
+            1 -> push(results[0], tmp)
+            else -> {
+                for (j in results.indices) {
+                    beginNew(results[j]).append(tmp).append(".v").append(j).end()
+                }
+            }
+        }
     }
 
     fun writeInstruction(i: Instruction) {
@@ -948,17 +1002,27 @@ fun defineFunctionImplementation(function: FunctionImpl) {
             F32Store -> store("f32")
             F64Store -> store("f64")
             // other operations
-            I32EQZ -> beginNew("i32").append(pop("i32")).append(" == 0 ? 1 : 0").end()
-            I64EQZ -> beginNew("i32").append(pop("i64")).append(" == 0 ? 1 : 0").end()
-            I32ShrU -> {
+            I32EQZ -> {
                 val i0 = pop("i32")
-                val i1 = pop("i32")
-                beginNew("i32").append("(u32) ").append(i1).append(" >> ").append(i0).end()
+                beginNew("i32").append(i0).append(" == 0 ? 1 : 0").end()
             }
-            I32ShrS -> {
-                val i0 = pop("i32")
-                val i1 = pop("i32")
-                beginNew("i32").append(i1).append(" >> ").append(i0).end()
+            I64EQZ -> {
+                val i0 = pop("i64")
+                beginNew("i32").append(i0).append(" == 0 ? 1 : 0").end()
+            }
+            is ShiftInstr -> {
+                val i0 = pop(i.type)
+                val i1 = pop(i.type)
+                beginNew(i.type)
+                writer.append(
+                    if (i.isRight && i.isU) {
+                        if (i.type == "i32") "(u32) " else "(u64) "
+                    } else ""
+                )
+                writer.append(i1).append(
+                    if (i.isRight) " >> "
+                    else " << "
+                ).append(i0).end()
             }
             Return -> {
                 val offset = stack.size - function.results.size
@@ -985,7 +1049,23 @@ fun defineFunctionImplementation(function: FunctionImpl) {
                     begin().append("return { /* unreachable */ }").end()
                 }
             }
-            is Const -> push(i.type, i.value)
+            is Const -> {
+                when (i.type) {
+                    "f32" -> push(i.type, makeFloat(i.value) + "f")
+                    "f64" -> push(i.type, makeFloat(i.value))
+                    "i32" -> {
+                        val v = if (i.value == "-2147483648") "(i32)(1u << 31)"
+                        else i.value
+                        push(i.type, v)
+                    }
+                    "i64" -> {
+                        val v = if (i.value == "-9223372036854775808") "(i64)(1llu << 63)"
+                        else i.value + "ll"
+                        push(i.type, v)
+                    }
+                    else -> push(i.type, i.value)
+                }
+            }
             is UnaryInstruction -> {
                 val i0 = pop(i.type)
                 beginNew(i.type).append(i.call).append('(').append(i0).append(')').end()
@@ -997,9 +1077,20 @@ fun defineFunctionImplementation(function: FunctionImpl) {
             is BinaryInstruction -> {
                 val i0 = pop(i.type)
                 val i1 = pop(i.type)
-                beginNew(i.type).append(i1).append(' ')
-                    .append(i.operator)
-                    .append(' ').append(i0).end()
+                if (i.operator.endsWith("(")) {
+                    if (i.operator.startsWith("std::rot")) {
+                        beginNew(i.type).append(i.operator).append( // cast to unsigned required
+                            if (i0 == "i32") "(u32) " else "(u64) "
+                        ).append(i1).append(", ").append(i0).append(')').end()
+                    } else {
+                        beginNew(i.type).append(i.operator).append(i1).append(", ")
+                            .append(i0).append(')').end()
+                    }
+                } else {
+                    beginNew(i.type).append(i1).append(' ')
+                        .append(i.operator)
+                        .append(' ').append(i0).end()
+                }
             }
             is CompareInstr -> {
                 val i0 = pop(i.type)
@@ -1013,7 +1104,8 @@ fun defineFunctionImplementation(function: FunctionImpl) {
             is IfBranch -> {
 
                 // get running parameters...
-                val baseSize = stack.size - i.params.size - 1
+                val condition = pop("i32")
+                val baseSize = stack.size - i.params.size
                 for (j in i.params) {
                     beginNew(j).append(pop(j)).end()
                 }
@@ -1028,82 +1120,93 @@ fun defineFunctionImplementation(function: FunctionImpl) {
                         .append(resultVars[ri]).append(" = 0").end()
                 }
 
-                begin().append("if (").append(pop("i32")).append(") {\n")
+                begin().append("if (").append(condition).append(") {\n")
                 val stackSave = ArrayList(stack)
                 stack.subList(0, baseSize).clear()
+                val stackForReset = ArrayList(stack)
 
-                // write stuff
-                depth++
-                for (instr in i.ifTrue) {
-                    writeInstruction(instr)
+                fun packResultsIntoOurStack(instructions: List<Instruction>) {
+                    val lastInstr = instructions.lastOrNull()
+                    if (lastInstr == Return || lastInstr == Unreachable || lastInstr is Jump) {
+                        return
+                    }
+                    // pack results into our stack somehow...
+                    // resultVars[i] = stack[i].name
+                    for (j in i.results.indices.reversed()) {
+                        val srcVar = pop(i.results[j])
+                        val dstVar = resultVars[j]
+                        begin().append(dstVar).append(" = ").append(srcVar).end()
+                    }
                 }
 
-                // todo pack results into our stack somehow...
-                if (i.results.isNotEmpty()) throw NotImplementedException()
-                depth--
+                fun writeBranchContents(instructions: List<Instruction>) {
+                    depth++
+                    for (instr in instructions) {
+                        writeInstruction(instr)
+                    }
+                    packResultsIntoOurStack(instructions)
+                    depth--
+                }
 
-                // rescue stack
-                stack.clear()
-                stack.addAll(stackSave)
+                writeBranchContents(i.ifTrue)
 
                 if (i.results.isEmpty() && i.ifFalse.isEmpty()) {
                     begin().append("}\n")
                 } else {
                     begin().append("} else {\n")
 
-                    // write stuff
-                    depth++
-                    for (instr in i.ifFalse) {
-                        writeInstruction(instr)
-                    }
-
-                    // todo pack results into our stack somehow...
-                    if (i.results.isNotEmpty()) throw NotImplementedException()
-                    depth--
-
+                    // reset stack to before "if"
                     stack.clear()
-                    stack.addAll(stackSave)
+                    stack.addAll(stackForReset)
+
+                    writeBranchContents(i.ifFalse)
+
                     begin().append("}\n")
+                }
+
+                // rescue stack
+                stack.clear()
+                stack.addAll(stackSave)
+                for (j in i.results.indices) {
+                    push(i.results[j], resultVars[j])
                 }
             }
             is Call -> {
-
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
-
-                val tmp = if (func.results.isNotEmpty()) gen() else ""
-                when (func.results.size) {
-                    0 -> begin()
-                    1 -> begin().append(func.results[0]).append(' ').append(tmp).append(" = ")
-                    else -> begin().append("auto ").append(tmp).append(" = ")
-                }
-
-                writer.append(func.funcName).append('(')
-                for (pi in func.params.indices.reversed()) {
-                    if (!writer.endsWith("(")) writer.append(", ")
-                    val param = func.params[pi]
-                    writer.append(pop(param))
-                }
-                writer.append(')').end()
-
-                when (func.results.size) {
-                    0 -> {}
-                    1 -> push(func.results[0], tmp)
-                    else -> {
-                        for (j in func.results.indices) {
-                            beginNew(func.results[j]).append(tmp).append(".v").append(j).end()
-                        }
-                    }
-                }
+                writeCall(func.funcName, func.params, func.results)
             }
             is CallIndirect -> {
                 val type = types[i.type]!!
-                TODO("read class structure, and decide based on that")
-                TODO("for now, index into jump table, and call based on that?")
+                val tmpType = gen()
+                val tmpVar = gen()
+                // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
+                begin().append("using ").append(tmpType).append(" = ")
+                if (type.results.isEmpty()) {
+                    writer.append("void")
+                } else {
+                    for (ri in type.results.indices) {
+                        writer.append(type.results[ri])
+                    }
+                }
+                writer.append("(*)(")
+                for (pi in type.params.indices) {
+                    if (pi > 0) writer.append(", ")
+                    writer.append(type.params[pi])
+                }
+                writer.append(")").end()
+                // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
+                begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
+                    .append(tmpType).append(">(indirect[").append(pop("i32")).append("])").end()
+                writeCall(tmpVar, type.params, type.results)
             }
             is LoopInstr -> {
-                assertTrue(i.results.isEmpty())
-                // todo check if the label is used
+                val resultNames = i.results.map { gen() }
+                for (j in i.results.indices) {
+                    begin().append(i.results[j]).append(' ')
+                        .append(resultNames[j]).append(" = 0;\n")
+                }
+                // to do check if the label is used
                 begin().append(i.label).append(": while (true) {\n")
                 val stackSave = ArrayList(stack)
                 stack.clear()
@@ -1113,61 +1216,106 @@ fun defineFunctionImplementation(function: FunctionImpl) {
                     writeInstruction(i.body[ii])
                 }
                 if (!lastIsContinue) {
+                    // save results
+                    for (j in i.results.indices.reversed()) {
+                        begin().append(resultNames[j]).append(" = ")
+                            .append(pop(i.results[j])).end()
+                    }
                     begin().append("break;\n")
-                }
+                } else assertTrue(i.results.isEmpty())
                 depth--
                 stack.clear()
                 stack.addAll(stackSave)
+                for (j in i.results.indices) {
+                    push(i.results[j], resultNames[j])
+                }
                 begin().append("}\n")
             }
             is Jump -> {
                 begin().append("goto ").append(i.label).append(";\n")
             }
+            is JumpIf -> {
+                val condition = pop("i32")
+                begin().append("if (").append(condition).append(" != 0) { goto ")
+                    .append(i.label).append("; }\n")
+            }
             is SwitchCase -> {
                 // big monster, only 1 per function allowed, afaik
                 // assertEquals(1, depth)
-                begin().append("{\n")
+                assertEquals(0, stack.size)
                 depth++
                 assertEquals(0, i.cases[0].size)
                 for (j in 1 until i.cases.size) {
-                    depth -= 2
-                    begin().append("l").append(j).append(":\n")
-                    depth += 2
+                    stack.clear()
+                    // assertEquals(0, stack.size)
+                    depth--
+                    begin().append("case").append(j).append(": {\n")
+                    depth++
                     val instructions = i.cases[j]
                     assertTrue(instructions.size >= 2)
                     val realLast = instructions.last()
                     assertTrue(realLast is Jump) // for while(true)-branch
-                    val last = instructions[instructions.size - 2]
-                    assertTrue(last is LocalSet && last.name == "lbl")
-                    val preLast = instructions[instructions.size - 3]
-                    assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == "i32"))
-                    // find end:
-                    //   - i32.const 2 local.set $lbl
-                    //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
-                    for (k in 0 until instructions.size - 3) {
-                        writeInstruction(instructions[k])
+                    var skipped = 2
+                    while (true) {
+                        val tmp = instructions[instructions.size - skipped]
+                        if (tmp is LocalSet && tmp.name.startsWith("s") &&
+                            (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
+                        ) {
+                            // println("skipping ${tmp.name}")
+                            skipped++
+                        } else break
                     }
-                    if (preLast is IfBranch) {
-                        assertEquals(1, preLast.ifTrue.size)
-                        assertEquals(1, preLast.ifFalse.size)
-                        begin().append("if (").append(pop("i32")).append(") {\n")
-                        depth++
-                        begin().append("goto l").append((preLast.ifTrue[0] as Const).value).end()
-                        depth--
-                        begin().append("} else {\n")
-                        depth++
-                        begin().append("goto l").append((preLast.ifFalse[0] as Const).value).end()
-                        depth--
-                        begin().append("}\n")
+                    val last = instructions[instructions.size - skipped]
+                    if (last != Unreachable) {
+                        assertTrue(last is LocalSet && last.name == "lbl")
+                        val preLast = instructions[instructions.size - (skipped + 1)]
+                        assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == "i32"))
+                        // find end:
+                        //   - i32.const 2 local.set $lbl
+                        //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
+                        for (k in 0 until instructions.size - (skipped + 1)) {
+                            writeInstruction(instructions[k])
+                        }
+                        fun executeStackSaving() {
+                            // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
+                            for (k in instructions.size - (skipped - 1) until instructions.size - 1) {
+                                // println("  stack saving[$k]: ${instructions[k]}")
+                                writeInstruction(instructions[k])
+                            }
+                        }
+                        if (preLast is IfBranch) {
+                            // save branch
+                            val branch = pop("i32")
+                            executeStackSaving()
+                            assertEquals(1, preLast.ifTrue.size)
+                            assertEquals(1, preLast.ifFalse.size)
+                            begin().append("if (").append(branch).append(") {\n")
+                            depth++
+                            begin().append("goto case").append((preLast.ifTrue[0] as Const).value).end()
+                            depth--
+                            begin().append("} else {\n")
+                            depth++
+                            begin().append("goto case").append((preLast.ifFalse[0] as Const).value).end()
+                            depth--
+                            begin().append("}\n")
+                        } else {
+                            executeStackSaving()
+                            preLast as Const
+                            begin().append("goto case").append(preLast.value).end()
+                        }
                     } else {
-                        preLast as Const
-                        begin().append("goto l").append(preLast.value).end()
+                        for (k in 0 until instructions.size - skipped) {
+                            writeInstruction(instructions[k])
+                        }
                     }
-
+                    depth--
+                    begin().append("}\n")
+                    depth++
                 }
                 depth--
-                begin().append("}\n")
+                begin().append("case0:\n") // exit switch-case
             }
+            Drop -> stack.pop()
             else -> throw NotImplementedError(i.toString())
         }
     }
@@ -1193,6 +1341,18 @@ fun defineGlobals() {
     writer.append("\n")
 }
 
+fun fillInFunctionTable() {
+    writer.append("// function table data\n")
+    writer.append("void initFunctionTable() {\n")
+    for (i in functionTable.indices) {
+        writer.append("  indirect[").append(i).append("] = (void*) ")
+            .append(functionTable[i]).append(";\n")
+    }
+    writer.append("}\n")
+}
+
+// todo getNth can be replaced by manipulating the stack
+
 fun main() {
     val clock = Clock("WASM2CPP")
     // load wasm.wat file
@@ -1207,24 +1367,41 @@ fun main() {
     for (func in functions) {
         functionsByName[func.funcName] = func
     }
+    functions.removeIf { it.funcName.startsWith("getNth_") }
 
-    // todo produce a compilable .cpp from it
+    tmp.getChild("data").delete()
+    tmp.getChild("data").mkdirs()
+    for (section in dataSections) {
+        tmp.getChild("data/jvm2wasm-data-${section.startIndex}-${section.startIndex + section.content.size}.bin")
+            .writeBytes(section.content)
+    }
+
+    // produce a compilable .cpp from it
     writer.append("// header\n")
     writer.append("void* memory = nullptr;\n")
+    writer.append("void* indirect[").append(functionTable.size).append("];\n")
     defineTypes()
     defineGlobals()
     defineReturnStructs()
+    val pos = writer.size
     defineImports()
+    tmp.getChild("jvm2wasm-base.h")
+        .writeBytes(writer.values, pos, writer.size - pos)
     defineFunctionHeads()
 
     try {
         defineFunctionImplementations()
+        fillInFunctionTable()
     } catch (e: Throwable) {
         e.printStackTrace()
     }
 
+    clock.stop("Transpiling")
+
     tmp.getChild("jvm2wasm.cpp")
         .writeBytes(writer.values, 0, writer.size)
+
+    clock.total("Total")
 
     // todo run it in a helper Java environment for libraries???
 }
