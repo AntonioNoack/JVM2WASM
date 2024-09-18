@@ -152,7 +152,7 @@ class BinaryWriter(
         var value = v
         if (v < 0) {
             while (true) {
-                val byte = v.and(0x7f)
+                val byte = value.and(0x7f)
                 value = value shr 7
                 if (value == -1 && byte.hasFlag(0x40)) {
                     stream.add(byte.toByte())
@@ -163,7 +163,7 @@ class BinaryWriter(
             }
         } else {
             while (true) {
-                val byte = v.and(0x7f)
+                val byte = value.and(0x7f)
                 value = value shr 7
                 if (value == 0 && !byte.hasFlag(0x40)) {
                     stream.add(byte.toByte())

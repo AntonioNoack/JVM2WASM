@@ -7,6 +7,7 @@ import wasm.writer.*
 import wasm.writer.Function
 import wasm2cpp.tmp
 
+// this isn't working yet, and not fully implemented
 fun main() {
     // load wasm.wat file
     val text = tmp.getChild("jvm2wasm.wat").readTextSync()
