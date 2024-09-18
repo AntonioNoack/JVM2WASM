@@ -1,7 +1,9 @@
-package binary
+package wasm.writer
 
-import me.anno.utils.types.Booleans.hasFlag
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
+import me.anno.utils.types.Booleans.hasFlag
+import me.anno.utils.types.Booleans.toInt
 
 class BinaryWriter(
     val stream: ByteArrayList,
@@ -12,15 +14,15 @@ class BinaryWriter(
         val kInvalidIndex = -1
     }
 
-    fun ByteArrayList.write(v: Int) {
+    private fun ByteArrayList.write(v: Int) {
         add(v.toByte())
     }
 
-    fun ByteArrayList.write(v: ByteArray) {
+    private fun ByteArrayList.write(v: ByteArray) {
         addAll(v, 0, v.size)
     }
 
-    fun ByteArrayList.writeLE32(v: Int) {
+    private fun ByteArrayList.writeLE32(v: Int) {
         ensureExtra(4)
         addUnsafe(v.toByte())
         addUnsafe((v ushr 8).toByte())
@@ -28,91 +30,8 @@ class BinaryWriter(
         addUnsafe((v ushr 24).toByte())
     }
 
-    class Sig(val paramTypes: List<Type>, val resultTypes: List<Type>)
-
-    open class Type(val kind: TypeKind, val index: Int = kInvalidIndex)
-
-    class FuncType(val sig: Sig) : Type(TypeKind.FUNC)
-    class Field(val type: Type, val mutable: Boolean)
-    class StructType(val fields: List<Field>) : Type(TypeKind.STRUCT)
-    class ArrayType(val field: Field) : Type(TypeKind.ARRAY)
-
-    enum class ExternalKind {
-        FUNC,
-        TABLE,
-        MEMORY,
-        GLOBAL,
-        TAG
-    }
-
-    open class Import(
-        val kind: ExternalKind,
-        val moduleName: String,
-        val fieldName: String
-    )
-
-    class FuncImport(moduleName: String, fieldName: String, val declIndex: Int) :
-        Import(ExternalKind.FUNC, moduleName, fieldName)
-
-    class TableImport(moduleName: String, fieldName: String, val table: Table) :
-        Import(ExternalKind.TABLE, moduleName, fieldName)
-
-    class MemoryImport(moduleName: String, fieldName: String, val memory: Memory) :
-        Import(ExternalKind.TABLE, moduleName, fieldName)
-
-    class GlobalImport(moduleName: String, fieldName: String, val global: Global) :
-        Import(ExternalKind.GLOBAL, moduleName, fieldName)
-
-    class TagImport(moduleName: String, fieldName: String, val tag: Tag) :
-        Import(ExternalKind.TAG, moduleName, fieldName)
-
-    class Function(val typeIndex: Int)
-
-    class Table(val elemType: Type, val elemLimits: Limits)
-
-    class Limits(val hasMax: Boolean, val isShared: Boolean, val is64Bit: Boolean, val initial: Long, val max: Long)
-
-    class Memory(val pageLimits: Limits)
-
-    class Tag(val funcTypeIndex: Int)
-
-    class Export(val kind: ExternalKind, val var_: Int)
-
-    class Global(val initExpr: List<Expr>, val type: Type, val mutable: Boolean)
-
-    class Start
-
-    class Module(
-        val types: List<Type>,
-        val imports: List<Import>,
-        val functions: List<Function>,
-        val tables: List<Table>,
-        val memories: List<Memory>,
-        val tags: List<Tag>,
-        val globals: List<Global>,
-        val exports: List<Export>,
-        val starts: List<Start>
-    )
-
-    val BINARY_MAGIC = 0x6d736100
-    val BINARY_VERSION = 1
-
-    enum class SectionType {
-        CUSTOM,
-        TYPE,
-        IMPORT,
-        FUNCTION,
-        TABLE,
-        MEMORY,
-        GLOBAL,
-        EXPORT,
-        START,
-        ELEM,
-        CODE,
-        DATA,
-        DATA_COUNT,
-        TAG,
-    }
+    private val BINARY_MAGIC = 0x6d736100 // \0asm
+    private val BINARY_VERSION = 1
 
     var lastSectionPayloadOffset = 0
     val LEB_SECTION_SIZE_GUESS = 1
@@ -139,7 +58,7 @@ class BinaryWriter(
         return result
     }
 
-    fun u32Leb128Length(i: Int): Int {
+    private fun u32Leb128Length(i: Int): Int {
         var size = 0
         var x = i
         do {
@@ -149,7 +68,7 @@ class BinaryWriter(
         return size
     }
 
-    fun writeU32Leb128(v: Int) {
+    private fun writeU32Leb128(v: Int) {
         stream.ensureExtra(MAX_U32_LEB128_BYTES)
         var x = v
         do {
@@ -158,7 +77,7 @@ class BinaryWriter(
         } while (x != 0)
     }
 
-    fun writeU64Leb128(v: Long) {
+    private fun writeU64Leb128(v: Long) {
         stream.ensureExtra(MAX_U32_LEB128_BYTES)
         var x = v
         do {
@@ -167,7 +86,7 @@ class BinaryWriter(
         } while (x != 0L)
     }
 
-    fun writeU32Leb128At(o: Int, v: Int) {
+    private fun writeU32Leb128At(o: Int, v: Int) {
         stream.ensureExtra(MAX_U32_LEB128_BYTES)
         var x = v
         var i = o
@@ -177,7 +96,7 @@ class BinaryWriter(
         } while (x != 0)
     }
 
-    fun writeFixupU32Leb128Size(offset: Int, lebSizeGuess: Int): Int {
+    private fun writeFixupU32Leb128Size(offset: Int, lebSizeGuess: Int): Int {
         if (canonicalize_lebs) {
             val size = stream.size - offset - lebSizeGuess
             val lebSize = u32Leb128Length(size)
@@ -197,7 +116,7 @@ class BinaryWriter(
         }
     }
 
-    fun writeFixedU32Leb128At(offset: Int, x: Int) {
+    private fun writeFixedU32Leb128At(offset: Int, x: Int) {
         stream.ensureCapacity(offset + 5)
         stream[offset] = (x or 0x80).toByte()
         stream[offset + 1] = ((x ushr 7) or 0x80).toByte()
@@ -300,14 +219,6 @@ class BinaryWriter(
         stream.write(if (global.mutable) 1 else 0)
     }
 
-    class Func
-    abstract class Expr
-    class Binary(val opcode: Opcode) : Expr()
-    class Unary(val opcode: Opcode) : Expr()
-    class Ternary(val opcode: Opcode) : Expr()
-    class Block(val declIndex: Int, val expr: List<Expr>) : Expr()
-    object Return : Expr()
-
     fun writeBlockDecl(decl: Int) {
         TODO()
     }
@@ -378,14 +289,14 @@ class BinaryWriter(
                         writeU32Leb128(type2.fields.size)
                         for (field in type2.fields) {
                             writeType(field.type)
-                            stream.write(if (field.mutable) 1 else 0)
+                            stream.write(field.mutable.toInt())
                         }
                     }
                     TypeKind.ARRAY -> {
                         val type2 = type as ArrayType
                         writeType(TypeKind.ARRAY)
                         writeType(type2.field.type)
-                        stream.write(if (type2.field.mutable) 1 else 0)
+                        stream.write(type2.field.mutable.toInt())
                     }
                     else -> {}
                 }
@@ -430,7 +341,7 @@ class BinaryWriter(
             endSection()
         }
         val numFunctions = module.functions.size - numFuncImports
-        if (numFunctions < 0) throw IllegalStateException()
+        assertTrue(numFunctions >= 0)
         if (numFunctions > 0) {
             beginKnownSection(SectionType.FUNCTION)
             writeU32Leb128(numFunctions)
@@ -440,7 +351,7 @@ class BinaryWriter(
             endSection()
         }
         val numTables = module.tables.size - numTableImports
-        if (numTables < 0) throw IllegalStateException()
+        assertTrue(numTables >= 0)
         if (numFunctions > 0) {
             beginKnownSection(SectionType.TABLE)
             writeU32Leb128(numTables)
@@ -450,7 +361,7 @@ class BinaryWriter(
             endSection()
         }
         val numMemories = module.memories.size - numMemoryImports
-        if (numMemories < 0) throw IllegalStateException()
+        assertTrue(numMemories >= 0)
         if (numMemories > 0) {
             beginKnownSection(SectionType.MEMORY)
             writeU32Leb128(numMemories)
@@ -460,7 +371,7 @@ class BinaryWriter(
             endSection()
         }
         val numTags = module.tags.size - numTagImports
-        if (numTags < 0) throw IllegalStateException()
+        assertTrue(numTags >= 0)
         if (numTags > 0) {
             beginKnownSection(SectionType.TAG)
             writeU32Leb128(numTags)
@@ -470,7 +381,7 @@ class BinaryWriter(
             endSection()
         }
         val numGlobals = module.globals.size - numGlobalImports
-        if (numGlobals < 0) throw IllegalStateException()
+        assertTrue(numGlobals >= 0)
         if (numGlobals > 0) {
             beginKnownSection(SectionType.GLOBAL)
             writeU32Leb128(numGlobals)

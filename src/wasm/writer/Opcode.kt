@@ -1,4 +1,4 @@
-package binary
+package wasm.writer
 
 val x = TypeKind.VOID
 val i32 = TypeKind.I32
@@ -39,3 +39,11 @@ enum class Opcode(
     constructor(opcode: Int) :
             this(x, x, x, x, 0, 0, opcode)
 }
+
+class Func
+abstract class Expr
+class Binary(val opcode: Opcode) : Expr()
+class Unary(val opcode: Opcode) : Expr()
+class Ternary(val opcode: Opcode) : Expr()
+class Block(val declIndex: Int, val expr: List<Expr>) : Expr()
+object Return : Expr()

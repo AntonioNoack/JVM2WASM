@@ -626,6 +626,7 @@ public class JVM32 {
     @WASM(code = "global.set $G")
     public static native void setNextPtr(int value);
 
+    // @WASM(code = "memory.size i32.const 16 i32.shl")
     @NoThrow
     @JavaScript(code = "return memory.buffer.byteLength;")
     public static native int getAllocatedSize();

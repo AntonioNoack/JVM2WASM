@@ -1,4 +1,4 @@
-package binary
+package wasm.writer
 
 enum class TypeKind(val id: Int) {
     I32(0x7f),
