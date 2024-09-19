@@ -307,6 +307,7 @@ public class LWJGLxOpenGL {
     public static void org_lwjgl_opengl_GL_create_V() {
     }
 
+    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV")
     @JavaScript(code = "gl.shaderSource(unmap(arg0),str(arg1)" +
             ".split('#extension').join('// #ext')" +
@@ -946,9 +947,74 @@ public class LWJGLxOpenGL {
     public static native void glFramebufferTexture2D_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV'")
+    public static native void org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV(int a, int b, int c, int d, int e);
+
+    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV")
     @JavaScript(code = "/*console.log('glRenderbufferStorage', arguments);*/gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
     public static native void glRenderbufferStorage(int target, int format, int width, int height);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV'")
+    public static native void org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV(int a, int b, int c);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV'")
+    public static native void org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV(int a, int b, int c, int d, int e);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL15C_glBeginQuery_IIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glBeginQuery_IIV'")
+    public static native void org_lwjgl_opengl_GL15C_glBeginQuery_IIV(int a, int b);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
+    @JavaScript(code = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
+    public static native void org_lwjgl_opengl_GL15C_glEndQuery_IV(int a);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL42C_glMemoryBarrier_IV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL42C_glMemoryBarrier_IV'")
+    public static native void org_lwjgl_opengl_GL42C_glMemoryBarrier_IV(int a);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV'")
+    public static native void org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV(int a, int b, int c, int d, int e);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV'")
+    public static native void org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV(int a, int b, int c, boolean d, int e, int f, int g);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV'")
+    public static native void org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV(int a, int b);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL45C_glClipControl_IIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL45C_glClipControl_IIV'")
+    public static native void org_lwjgl_opengl_GL45C_glClipControl_IIV(int a, int b);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV'")
+    public static native void org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV(int a, int b, int c);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV'")
+    public static native void org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV(int a, int b, int c);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV")
+    @JavaScript(code = "throw 'org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV'")
+    public static native void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV")

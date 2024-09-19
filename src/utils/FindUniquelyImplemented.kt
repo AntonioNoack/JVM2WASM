@@ -9,6 +9,7 @@ import me.anno.utils.structures.maps.CountMap
  * find functions with a single implementation only, and make it final
  * */
 fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMethods: Collection<MethodSig>) {
+    println("[findUniquelyImplemented]")
 
     // we only need this for classes, where multiple classes are constructable
     // otherwise, we can directly resolve the call :)

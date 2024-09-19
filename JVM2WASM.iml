@@ -13,5 +13,6 @@
     <orderEntry type="library" name="VideoStudio" level="project" />
     <orderEntry type="library" name="scimark2lib" level="project" />
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
+    <orderEntry type="library" name="KotlynReflect" level="project" />
   </component>
 </module>

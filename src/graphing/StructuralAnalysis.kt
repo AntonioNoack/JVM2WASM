@@ -1262,7 +1262,7 @@ object StructuralAnalysis {
             // load stack
             var s0 = 0
             val inputs = node.inputStack
-            if (inputs != null && inputs.isNotEmpty()) {
+            if (!inputs.isNullOrEmpty()) {
                 if (comments) printer.append("  ;; load stack\n")
                 for (idx in 0 until inputs.size - dropCtr) {
                     val type = inputs[idx]

@@ -7,7 +7,10 @@ import jvm.appendNativeHelperFunctions
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
+import me.anno.utils.assertions.assertNotNull
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
+import me.anno.utils.structures.lists.Lists.any2
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
@@ -104,8 +107,8 @@ val classReplacements = hashMapOf(
     "java/lang/RuntimePermission" to "jvm/custom/RTPermission",
 )
 
-fun rep(clazz: String?) = classReplacements[clazz] ?: clazz
-fun reb(clazz: String) = classReplacements[clazz] ?: clazz
+fun replaceClass0(clazz: String?) = classReplacements[clazz] ?: clazz
+fun replaceClass1(clazz: String) = classReplacements[clazz] ?: clazz
 
 // forbid from being implemented -> "just" override its methods
 fun cannotUseClass(clazz: String): Boolean {
@@ -271,7 +274,7 @@ fun isRootType(clazz: String): Boolean {
     }
 }
 
-val entrySig = MethodSig.c("", "entry", "")
+val entrySig = MethodSig.c("", "entry", "()V")
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
 
@@ -318,7 +321,7 @@ fun main() {
     hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
     hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
 
-    genericMappingPass()
+    resolveGenericTypes()
     findNoThrowMethods()
 
     // java_lang_StrictMath_sqrt_DD
@@ -359,15 +362,17 @@ fun main() {
     // only now usedMethods is complete
     printMethodFieldStats()
 
-    printNotImplementedMethods(importPrinter, missingMethods)
-
     for (sig in dIndex.usedMethods
         .filter { it in hIndex.nativeMethods }) {
-        val annot = hIndex.annotations[sig] ?: continue
-        if (annot.any { it.clazz == "annotations/JavaScript" || it.clazz == "annotations/WASM" }) {
+        val annotations = hIndex.annotations[sig] ?: continue
+        if (annotations.any2 { it.clazz == "annotations/JavaScript" || it.clazz == "annotations/WASM" }) {
             hIndex.notImplementedMethods.remove(sig)
+            hIndex.customImplementedMethods.add(sig)
+            // println("Marked $sig as custom")
         }
     }
+
+    printNotImplementedMethods(importPrinter, missingMethods)
 
     printNativeMethods(importPrinter, missingMethods)
 
@@ -436,6 +441,7 @@ fun main() {
     appendNativeHelperFunctions(dataPrinter)
 
     val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
+
     for (func in jsImplemented) usedButNotImplemented.remove(func.key)
     for (func in jsPseudoImplemented) usedButNotImplemented.remove(func.key)
     for (func in gIndex.translatedMethods) usedButNotImplemented.remove(methodName(func.key))
@@ -446,28 +452,76 @@ fun main() {
         }
     }
 
-    for (desc in gIndex.nthMethods.values
-        .map { it.descriptor }.toSortedSet()) {
+    // append nth-getter-methods
+    for (desc in gIndex.nthGetterMethods
+        .map { it.value.descriptor }.toSortedSet()) {
         bodyPrinter.append(desc)
     }
 
     listEntryPoints({
         for (sig in hIndex.methods[it]!!) {
-            gIndex.actuallyUsed.add(entrySig, methodName(sig))
+            ActuallyUsedIndex.add(entrySig, sig)
         }
     }, { sig ->
-        gIndex.actuallyUsed.add(entrySig, methodName(sig))
+        ActuallyUsedIndex.add(entrySig, sig)
     })
 
-    bodyPrinter.ensureExtra(gIndex.translatedMethods.values.sumOf { it.length })
-    val resolved = ActuallyUsedIndex.resolve()
+    val usedMethods = ActuallyUsedIndex.resolve()
 
-    usedButNotImplemented.retainAll(resolved)
-    if (usedButNotImplemented.isNotEmpty()) {
-        printMissingFunctions(usedButNotImplemented, resolved)
+    val isUsed = MethodSig.c(
+        "kotlin/jvm/internal/PropertyReference1", "invoke",
+        "(Ljava_lang_Object;)Ljava_lang_Object;"
+    )
+
+    val isMaybeUsed = MethodSig.c(
+        "kotlin/jvm/internal/PropertyReference1", "get",
+        "(Ljava_lang_Object;)Ljava_lang_Object;"
+    )
+
+    val parentClazz = "kotlin/jvm/internal/PropertyReference1Impl"
+    val clazzMissing = "me/anno/ecs/systems/Systems\$registerSystem\$1\$1"
+    println("SuperClass: ${hIndex.superClass[clazzMissing]}, Interfaces: ${hIndex.interfaces[clazzMissing]}")
+    val parentMissing = MethodSig.c(
+        parentClazz, "get",
+        "(Ljava_lang_Object;)Ljava_lang_Object;"
+    )
+    val isMissing = MethodSig.c(
+        clazzMissing, "get",
+        "(Ljava_lang_Object;)Ljava_lang_Object;"
+    )
+
+    printUsed(isUsed)
+    printUsed(isMaybeUsed)
+    printUsed(isMissing)
+    printUsed(parentMissing)
+
+    assertTrue(methodName(isUsed) in usedMethods)
+    assertTrue(methodName(isMissing) in usedMethods)
+
+    usedButNotImplemented.retainAll(usedMethods)
+
+    val nameToMethod = nameToMethod
+    val usedBotNotImplementedMethods =
+        usedButNotImplemented
+            .mapNotNull { nameToMethod[it] }
+
+    for (sig in usedBotNotImplementedMethods) {
+        if (sig.clazz in hIndex.interfaceClasses &&
+            sig !in hIndex.jvmImplementedMethods &&
+            sig !in hIndex.customImplementedMethods
+        ) {
+            usedButNotImplemented.remove(methodName(sig))
+        }
+        if (sig in hIndex.abstractMethods) {
+            usedButNotImplemented.remove(methodName(sig))
+        }
     }
 
-    printMethodImplementations(bodyPrinter, resolved)
+    if (usedButNotImplemented.isNotEmpty()) {
+        printMissingFunctions(usedButNotImplemented, usedMethods)
+    }
+
+    printMethodImplementations(bodyPrinter, usedMethods)
 
     fun global(name: String, type: String, type2: String, value: Int) {
         // can be mutable...
@@ -556,5 +610,5 @@ fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<Stri
         }
     }
     println()
-    throw IllegalStateException("Missing functions")
+    throw IllegalStateException("Missing ${usedButNotImplemented.size} functions")
 }

@@ -21,7 +21,7 @@ class DelayedLambdaUpdate(
 ) {
 
     private fun isNative(type: String): Boolean {
-        return type[0] != 'L' && type[0] != 'T' && type[0] != '['
+        return type[0] != 'L' && type[0] != 'T' && type[0] !in "[A"
     }
 
     private fun convert(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {

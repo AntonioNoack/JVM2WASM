@@ -1,12 +1,14 @@
 package utils
 
 import dIndex
+import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import jvm.JVM32.arrayOverhead
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.Color
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
@@ -26,6 +28,7 @@ fun OutputStream.writeClass(clazz: Int) {
 
 var classInstanceTablePtr = 0
 fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
+    println("[appendClassInstanceTable]")
 
     classInstanceTablePtr = indexStartPtr
 
@@ -209,12 +212,14 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
 var throwableLookupPtr = 0
 fun appendThrowableLookup(printer: StringBuilder2, ptr0: Int): Int {
+    println("[appendThrowableLookup]")
     throwableLookupPtr = ptr0
     return appendData(printer, ptr0, MethodTranslator.callTable)
 }
 
 var resourceTablePtr = 0
 fun appendResourceTable(printer: StringBuilder2, ptr0: Int): Int {
+    println("[appendResourceTable]")
     resourceTablePtr = ptr0
     val resources = resources
     val table = ByteArrayOutputStream2(
@@ -270,8 +275,8 @@ val nameToMethod
     get() = hIndex.methods.map { it.value }.flatten()
         .associateBy { methodName(it) }
 
-val dynIndex = HashMap<String, Int>()
-val dynIndexSig = MethodSig.c("", "dynIndex", "")
+val dynIndex = HashMap<String, Pair<MethodSig, Int>>()
+val dynIndexSig = MethodSig.c("", "dynIndex", "()V")
 fun appendDynamicFunctionTable(
     printer: StringBuilder2,
     implementedMethods: Map<String, MethodSig>
@@ -290,16 +295,19 @@ fun appendDynamicFunctionTable(
                     methodName(it) !in hIndex.methodAliases
         }
         .sortedBy { it.value.name + "/" + it.value.descriptor }
-    for ((name, _) in dynamicFunctions) {
+    for ((name, sig) in dynamicFunctions) {
         if (nameToMethod[name] in hIndex.abstractMethods)
             throw IllegalStateException("$name is abstract, but also listed")
-        if (name !in dynIndex)
-            dynIndex[name] = dynIndex.size
+        if (name !in dynIndex) {
+            dynIndex[name] = sig to dynIndex.size
+        }
     }
     printer.append("(table ${dynIndex.size} funcref)\n")
     printer.append("(elem (i32.const 0)\n")
-    val dynIndex2 = arrayOfNulls<String>(dynIndex.size)
-    for ((name, idx) in dynIndex) {
+    var i = 0
+    for ((name, idx) in dynIndex
+        .entries.sortedBy { it.value.second }) {
+        assertEquals(i++, idx.second)
         var name2 = name
         // resolve by aliases
         while (true) {
@@ -314,19 +322,14 @@ fun appendDynamicFunctionTable(
             }
             name2 = name3
         }
-        if (dynIndex2[idx] != null) {
-            throw IllegalStateException("Duplicate entry $idx: $name -> $name2 != ${dynIndex2[idx]}")
-        }
+
         if (nameToMethod[name2] in hIndex.abstractMethods)
             throw IllegalStateException("$name is abstract, but also listed")
-        dynIndex2[idx] = name2
-    }
-    for (idx in dynIndex2.indices) {
-        val name = dynIndex2[idx] ?: throw NullPointerException("Missing index $idx")
-        val sig = nameToMethod[name]
-        if (sig in hIndex.abstractMethods) throw IllegalStateException("$name is abstract, but also listed")
-        gIndex.actuallyUsed.add(dynIndexSig, name)
-        printer.append("  $").append(name).append('\n')
+
+        val sig = nameToMethod[name2] ?: idx.first
+        if (sig in hIndex.abstractMethods) throw IllegalStateException("$name2 is abstract, but also listed")
+        printer.append("  $").append(name2).append('\n')
+        ActuallyUsedIndex.add(dynIndexSig, sig)
     }
     printer.append(")\n")
     println("filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
@@ -342,6 +345,7 @@ fun appendDynamicFunctionTable(
 // ...
  * */
 fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
+    println("[appendInheritanceTable]")
     // done append custom functions
     // append class instanceOf-table
     val classTableData = ByteArrayOutputStream2(numClasses * 4)
@@ -441,7 +445,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                         }
                         implFunctions0[gIndex.getInterfaceIndex(sig.clazz, sig.name, sig.descriptor)] = impl
                         val name = methodName(impl)
-                        if (name !in dynIndex) dynIndex[name] = dynIndex.size
+                        if (name !in dynIndex) dynIndex[name] = impl to dynIndex.size
                     }
                 }
 
@@ -449,7 +453,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                     val impl = findMethod(clazz, "<clinit>", "()V")
                     implFunctions0[staticInitIdx] = impl!!
                     val name = methodName(impl)
-                    if (name !in dynIndex) dynIndex[name] = dynIndex.size
+                    if (name !in dynIndex) dynIndex[name] = impl to dynIndex.size
                 }
 
                 if (print) {
@@ -468,7 +472,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                 instTable.writeLE32(implFunctions.size)
                 for ((id, sig) in implFunctions) {
                     instTable.writeLE32(id)
-                    instTable.writeLE32(dynIndex[methodName(sig)]!!)
+                    instTable.writeLE32(dynIndex[methodName(sig)]!!.second)
                 }
                 ptr += implFunctions.size * 8 + 4
 
@@ -504,6 +508,7 @@ var staticTablePtr = -1
 var clInitFlagTable = 0
 val staticLookup = HashMap<String, Int>()
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
+    println("[appendStaticInstanceTable]")
     staticTablePtr = ptr0
     clInitFlagTable = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
     var ptr = clInitFlagTable + numClasses // 1 byte for flag for init
@@ -528,6 +533,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
 var methodTablePtr = 0
 var aidtCtr = 50 // disabled
 fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
+    println("[appendInvokeDynamicTable]")
 
     methodTablePtr = ptr0
 
@@ -589,7 +595,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                     if (sig.clazz == "java/lang/Object") return false
                     if (sig in hIndex.jvmImplementedMethods) return false
                     val superClass = hIndex.superClass[sig.clazz] ?: throw NullPointerException(sig.clazz)
-                    return methodIsAbstract(MethodSig.c(superClass, sig.name, sig.descriptor))
+                    return methodIsAbstract(sig.withClass(superClass))
                 }
 
                 val impl = findMethod(clazz, sig) ?: sig
@@ -600,7 +606,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                 val dynIndexI = dynIndex[name]
                 if (dynIndexI != null) {
                     numOk++
-                    table2.writeLE32(dynIndexI)
+                    table2.writeLE32(dynIndexI.second)
                     if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexI")
                 } else if (methodIsAbstract(mapped ?: impl)) {
                     numAbstract++
@@ -623,7 +629,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                             throw IllegalStateException("$name, $sig2 is abstract, but also listed")
                         }
                         val dynIndexJ = dynIndex.size
-                        dynIndex[name] = dynIndexJ
+                        dynIndex[name] = sig2 to dynIndexJ
                         table2.writeLE32(dynIndexJ)
                         if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexJ*")
                     } else {
@@ -638,7 +644,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                             if (false) {
                                 // to do check if any super class or interface is being used...
                                 fun checkChildren(clazz: String) {
-                                    if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
+                                    if (sig.withClass(clazz) in dIndex.usedMethods) {
                                         printUsed(sig)
                                         throw IllegalStateException("$sig is being used by super class $clazz")
                                     }
@@ -649,7 +655,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
 
                                 fun checkSuper(clazz: String) {
                                     if (clazz == "java/lang/Object") return
-                                    if (MethodSig.c(clazz, sig.name, sig.descriptor) in dIndex.usedMethods) {
+                                    if (sig.withClass(clazz) in dIndex.usedMethods) {
                                         printUsed(sig)
                                         throw IllegalStateException("$sig is being used by super class $clazz")
                                     }
@@ -700,6 +706,7 @@ fun appendData(printer: StringBuilder2, startIndex: Int, vararg data: ByteArray)
 }
 
 fun appendStringData(printer: StringBuilder2, gIndex: GeneratorIndex): Int {
+    println("[appendStringData]")
     return appendData(printer, stringStart, gIndex.stringOutput)
 }
 

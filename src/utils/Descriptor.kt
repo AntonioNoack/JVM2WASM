@@ -3,8 +3,7 @@ package utils
 import hIndex
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
-import reb
-import java.lang.IllegalStateException
+import replaceClass1
 
 val f32 = "f32"
 val f64 = "f64"
@@ -18,7 +17,7 @@ val ptrType = if (is32Bits) i32 else i64
 
 fun single(d: String, generics: Boolean = false): String {
     var i = 0
-    while (d[i] == '[') i++
+    while (d[i] in "[A") i++
     val pad = generics.toInt()
     return d.substring(0, i) + when (d[i++]) {
         'Z' -> "Z"
@@ -34,7 +33,7 @@ fun single(d: String, generics: Boolean = false): String {
             // read until ;
             val j = d.indexOf2(';', i + 1)
             val n = d.substring(i - pad, j + pad)
-            if (generics) n else reb(n)
+            if (generics) n else replaceClass1(n)
         }
 
         else -> throw IllegalArgumentException(d)
@@ -64,7 +63,7 @@ fun split1(d: String, generics: Boolean = false): List<String> {
                     str
                 }
 
-                '[' -> "[${readType()}"
+                in "[A" -> "[${readType()}"
                 else -> throw IllegalArgumentException(d)
             }
         }
@@ -99,10 +98,10 @@ fun genericsTypies(d: String, static: Boolean = true): String {
             result.append(')')
             continue
         }
-        while (d[i] == '[') i++
+        while (d[i] in "[A") i++
         result.append(
             when (val c = d[i++]) {
-                'Z', 'C', 'B', 'S', 'I', 'J', 'F', 'D' -> if (d[k] != '[') c else '?'
+                'Z', 'C', 'B', 'S', 'I', 'J', 'F', 'D' -> if (d[k] !in "[A") c else '?'
                 'L', 'T' -> {
                     // read until ;
                     i = d.indexOf(';', i + 1) + 1
@@ -134,7 +133,7 @@ fun splitToType(d: String, canThrow: Boolean): String {
                     if (is32Bits) '0' else '1'
                 }
 
-                '[' -> {
+                in "[A" -> {
                     readType()
                     if (is32Bits) '0' else '1'
                 }
@@ -177,21 +176,27 @@ fun storageSize(d: String): Int = when (d[0]) {
     'C', 'S' -> 2
     'I', 'F' -> 4
     'J', 'D' -> 8
-    'L', '[' -> if (is32Bits) 4 else 8
+    'L', '[', 'A' -> if (is32Bits) 4 else 8
     else -> throw IllegalArgumentException(d)
 }
 
-fun String.escapeChars() = this
-    .replace('|', '_')
-    .replace('/', '_')
-    .replace(";", "")
-    .replace("(", "")
-    .replace(")", "")
-    .replace('[', 'A')
-    .replace(']', 'W')
-    .replace('$', 'X')
-    .replace('?', 'Y')
-    .replace('-', 'v')
+fun String.escapeChars() =
+    this.filter {
+        when (it) {
+            ';', '(', ')' -> false
+            else -> true
+        }
+    }.map {
+        when (it) {
+            '|', '/' -> '_'
+            '[' -> 'A'
+            ']' -> 'W'
+            '$' -> 'X'
+            '?' -> 'Y'
+            '-' -> 'v'
+            else -> it
+        }
+    }.joinToString("")
 
 fun methodName(sig: MethodSig): String {
     // check if alias exists
@@ -221,12 +226,16 @@ fun methodName(clazz: String, sig: GenericSig): String {
     return methodName(MethodSig.c(clazz, sig.name, sig.descriptor))
 }
 
+private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)
+
 fun methodName2(clazz: String, name: String, args: String): String {
-    return when (name) {
-        "<clinit>" -> "static|$clazz|$args"
-        "<init>" -> "new|$clazz|$args"
-        else -> "$clazz|$name|$args"
-    }.escapeChars()
+    return methodName2Cache.getOrPut(Triple(clazz, name, args)) {
+        when (name) {
+            "<clinit>" -> "static|$clazz|$args"
+            "<init>" -> "new|$clazz|$args"
+            else -> "$clazz|$name|$args"
+        }.escapeChars()
+    }
 }
 
 fun descWithoutGenerics(desc: String): String {

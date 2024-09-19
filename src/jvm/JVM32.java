@@ -238,7 +238,9 @@ public class JVM32 {
         // unsafe memory -> from ~8ms/frame to ~6.2ms/frame
         int x = resolveIndirectByClassUnsafe(clazz, methodPtr);
         if (x < 0) {
-            throwJs("resolveIndirectByClass", clazz, methodPtr, x);
+            Class<Object> class1 = ptrTo(findClass(clazz));
+            log("resolveIndirectByClass", class1.getName());
+            throwJs("classIndex, methodPtr, resolved:", clazz, methodPtr,x);
         }
         return x;
         /* log("resolve", clazz, methodIndex);
@@ -365,13 +367,13 @@ public class JVM32 {
         }
 
         // return -1 - min
-        log("Method could not been found", clazz);
+        log("Method could not be found", clazz);
         log("method, length:", methodId, tableLength);
         for (int i = 0; i < tableLength; i++) {
             int addr = tablePtr + (i << 3);
             log("method[i]", read32(addr), read32(addr + 4));
         }
-        throwJs("Method could not been found");
+        throwJs("Method could not be found");
         return -1;
     }
 
@@ -694,11 +696,9 @@ public class JVM32 {
     @Alias(names = "_c")
     public static int calloc(int size) {
 
-        // log("calloc", size);
         size = adjustCallocSize(size);
 
         int ptr;
-
         // enough space for the first allocations
         if (!GCX.isInited) {
             ptr = allocateNewSpace(size);

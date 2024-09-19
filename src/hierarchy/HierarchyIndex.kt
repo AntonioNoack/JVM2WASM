@@ -13,6 +13,8 @@ object HierarchyIndex {
     val superClass = HashMap<String, String>(cap)
     val childClasses = HashMap<String, HashSet<String>>(cap)
     val interfaces = HashMap<String, List<String>>(cap)
+    val interfaceClasses = HashSet<String>()
+
     val methods = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
 
@@ -26,6 +28,7 @@ object HierarchyIndex {
     val finalMethods = HashSet<MethodSig>(cap)
     val notImplementedMethods = HashSet<MethodSig>(cap)
     val jvmImplementedMethods = HashSet<MethodSig>(cap)
+    val customImplementedMethods = HashSet<MethodSig>(cap2)
     val abstractMethods = HashSet<MethodSig>(cap)
     val nativeMethods = HashSet<MethodSig>(cap)
     val hasSuperMaybeMethods = HashSet<MethodSig>(cap2)

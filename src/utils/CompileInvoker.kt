@@ -1,15 +1,28 @@
 package utils
 
 import dIndex
+import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import me.anno.utils.OS
+import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.types.Floats.f3
 import me.anno.utils.types.Strings.distance
 import t0
 import java.io.InputStream
 import kotlin.concurrent.thread
 import kotlin.math.min
+
+fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.clazz): String? {
+    val interfaces = hIndex.interfaces[clazz] ?: emptyList()
+    if (interfaces.any2 { sig.withClass(it) in dIndex.usedInterfaceCalls }) {
+        return clazz
+    }
+    val superClass = hIndex.superClass[clazz]
+    val bySuper = if (superClass != null) isUsedAsInterface(sig, superClass) else null
+    if (bySuper != null) return bySuper
+    return interfaces.firstNotNullOfOrNull { isUsedAsInterface(sig, it) }
+}
 
 val builder = Builder(512)
 fun printUsed(sig: MethodSig) {
@@ -20,7 +33,7 @@ fun printUsed(sig: MethodSig) {
         // check all super classes
         var parent = hIndex.superClass[sig.clazz]
         while (parent != null) {
-            val sig2 = MethodSig.c(parent, sig.name, sig.descriptor)
+            val sig2 = sig.withClass(parent)
             if (sig2 in dIndex.usedMethods) {
                 builder.append(" used-by-$parent")
                 break
@@ -37,37 +50,18 @@ fun printUsed(sig: MethodSig) {
     if (sig in hIndex.finalMethods) builder.append(" final")
     if (sig in dIndex.methodsWithForbiddenDependencies) builder.append(" forbidden")
 
-    fun handleInterfaces(clazz: String): Boolean {
-        val interfaces = hIndex.interfaces[clazz]
-        if (interfaces != null && interfaces.any {
-                MethodSig.c(it, sig.name, sig.descriptor) in dIndex.usedInterfaceCalls
-            }) {
-            builder.append(" used-as-interface")
-            if (clazz != sig.clazz) builder.append("[$clazz]")
-            return true
-        }
-
-        val superClass = hIndex.superClass[clazz]
-        if (superClass != null && handleInterfaces(superClass))
-            return true
-
-        if (interfaces != null) {
-            for (interfaceI in interfaces) {
-                if (handleInterfaces(interfaceI))
-                    return true
-            }
-        }
-
-        return false
+    val uaiClass = isUsedAsInterface(sig)
+    if (uaiClass != null) {
+        builder.append(" used-as-interface")
+        if (uaiClass != sig.clazz) builder.append("[$uaiClass]")
+    } else if (sig in dIndex.knownInterfaceDependencies) {
+        builder.append(" interface")
     }
-
-    if (!handleInterfaces(sig.clazz))
-        if (sig in dIndex.knownInterfaceDependencies) builder.append(" interface")
 
     if (sig.clazz in dIndex.constructableClasses) builder.append(" constructable")
 
     val name = methodName(sig)
-    if (name in gIndex.actuallyUsed.resolved) builder.append(" actually-used(${gIndex.actuallyUsed.usedBy[name]})")
+    if (name in ActuallyUsedIndex.resolved) builder.append(" actually-used(${ActuallyUsedIndex.usedBy[name]})")
     val mapsTo = hIndex.methodAliases[name]
     if (mapsTo != null && mapsTo != sig) builder.append(" maps-to: ").append(mapsTo)
     val mappedBy = hIndex.methodAliases.entries.filter { /*it.key != name &&*/ it.value == sig }.map { it.key }
@@ -84,8 +78,9 @@ fun printUsed(sig: MethodSig) {
     }
     println(builder.toString())
     builder.clear()
-    if (mapsTo != null && mapsTo != sig)
+    if (mapsTo != null && mapsTo != sig) {
         printUsed(mapsTo)
+    }
 }
 
 fun compileToWASM(printer: StringBuilder2) {

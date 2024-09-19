@@ -1,29 +1,38 @@
 package dependency
 
 import entrySig
-import utils.methodName
+import hIndex
 import utils.MethodSig
 import utils.dynIndexSig
+import utils.methodName
 
 object ActuallyUsedIndex {
 
+    private val isLocked get() = resolved.isNotEmpty()
     val usedBy = HashMap<String, HashSet<String>>()
     val uses = HashMap<String, HashSet<String>>()
 
-    fun add(caller: MethodSig, called: String) {
-        if(called == "me_anno_ecs_prefab_PrefabSaveable_simpleTraversal_ZLkotlin_jvm_functions_Function1Lme_anno_utils_structures_Hierarchical")
-            TODO("$caller -> $called")
-        add(methodName(caller), called)
+    fun add(caller: MethodSig, called: MethodSig) {
+        if (caller.clazz == "kotlin/jvm/internal/PropertyReference1") {
+            println("Method-Translating/2: $caller -> $called")
+        }
+        val callerName = methodName(caller)
+        val calledName = methodName(called)
+        val changed0 = usedBy.getOrPut(calledName) { HashSet() }.add(callerName)
+        val changed1 = uses.getOrPut(callerName) { HashSet() }.add(calledName)
+        if ((changed0 || changed1) && isLocked) {
+            throw IllegalStateException("Cannot add dependencies after resolution!, $callerName -> $calledName")
+        }
+        if (changed0 || changed1) {
+            if (called in hIndex.abstractMethods) {
+
+            }
+        }
     }
 
-    fun add(caller: String, called: String) {
-        usedBy.getOrPut(called) { HashSet() }.add(caller)
-        uses.getOrPut(caller) { HashSet() }.add(called)
-    }
-
-    var resolved: HashSet<String> = HashSet()
+    val resolved: HashSet<String> = HashSet()
     fun resolve(): HashSet<String> {
-        val resolved = HashSet<String>()
+        val resolved = resolved
         val todoList = ArrayList<String>()
         fun todo(sig: String) {
             if (resolved.add(sig)) {
@@ -41,7 +50,6 @@ object ActuallyUsedIndex {
                 }
             }
         }
-        this.resolved = resolved
         return resolved
     }
 }

@@ -135,6 +135,13 @@ fun main() {
         .writeBytes(writer.values, pos, writer.size - pos)
     defineFunctionHeads(parser)
 
+    writer.append("void unreachable(std::string);\n")
+    writer.append("void reading(i32 size, i32 addr);\n")
+    writer.append("void writing(i32 size, i32 addr, i32 value);\n")
+    writer.append("void writing(i32 size, i32 addr, f32 value);\n")
+    writer.append("void writing(i32 size, i32 addr, i64 value);\n")
+    writer.append("void writing(i32 size, i32 addr, f64 value);\n")
+
     try {
         defineFunctionImplementations(parser)
         fillInFunctionTable(parser)

@@ -5,6 +5,7 @@ import annotations.NotCalled
 import api
 import canThrowError
 import dIndex
+import dependency.ActuallyUsedIndex
 import enableTracing
 import exportAll
 import gIndex
@@ -21,7 +22,7 @@ import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
-import reb
+import replaceClass1
 import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
 import useWASMExceptions
@@ -50,7 +51,10 @@ class MethodTranslator(
     private var currentNode = Node(startLabel)
     var printer = currentNode.printer
 
+    val print = clazz == "kotlin/jvm/internal/PropertyReference1" && name == "invoke"
+
     init {
+        if (print) println("Method-Translating $clazz.$name.$descriptor")
         nodes.add(currentNode)
         currentNode.inputStack = emptyList()
     }
@@ -170,7 +174,7 @@ class MethodTranslator(
     }
 
     @Boring
-    override fun visitAnnotationDefault(): AnnotationVisitor {
+    override fun visitAnnotationDefault(): AnnotationVisitor? {
         return super.visitAnnotationDefault()
     }
 
@@ -934,7 +938,7 @@ class MethodTranslator(
         descriptor: String,
         isInterface: Boolean
     ) {
-        val owner = reb(owner0)
+        val owner = replaceClass1(owner0)
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
     }
 
@@ -947,7 +951,7 @@ class MethodTranslator(
         checkThrowable: Boolean
     ): Boolean {
 
-        val owner = reb(owner0)
+        val owner = replaceClass1(owner0)
 
         if (printOps) println("  [call] ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface")
 
@@ -993,6 +997,7 @@ class MethodTranslator(
                 printer
                     .append("  call_indirect (type ")
                     .append(gIndex.getType(descriptor, calledCanThrow))
+                ActuallyUsedIndex.add(this.sig, sig)
                 if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
                 else printer.append(")\n")
 
@@ -1000,7 +1005,7 @@ class MethodTranslator(
 
             }
             0xb6 -> { // invoke virtual
-                if (owner[0] != '[' && owner !in dIndex.constructableClasses) {
+                if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
 
                     stackPush()
 
@@ -1073,7 +1078,7 @@ class MethodTranslator(
                                     name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
                                 ) throw IllegalStateException("$sig0 -> $sig must not be final!!!")
                                 if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                                gIndex.actuallyUsed.add(this.sig, name2)
+                                ActuallyUsedIndex.add(this.sig, sig)
                                 printer.append("  call \$").append(name2).append('\n')
                                 stackPop()
                             }
@@ -1104,6 +1109,7 @@ class MethodTranslator(
                         .append("  call_indirect (type ")
                         .append(gIndex.getType(descriptor, calledCanThrow))
                         .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
+                    ActuallyUsedIndex.add(this.sig, sig)
                 }
             }
             // typically, <init>, but also can be private or super function; -> no resolution required
@@ -1117,7 +1123,7 @@ class MethodTranslator(
                     stackPush()
                     val name2 = methodName(sig)
                     if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                    gIndex.actuallyUsed.add(this.sig, name2)
+                    ActuallyUsedIndex.add(this.sig, sig)
                     if (name2 == "me_anno_gpu_OSWindow_addCallbacks_V")
                         throw IllegalStateException()
                     printer.append("  call \$").append(name2).append('\n')
@@ -1134,7 +1140,7 @@ class MethodTranslator(
                     stackPush()
                     val name2 = methodName(sig)
                     if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                    gIndex.actuallyUsed.add(this.sig, name2)
+                    ActuallyUsedIndex.add(this.sig, sig)
                     printer.append("  call \$").append(name2)
                     if (comments) printer.append(" ;; static call\n")
                     else printer.append('\n')
@@ -1472,7 +1478,7 @@ class MethodTranslator(
     }
 
     override fun visitTypeInsn(opcode: Int, type0: String) {
-        val type = reb(type0)
+        val type = replaceClass1(type0)
         if (printOps) println("  [${OpCode[opcode]}] $type")
         when (opcode) {
             0xbb -> {
@@ -1682,10 +1688,9 @@ class MethodTranslator(
             if (comments) printer.append("  ;; skipped <clinit>, because empty\n")
             return
         }
-        val clInitName = methodName(sig)
-        gIndex.actuallyUsed.add(this.sig, clInitName)
         stackPush()
-        printer.append("  call $").append(clInitName).append('\n')
+        printer.append("  call $").append(methodName(sig)).append('\n')
+        ActuallyUsedIndex.add(this.sig, sig)
         stackPop()
         if (canThrowError(sig)) {
             handleThrowable()
@@ -1694,7 +1699,7 @@ class MethodTranslator(
 
     private val precalculateStaticFields = true
     override fun visitFieldInsn(opcode: Int, owner0: String, name: String, descriptor: String) {
-        visitFieldInsn2(opcode, reb(owner0), name, descriptor, true)
+        visitFieldInsn2(opcode, replaceClass1(owner0), name, descriptor, true)
     }
 
     private fun dupI32(printer: Builder = this.printer) {

@@ -4,15 +4,14 @@ import api
 import dIndex
 import hIndex
 import org.objectweb.asm.*
-import reb
+import replaceClass1
 import utils.MethodSig
 import utils.methodName
-import utils.printUsed
 
 class ClassTranslator(val clazz: String) : ClassVisitor(api) {
 
     init {
-        if (reb(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
+        if (replaceClass1(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
 
     private val minVersion = 50

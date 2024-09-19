@@ -59,7 +59,9 @@ fun defineFunctionImplementations(parser: WATParser) {
     writer.append("#include <cmath> // trunc, ...\n")
     val functions = parser.functions
     for (fi in functions.indices) {
-        defineFunctionImplementation(functions[fi], parser)
+        val function = functions[fi]
+        // if (function.funcName == "stackPush" || function.funcName == "stackPop") continue
+        defineFunctionImplementation(function, parser)
     }
     writer.append('\n')
 }
@@ -107,25 +109,23 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
         begin().append(name).append(" = ").append(pop(type)).end()
     }
 
-    fun shift(type: String): Int {
-        return when (type) {
-            "i32", "f32" -> 2
-            "i64", "f64" -> 3
-            else -> throw NotImplementedError()
-        }
-    }
-
     fun load(type: String, memoryType: String = type) {
         val ptr = pop("i32")
-        beginNew(type).append("((").append(memoryType).append("*) memory)[(u32) ").append(ptr)
-            .append(" >> ").append(shift(type)).append("]").end()
+        if (false && (function.funcName[0] != 'r' || function.funcName.length > 4)) {
+            begin().append("reading(sizeof(").append(memoryType).append("),")
+                .append(ptr).append(")").end()
+        }
+        beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
+            .append("))[0]").end()
     }
 
     fun store(type: String, memoryType: String = type) {
         val value = pop(type)
         val ptr = pop("i32")
-        begin().append("((").append(memoryType).append("*) memory)[(u32) ").append(ptr)
-            .append(" >> ").append(shift(type)).append("] = ").append(value).append(";\n")
+        if (false) begin().append("writing(sizeof(").append(memoryType).append("),")
+            .append(ptr).append(",").append(value).append(")").end()
+        begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
+            .append("))[0] = ").append(value).end()
     }
 
     fun writeCall(funcName: String, params: List<String>, results: List<String>) {
@@ -135,10 +135,10 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
             return
         }
 
-        if (funcName == "stackPush" || funcName == "stackPop") {
+        /*if (funcName == "stackPush" || funcName == "stackPop") {
             if (funcName == "stackPush") pop("i32")
             return
-        }
+        }*/
 
         if (funcName.startsWith("swap")) {
             stack.add(stack.size - 2, stack.removeLast())
@@ -259,11 +259,8 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                 writer.end()
             }
             Unreachable -> {
-                if (function.results.isEmpty()) {
-                    begin().append("return /* unreachable */").end()
-                } else {
-                    begin().append("return { /* unreachable */ }").end()
-                }
+                begin().append("unreachable(\"")
+                    .append(function.funcName).append("\")").end()
             }
             is Const -> {
                 when (i.type) {
@@ -322,8 +319,9 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                 // get running parameters...
                 val condition = pop("i32")
                 val baseSize = stack.size - i.params.size
-                for (j in i.params) {
-                    beginNew(j).append(pop(j)).end()
+                val paramPopped = i.params.reversed().map { pop(it) }
+                for (j in i.params.indices) {
+                    beginNew(i.params[j]).append(paramPopped[i.params.lastIndex - j]).end()
                 }
 
                 if (i.ifFalse.isEmpty()) {
@@ -465,7 +463,7 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                     stack.clear()
                     // assertEquals(0, stack.size)
                     depth--
-                    begin().append("case").append(j).append(": {\n")
+                    begin().append("case").append(j - 1).append(": {\n")
                     depth++
                     val instructions = i.cases[j]
                     assertTrue(instructions.size >= 2)
@@ -529,7 +527,7 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                     depth++
                 }
                 depth--
-                begin().append("case0:\n") // exit switch-case
+                begin().append("case${i.cases.size - 1}:\n") // exit switch-case
             }
             Drop -> stack.pop()
             else -> throw NotImplementedError(i.toString())

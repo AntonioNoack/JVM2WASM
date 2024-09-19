@@ -8,7 +8,7 @@ import jvm.JVM32.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.types.Booleans.toInt
-import reb
+import replaceClass1
 import utils.*
 
 @Suppress("PropertyName")
@@ -97,10 +97,10 @@ object GeneratorIndex {
 
     val translatedMethods = HashMap<MethodSig, String>()
 
-    val nthMethods = HashMap<List<String>, GenericSig>()
+    val nthGetterMethods = HashMap<List<String>, GenericSig>()
     fun getNth(typeStack: List<String>): String {
-        return nthMethods.getOrPut(typeStack) {
-            val name = "getNth_${nthMethods.size}"
+        return nthGetterMethods.getOrPut(typeStack) {
+            val name = "getNth_${nthGetterMethods.size}"
             val method = Builder(
                 "(func \$$name (param ${typeStack.joinToString(" ")}) " +
                         "(result ${typeStack.joinToString(" ")} ${typeStack.first()})"
@@ -124,7 +124,7 @@ object GeneratorIndex {
     var lockClasses = false
 
     fun getClassIndex(name: String): Int {
-        val name2 = reb(name)
+        val name2 = replaceClass1(name)
         if (name != name2) TODO()
         if ('.' in name) throw IllegalArgumentException(name)
         if (name in classIndex) return classIndex[name]!!

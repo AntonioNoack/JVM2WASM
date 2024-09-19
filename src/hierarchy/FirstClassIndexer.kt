@@ -9,8 +9,8 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.FieldVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
-import reb
-import rep
+import replaceClass0
+import replaceClass1
 import utils.*
 import java.io.IOException
 
@@ -20,7 +20,7 @@ import java.io.IOException
 class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVisitor(api) {
 
     init {
-        if (reb(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
+        if (replaceClass1(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
 
     companion object {
@@ -50,7 +50,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         }
 
         fun String.readType(i: Int): Int {
-            if (this[i] == '[' || this[i] == '*') return readType(i + 1)
+            if (this[i] in "[A*") return readType(i + 1)
             when (this[i]) {
                 'L', 'T' -> {} // fine :)
                 'Z', 'B', 'S', 'C', 'I', 'J', 'F', 'D' -> return i + 1 // native types or arrays
@@ -63,7 +63,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             when (next0) {
                 "Z", "B", "S", "C", "I", "J", "F", "D" -> {}
                 else -> {
-                    val next = reb(next0)
+                    val next = replaceClass1(next0)
                     if (!next.startsWith("[") && hIndex.doneClasses.add(next)) {
                         try {
                             ClassReader(next)
@@ -95,8 +95,8 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         interfaces0: Array<String>
     ) {
 
-        val name = reb(name0)
-        val interfaces = interfaces0.map { reb(it) }
+        val name = replaceClass1(name0)
+        val interfaces = interfaces0.map { replaceClass1(it) }
 
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //     println("[C] $name ($signature): $superName, ${interfaces.joinToString()}")
@@ -105,9 +105,13 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         isInterface = access.hasFlag(ACC_INTERFACE)
         isFinal = access.hasFlag(ACC_FINAL)
 
+        if (isInterface) {
+            hIndex.interfaceClasses.add(name)
+        }
+
         // if (name.startsWith("java/nio")) println("visiting $name, super: $superName0")
 
-        var superName = rep(superName0)
+        var superName = replaceClass0(superName0)
         if (superName == null && name != "java/lang/Object") superName = "java/lang/Object"
         if (superName != null) {
             index.registerSuperClass(name, superName)

@@ -7,7 +7,7 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import org.objectweb.asm.*
-import reb
+import replaceClass1
 import utils.*
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
@@ -100,8 +100,8 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val sig1 = MethodSig.c(owner, name, descriptor)
 
         val static = opcode == 0xb8
-        val meth = hIndex.methods.getOrPut(owner) { HashSet() }
-        if (meth.add(sig1)) {// a new method
+        val isNewMethod = hIndex.methods.getOrPut(owner) { HashSet() }.add(sig1)
+        if (isNewMethod) {
             if (static) hIndex.staticMethods.add(sig1)
             if (hIndex.notImplementedMethods.add(sig1)) {
                 hIndex.hasSuperMaybeMethods.add(sig1)
@@ -245,7 +245,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isGetter = false
         isSetter = false
         instructionIndex++
-        val type = reb(type0)
+        val type = replaceClass1(type0)
         clazz.dep(type)
         if (opcode == 0xbb) {
             if (type.endsWith("[]")) throw IllegalStateException(type)
@@ -282,7 +282,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isGetter = false
         isSetter = false
         instructionIndex++
-        if (type != null) clazz.dep(reb(type))
+        if (type != null) clazz.dep(replaceClass1(type))
     }
 
     private var lastField: FieldSig? = null
@@ -292,7 +292,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (instructionIndex != 2 && isSetter) isSetter = false
         instructionIndex++
 
-        val owner = reb(owner0)
+        val owner = replaceClass1(owner0)
         clazz.dep(owner)
 
         // only getters are of importance, because setters without getters don't matter
