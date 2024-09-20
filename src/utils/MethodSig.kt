@@ -27,7 +27,7 @@ data class MethodSig private constructor(val clazz: String, val name: String, va
             return clazz2
         }
 
-        private fun validateDescriptor(descriptor: String): String {
+        fun validateDescriptor(descriptor: String): String {
             val descriptor2 = if ('/' in descriptor) descriptor.replace('/', '_') else descriptor
             val descriptor3 = if ('$' in descriptor2) descriptor2.replace('$', 'X') else descriptor2
             val descriptor4 = if ('[' in descriptor3) descriptor3.replace('[', 'A') else descriptor3

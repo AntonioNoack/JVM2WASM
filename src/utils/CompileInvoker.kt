@@ -4,7 +4,7 @@ import dIndex
 import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
-import me.anno.utils.OS
+import me.anno.utils.OS.documents
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.types.Floats.f3
 import me.anno.utils.types.Strings.distance
@@ -83,9 +83,15 @@ fun printUsed(sig: MethodSig) {
     }
 }
 
+val dstFolder = documents.getChild("IdeaProjects/JVM2WASM/tmp")
+val debugFolder = dstFolder.getChild("debug").apply {
+    delete()
+    mkdirs()
+}
+
 fun compileToWASM(printer: StringBuilder2) {
 
-    val tmp = OS.documents.getChild("IdeaProjects/JVM2WASM/tmp/jvm2wasm.wat")
+    val tmp = dstFolder.getChild("jvm2wasm.wat")
     tmp.outputStream().use {
         it.write(printer.values, 0, printer.size)
     }

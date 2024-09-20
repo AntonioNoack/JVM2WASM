@@ -92,7 +92,7 @@ fun registerDefaultOffsets() {
     hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "I", true)] = arrayOverhead
     hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "Z", true)] = trackAllocations
 
-    eq(gIndex.getInterfaceIndex("", "<clinit>", "()V"), 0)
+    eq(gIndex.getInterfaceIndex(InterfaceSig.c("<clinit>", "()V")), 0)
     gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
 }
@@ -195,7 +195,7 @@ fun resolveGenericTypes() {
                             (generics.firstOrNull { it.name == p }
                                 ?: ownGenerics?.firstOrNull { it.name == p }
                                     // ?: throw NullPointerException("Didn't find mapping for $p, own generics: $ownGenerics")
-                                    )?.descriptor
+                                    )?.superClass
                         } else p
                     }
 
@@ -383,6 +383,7 @@ fun indexFieldsInSyntheticMethods() {
 }
 
 fun calculateFieldOffsets() {
+    println("[calculateFieldOffsets]")
     val usedFields = HashSet(dIndex.usedFieldsR)
     if (fieldsRWRequired) {
         usedFields.retainAll(dIndex.usedFieldsW)
@@ -406,7 +407,20 @@ fun calculateFieldOffsets() {
     gIndex.lockFields = true
 }
 
+fun printInterfaceIndex() {
+    if (printDebug) {
+        val debugInfo = StringBuilder2()
+        gIndex.interfaceIndex.entries.sortedBy { it.value }
+            .forEach { (sig, index) ->
+                debugInfo.append("[").append(index).append("]: ").append(sig).append("\n")
+            }
+        debugFolder.getChild("interfaceIndex.txt")
+            .writeBytes(debugInfo.values, 0, debugInfo.size)
+    }
+}
+
 fun assignNativeCode() {
+    println("[assignNativeCode]")
     for ((method, code, noinline) in hIndex.annotations.entries
         .mapNotNull { m ->
             val wasm = m.value.firstOrNull { it.clazz == "annotations/WASM" }
@@ -602,12 +616,12 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
     for (sig in dIndex.usedMethods
         .filter {
             it !in hIndex.abstractMethods &&
-            // it in hIndex.hasSuperMaybeMethods && // ???
-            it !in dIndex.methodsWithForbiddenDependencies &&
+                    // it in hIndex.hasSuperMaybeMethods && // ???
+                    it !in dIndex.methodsWithForbiddenDependencies &&
                     it !in hIndex.jvmImplementedMethods
         }
         .sortedBy { methodName(it) }) {
-        val superMethod = dIndex.findSuperMethod( sig)
+        val superMethod = dIndex.findSuperMethod(sig)
         if (superMethod != null) {
             if (sig != superMethod) {
                 hIndex.methodAliases[methodName(sig)] = superMethod

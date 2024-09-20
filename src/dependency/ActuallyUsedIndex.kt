@@ -13,7 +13,7 @@ object ActuallyUsedIndex {
     val uses = HashMap<String, HashSet<String>>()
 
     fun add(caller: MethodSig, called: MethodSig) {
-        if (caller.clazz == "kotlin/jvm/internal/PropertyReference1") {
+        if (false && caller.clazz == "kotlin/jvm/internal/PropertyReference1") {
             println("Method-Translating/2: $caller -> $called")
         }
         val callerName = methodName(caller)

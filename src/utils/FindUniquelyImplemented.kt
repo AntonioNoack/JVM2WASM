@@ -28,7 +28,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         }
     }
 
-    val methodCounter = CountMap<GenericSig>(usedMethods.size)
+    val methodCounter = CountMap<InterfaceSig>(usedMethods.size)
     for (sig in usedMethods) {
         if (
             sig.name != "<init>" && // cannot be invoked dynamically
@@ -38,14 +38,14 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             sig !in hIndex.abstractMethods && // we can ignore that one
             sig in implementedMethods
         ) {
-            when (methodCounter.incAndGet(GenericSig(sig))) {
+            when (methodCounter.incAndGet(InterfaceSig(sig))) {
                 1 -> finalMethods++
                 2 -> finalMethods--
             }
         }
     }
 
-    val toBeMarkedAsFinal = HashSet<GenericSig>(finalMethods)
+    val toBeMarkedAsFinal = HashSet<InterfaceSig>(finalMethods)
     for ((sig, counter) in methodCounter.values) {
         if (counter.value == 1) {
             toBeMarkedAsFinal.add(sig)
@@ -57,7 +57,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         if (methodName(sig) !in hIndex.methodAliases && // just the same
             sig !in hIndex.staticMethods &&
             sig !in hIndex.abstractMethods && // we can ignore that one
-            GenericSig(sig) in toBeMarkedAsFinal
+            InterfaceSig(sig) in toBeMarkedAsFinal
         ) {
             hIndex.finalMethods.add(sig)
         }

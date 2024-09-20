@@ -7,6 +7,7 @@ import isRootType
 import jvm.JVM32.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass1
 import utils.*
@@ -97,7 +98,9 @@ object GeneratorIndex {
 
     val translatedMethods = HashMap<MethodSig, String>()
 
-    val nthGetterMethods = HashMap<List<String>, GenericSig>()
+    data class NthGetter(val name: String, val method: String)
+
+    val nthGetterMethods = HashMap<List<String>, NthGetter>()
     fun getNth(typeStack: List<String>): String {
         return nthGetterMethods.getOrPut(typeStack) {
             val name = "getNth_${nthGetterMethods.size}"
@@ -109,7 +112,7 @@ object GeneratorIndex {
                 method.append(" local.get $i")
             }
             method.append(" local.get 0)\n") // the actual value, we're interested in
-            GenericSig(name, method.toString())
+            NthGetter(name, method.toString())
         }.name
     }
 
@@ -158,9 +161,9 @@ object GeneratorIndex {
         } else classIndex["[]"]!!
     }
 
-    val dynMethodIndices = HashMap<Int, HashMap<GenericSig, Int>>()
+    val dynMethodIndices = HashMap<Int, HashMap<InterfaceSig, Int>>()
 
-    fun getDynMethodIdx(clazz: String): Map<GenericSig, Int> {
+    fun getDynMethodIdx(clazz: String): Map<InterfaceSig, Int> {
         if (clazz.startsWith("[L") || clazz.startsWith("[["))
             return getDynMethodIdx("[]")
         if (lockedDynIndex) {
@@ -196,7 +199,7 @@ object GeneratorIndex {
             return getDynMethodIdx("[]", name, descriptor)
         val clazzMap = getDynMethodIdx(clazz)
         return if (lockedDynIndex) {
-            clazzMap[GenericSig(name, descriptor)]
+            clazzMap[InterfaceSig.c(name, descriptor)]
                 ?: kotlin.run {
                     val mapped = hIndex.methodAliases[methodName(clazz, name, descriptor)]
                     if (mapped != null && (mapped.clazz != clazz || mapped.name != name || mapped.descriptor != descriptor)) {
@@ -207,9 +210,8 @@ object GeneratorIndex {
                     }
                 }
         } else {
-            (clazzMap as HashMap).getOrPut(GenericSig(name, descriptor)) {
-                clazzMap.size
-            }
+            val sig = InterfaceSig.c(name, descriptor)
+            (clazzMap as HashMap).getOrPut(sig) { clazzMap.size }
         }
     }
 
@@ -261,8 +263,7 @@ object GeneratorIndex {
         val fos = getFieldOffsets(clazz, static)
         return if (lockFields) fos.fields[name]?.offset else {
             fos.fields.getOrPut(name) {
-                if (!static && clazz == "java/lang/System") TODO("$clazz/$name/$descriptor/$static")
-                if (fos.locked) throw IllegalStateException("$clazz has been locked by ${fos.locker}")
+                assertTrue(!fos.locked) { "$clazz has been locked by ${fos.locker}" }
                 // if(static) println("$clazz/$name/$fieldSize")
                 val offset = fos.offset
                 fos.offset += storageSize(descriptor)
@@ -271,10 +272,10 @@ object GeneratorIndex {
         }
     }
 
-    val interfaceIndex = HashMap<GenericSig, Int>()
-    fun getInterfaceIndex(clazz: String, name: String, descriptor: String): Int {
+    val interfaceIndex = HashMap<InterfaceSig, Int>()
+    fun getInterfaceIndex(key:InterfaceSig): Int {
         // clazz isn't really needed, because there cannot be collisions
-        return interfaceIndex.getOrPut(GenericSig(name, descriptor)) {
+        return interfaceIndex.getOrPut(key) {
             // println("interface#${interfaceIndex.size} by $clazz: $name, $descriptor")
             interfaceIndex.size
         }

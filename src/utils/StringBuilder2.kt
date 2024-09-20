@@ -2,7 +2,7 @@ package utils
 
 import me.anno.utils.structures.arrays.ByteArrayList
 
-class StringBuilder2(initCapacity: Int) : ByteArrayList(initCapacity) {
+class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
 
     companion object {
         private val droppable = listOf("i32.const", "local.get")

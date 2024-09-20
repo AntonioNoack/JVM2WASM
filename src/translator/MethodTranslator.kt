@@ -51,7 +51,7 @@ class MethodTranslator(
     private var currentNode = Node(startLabel)
     var printer = currentNode.printer
 
-    val print = clazz == "kotlin/jvm/internal/PropertyReference1" && name == "invoke"
+    val print = false // clazz == "kotlin/jvm/internal/PropertyReference1" && name == "invoke"
 
     init {
         if (print) println("Method-Translating $clazz.$name.$descriptor")
@@ -984,12 +984,12 @@ class MethodTranslator(
             0xb9 -> { // invoke interface
                 // load interface/function index
                 getCaller()
-                printer.append(" i32.const ").append(gIndex.getInterfaceIndex(owner, name, descriptor))
+                printer.append(" i32.const ").append(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor)))
                 // looks up class, goes to interface list, binary searches function, returns func-ptr
                 // instance, function index -> instance, function-ptr
                 printer.push(i32).append(" call \$resolveInterface\n")
                 handleThrowable() // if it's not found or nullptr
-                printer.pop(i32) // pop instance (?)
+                printer.pop(i32) // pop instance
                 pop(splitArgs, false, ret)
 
                 stackPush()
@@ -1002,7 +1002,6 @@ class MethodTranslator(
                 else printer.append(")\n")
 
                 stackPop()
-
             }
             0xb6 -> { // invoke virtual
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {

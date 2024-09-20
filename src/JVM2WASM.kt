@@ -7,7 +7,6 @@ import jvm.appendNativeHelperFunctions
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
-import me.anno.utils.assertions.assertNotNull
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.lists.Lists.any2
@@ -277,6 +276,10 @@ fun isRootType(clazz: String): Boolean {
 val entrySig = MethodSig.c("", "entry", "()V")
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
+    jvm2wasm()
+}
+
+fun jvm2wasm() {
 
     // ok in Java, trapping in WASM
     // todo has this been fixed?
@@ -454,7 +457,7 @@ fun main() {
 
     // append nth-getter-methods
     for (desc in gIndex.nthGetterMethods
-        .map { it.value.descriptor }.toSortedSet()) {
+        .map { it.value.method }.toSortedSet()) {
         bodyPrinter.append(desc)
     }
 
@@ -522,6 +525,8 @@ fun main() {
     }
 
     printMethodImplementations(bodyPrinter, usedMethods)
+
+    printInterfaceIndex()
 
     fun global(name: String, type: String, type2: String, value: Int) {
         // can be mutable...

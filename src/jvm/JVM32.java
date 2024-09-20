@@ -368,10 +368,10 @@ public class JVM32 {
 
         // return -1 - min
         log("Method could not be found", clazz);
-        log("method, length:", methodId, tableLength);
+        log("  id, length:", methodId, tableLength);
         for (int i = 0; i < tableLength; i++) {
             int addr = tablePtr + (i << 3);
-            log("method[i]", read32(addr), read32(addr + 4));
+            log("  ", read32(addr), read32(addr + 4));
         }
         throwJs("Method could not be found");
         return -1;
@@ -451,7 +451,6 @@ public class JVM32 {
 
     @Alias(names = "cr")
     public static int create(int clazz) {
-        // log("creating", clazz);
         if (ge_ub(clazz, numClasses())) {
             log("class index out of bounds", clazz, numClasses());
             throwJs();
@@ -470,6 +469,7 @@ public class JVM32 {
             throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
         int newInstance = calloc(instanceSize);
 
+        // log("Creating", clazz, newInstance);
         /*if (instanceSize > 1024) {
             log("Allocating", clazz, instanceSize, newInstance);
             printStackTrace();

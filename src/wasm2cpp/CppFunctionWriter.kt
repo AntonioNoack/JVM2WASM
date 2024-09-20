@@ -70,6 +70,10 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
     defineFunctionHead(function, true)
     writer.append(" {\n")
 
+    if (false && '_' in function.funcName) {
+        writer.append("std::cout << \"[\" << (global_Q0 - global_Q) << \"] ").append(function.funcName).append("\" << std::endl;\n")
+    }
+
     var depth = 1
     val localsByName = function.locals
         .associateBy { it.name }

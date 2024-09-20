@@ -1376,6 +1376,12 @@ public class JavaLang {
         return empty;// todo
     }
 
+    @Alias(names = "java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor")
+    public static <V> Object[] java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
+            throws NoSuchFieldException, IllegalAccessException {
+        return new Object[]{getConstructorWithoutArgs(self)}; // to do better implementation?
+    }
+
     @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method")
     public static Object[] java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method(Object self, boolean sth) {
         return empty;// todo
@@ -1384,7 +1390,8 @@ public class JavaLang {
     private static Constructor<Object>[] constructors;
 
     @Alias(names = "java_lang_Class_getConstructor_ALjava_lang_ClassLjava_lang_reflect_Constructor")
-    public static <V> Constructor<V> getConstructor(Class<V> self, Object[] args) throws NoSuchFieldException, IllegalAccessException {
+    public static <V> Constructor<V> getConstructor(Class<V> self, Object[] args)
+            throws NoSuchFieldException, IllegalAccessException {
         if (args == null) {
             throwJs("Arguments was null?");
             return null;
@@ -1393,6 +1400,10 @@ public class JavaLang {
             throwJs("Cannot access constructors with arguments");
             return null;
         }
+        return getConstructorWithoutArgs(self);
+    }
+
+    private static <V> Constructor<V> getConstructorWithoutArgs(Class<V> self) throws NoSuchFieldException, IllegalAccessException {
         if (constructors == null) {
             constructors = new Constructor[numClasses()];
         }
@@ -1404,6 +1415,11 @@ public class JavaLang {
             constructors[idx] = cs;
         }
         return (Constructor<V>) cs;
+    }
+
+    @Alias(names = "java_lang_reflect_Constructor_getParameterCount_I")
+    private static int java_lang_reflect_Constructor_getParameterCount_I(Object self) {
+        return 0; // anything else isn't supported at the moment
     }
 
     @Alias(names = "java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ")

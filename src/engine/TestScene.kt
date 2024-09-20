@@ -34,6 +34,7 @@ fun testScene(scene: FileReference, init: ((SceneView) -> Unit)? = null): Panel 
     // ECSSceneTabs.open(tab, true)
     log("Opened ECSSceneTab")
     val sceneView = SceneView(PlayMode.EDITING, style)
+    log("Created SceneView")
     PrefabInspector.currentInspector = PrefabInspector(scene)
     log("Created PrefabInspector")
     val list = CustomList(false, style)

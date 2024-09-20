@@ -98,6 +98,10 @@ fun fillInFunctionTable(parser: WATParser) {
 }
 
 fun main() {
+    wasm2cpp()
+}
+
+fun wasm2cpp() {
 
     val clock = Clock("WASM2CPP")
 
@@ -154,7 +158,7 @@ fun main() {
     tmp.getChild("jvm2wasm.cpp")
         .writeBytes(writer.values, 0, writer.size)
 
-    clock.total("Total")
+    clock.total("WASM2CPP")
 
     // todo run it in a helper Java environment for libraries???
 }

@@ -80,29 +80,56 @@ void jvm_JVM32_log_Ljava_lang_StringIIV(i32 a, i32 b, i32 c) { std::cout << strT
 void jvm_JVM32_log_Ljava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << strToCpp(c) << std::endl; }
 void jvm_JVM32_log_Ljava_lang_StringIV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << b << std::endl; }
 void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringDV(i32 a, i32 b, f64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringILjava_lang_StringV(i32, i32, i32, i32) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringIV(i32, i32, i32) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringJV(i32, i32, i64) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringIV(i32, i32, i32, i32) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32, i32, i32) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringV(i32, i32) { }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringZV(i32, i32, i32) { }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << strToCpp(d) << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringJV(i32 a, i32 b, i64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << ", " << d << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << strToCpp(b) << std::endl; }
+void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringZV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
 void jvm_JVM32_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::endl; }
 void jvm_JVM32_trackCalloc_IV(i32) { }
+
+std::string coutBuffer("");
+std::string cerrBuffer("");
+
 void jvm_JavaLang_printByte_IZV(i32 c, i32 logNotErr) {
-    if(logNotErr) std::cout << (char)c;
-    else std::cerr << (char)c;
+    if(logNotErr) coutBuffer += (char)c;
+    else cerrBuffer += (char)c;
 }
+
 void jvm_JavaLang_printFlush_ZV(i32 logNotErr) { 
-    if(logNotErr) std::cout << std::endl;
-    else std::cerr << std::endl;
+    if(logNotErr) {
+        std::cout << coutBuffer << std::endl;
+        coutBuffer = "";
+    }
+    else {
+        std::cerr << cerrBuffer << std::endl;
+        cerrBuffer = "";
+    }
 }
+
 void jvm_LWJGLxGLFW_disableCursor_V() { }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_GL11C_glTexSubImage2D_IIIIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32) { }
+void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+    // i=data, j=length in elements
+    glTexImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
+}
+void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
+    // easy, without any data
+    glTexImage2D(a,b,c,d,e,f,g,h,nullptr);
+}
+void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j, i32 k) {
+    // j=data, k=length in elements
+    glTexImage3D(a,b,c,d,e,f,g,h,i,((char*)memory + j));
+}
+void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i) {
+    // easy, without any data
+    glTexImage3D(a,b,c,d,e,f,g,h,i,nullptr);
+}
+void jvm_LWJGLxOpenGL_GL11C_glTexSubImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+    // i=data, j=length in elements
+    glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
+}
 void jvm_LWJGLxOpenGL_drawBuffersCreate_V() { }
 void jvm_LWJGLxOpenGL_drawBuffersExec_V() { }
 void jvm_LWJGLxOpenGL_drawBuffersPush_IV(i32) { }
@@ -174,6 +201,7 @@ void org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV(i32, i32, i32) { /* todo */ }
 void org_lwjgl_opengl_GL15C_glBeginQuery_IIV(i32 a, i32 b) { glBeginQuery(a,b); }
 void org_lwjgl_opengl_GL15C_glEndQuery_IV(i32 a) { glEndQuery(a); }
 void org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV(i32 a, i32 b, i32 c) { glBindBufferBase(a,b,c); }
+void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(i32 x) { GLuint xi = x; glDrawBuffers(1, &xi); }
 
 // todo handle NaN correctly
 i32 dcmpg(f64 a, f64 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
@@ -265,15 +293,53 @@ i32 jvm_JVM32_grow_IZ(i32 numExtraPages) {
 // void org_lwjgl_opengl_GL43C_nglPushDebugGroup_IIIJV(i32, i32, i32, i64) { return 0; }
 // void org_lwjgl_opengl_GL46C_glPopDebugGroup_V() { glPopDebugGroup(); return 0; }
 
-i32 jvm_JavaLang_fillD2S_ACDI(i32, f64) { return 0; }
-i32 jvm_JavaLang_fillD2S_ACDII(i32, f64, i32) { return 0; }
-i32 jvm_JavaX_fillDate_ACI(i32) { return 0; }
+GLchar tmpLog[1024];
+
+i32 jvm_JavaLang_fillD2S_ACDI(i32 data, f64 v) {
+    if(!data) return 0;
+    std::string str = std::to_string(v);
+    i32 length = std::min(al(data).v0, (i32) str.size());
+    for(i32 i=0;i<length;i++) {
+        w16(data + arrayOverhead + i*2, str[i]);
+    }
+    return length;
+}
+
+i32 jvm_JavaLang_fillD2S_ACDII(i32 data, f64 v, i32 digits) {
+    if(!data) return 0;
+    std::stringstream stream;
+    stream << std::fixed << std::setprecision(digits) << v;
+    std::string str = stream.str();
+    i32 length = std::min(al(data).v0, (i32) str.size());
+    for(i32 i=0;i<length;i++) {
+        w16(data + arrayOverhead + i*2, str[i]);
+    }
+    return length;
+}
+
+i32 jvm_JavaX_fillDate_ACI(i32 data) { return 0; }
 f64 jvm_LWJGLxGLFW_getMouseX_D() { return mouseX; }
 f64 jvm_LWJGLxGLFW_getMouseY_D() { return mouseY; }
 i32 jvm_LWJGLxGLFW_getWindowHeight_I() { return height; }
 i32 jvm_LWJGLxGLFW_getWindowWidth_I() { return width; }
-i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32, i32) { return 0; }
-i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32, i32) { return 0; }
+i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32 data, i32 shader) {
+    GLsizei len = 0;
+    glGetProgramInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
+    for(GLsizei i=0;i<len;i++) {
+        w16(data + arrayOverhead + i*2, tmpLog[i]);
+    }
+    return len;
+}
+
+i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32 data, i32 shader) { 
+    // (GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog
+    GLsizei len = 0;
+    glGetShaderInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
+    for(GLsizei i=0;i<len;i++) {
+        w16(data + arrayOverhead + i*2, tmpLog[i]);
+    }
+    return len;
+}
 i32 jvm_LWJGLxOpenGL_glGenTexture_I() { GLuint result = 0; glGenTextures(1, &result); return result; }
 i32 jvm_LWJGLxOpenGL_glGetUniformLocationString_ILjava_lang_StringI(i32 a, i32 b) { 
     std::string name = strToCpp(b);
@@ -315,7 +381,7 @@ void org_lwjgl_opengl_GL46C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c
 i32 org_lwjgl_opengl_GL46C_glGenFramebuffers_I() { GLuint result = 0; glGenFramebuffers(1, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGenRenderbuffers_I() { GLuint result = 0; glGenRenderbuffers(1, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGetError_I() { return glGetError(); }
-i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegeri_v(a, 0, &result); return result; }
+i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGetProgrami_III(i32 a, i32 b) { GLint result = 0; glGetProgramiv(a,b,&result); return result; }
 void org_lwjgl_opengl_GL46C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL46C_glRenderbufferStorageMultisample_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glRenderbufferStorageMultisample(a,b,c,d,e); }
@@ -337,6 +403,7 @@ void org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c
 void org_lwjgl_opengl_GL42C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glBlendFuncSeparatei(a,b,c,d,e); }
 void org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV(i32 a, i32 b) { glVertexAttribI1i(a,b); }
+i32 org_lwjgl_opengl_GL45C_glCreateVertexArrays_I() { GLuint result = 0; glCreateVertexArrays(1, &result); return result; }
 
 i32 org_lwjgl_system_JNI_callPV_IAIJV(i32, i32, i64) { return 0; }
 i32 org_lwjgl_system_JNI_callPV_IIAFJV(i32, i32, i32, i64) { return 0; }

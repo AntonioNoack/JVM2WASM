@@ -9,6 +9,7 @@ import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
@@ -335,6 +336,8 @@ fun appendDynamicFunctionTable(
     println("filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
 }
 
+var printDebug = true
+
 /**
  *
 // super class
@@ -346,16 +349,15 @@ fun appendDynamicFunctionTable(
  * */
 fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     println("[appendInheritanceTable]")
+    val debugInfo = StringBuilder2(1024)
     // done append custom functions
     // append class instanceOf-table
     val classTableData = ByteArrayOutputStream2(numClasses * 4)
     val instTable = ByteArrayOutputStream2()
     var ptr = ptr0 + numClasses * 4
-    val staticInitIdx = gIndex.getInterfaceIndex("", "<clinit>", "()V")
+    val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c("<clinit>", "()V"))
 
-    if (gIndex.getFieldOffsets("java/lang/String", false).offset != objectOverhead + 8)
-        throw IllegalStateException("Expected string to have size objectOverhead + 8 for hash and char[]")
-
+    assertEquals(objectOverhead + 8, gIndex.getFieldOffsets("java/lang/String", false).offset)
     for (classId in 0 until numClasses) {
         if (classId == 0 || classId in 17 until 25) {
             // write 0 :), no table space used
@@ -396,12 +398,27 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
             // #functions
 
             instTable.writeLE32(gIndex.getClassIndex(superClass))
-            instTable.writeLE32(gIndex.getFieldOffsets(clazz, false).offset)
+            val fieldOffsets = gIndex.getFieldOffsets(clazz, false)
+            val clazzSize = fieldOffsets.offset
+            instTable.writeLE32(clazzSize)
             instTable.writeLE32(interfaces.size)
             for (j in interfaces) {
                 instTable.writeLE32(gIndex.getClassIndex(j))
             }
             ptr += interfaces.size * 4 + 12
+
+            if (printDebug) {
+                debugInfo.append("[").append(classId).append("]: ").append(clazz).append("\n")
+                debugInfo.append("  extends ").append(superClass).append("\n")
+                for (interface1 in interfaces) {
+                    debugInfo.append("  implements ").append(interface1).append("\n")
+                }
+                debugInfo.append("  fields[total: ").append(clazzSize).append("]:\n")
+                fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name,data) ->
+                    debugInfo.append("    *").append(data.offset).append(": ").append(name)
+                        .append(": ").append(data.type).append("\n")
+                }
+            }
 
             val print =
                 clazz == "me_anno_utils_pooling_Stack_storageXlambdav0_Lme_anno_utils_pooling_StackLme_anno_utils_pooling_StackXLocalStack"
@@ -415,6 +432,10 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
             // these functions only need to be available, if the class is considered constructable
 
             if (clazz in dIndex.constructableClasses && !flags.hasFlag(ACC_ABSTRACT) && !flags.hasFlag(ACC_INTERFACE)) {
+
+                if (printDebug) {
+                    debugInfo.append("  constructable & !abstract & !interface\n")
+                }
 
                 val implFunctions0 = HashMap<Int, MethodSig>()
                 for (sig in dIndex.usedInterfaceCalls) {
@@ -443,7 +464,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                                         "because ${genericsTypies(sig)} != ${genericsTypies(impl)}"
                             )
                         }
-                        implFunctions0[gIndex.getInterfaceIndex(sig.clazz, sig.name, sig.descriptor)] = impl
+                        implFunctions0[gIndex.getInterfaceIndex(InterfaceSig(sig))] = impl
                         val name = methodName(impl)
                         if (name !in dynIndex) dynIndex[name] = impl to dynIndex.size
                     }
@@ -476,6 +497,12 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                 }
                 ptr += implFunctions.size * 8 + 4
 
+                if (printDebug) {
+                    for ((id, sig) in implFunctions) {
+                        debugInfo.append("  method[").append(id).append("]: ").append(sig).append("\n")
+                    }
+                }
+
                 if (print) println("implemented $implFunctions")
 
             } else {
@@ -499,8 +526,13 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
         }
     }
 
+    if (printDebug) {
+        debugFolder.getChild("inheritanceTable.txt")
+            .writeBytes(debugInfo.values, 0, debugInfo.size)
+    }
+
     val ptr2 = appendData(printer, ptr0, classTableData, instTable)
-    if (ptr != ptr2) throw IllegalStateException()
+    assertEquals(ptr, ptr2)
     return ptr
 }
 
@@ -509,24 +541,34 @@ var clInitFlagTable = 0
 val staticLookup = HashMap<String, Int>()
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     println("[appendStaticInstanceTable]")
+    val debugInfo = StringBuilder2(1024)
     staticTablePtr = ptr0
     clInitFlagTable = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
     var ptr = clInitFlagTable + numClasses // 1 byte for flag for init
     val staticBuffer = ByteArrayOutputStream2(numClasses * 4)
     for (i in 0 until numClasses) {
         val className = gIndex.classNames[i]
-        val size = gIndex.getFieldOffsets(className, true).offset
+        val fieldOffsets = gIndex.getFieldOffsets(className, true)
+        val size = fieldOffsets.offset
         if (size == 0) {
             staticBuffer.writeLE32(0)
         } else {
             // println("writing $i static $className to $ptr, size: $size")
             staticBuffer.writeLE32(ptr)
             staticLookup[className] = ptr
+            debugInfo.append("[").append(i).append("] ")
+                .append(className).append(": *").append(ptr).append("\n")
+            fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name, data) ->
+                debugInfo.append("  *").append(data.offset).append(": ").append(name)
+                    .append(": ").append(data.type).append("\n")
+            }
             ptr += size
         }
     }
+    debugFolder.getChild("staticInstances.txt")
+        .writeBytes(debugInfo.values, 0, debugInfo.size)
     val ptr2 = appendData(printer, staticTablePtr, staticBuffer)
-    if (ptr < ptr2) throw IllegalStateException("$ptr >= $ptr2")
+    assertTrue(ptr >= ptr2)
     return ptr
 }
 
@@ -546,7 +588,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
     var numFixed = 0
 
     // create method table (for inheritance), #resolveIndirect
-    fun getDynMethodIdx(clazz: Int): Map<GenericSig, Int> {
+    fun getDynMethodIdx(clazz: Int): Map<InterfaceSig, Int> {
         val pic = gIndex.dynMethodIndices[clazz]
         if (pic != null) return pic
         if (clazz == 0) throw IllegalStateException("java/lang/Object must have dynamic function table!")
@@ -577,7 +619,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
         } else {
             // todo: if all is the same as the parent class, we could link to the parent class :)
             methodTable.writeLE32(ptr)
-            val dynIndexToMethod = arrayOfNulls<GenericSig>(dynMethods.size)
+            val dynIndexToMethod = arrayOfNulls<InterfaceSig>(dynMethods.size)
             table2.writeLE32(dynMethods.size * 4)
             for ((m, idx) in dynMethods) {
                 if (dynIndexToMethod[idx] != null) throw IllegalStateException("Index must not appear twice in pic! $dynMethods")

@@ -8,7 +8,8 @@ public class StringBuilderUTF8 {
 
     // temporary, while content is still char[]
     @Alias(names = "java_lang_StringBuilder_append_Ljava_lang_StringLjava_lang_StringBuilder")
-    private static StringBuilder java_lang_StringBuilder_append_Ljava_lang_StringLjava_lang_StringBuilder(StringBuilder self, String str) {
+    private static StringBuilder append_Ljava_lang_StringLjava_lang_StringBuilder(StringBuilder self, String str) {
+        if (str == null) str = "null";
         byte[] bytes = str.getBytes();
         for (byte b : bytes) self.append((char) b);
         return self;

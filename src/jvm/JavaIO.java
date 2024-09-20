@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 
+import static jvm.JVM32.log;
 import static jvm.JVM32.read32;
 import static jvm.JavaLang.*;
 
@@ -90,7 +91,10 @@ public class JavaIO {
         InputStream stream = ptrTo(read32(getAddr(reader) + lockFieldOffset));
         for (int i = 0; i < length; i++) {
             int code = stream.read();
-            if (code < 0) return i;
+            if (code < 0) {
+                // if i == 0, we reached the end
+                return i == 0 ? -1 : i;
+            }
             chars[start + i] = (char) code;
         }
         return length;

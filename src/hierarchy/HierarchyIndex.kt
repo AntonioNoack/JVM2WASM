@@ -1,7 +1,7 @@
 package hierarchy
 
 import utils.FieldSig
-import utils.GenericSig
+import utils.InterfaceSig
 import utils.MethodSig
 import utils.methodName
 

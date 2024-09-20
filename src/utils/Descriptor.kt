@@ -222,7 +222,7 @@ fun methodName(clazz: String, name: String, descriptor: String): String {
     return methodName(MethodSig.c(clazz, name, descriptor))
 }
 
-fun methodName(clazz: String, sig: GenericSig): String {
+fun methodName(clazz: String, sig: InterfaceSig): String {
     return methodName(MethodSig.c(clazz, sig.name, sig.descriptor))
 }
 
