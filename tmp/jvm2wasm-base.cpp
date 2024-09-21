@@ -253,9 +253,7 @@ i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2
 i32 engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFI(i32, f32, i32, i32, i32, i32, i32, i32, f32) { return 0; }
 i32 engine_TextGen_genTexTexture_Ljava_lang_StringFLjava_lang_StringIII(i32, f32, i32, i32, i32) { return 0; }
 i32 engine_TextGen_measureText1_Ljava_lang_StringFLjava_lang_StringI(i32, f32, i32) { return 0; }
-i32 java_io_BufferedInputStream_close_V(i32) { return 0; }
 i32 java_io_BufferedInputStream_fill_V(i32) { return 0; }
-i32 java_io_InputStreamReader_close_V(i32) { return 0; }
 i32 java_io_RandomAccessFile_close0_V(i32) { return 0; }
 i32 java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return 0; }
 i32 java_io_RandomAccessFile_seek0_JV(i32, i64) { return 0; }
@@ -463,16 +461,12 @@ i32 static_java_util_Date_V() { return 0; }
 i32 static_java_util_Formatter_V() { return 0; }
 i32 static_me_anno_audio_AudioFXCache_V() { return 0; }
 i32 static_me_anno_video_formats_gpu_GPUFrame_V() { return 0; }
-i32i32 java_io_InputStreamReader_ready_Z(i32) { return { }; }
-i32i32 java_lang_ClassLoader_loadClass_Ljava_lang_StringZLjava_lang_Class(i32, i32, i32) { return {}; }
 i32i32 java_lang_Class_copyConstructors_ALjava_lang_reflect_ConstructorALjava_lang_reflect_Constructor(i32) { return {}; }
 i32i32 java_lang_Class_getDeclaredConstructors0_ZALjava_lang_reflect_Constructor(i32, i32) { return { }; }
 i32i32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { return { }; }
 i32i32 java_lang_Class_getModifiers_I(i32) { return { }; }
 i32i32 java_lang_Class_getName0_Ljava_lang_String(i32) { return { }; }
 i32i32 java_lang_Class_isInterface_Z(i32) { return { }; }
-f64i32 java_lang_Double_parseDouble_Ljava_lang_StringD(i32) { return { }; }
-f32i32 java_lang_Float_parseFloat_Ljava_lang_StringF(i32) { return { }; }
 i32i32 java_lang_Thread_holdsLock_Ljava_lang_ObjectZ(i32) { return { }; }
 i32i32 java_lang_Thread_isAlive_Z(i32) { return { }; }
 i32i32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return { }; }
@@ -491,15 +485,12 @@ i64i32 java_util_zip_Deflater_init_IIZJ(i32, i32, i32) { return { }; }
 i32i32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { return { }; }
 i64i32 java_util_zip_Inflater_init_ZJ(i32) { return { }; }
 i32i32 jvm_custom_File_isAbsolute_Z(i32) { return { }; }
-i32i32 kotlin_random_jdk8_PlatformThreadLocalRandom_getImpl_Ljava_util_Random(i32) { return { }; }
-i32i32 kotlin_random_jdk8_PlatformThreadLocalRandom_nextInt_III(i32, i32, i32) { return { }; }
 // i32i32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return { }; }
 i32i32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return { }; }
 i32i32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return { }; }
 i32i32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return { }; }
 i32i32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return { }; }
 i32i32 me_anno_ecs_prefab_change_PathXCompanion_generateRandomId_Ljava_lang_String(i32) { return { }; }
-f64i32 me_anno_maths_Maths_random_D() { return { }; }
 i64i32 org_lwjgl_system_JNI_invokePP_JIIJJ(i64, i32, i32, i64) { return { }; }
 i32i32 sun_reflect_Reflection_getClassAccessFlags_Ljava_lang_ClassI(i32) { return { }; }
 i64i32 me_anno_input_Input_initForGLFWXlambdaX1_Lme_anno_gpu_OSWindowJIJVxd26ac3d_address_J(i32) { return {}; }
@@ -519,6 +510,9 @@ i32i32 kotlin_collections_CharIterator_hasNext_Z(i32) { return {}; }
 i32 me_anno_io_base_BaseReader_readAllInList_V(i32) { return 0; }
 i32i32 kotlin_jvm_internal_MutablePropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return {}; }
 i32i32 kotlin_jvm_internal_PropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return {}; }
+f64 jvm_JavaUtil_seedUniquifier_D() {
+    return java_lang_System_currentTimeMillis_J();
+}
 
 GLFWwindow* window = nullptr;
 void jvm_LWJGLxGLFW_setTitle_Ljava_lang_StringV(i32 str) {
@@ -609,6 +603,7 @@ void createWindow() {
 
 i64 lastTime = 0L;
 void notifySampler(std::string funcName) {
+    // std::cerr << funcName << std::endl;
     // i64 thisTime = java_lang_System_nanoTime_J();
     // if(std::abs(thisTime - lastTime) > 1000000000) {
     /*if(lastTime++ > 1000000) {

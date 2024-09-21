@@ -7,6 +7,7 @@ import annotations.WASM;
 import jvm.lang.Bean;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
 import kotlin.jvm.internal.ClassReference;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.lang.annotation.Annotation;
@@ -14,6 +15,7 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.*;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Random;
 
 import static jvm.JVM32.*;
 import static jvm.Utils.cl;
@@ -500,6 +502,11 @@ public class JavaLang {
         setStackPtr(getStackPtr0());
     }
 
+    @Alias(names = "java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type")
+    public static Object[] java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type() {
+        return empty; // not yet implemented / supported
+    }
+
     static class JSOutputStream extends OutputStream {
 
         public JSOutputStream(boolean justLog) {
@@ -611,6 +618,11 @@ public class JavaLang {
     @Alias(names = "java_lang_Class_getClassLoader_Ljava_lang_ClassLoader")
     public static ClassLoader getClassLoader(Class<Object> clazz) {
         return cl;
+    }
+
+    @Alias(names = "java_lang_ClassLoader_loadClass_Ljava_lang_StringZLjava_lang_Class")
+    public static <V> Class<V> ClassLoader_loadClass(ClassLoader self, String name, boolean resolve) throws ClassNotFoundException {
+        return Class_forName(name);
     }
 
     @NoThrow
@@ -1481,6 +1493,119 @@ public class JavaLang {
     @Alias(names = "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter")
     public static Object[] Executable_getParameters(Object self) {
         return empty;// todo implement for panels...
+    }
+
+    @Alias(names = "java_lang_Double_parseDouble_Ljava_lang_StringD")
+    public static double parseDouble(String src) {
+        if (src == null || src.isEmpty()) {
+            throw new NumberFormatException("Cannot parse empty as double");
+        }
+        // parse NaN, Infinity
+        switch (src) {
+            case "NaN":
+                return Double.NaN;
+            case "Infinity":
+            case "+Infinity":
+                return Double.POSITIVE_INFINITY;
+            case "-Infinity":
+                return Double.NEGATIVE_INFINITY;
+        }
+        char c0 = src.charAt(0);
+        int i0 = c0 == '+' || c0 == '-' ? 1 : 0;
+        return parseDoubleWhole(src, i0);
+    }
+
+    private static double parseDoubleWhole(@NotNull String src, int i0) {
+        double whole = 0.0;
+        double digits = 0.0;
+        int exponent = 0;
+        for (int i = i0, l = src.length(); i < l; i++) {
+            char c = src.charAt(i);
+            if (c >= '0' && c <= '9') {
+                whole = 10.0 * whole + (c - '0');
+            } else if (c == '.') {
+                // read digits next
+                return parseDoubleDigits(src, i + 1, whole);
+            } else if (c == 'e' || c == 'E') {
+                return parseDoubleExponent(src, i + 1, whole);
+            } else {
+                throw new NumberFormatException("Unexpected character in number");
+            }
+        }
+        if (src.charAt(0) == '-') whole = -whole;
+        return whole;
+    }
+
+    private static double parseDoubleDigits(@NotNull String src, int i0, double whole) {
+        double digits = 0.0;
+        double exponent = 0.1;
+        for (int i = i0, l = src.length(); i < l; i++) {
+            char c = src.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits += (c - '0') * exponent;
+                exponent *= 0.1;
+            } else if (c == 'e' || c == 'E') {
+                return parseDoubleExponent(src, i + 1, whole + digits);
+            } else {
+                throw new NumberFormatException("Unexpected character in digits");
+            }
+        }
+        return whole;
+    }
+
+    private static double parseDoubleExponent(@NotNull String src, int i0, double number) {
+        int exponent = 0;
+        if (i0 == src.length()) {
+            throw new NumberFormatException("Empty exponent");
+        }
+        int i = i0;
+        char c0 = src.charAt(i0);
+        if (c0 == '+' || c0 == '-') {
+            // sign for exponent
+            i++;
+        }
+        if (i == src.length()) {
+            throw new NumberFormatException("Empty exponent");
+        }
+        for (int l = src.length(); i < l; i++) {
+            char c = src.charAt(i);
+            if (c >= '0' && c <= '9') {
+                exponent = exponent * 10 + (c - '0');
+            } else {
+                throw new NumberFormatException("Unexpected character in exponent");
+            }
+        }
+        if (c0 == '-') exponent = -exponent;
+        double whole = number * Math.pow(10.0, exponent);
+        if (src.charAt(0) == '-') whole = -whole;
+        return whole;
+    }
+
+    @Alias(names = "java_lang_Float_parseFloat_Ljava_lang_StringF")
+    public static float parseFloat(String src) {
+        return (float) parseDouble(src);
+    }
+
+    private static Random random;
+
+    @NoThrow
+    @Alias(names = "kotlin_random_jdk8_PlatformThreadLocalRandom_getImpl_Ljava_util_Random")
+    public static Random PlatformThreadLocalRandom_getImplRandom(Object self) {
+        if (random == null) random = new Random(System.currentTimeMillis());
+        return random;
+    }
+
+    @NoThrow
+    @Alias(names = "kotlin_random_jdk8_PlatformThreadLocalRandom_nextInt_III")
+    public static int kotlin_random_jdk8_PlatformThreadLocalRandom_nextInt_III(Object self, int min, int maxExcl) {
+        return PlatformThreadLocalRandom_getImplRandom(null)
+                .nextInt(maxExcl - min) + min;
+    }
+
+    @NoThrow
+    @Alias(names = "me_anno_maths_Maths_random_D")
+    public static double me_anno_maths_Maths_random_D() {
+        return PlatformThreadLocalRandom_getImplRandom(null).nextDouble();
     }
 
 }

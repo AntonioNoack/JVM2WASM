@@ -390,4 +390,10 @@ public class LWJGLxGLFW {
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV")
     @JavaScript(code = "")
     public static native void org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV(long window);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_glfw_GLFW_glfwCreateCursor_Lorg_lwjgl_glfw_GLFWImageIIJ")
+    public static long org_lwjgl_glfw_GLFW_glfwCreateCursor_Lorg_lwjgl_glfw_GLFWImageIIJ(GLFWImage image, int cx, int cy) {
+        return 0;
+    }
 }

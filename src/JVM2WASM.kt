@@ -16,6 +16,8 @@ import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
 import java.io.FileNotFoundException
+import java.io.InputStream
+import java.io.InputStreamReader
 import kotlin.math.sin
 
 const val api = ASM9
@@ -500,6 +502,10 @@ fun jvm2wasm() {
 
     assertTrue(methodName(isUsed) in usedMethods)
     assertTrue(methodName(isMissing) in usedMethods)
+
+    val isUsed2 = MethodSig.c("java/io/InputStreamReader", "close", "()V")
+    printUsed(isUsed2)
+    assertTrue(methodName(isUsed2) in usedMethods)
 
     usedButNotImplemented.retainAll(usedMethods)
 
