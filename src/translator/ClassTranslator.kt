@@ -66,7 +66,7 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
         return if (writer == null) {
             val sig = MethodSig.c(clazz, name, descriptor)
             val methodName = methodName(sig)
-            val map = hIndex.methodAliases[methodName] ?: sig
+            val map = hIndex.getAlias(sig)
             if ((sig !in dIndex.methodsWithForbiddenDependencies &&
                         sig in dIndex.usedMethods && map == sig) ||
                 // todo why is this not in usedMethods??? it's shown to be actually-used

@@ -392,14 +392,14 @@ fun jvm2wasm() {
 
     // 4811/15181 -> 3833/15181, 1906 unique
     findUniquelyImplemented(
-        dIndex.usedMethods.filter { methodName(it) !in hIndex.methodAliases },
+        dIndex.usedMethods.filter { hIndex.getAlias(it) == it },
         implementedMethods.values.toSet()
     )
 
     /** translate method implementations */
     // find all aliases, that are being used
     val aliasedMethods = dIndex.usedMethods.mapNotNull {
-        hIndex.methodAliases[methodName(it)]
+        hIndex.getAlias(it)
     }
 
     fun filterClass(clazz: String): Boolean {
@@ -605,9 +605,9 @@ fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<Stri
     for (name in usedButNotImplemented) {
         println("  $name")
         println("    resolved: ${name in resolved}")
-        val sig = hIndex.methodAliases[name] ?: nameToMethod[name]
+        val sig = hIndex.getAlias(name) ?: nameToMethod[name]
         if (sig != null) {
-            println("    alias: " + hIndex.methodAliases[name])
+            println("    alias: " + hIndex.getAlias(name))
             println("    name2method: " + nameToMethod[name])
             println("    translated: " + (sig in gIndex.translatedMethods))
             print("    ")

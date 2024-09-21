@@ -1,7 +1,6 @@
 package hierarchy
 
 import utils.FieldSig
-import utils.InterfaceSig
 import utils.MethodSig
 import utils.methodName
 
@@ -36,9 +35,22 @@ object HierarchyIndex {
 
     val methodAliases = HashMap<String, MethodSig>(cap)
 
-    fun alias(sig: MethodSig): MethodSig {
+    fun getAlias(sig: MethodSig): MethodSig {
         val sig1 = methodAliases[methodName(sig)] ?: sig
-        return if (sig1 != sig) alias(sig1) else sig
+        return if (sig1 != sig) getAlias(sig1) else sig
+    }
+
+    fun getAlias(methodName: String): MethodSig? {
+        val sig1 = methodAliases[methodName] ?: return null
+        return getAlias(sig1)
+    }
+
+    fun setAlias(from: MethodSig, to: MethodSig) {
+        setAlias(methodName(from), to)
+    }
+
+    fun setAlias(from: String, to: MethodSig) {
+        methodAliases[from] = to
     }
 
     fun registerSuperClass(clazz: String, superClazz: String) {

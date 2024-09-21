@@ -184,7 +184,7 @@ fun resolveGenericTypes() {
                             val sig2 = method.withClass(clazz)
                             val sig3 = candidates.first()
                             if (sig2 == sig3) throw NotImplementedError()
-                            hIndex.methodAliases[methodName(sig2)] = sig3
+                            hIndex.setAlias(sig2, sig3)
                             println("Arguments mismatch!, assumed only viable to match")
                         } else println("Arguments mismatch!")
                         continue
@@ -206,7 +206,7 @@ fun resolveGenericTypes() {
                             val sig2 = method.withClass(clazz)
                             val sig3 = candidates.first()
                             if (sig2 == sig3) throw NotImplementedError()
-                            hIndex.methodAliases[methodName(sig2)] = sig3
+                            hIndex.setAlias(sig2, sig3)
                         } else {
                             println("Didn't find all mappings for $clazz, $method!")
                         }
@@ -236,7 +236,7 @@ fun resolveGenericTypes() {
                         // define mapping
                         val sig2 = method.withClass(clazz)
                         if (sig2 == implMethod) throw NotImplementedError()
-                        hIndex.methodAliases[methodName(sig2)] = implMethod
+                        hIndex.setAlias(sig2, implMethod)
                     } else println("warn! no mapping found for [$clazz]: $generics to $superType by $params, $candidates")
 
                 }
@@ -268,9 +268,9 @@ fun findAliases() {
                 if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
                 if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
                 if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-                val previous = hIndex.methodAliases[aliasName]
+                val previous = hIndex.getAlias(aliasName)
                 if (previous != null && previous != sig) throw IllegalStateException("Cannot replace $aliasName -> $previous with -> $sig")
-                hIndex.methodAliases[aliasName] = sig
+                hIndex.setAlias(aliasName, sig)
             }
         }
         val revAlias = annotations.firstOrNull { it.clazz == "annotations/RevAlias" }
@@ -280,8 +280,9 @@ fun findAliases() {
             if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
             if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
             val sig1 = nameToMethod0[aliasName]
-            if (sig1 != null) hIndex.methodAliases[methodName(sig)] = sig1
-            else println("Skipped $sig -> $aliasName, because unknown")
+            if (sig1 != null) {
+                hIndex.setAlias(sig, sig1)
+            } else println("Skipped $sig -> $aliasName, because unknown")
         }
     }
 }
@@ -346,11 +347,11 @@ fun replaceRenamedDependencies() {
     dIndex.methodDependencies = HashMap(
         dIndex.methodDependencies
             .mapValues { (_, dependencies) ->
-                dependencies.map {
-                    resolvedMethods.getOrPut(it) {
-                        val found = findMethod(it.clazz, it.name, it.descriptor, false) ?: it
-                        if (found != it) hIndex.methodAliases[methodName(it)] = found
-                        if ((found in hIndex.staticMethods) == (it in hIndex.staticMethods)) found else it
+                dependencies.map { sig ->
+                    resolvedMethods.getOrPut(sig) {
+                        val found = findMethod(sig.clazz, sig.name, sig.descriptor, false) ?: sig
+                        if (found != sig) hIndex.setAlias(sig, found)
+                        if ((found in hIndex.staticMethods) == (sig in hIndex.staticMethods)) found else sig
                     }
                 }.toHashSet()
             }
@@ -612,7 +613,6 @@ fun printForbiddenMethods(importPrinter: StringBuilder2, missingMethods: HashSet
 fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     println("[printNotImplementedMethods]")
     importPrinter.append(";; not implemented, not forbidden\n")
-    var counter = 0
     for (sig in dIndex.usedMethods
         .filter {
             it !in hIndex.abstractMethods &&
@@ -624,7 +624,7 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
         val superMethod = dIndex.findSuperMethod(sig)
         if (superMethod != null) {
             if (sig != superMethod) {
-                hIndex.methodAliases[methodName(sig)] = superMethod
+                hIndex.setAlias(sig, superMethod)
             }
         } else {
             if (hIndex.classFlags[sig.clazz]?.hasFlag(ACC_INTERFACE) == true) {
@@ -687,68 +687,76 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                         exceptions: Array<out String>?
                     ): MethodVisitor? {
                         val sig1 = MethodSig.c(clazz, name, descriptor)
-                        val map = hIndex.methodAliases[methodName(sig1)]
-                        return if (sig1 !in dIndex.methodsWithForbiddenDependencies && sig1 in dIndex.usedMethods &&
-                            (map == null || map == sig1)
-                        ) object : MethodVisitor(api) {
+                        val map = hIndex.getAlias(sig1)
+                        return if (sig1 !in dIndex.methodsWithForbiddenDependencies &&
+                            sig1 in dIndex.usedMethods &&
+                            map == sig1
+                        ) {
+                            object : MethodVisitor(api) {
 
-                            override fun visitInvokeDynamicInsn(
-                                name: String?,
-                                descriptor: String?,
-                                bootstrapMethodHandle: Handle?,
-                                vararg args: Any?
-                            ) {
-                                val dst = args[1] as Handle
-                                val synthClassName = synthClassName(sig1, dst)
-                                // println("lambda: $sig1 -> $synthClassName")
-                                gIndex.getClassIndex(synthClassName) // add class to index
-                                val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
-                                dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
-                            }
+                                override fun visitInvokeDynamicInsn(
+                                    name: String?,
+                                    descriptor: String?,
+                                    bootstrapMethodHandle: Handle?,
+                                    vararg args: Any?
+                                ) {
+                                    val dst = args[1] as Handle
+                                    val synthClassName = synthClassName(sig1, dst)
+                                    // println("lambda: $sig1 -> $synthClassName")
+                                    gIndex.getClassIndex(synthClassName) // add class to index
+                                    val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
+                                    dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
+                                }
 
-                            override fun visitTypeInsn(opcode: Int, type: String) {
-                                gIndex.getClassIndex(replaceClass1(type)) // add class to index
-                            }
-
-                            override fun visitTryCatchBlock(start: Label, end: Label, handler: Label, type: String?) {
-                                if (type != null) {
+                                override fun visitTypeInsn(opcode: Int, type: String) {
                                     gIndex.getClassIndex(replaceClass1(type)) // add class to index
                                 }
-                            }
 
-                            override fun visitLdcInsn(value: Any?) {
-                                if (value is Type) { // add class to index
-                                    gIndex.getClassIndex(replaceClass1(single(value.descriptor)))
+                                override fun visitTryCatchBlock(
+                                    start: Label,
+                                    end: Label,
+                                    handler: Label,
+                                    type: String?
+                                ) {
+                                    if (type != null) {
+                                        gIndex.getClassIndex(replaceClass1(type)) // add class to index
+                                    }
                                 }
-                            }
 
-                            override fun visitMethodInsn(
-                                opcode: Int,
-                                owner0: String,
-                                name: String,
-                                descriptor: String,
-                                isInterface: Boolean
-                            ) {
-                                if (opcode == 0xb6) { // invoke virtual
-                                    val owner = replaceClass1(owner0)
-                                    val sig0 = MethodSig.c(owner, name, descriptor)
-                                    // just for checking if abstract
-                                    if (sig0 !in hIndex.finalMethods) {
-                                        // check if method is defined in parent class
-                                        fun add(clazz: String) {
-                                            val superClass = hIndex.superClass[clazz]
-                                            if (superClass != null &&
-                                                MethodSig.c(
-                                                    superClass,
-                                                    name, descriptor
-                                                ) in hIndex.methods[superClass]!!
-                                            ) {
-                                                add(superClass)
-                                            } else {
-                                                dynIndex.getOrPut(clazz) { HashSet() }.add(sig0)
+                                override fun visitLdcInsn(value: Any?) {
+                                    if (value is Type) { // add class to index
+                                        gIndex.getClassIndex(replaceClass1(single(value.descriptor)))
+                                    }
+                                }
+
+                                override fun visitMethodInsn(
+                                    opcode: Int,
+                                    owner0: String,
+                                    name: String,
+                                    descriptor: String,
+                                    isInterface: Boolean
+                                ) {
+                                    if (opcode == 0xb6) { // invoke virtual
+                                        val owner = replaceClass1(owner0)
+                                        val sig0 = MethodSig.c(owner, name, descriptor)
+                                        // just for checking if abstract
+                                        if (sig0 !in hIndex.finalMethods) {
+                                            // check if method is defined in parent class
+                                            fun add(clazz: String) {
+                                                val superClass = hIndex.superClass[clazz]
+                                                if (superClass != null &&
+                                                    MethodSig.c(
+                                                        superClass,
+                                                        name, descriptor
+                                                    ) in hIndex.methods[superClass]!!
+                                                ) {
+                                                    add(superClass)
+                                                } else {
+                                                    dynIndex.getOrPut(clazz) { HashSet() }.add(sig0)
+                                                }
                                             }
+                                            add(owner)
                                         }
-                                        add(owner)
                                     }
                                 }
                             }

@@ -285,15 +285,15 @@ fun appendDynamicFunctionTable(
     val nameToMethod = nameToMethod
     val dynamicFunctions = implementedMethods
         .entries
-        .filter { (_, it) -> // saving space by remove functions that cannot be invoked dynamically
-            it.clazz != "?" &&
-                    it.name != "<init>" &&
-                    it.name != "<clinit>" &&
-                    it.name !in dynIndex &&
-                    it !in hIndex.staticMethods &&
-                    it !in hIndex.finalMethods &&
-                    it !in hIndex.abstractMethods &&
-                    methodName(it) !in hIndex.methodAliases
+        .filter { (_, sig) -> // saving space by remove functions that cannot be invoked dynamically
+            sig.clazz != "?" &&
+                    sig.name != "<init>" &&
+                    sig.name != "<clinit>" &&
+                    sig.name !in dynIndex &&
+                    sig !in hIndex.staticMethods &&
+                    sig !in hIndex.finalMethods &&
+                    sig !in hIndex.abstractMethods &&
+                    hIndex.getAlias(sig) == sig
         }
         .sortedBy { it.value.name + "/" + it.value.descriptor }
     for ((name, sig) in dynamicFunctions) {
@@ -312,7 +312,7 @@ fun appendDynamicFunctionTable(
         var name2 = name
         // resolve by aliases
         while (true) {
-            val sig = hIndex.methodAliases[name2] ?: break
+            val sig = hIndex.getAlias(name2) ?: break
             val name3 = methodName(sig)
             if (name2 == name3) {
                 if (name2 !in implementedMethods) {
@@ -414,7 +414,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                     debugInfo.append("  implements ").append(interface1).append("\n")
                 }
                 debugInfo.append("  fields[total: ").append(clazzSize).append("]:\n")
-                fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name,data) ->
+                fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name, data) ->
                     debugInfo.append("    *").append(data.offset).append(": ").append(name)
                         .append(": ").append(data.type).append("\n")
                 }
@@ -488,8 +488,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                 }
 
                 val implFunctions = implFunctions0
-                    .entries
-                    .sortedBy { it.key } // sorted by id
+                    .entries.sortedBy { it.key } // sorted by id
                 instTable.writeLE32(implFunctions.size)
                 for ((id, sig) in implFunctions) {
                     instTable.writeLE32(id)
@@ -641,9 +640,9 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                 }
 
                 val impl = findMethod(clazz, sig) ?: sig
-                val name = methodName(impl)
                 // if method is missing, find replacement
-                val mapped = hIndex.methodAliases[name]
+                val mapped = hIndex.getAlias(impl)
+                val name = methodName(mapped)
                 if (print) println("$idx, $sig0 -> $sig, $impl, $mapped")
                 val dynIndexI = dynIndex[name]
                 if (dynIndexI != null) {
@@ -656,22 +655,21 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                     table2.writeLE32(-1)
                     if (i == 14 && sig.name == "get") {
                         printUsed(sig)
-                        if (mapped != null) printUsed(mapped)
+                        if (mapped != sig) printUsed(mapped)
                     }
                     if (print || aidtCtr++ < 50) println("  $idx -> -1") // , available:
                     /*for (m in hIndex.methods[clazz]!!.filter { it.name == sig.name }) {
                         printUsed(m)
                     }*/
                 } else {
-                    val sig2 = mapped ?: sig
-                    if (sig2 in dIndex.usedMethods) {
+                    if (mapped in dIndex.usedMethods) {
                         numFixed++
-                        if (sig2 in hIndex.abstractMethods) {
-                            printUsed(sig2)
-                            throw IllegalStateException("$name, $sig2 is abstract, but also listed")
+                        if (mapped in hIndex.abstractMethods) {
+                            printUsed(mapped)
+                            throw IllegalStateException("$name, $mapped is abstract, but also listed")
                         }
                         val dynIndexJ = dynIndex.size
-                        dynIndex[name] = sig2 to dynIndexJ
+                        dynIndex[name] = mapped to dynIndexJ
                         table2.writeLE32(dynIndexJ)
                         if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexJ*")
                     } else {

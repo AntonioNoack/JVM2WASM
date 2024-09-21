@@ -33,7 +33,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         if (
             sig.name != "<init>" && // cannot be invoked dynamically
             sig.clazz != "?" &&
-            methodName(sig) !in hIndex.methodAliases && // just the same
+            hIndex.getAlias(sig) == sig && // just the same
             sig !in hIndex.staticMethods &&
             sig !in hIndex.abstractMethods && // we can ignore that one
             sig in implementedMethods
@@ -54,7 +54,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
 
     // mark all those methods as final
     for (sig in usedMethods) {
-        if (methodName(sig) !in hIndex.methodAliases && // just the same
+        if (hIndex.getAlias(sig) == sig && // just the same
             sig !in hIndex.staticMethods &&
             sig !in hIndex.abstractMethods && // we can ignore that one
             InterfaceSig(sig) in toBeMarkedAsFinal

@@ -30,12 +30,11 @@ fun StringBuilder2.import2(sig: MethodSig) {
     val wasm = hIndex.annotations[sig]?.filter { it.clazz == "annotations/WASM" }
     if (wasm.isNullOrEmpty()) {
         if (sig in hIndex.abstractMethods) return
-        val name = methodName(sig)
-        if (name !in hIndex.methodAliases ||
+        if (hIndex.getAlias(sig) == sig ||
             (hIndex.annotations[sig] ?: emptyList()).any { it.clazz == "annotations/Alias" }
         ) {
             import1(
-                name,
+                methodName(sig),
                 (if (sig in hIndex.staticMethods) emptyList() else listOf(ptrType)) +
                         split1(desc.substring(1, di)).map { jvm2wasm(it) },
                 if (canThrowError(sig) && !useWASMExceptions) {

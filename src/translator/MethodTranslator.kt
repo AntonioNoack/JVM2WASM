@@ -135,8 +135,8 @@ class MethodTranslator(
         val name2 = methodName(sig)
         headPrinter.append("(func $").append(name2)
 
-        val mapped = hIndex.methodAliases[name2]
-        if (mapped != null && mapped != sig) {
+        val mapped = hIndex.getAlias(sig)
+        if (mapped != sig) {
             throw IllegalStateException("Must not translate $sig, because it is mapped to $mapped")
         }
         if (exportAll || sig in hIndex.exportedMethods) {
@@ -965,7 +965,7 @@ class MethodTranslator(
             throw RuntimeException("Called static/non-static incorrectly, $static vs $sig0 (in $sig)")
 
 
-        val sig = hIndex.alias(sig0)
+        val sig = hIndex.getAlias(sig0)
 
         val meth = hIndex.methods.getOrPut(owner) { HashSet() }
         if (sig == sig0 && meth.add(sig0) && static) {

@@ -12,9 +12,9 @@ fun findMethod(clazz: String, sig: MethodSig): MethodSig? {
     return findMethod(clazz, sig.name, sig.descriptor)
 }
 
-var printFM = false
+var debugFindMethod = false
 fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable: Boolean = true): MethodSig? {
-    if (printFM) println("searching $clazz")
+    if (debugFindMethod) println("searching $clazz")
     val methodSig = MethodSig.c(clazz, name, desc)
     val isStatic = methodSig in hIndex.staticMethods
     fun isConstructable() = clazz in dIndex.constructableClasses
@@ -27,21 +27,21 @@ fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable:
     // checking whether method maybe is abstract...
     val superClass = hIndex.superClass[clazz]
     if ((hIndex.classFlags[clazz] ?: 0).hasFlag(Opcodes.ACC_ABSTRACT) && methodSig in hIndex.abstractMethods) {
-        if (printFM) println("method & clazz are abstract -> returning $methodSig")
+        if (debugFindMethod) println("method & clazz are abstract -> returning $methodSig")
         val superMethodSig = if (superClass != null) findMethod(superClass, name, desc, throwNotConstructable) else null
         return superMethodSig ?: methodSig
     }
 
     // check if method is actually implemented
     if (methodSig in hIndex.jvmImplementedMethods) {
-        if (printFM) println("found impl: $methodSig")
+        if (debugFindMethod) println("found impl: $methodSig")
         return methodSig
     }
 
     // check if there is aliases
-    val mapped = hIndex.methodAliases[methodName(methodSig)]
-    if (mapped != null && mapped != methodSig) {
-        if (printFM) println("looking up map $mapped")
+    val mapped = hIndex.getAlias(methodSig)
+    if (mapped != methodSig) {
+        if (debugFindMethod) println("looking up map $mapped")
         return findMethod(mapped.clazz, mapped.name, mapped.descriptor, throwNotConstructable)
     }
 

@@ -62,8 +62,8 @@ fun printUsed(sig: MethodSig) {
 
     val name = methodName(sig)
     if (name in ActuallyUsedIndex.resolved) builder.append(" actually-used(${ActuallyUsedIndex.usedBy[name]})")
-    val mapsTo = hIndex.methodAliases[name]
-    if (mapsTo != null && mapsTo != sig) builder.append(" maps-to: ").append(mapsTo)
+    val mapsTo = hIndex.getAlias(sig)
+    if (mapsTo != sig) builder.append(" maps-to: ").append(mapsTo)
     val mappedBy = hIndex.methodAliases.entries.filter { /*it.key != name &&*/ it.value == sig }.map { it.key }
     if (mappedBy.isNotEmpty()) builder.append(" mapped-by: ").append(mappedBy)
     var usedBy = dIndex.methodDependencies.entries.filter { sig != it.key && sig in it.value }.map { it.key }
@@ -78,7 +78,7 @@ fun printUsed(sig: MethodSig) {
     }
     println(builder.toString())
     builder.clear()
-    if (mapsTo != null && mapsTo != sig) {
+    if (mapsTo != sig) {
         printUsed(mapsTo)
     }
 }

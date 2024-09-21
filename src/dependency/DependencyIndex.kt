@@ -5,7 +5,10 @@ import gIndex
 import hIndex
 import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
-import utils.*
+import utils.FieldSig
+import utils.MethodSig
+import utils.findMethod
+import utils.printUsed
 
 object DependencyIndex {
 
@@ -34,10 +37,16 @@ object DependencyIndex {
         if (method in hIndex.jvmImplementedMethods || method in hIndex.customImplementedMethods) {
             return method
         }
-        val aliased = hIndex.methodAliases[methodName(method)]
-        if (aliased != null) {
+        val aliased = hIndex.getAlias(method)
+        if (aliased != method) {
             return aliased
         }
+
+        // check super class
+        val superClass = hIndex.superClass[method.clazz]
+        val bySuper = if (superClass != null) findSuperMethod(method.withClass(superClass)) else null
+        if (bySuper != null) return bySuper
+
         // check interfaces for default-implementations
         val interfaces = hIndex.interfaces[method.clazz]
         if (interfaces != null) for (interfaceI in interfaces) {
@@ -47,9 +56,7 @@ object DependencyIndex {
                 ) return method2
             }
         }
-        // check super class
-        val superClass = hIndex.superClass[method.clazz]
-        return if (superClass != null) findSuperMethod(method.withClass(superClass)) else null
+        return null
     }
 
     private fun findSuperMethod1(method: MethodSig): MethodSig? {
@@ -302,16 +309,15 @@ object DependencyIndex {
 
                     checkState(dependencies)
 
-                    val name = methodName(sig)
-                    val alias = hIndex.methodAliases[name]
+                    val alias = hIndex.getAlias(sig)
                     // println("[alias] $sig -> $name -> $alias")
-                    if (alias != null && alias != sig) {
+                    if (alias != sig) {
                         methodDependencies[sig] = methodDependencies[alias] ?: hashSetOf()
                         fieldDependenciesR[sig] = fieldDependenciesR[alias] ?: emptySet()
                         fieldDependenciesW[sig] = fieldDependenciesW[alias] ?: emptySet()
                         constructorDependencies[sig] = constructorDependencies[alias] ?: emptySet()
                         interfaceDependencies[sig] = interfaceDependencies[alias] ?: HashSet()
-                        hIndex.methodAliases[name] = alias
+                        hIndex.setAlias(sig, alias)
                         newRemaining.add(alias)
                         // methodsWithForbiddenDependencies.add(sig) // why???
                         handleChildImplementations(sig.clazz, dependencies)
