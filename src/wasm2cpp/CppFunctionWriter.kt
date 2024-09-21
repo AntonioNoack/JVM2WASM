@@ -1,6 +1,7 @@
 package wasm2cpp
 
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
@@ -61,17 +62,21 @@ fun defineFunctionImplementations(parser: WATParser) {
     for (fi in functions.indices) {
         val function = functions[fi]
         // if (function.funcName == "stackPush" || function.funcName == "stackPop") continue
-        defineFunctionImplementation(function, parser)
+        FunctionWriter(function, parser)
     }
     writer.append('\n')
 }
 
-fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
-    defineFunctionHead(function, true)
-    writer.append(" {\n")
+class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
-    if (false && '_' in function.funcName) {
-        writer.append("std::cout << \"[\" << (global_Q0 - global_Q) << \"] ").append(function.funcName).append("\" << std::endl;\n")
+    init {
+        defineFunctionHead(function, true)
+        writer.append(" {\n")
+
+        if ('_' in function.funcName) {
+            // writer.append("std::cout << \"[\" << (global_Q0 - global_Q) << \"] ").append(function.funcName).append("\" << std::endl;\n")
+            writer.append("notifySampler(\"").append(function.funcName).append("\");\n")
+        }
     }
 
     var depth = 1
@@ -199,10 +204,12 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
             }
             is LocalGet -> {
                 val local = localsByName[i.name]!!
+                assertNotEquals("lbl", i.name)
                 beginNew(local.type).append(local.name).end()
             }
             is LocalSet -> {
                 val local = localsByName[i.name]!!
+                if (i.name == "lbl") return
                 beginSetEnd(local.name, local.type)
             }
             // loading
@@ -430,8 +437,17 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                 stack.clear()
                 depth++
                 val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
-                for (ii in 0 until i.body.size - lastIsContinue.toInt()) {
-                    writeInstruction(i.body[ii])
+                val i1 = i.body.size - lastIsContinue.toInt()
+                val isSwitchCase = if (i1 > 0) i.body[0] as? SwitchCase else null
+                if (isSwitchCase != null) {
+                    assertEquals(0, isSwitchCase.cases[0].size)
+                    val cases = isSwitchCase.cases.subList(1, isSwitchCase.cases.size) +
+                            listOf(i.body.subList(1, i1))
+                    writeSwitchCase(isSwitchCase, cases)
+                } else {
+                    for (ii in 0 until i1) {
+                        writeInstruction(i.body[ii])
+                    }
                 }
                 if (!lastIsContinue) {
                     // save results
@@ -457,95 +473,100 @@ fun defineFunctionImplementation(function: FunctionImpl, parser: WATParser) {
                 begin().append("if (").append(condition).append(" != 0) { goto ")
                     .append(i.label).append("; }\n")
             }
-            is SwitchCase -> {
-                // big monster, only 1 per function allowed, afaik
-                // assertEquals(1, depth)
-                assertEquals(0, stack.size)
-                depth++
-                assertEquals(0, i.cases[0].size)
-                for (j in 1 until i.cases.size) {
-                    stack.clear()
-                    // assertEquals(0, stack.size)
-                    depth--
-                    begin().append("case").append(j - 1).append(": {\n")
-                    depth++
-                    val instructions = i.cases[j]
-                    assertTrue(instructions.size >= 2)
-                    val realLast = instructions.last()
-                    assertTrue(realLast is Jump) // for while(true)-branch
-                    var skipped = 2
-                    while (true) {
-                        val tmp = instructions[instructions.size - skipped]
-                        if (tmp is LocalSet && tmp.name.startsWith("s") &&
-                            (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
-                        ) {
-                            // println("skipping ${tmp.name}")
-                            skipped++
-                        } else break
-                    }
-                    val last = instructions[instructions.size - skipped]
-                    if (last != Unreachable) {
-                        assertTrue(last is LocalSet && last.name == "lbl")
-                        val preLast = instructions[instructions.size - (skipped + 1)]
-                        assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == "i32"))
-                        // find end:
-                        //   - i32.const 2 local.set $lbl
-                        //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
-                        for (k in 0 until instructions.size - (skipped + 1)) {
-                            writeInstruction(instructions[k])
-                        }
-                        fun executeStackSaving() {
-                            // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
-                            for (k in instructions.size - (skipped - 1) until instructions.size - 1) {
-                                // println("  stack saving[$k]: ${instructions[k]}")
-                                writeInstruction(instructions[k])
-                            }
-                        }
-                        if (preLast is IfBranch) {
-                            // save branch
-                            val branch = pop("i32")
-                            executeStackSaving()
-                            assertEquals(1, preLast.ifTrue.size)
-                            assertEquals(1, preLast.ifFalse.size)
-                            begin().append("if (").append(branch).append(") {\n")
-                            depth++
-                            begin().append("goto case").append((preLast.ifTrue[0] as Const).value).end()
-                            depth--
-                            begin().append("} else {\n")
-                            depth++
-                            begin().append("goto case").append((preLast.ifFalse[0] as Const).value).end()
-                            depth--
-                            begin().append("}\n")
-                        } else {
-                            executeStackSaving()
-                            preLast as Const
-                            begin().append("goto case").append(preLast.value).end()
-                        }
-                    } else {
-                        for (k in 0 until instructions.size - skipped) {
-                            writeInstruction(instructions[k])
-                        }
-                    }
-                    depth--
-                    begin().append("}\n")
-                    depth++
-                }
-                depth--
-                begin().append("case${i.cases.size - 1}:\n") // exit switch-case
-            }
             Drop -> stack.pop()
             else -> throw NotImplementedError(i.toString())
         }
     }
-    for (local in function.locals) {
-        begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
+
+    fun writeSwitchCase(i: SwitchCase, cases: List<List<Instruction>>) {
+        // big monster, only 1 per function allowed, afaik
+        // assertEquals(1, depth)
+        assertEquals(0, stack.size)
+        depth++
+        for (j in cases.indices) {
+            stack.clear()
+            // assertEquals(0, stack.size)
+            depth--
+            begin().append("case").append(j).append(": {\n")
+            depth++
+            val instructions = cases[j]
+            assertTrue(instructions.size >= 2)
+            val realLast = instructions.last()
+            val isLast = j == cases.lastIndex
+            assertTrue(isLast || realLast is Jump) // for while(true)-branch
+            var skipped = if (isLast) 1 else 2
+            while (!isLast) {
+                val tmp = instructions[instructions.size - skipped]
+                if (tmp is LocalSet && tmp.name.startsWith("s") &&
+                    (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
+                ) {
+                    // println("skipping ${tmp.name}")
+                    skipped++
+                } else break
+            }
+            val last = instructions[instructions.size - skipped]
+            if (last != Unreachable) {
+                assertTrue(last is LocalSet && last.name == "lbl")
+                val preLast = instructions[instructions.size - (skipped + 1)]
+                assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == "i32"))
+                // find end:
+                //   - i32.const 2 local.set $lbl
+                //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
+                for (k in 0 until instructions.size - (skipped + 1)) {
+                    writeInstruction(instructions[k])
+                }
+                fun executeStackSaving() {
+                    // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
+                    for (k in instructions.size - (skipped - 1) until instructions.size - 1) {
+                        // println("  stack saving[$k]: ${instructions[k]}")
+                        writeInstruction(instructions[k])
+                    }
+                }
+                if (preLast is IfBranch) {
+                    // save branch
+                    val branch = pop("i32")
+                    executeStackSaving()
+                    assertEquals(1, preLast.ifTrue.size)
+                    assertEquals(1, preLast.ifFalse.size)
+                    begin().append("if (").append(branch).append(") {\n")
+                    depth++
+                    begin().append("goto case").append((preLast.ifTrue[0] as Const).value).end()
+                    depth--
+                    begin().append("} else {\n")
+                    depth++
+                    begin().append("goto case").append((preLast.ifFalse[0] as Const).value).end()
+                    depth--
+                    begin().append("}\n")
+                } else {
+                    executeStackSaving()
+                    preLast as Const
+                    begin().append("goto case").append(preLast.value).end()
+                }
+            } else {
+                for (k in 0 until instructions.size - skipped) {
+                    writeInstruction(instructions[k])
+                }
+            }
+            depth--
+            begin().append("}\n")
+            depth++
+        }
+        depth--
     }
-    for (instr in function.body) {
-        writeInstruction(instr)
+
+    init {
+        for (local in function.locals) {
+            if (local.name == "lbl") continue
+            begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
+        }
+        for (instr in function.body) {
+            writeInstruction(instr)
+        }
+        when (function.body.lastOrNull()) {
+            Return, Unreachable -> {}
+            else -> writeInstruction(Return)
+        }
+        writer.append("}\n")
     }
-    when (function.body.lastOrNull()) {
-        Return, Unreachable -> {}
-        else -> writeInstruction(Return)
-    }
-    writer.append("}\n")
+
 }

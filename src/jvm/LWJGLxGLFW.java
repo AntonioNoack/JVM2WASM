@@ -349,26 +349,45 @@ public class LWJGLxGLFW {
     public static void org_lwjgl_glfw_GLFW_glfwDefaultWindowHints_V() {
     }
 
-	@NoThrow
-	@Alias(names = "new_org_lwjgl_glfw_GLFWErrorCallback_V")
-	public static void new_org_lwjgl_glfw_GLFWErrorCallback_V(Object self) {
-	}
+    @NoThrow
+    @Alias(names = "new_org_lwjgl_glfw_GLFWErrorCallback_V")
+    public static void new_org_lwjgl_glfw_GLFWErrorCallback_V(Object self) {
+    }
 
-	@NoThrow
-	@Alias(names = "org_lwjgl_system_CallbackI_address_J")
-	public static long org_lwjgl_system_CallbackI_address_J(Object self) {
-		return getAddr(self);
-	}
+    @NoThrow
+    @Alias(names = "org_lwjgl_system_CallbackI_address_J")
+    public static long org_lwjgl_system_CallbackI_address_J(Object self) {
+        return getAddr(self);
+    }
 
-	@NoThrow
-	@Alias(names = "org_lwjgl_system_Callback_free_V")
-	public static void org_lwjgl_system_Callback_free_V(Object self) {
-	}
+    @NoThrow
+    @Alias(names = "org_lwjgl_system_Callback_free_V")
+    public static void org_lwjgl_system_Callback_free_V(Object self) {
+    }
 
-	@NoThrow
-	@Alias(names = "org_lwjgl_system_Callback_hashCode_I")
-	public static int org_lwjgl_system_Callback_hashCode_I(Object self) {
-		return System.identityHashCode(self);
-	}
+    @NoThrow
+    @Alias(names = "org_lwjgl_system_Callback_hashCode_I")
+    public static int org_lwjgl_system_Callback_hashCode_I(Object self) {
+        return System.identityHashCode(self);
+    }
 
+    @NoThrow
+    @Alias(names = "org_lwjgl_glfw_GLFW_glfwSetWindowIcon_JLorg_lwjgl_glfw_GLFWImageXBufferV")
+    public static void org_lwjgl_glfw_GLFW_glfwSetWindowIcon_JLorg_lwjgl_glfw_GLFWImageXBufferV(GLFWImage.Buffer images) {
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_glfw_GLFW_glfwDestroyWindow_JV")
+    @JavaScript(code = "")
+    public static native void org_lwjgl_glfw_GLFW_glfwDestroyWindow_JV(long window);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_glfw_GLFW_glfwHideWindow_JV")
+    @JavaScript(code = "")
+    public static native void org_lwjgl_glfw_GLFW_glfwHideWindow_JV(long window);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV")
+    @JavaScript(code = "")
+    public static native void org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV(long window);
 }

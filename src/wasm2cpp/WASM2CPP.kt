@@ -21,6 +21,7 @@ fun defineTypes() {
     writer.append("// types\n")
     writer.append("#include <cstdint>\n") // for number types
     writer.append("#include <bit>\n") // bitcast from C++20
+    writer.append("#include <string>\n") // for debugging
     val map = listOf(
         "i32" to "int32_t",
         "i64" to "int64_t",
@@ -140,15 +141,14 @@ fun wasm2cpp() {
     defineFunctionHeads(parser)
 
     writer.append("void unreachable(std::string);\n")
-    writer.append("void reading(i32 size, i32 addr);\n")
-    writer.append("void writing(i32 size, i32 addr, i32 value);\n")
-    writer.append("void writing(i32 size, i32 addr, f32 value);\n")
-    writer.append("void writing(i32 size, i32 addr, i64 value);\n")
-    writer.append("void writing(i32 size, i32 addr, f64 value);\n")
+    writer.append("void notifySampler(std::string funcName);\n")
 
     try {
+       /* parser.functions.removeIf {
+            it.funcName != "me_anno_gpu_deferred_DeferredSettings_appendLayerWriters_Ljava_lang_StringBuilderLme_anno_utils_structures_arrays_BooleanArrayListZV"
+        }*/
         defineFunctionImplementations(parser)
-        fillInFunctionTable(parser)
+       fillInFunctionTable(parser)
     } catch (e: Throwable) {
         e.printStackTrace()
     }

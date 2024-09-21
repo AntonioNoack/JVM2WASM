@@ -987,7 +987,9 @@ class MethodTranslator(
                 printer.append(" i32.const ").append(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor)))
                 // looks up class, goes to interface list, binary searches function, returns func-ptr
                 // instance, function index -> instance, function-ptr
+                stackPush()
                 printer.push(i32).append(" call \$resolveInterface\n")
+                stackPop() // so we can track the call better
                 handleThrowable() // if it's not found or nullptr
                 printer.pop(i32) // pop instance
                 pop(splitArgs, false, ret)

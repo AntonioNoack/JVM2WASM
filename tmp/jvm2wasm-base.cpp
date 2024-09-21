@@ -110,48 +110,58 @@ void jvm_JavaLang_printFlush_ZV(i32 logNotErr) {
 }
 
 void jvm_LWJGLxGLFW_disableCursor_V() { }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+void jvm_LWJGLxOpenGL_texImage2DAny_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
     // i=data, j=length in elements
     glTexImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
 }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage2D_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
-    // easy, without any data
+void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
+    // std::cout << "glTexImage2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ", " << f << ", " << g << ", " << h << ")" << std::endl;
+    if(c == 33340) c = 0x822C; // GL_RG32UI -> GL_RG16
     glTexImage2D(a,b,c,d,e,f,g,h,nullptr);
 }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j, i32 k) {
+void jvm_LWJGLxOpenGL_texImage3DAny_IIIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j, i32 k) {
     // j=data, k=length in elements
     glTexImage3D(a,b,c,d,e,f,g,h,i,((char*)memory + j));
 }
-void jvm_LWJGLxOpenGL_GL11C_glTexImage3D_IIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i) {
-    // easy, without any data
+void jvm_LWJGLxOpenGL_texImage3DNullptr_IIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i) {
     glTexImage3D(a,b,c,d,e,f,g,h,i,nullptr);
 }
-void jvm_LWJGLxOpenGL_GL11C_glTexSubImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+void jvm_LWJGLxOpenGL_texSubImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
     // i=data, j=length in elements
     glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
 }
+f32 org_lwjgl_opengl_GL11C_glGetFloat_IF(i32 type) { float v = 0.0; glGetFloatv(type,&v); return v; }
 void jvm_LWJGLxOpenGL_drawBuffersCreate_V() { }
 void jvm_LWJGLxOpenGL_drawBuffersExec_V() { }
 void jvm_LWJGLxOpenGL_drawBuffersPush_IV(i32) { }
-void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glBufferData16_IIIIV(i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glBufferData8_IIIIV(i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glBufferSubData8_IIIIV(i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glReadPixels_IIIIIIAFV_IIIIIIIIV(i32, i32, i32, i32, i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glUniform1fv_IIIV(i32 u, i32 addr, i32 count) { }
-void jvm_LWJGLxOpenGL_glUniform4fv_IIIV(i32 u, i32 addr, i32 count) { }
-void jvm_LWJGLxOpenGL_glUniformMatrix4fv_IZIIV(i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_glUniformMatrix4x3fv_IZIIV(i32, i32, i32, i32) { }
-void jvm_LWJGLxOpenGL_org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
-
+void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32 shader, i32 index, i32 name) {
+    std::string name1 = strToCpp(name);
+    glBindAttribLocation(shader, index, name1.c_str()); // is 0-terminated
+}
+void jvm_LWJGLxOpenGL_readPixelsF32_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
+    glReadnPixels(a,b,c,d,e,f,h<<2,(char*)memory+g);
+}
+void jvm_LWJGLxOpenGL_readPixelsU8_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
+    // (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, void * data)
+    glReadnPixels(a,b,c,d,e,f,h,(char*)memory+g);
 }
 void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(i32, i32) { }
 void org_lwjgl_glfw_GLFW_glfwSetCursor_JJV(i64, i64) { }
+
+i32 org_lwjgl_opengl_GL15C_glGetQueryObjecti_III(i32 a, i32 b) { GLint r = 0; glGetQueryObjectiv(a,b,&r); return r; }
+i64 org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ(i32 a, i32 b) { GLint64 r = 0; glGetQueryObjecti64v(a,b,&r); return r; }
+void org_lwjgl_opengl_GL15C_glDeleteQueries_IV(i32 x) { GLuint xi = x; glDeleteQueries(1, &xi); }
 void org_lwjgl_opengl_GL46C_glActiveTexture_IV(i32 x) { glActiveTexture(x); }
 void org_lwjgl_opengl_GL46C_glAttachShader_IIV(i32 x, i32 y) { glAttachShader(x,y); }
-void org_lwjgl_opengl_GL46C_glBindFramebuffer_IIV(i32 x, i32 y) { glBindFramebuffer(x,y); }
+void org_lwjgl_opengl_GL46C_glBindFramebuffer_IIV(i32 x, i32 y) {
+    glBindFramebuffer(x,y);
+    // std::cout << "glBindFramebuffer(" << x << ", " << y << ")" << std::endl;
+}
 void org_lwjgl_opengl_GL46C_glBindRenderbuffer_IIV(i32 x, i32 y) { glBindRenderbuffer(x,y); }
-void org_lwjgl_opengl_GL46C_glBindTexture_IIV(i32 x, i32 y) { glBindTexture(x,y); }
+void org_lwjgl_opengl_GL46C_glBindTexture_IIV(i32 x, i32 y) { 
+    glBindTexture(x,y);
+    // std::cout << "glBindTexture(" << x << ", " << y << ")" << std::endl;
+}
 void org_lwjgl_opengl_GL46C_glBindVertexArray_IV(i32 i) { glBindVertexArray(i); }
 void org_lwjgl_opengl_GL46C_glBlendEquationSeparate_IIV(i32 a, i32 b) { glBlendEquationSeparate(a,b); }
 void org_lwjgl_opengl_GL46C_glBlendFuncSeparate_IIIIV(i32 a, i32 b, i32 c, i32 d) { glBlendFuncSeparate(a,b,c,d); }
@@ -177,7 +187,10 @@ void org_lwjgl_opengl_GL46C_glEnable_IV(i32 x) { glEnable(x); }
 void org_lwjgl_opengl_GL46C_glFinish_V() { glFinish(); }
 void org_lwjgl_opengl_GL46C_glFlush_V() { glFlush(); }
 void org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV(i32 x, i32 y, i32 z, i32 w) { glFramebufferRenderbuffer(x,y,z,w); }
-void org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glFramebufferTexture2D(a,b,c,d,e); }
+void org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) {
+    glFramebufferTexture2D(a,b,c,d,e);
+    // std::cout << "glFramebufferTexture2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ")" << std::endl;
+}
 void org_lwjgl_opengl_GL46C_glGenerateMipmap_IV(i32 x) { glGenerateMipmap(x); }
 void org_lwjgl_opengl_GL46C_glLinkProgram_IV(i32 x) { glLinkProgram(x); }
 void org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV(i32 x, i32 y, i32 z, i32 w) { glRenderbufferStorage(x,y,z,w); }
@@ -197,11 +210,37 @@ void org_lwjgl_opengl_GL46C_glVertexAttrib1f_IFV(i32 x, f32 y) { glVertexAttrib1
 void org_lwjgl_opengl_GL46C_glVertexAttribDivisor_IIV(i32 x, i32 y) { glVertexAttribDivisor(x,y); }
 void org_lwjgl_opengl_GL46C_glVertexAttribPointer_IIIZIJV(i32 a, i32 b, i32 c, i32 d, i32 e, i64 f) { glVertexAttribPointer(a,b,c,d,e,(void*)f); }
 void org_lwjgl_opengl_GL46C_glViewport_IIIIV(i32 x, i32 y, i32 w, i32 h) { glViewport(x,y,w,h); }
-void org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV(i32, i32, i32) { /* todo */ }
+void org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV(i32, i32, i32) { /* todo */ } // GL_TEXTURE_BORDER_COLOR
 void org_lwjgl_opengl_GL15C_glBeginQuery_IIV(i32 a, i32 b) { glBeginQuery(a,b); }
 void org_lwjgl_opengl_GL15C_glEndQuery_IV(i32 a) { glEndQuery(a); }
 void org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV(i32 a, i32 b, i32 c) { glBindBufferBase(a,b,c); }
 void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(i32 x) { GLuint xi = x; glDrawBuffers(1, &xi); }
+void jvm_LWJGLxOpenGL_bufferData8_IIIIV(i32 buffer, i32 data, i32 length, i32 usage) {
+    glBufferData(buffer, (u32) length, (char*) memory + (u32)data, usage);
+}
+void jvm_LWJGLxOpenGL_bufferData16_IIIIV(i32 buffer, i32 data, i32 length, i32 usage) {
+    glBufferData(buffer, (u32) length<<1, (char*) memory + (u32)data, usage);
+}
+void jvm_LWJGLxOpenGL_bufferSubData8_IJIIV(i32 buffer, i64 offset, i32 data, i32 length) {
+    glBufferSubData(buffer, offset, (u32) (length), (char*) memory + (u32)data);
+}
+void jvm_LWJGLxOpenGL_bufferSubData16_IJIIV(i32 buffer, i64 offset, i32 data, i32 length) {
+    glBufferSubData(buffer, offset, (u32) (length << 1), (char*) memory + (u32)data);
+}
+void jvm_LWJGLxOpenGL_glUniform1fv_IIIV(i32 u, i32 addr, i32 count) { }
+void jvm_LWJGLxOpenGL_glUniform4fv_IIIV(i32 u, i32 addr, i32 count) { }
+void jvm_LWJGLxOpenGL_uniformMatrix2fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
+    glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (u32)data)); // correct???
+}
+void jvm_LWJGLxOpenGL_uniformMatrix3fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
+    glUniformMatrix2fv(u,len/9,t,(float*)((char*) memory + (u32)data)); // correct???
+}
+void jvm_LWJGLxOpenGL_uniformMatrix4x3fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
+    glUniformMatrix4fv(u,len/12,t,(float*)((char*) memory + (u32)data));
+}
+void jvm_LWJGLxOpenGL_uniformMatrix4fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
+    glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (u32)data));
+}
 
 // todo handle NaN correctly
 i32 dcmpg(f64 a, f64 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
@@ -290,34 +329,47 @@ i32 jvm_JVM32_grow_IZ(i32 numExtraPages) {
     } else return 0;
 }
 
-// void org_lwjgl_opengl_GL43C_nglPushDebugGroup_IIIJV(i32, i32, i32, i64) { return 0; }
-// void org_lwjgl_opengl_GL46C_glPopDebugGroup_V() { glPopDebugGroup(); return 0; }
-
 GLchar tmpLog[1024];
 
-i32 jvm_JavaLang_fillD2S_ACDI(i32 data, f64 v) {
+i32 strToJVM(i32 data, std::string str) {
     if(!data) return 0;
-    std::string str = std::to_string(v);
     i32 length = std::min(al(data).v0, (i32) str.size());
     for(i32 i=0;i<length;i++) {
         w16(data + arrayOverhead + i*2, str[i]);
     }
     return length;
+}
+
+i32 jvm_JavaLang_fillD2S_ACDI(i32 data, f64 v) {
+    return strToJVM(data, std::to_string(v));
 }
 
 i32 jvm_JavaLang_fillD2S_ACDII(i32 data, f64 v, i32 digits) {
     if(!data) return 0;
     std::stringstream stream;
     stream << std::fixed << std::setprecision(digits) << v;
-    std::string str = stream.str();
-    i32 length = std::min(al(data).v0, (i32) str.size());
-    for(i32 i=0;i<length;i++) {
-        w16(data + arrayOverhead + i*2, str[i]);
-    }
-    return length;
+    return strToJVM(data, stream.str());
 }
 
-i32 jvm_JavaX_fillDate_ACI(i32 data) { return 0; }
+i32 jvm_JavaX_fillDate_ACI(i32 data) {
+    // Get current time as a time_point
+    auto now = std::chrono::system_clock::now();
+    // Convert time_point to a time_t to get calendar time
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    
+    // Convert time_t to a tm structure for hour, minute, and second access
+    std::tm local_time = *std::localtime(&time_t_now);
+
+    // Get the fractional seconds (milliseconds)
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    // Output the time in hh:mm:ss.sss format
+    std::stringstream stream;
+    stream << std::put_time(&local_time, "%H:%M:%S") << '.' 
+              << std::setfill('0') << std::setw(3) << ms.count();
+    return strToJVM(data, stream.str());
+}
+
 f64 jvm_LWJGLxGLFW_getMouseX_D() { return mouseX; }
 f64 jvm_LWJGLxGLFW_getMouseY_D() { return mouseY; }
 i32 jvm_LWJGLxGLFW_getWindowHeight_I() { return height; }
@@ -325,6 +377,7 @@ i32 jvm_LWJGLxGLFW_getWindowWidth_I() { return width; }
 i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32 data, i32 shader) {
     GLsizei len = 0;
     glGetProgramInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
+    len = std::min(len, (GLsizei) al(data).v0);
     for(GLsizei i=0;i<len;i++) {
         w16(data + arrayOverhead + i*2, tmpLog[i]);
     }
@@ -335,54 +388,30 @@ i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32 data, i32 shader) {
     // (GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog
     GLsizei len = 0;
     glGetShaderInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
+    len = std::min(len, (GLsizei) al(data).v0);
     for(GLsizei i=0;i<len;i++) {
         w16(data + arrayOverhead + i*2, tmpLog[i]);
     }
     return len;
 }
+
 i32 jvm_LWJGLxOpenGL_glGenTexture_I() { GLuint result = 0; glGenTextures(1, &result); return result; }
 i32 jvm_LWJGLxOpenGL_glGetUniformLocationString_ILjava_lang_StringI(i32 a, i32 b) { 
     std::string name = strToCpp(b);
     return glGetUniformLocation(a, name.c_str());
 }
-i32 kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return 0; }
-i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
-i32 me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return 0; }
-i32 new_java_text_SimpleDateFormat_V(i32) { return 0; }
-i32 new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return 0; }
-i32 org_lwjgl_opengl_GL11C_nglGetFloatv_IJV(i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL11C_nglReadPixels_IIIIIIJV(i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL11C_nglTexImage2D_IIIIIIIIJV(i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL11C_nglTexSubImage2D_IIIIIIIIJV(i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL15C_glBindBuffer_IIV(i32 a, i32 b) { glBindBuffer(a, b); return 0; }
-i32 org_lwjgl_opengl_GL15C_glGenBuffers_I() { GLuint result = 0; glGenBuffers(1, &result); return result; }
-i32 org_lwjgl_opengl_GL15C_nglBufferSubData_IJJJV(i32, i64, i64, i64) { return 0; }
-i32 org_lwjgl_opengl_GL15C_nglDeleteBuffers_IJV(i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL15C_nglGetQueryObjectiv_IIJV(i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL20C_nglDrawBuffers_IJV(i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL20C_nglUniformMatrix2fv_IIZJV(i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL20C_nglUniformMatrix3fv_IIZJV(i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL30C_nglVertexAttribIPointer_IIIIJV(i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL33C_nglGetQueryObjecti64v_IIJV(i32, i32, i64) { return 0; }
-i32 org_lwjgl_opengl_GL43C_nglDebugMessageCallback_JJV(i64, i64) { return 0; }
-i32 org_lwjgl_opengl_GL45C_nglCreateVertexArrays_IJV(i32, i64) { return 0; }
+void org_lwjgl_opengl_GL15C_glBindBuffer_IIV(i32 a, i32 b) { glBindBuffer(a, b); }
+void org_lwjgl_opengl_GL15C_glDeleteBuffers_IV(i32 x) { GLuint xi = x; glDeleteBuffers(1, &xi); }
+void org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV(i32, i32, i32, i32, i64) {  }
 void org_lwjgl_opengl_GL46C_glBeginQuery_IIV(i32 a, i32 b) { glBeginQuery(a, b); }
 void org_lwjgl_opengl_GL46C_glBindBufferBase_IIIV(i32 a, i32 b, i32 c) { glBindBufferBase(a,b,c); }
-void org_lwjgl_opengl_GL46C_glBindImageTexture_IIIZIIIV(i32, i32, i32, i32, i32, i32, i32) { }
-void org_lwjgl_opengl_GL46C_glBlendEquationSeparatei_IIIV(i32, i32, i32) { }
-void org_lwjgl_opengl_GL46C_glBlendFuncSeparatei_IIIIIV(i32, i32, i32, i32, i32) { }
-i32 org_lwjgl_opengl_GL46C_glCheckFramebufferStatus_II(i32 i) { return glCheckFramebufferStatus(i); }
+void org_lwjgl_opengl_GL46C_glBindImageTexture_IIIZIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g) { glBindImageTexture(a,b,c,d,e,f,g); }
+void org_lwjgl_opengl_GL46C_glBlendEquationSeparatei_IIIV(i32 a, i32 b, i32 c) { glBlendEquationSeparatei(a,b,c); }
+void org_lwjgl_opengl_GL46C_glBlendFuncSeparatei_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glBlendFuncSeparatei(a,b,c,d,e); }
 void org_lwjgl_opengl_GL46C_glClipControl_IIV(i32 a, i32 b) { glClipControl(a,b); }
-i32 org_lwjgl_opengl_GL46C_glCreateProgram_I() { return glCreateProgram(); }
-i32 org_lwjgl_opengl_GL46C_glCreateShader_II(i32 type) { return glCreateShader(type); }
 void org_lwjgl_opengl_GL46C_glDispatchCompute_IIIV(i32 a, i32 b, i32 c) { glDispatchCompute(a,b,c); }
 void org_lwjgl_opengl_GL46C_glEndQuery_IV(i32 x) { glEndQuery(x); }
 void org_lwjgl_opengl_GL46C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glFramebufferTextureLayer(a,b,c,d,e); }
-i32 org_lwjgl_opengl_GL46C_glGenFramebuffers_I() { GLuint result = 0; glGenFramebuffers(1, &result); return result; }
-i32 org_lwjgl_opengl_GL46C_glGenRenderbuffers_I() { GLuint result = 0; glGenRenderbuffers(1, &result); return result; }
-i32 org_lwjgl_opengl_GL46C_glGetError_I() { return glGetError(); }
-i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
-i32 org_lwjgl_opengl_GL46C_glGetProgrami_III(i32 a, i32 b) { GLint result = 0; glGetProgramiv(a,b,&result); return result; }
 void org_lwjgl_opengl_GL46C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL46C_glRenderbufferStorageMultisample_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glRenderbufferStorageMultisample(a,b,c,d,e); }
 void org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV(i32 a, i32 b) {
@@ -392,10 +421,13 @@ void org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV(i32 a, i32 
     GLint length = code.size();
     glShaderSource(a, 1, &codePtr, &length);
 }
-i32 org_lwjgl_opengl_GL46C_glTexImage2DMultisample_IIIIIZV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f) { glTexImage2DMultisample(a,b,c,d,e,f); return 0; }
-void org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV(i32, i32, i32, i32, i32) {}
-void org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV(i32, i32, i32, i32, i32) {}
-void org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV(i32, i32, i32) {}
+// i32 org_lwjgl_opengl_GL46C_glTexImage2DMultisample_IIIIIZV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f) { glTexImage2DMultisample(a,b,c,d,e,f); return 0; }
+void org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glRenderbufferStorageMultisample(a,b,c,d,e); }
+void org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f) {
+    // GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations
+    glTexImage2DMultisample(a,b,c,d,e,f);
+}
+void org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV(i32 a, i32 b, i32 c) { glBlendEquationSeparatei(a,b,c); }
 void org_lwjgl_opengl_GL45C_glClipControl_IIV(i32 a, i32 b) { glClipControl(a,b); }
 void org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g) { glBindImageTexture(a,b,c,d!=0,e,f,g); }
 void org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV(i32 a, i32 b, i32 c) { glDispatchCompute(a,b,c); }
@@ -403,19 +435,28 @@ void org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c
 void org_lwjgl_opengl_GL42C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glBlendFuncSeparatei(a,b,c,d,e); }
 void org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV(i32 a, i32 b) { glVertexAttribI1i(a,b); }
+void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(i32 a, i32 b, i32 c, i32 d, i32 data) {
+    // (GLenum target, GLint level, GLenum format, GLenum type, void * pixels)
+    glGetTexImage(a,b,c,d,(void*)((char*)memory+data));
+}
 i32 org_lwjgl_opengl_GL45C_glCreateVertexArrays_I() { GLuint result = 0; glCreateVertexArrays(1, &result); return result; }
+i32 org_lwjgl_opengl_GL15C_glGenQueries_I() { GLuint r = 0; glGenQueries(1, &r); return r; }
+i32 org_lwjgl_opengl_GL46C_glCheckFramebufferStatus_II(i32 i) { return glCheckFramebufferStatus(i); }
+i32 org_lwjgl_opengl_GL15C_glGenBuffers_I() { GLuint result = 0; glGenBuffers(1, &result); return result; }
+i32 org_lwjgl_opengl_GL46C_glCreateProgram_I() { return glCreateProgram(); }
+i32 org_lwjgl_opengl_GL46C_glCreateShader_II(i32 type) { return glCreateShader(type); }
+i32 org_lwjgl_opengl_GL46C_glGenFramebuffers_I() { GLuint result = 0; glGenFramebuffers(1, &result); return result; }
+i32 org_lwjgl_opengl_GL46C_glGenRenderbuffers_I() { GLuint result = 0; glGenRenderbuffers(1, &result); return result; }
+i32 org_lwjgl_opengl_GL46C_glGetError_I() { return glGetError(); }
+i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
+i32 org_lwjgl_opengl_GL46C_glGetProgrami_III(i32 a, i32 b) { GLint result = 0; glGetProgramiv(a,b,&result); return result; }
 
-i32 org_lwjgl_system_JNI_callPV_IAIJV(i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIAFJV(i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIIIAIJV(i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIIIIIIIADJV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIIIIIIIAFJV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIIIIIIIASJV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_callPV_IIIIIIIIIAIJV(i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i64) { return 0; }
-i32 org_lwjgl_system_JNI_invokePPV_JIJJV(i64, i32, i64, i64) { return 0; }
-i32 org_lwjgl_system_JNI_invokePV_IIJJV(i32, i32, i64, i64) { return 0; }
-i32 org_lwjgl_system_JNI_invokePV_IJJV(i32, i64, i64) { return 0; }
-i32 org_lwjgl_system_JNI_invokePV_JJV(i64, i64) { return 0; }
+
+i32 kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return 0; }
+i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
+i32 me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return 0; }
+i32 new_java_text_SimpleDateFormat_V(i32) { return 0; }
+i32 new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return 0; }
 i32 static_java_io_BufferedInputStream_V() { return 0; }
 i32 static_java_lang_reflect_AccessibleObject_V() { return 0; }
 i32 static_java_util_Date_V() { return 0; }
@@ -485,6 +526,18 @@ void jvm_LWJGLxGLFW_setTitle_Ljava_lang_StringV(i32 str) {
     glfwSetWindowTitle(window, string.c_str());
 }
 
+void org_lwjgl_glfw_GLFW_glfwDestroyWindow_JV(i64 window0) {
+    glfwDestroyWindow(window);
+}
+
+void org_lwjgl_glfw_GLFW_glfwHideWindow_JV(i64 window0) {
+    glfwHideWindow(window);
+}
+
+void org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV(i64 window0) {
+    glfwRequestWindowAttention(window);
+}
+
 void unreachable(std::string msg) {
     std::cout << "!! Unreachable(" << msg << ") !!" << std::endl;
     // create new throwable, and return error
@@ -552,6 +605,20 @@ void createWindow() {
     }
     glfwMakeContextCurrent(window);
     // todo continue
+}
+
+i64 lastTime = 0L;
+void notifySampler(std::string funcName) {
+    // i64 thisTime = java_lang_System_nanoTime_J();
+    // if(std::abs(thisTime - lastTime) > 1000000000) {
+    /*if(lastTime++ > 1000000) {
+        // lastTime = thisTime;
+        lastTime = 0;
+        i32 err = cr(14).v0;
+        std::cerr << "Waiting... " << funcName << std::endl;
+        new_java_lang_Throwable_Ljava_lang_StringV(err, 0);
+        java_lang_Throwable_printStackTrace_V(err);
+    }*/
 }
 
 // Linux:
