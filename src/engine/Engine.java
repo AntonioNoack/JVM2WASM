@@ -7,12 +7,12 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
+import me.anno.Time;
 import me.anno.cache.AsyncCacheData;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
 import me.anno.engine.ui.render.RenderMode;
-import me.anno.engine.ui.render.SceneView;
 import me.anno.fonts.Font;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
@@ -33,6 +33,7 @@ import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
 import me.anno.utils.Clock;
+import me.anno.utils.OS;
 import me.anno.utils.async.Callback;
 import org.lwjgl.opengl.GL11C;
 
@@ -56,7 +57,7 @@ public class Engine {
 
     private static OSWindow window;
 
-    private static void init() {
+    private static void initBrowserFonts() {
         // todo setup everything that JVMPlugin would do...
         FontStats.INSTANCE.setQueryInstalledFontsImpl(Collections::emptyList);
         FontStats.INSTANCE.setGetFontHeightImpl(font -> (double) font.getSize());
@@ -68,24 +69,28 @@ public class Engine {
         FontStats.INSTANCE.setGetTextLengthImpl((font, text) -> 100.0);
     }
 
+    @NoThrow
+    @JavaScript(code = "return 1;")
+    public static native boolean runsInBrowser();
+
+    static {
+        if (!runsInBrowser()) {
+            OS.isWeb = false;
+            OS.isLinux = true;
+        }
+    }
+
     @SuppressWarnings("ConfusingMainMethod")
-    public static void main(String clazzName, boolean fp16, boolean fp32) {
-
-        //  OS.isAndroid = false;
-        //  OS.isLinux = false;
-        //  OS.isWeb = true;
-
-        //  GFX.supportsF16Targets = fp16;
-        //  GFX.supportsF32Targets = fp32;
+    public static void main(String clazzName) {
 
         // Build.setShipped(true);
 
         // LuaTest.test();
         // SciMark.test();
 
-        log("Calling init()");
-        init();
-        log("Called init()");
+        if (runsInBrowser()) {
+            initBrowserFonts();
+        }
 
         EngineBase instance;
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
@@ -104,49 +109,30 @@ public class Engine {
             return Unit.INSTANCE;
         });
 
-        log("Created panel");
-
         panel.setWeight(1f);
         instance = new SimpleStudio(panel);
 
-        log("Created Studio-instance");
-
         instance.run(false);
-
-        log("Called instance.run");
 
         Clock tick = new Clock("Engine");
 
-        log("Created clock");
-
         window = new WebGLWindow(me.anno.Engine.getProjectName());
         WindowManagement.createWindow(window, tick);
-
-        log("Created window");
-
         WindowManagement.prepareForRendering(tick);
-
-        log("Prepared for rendering");
 
         GFX.setupBasics(tick);
 
-        log("Setup basics");
+        tick.stop("GFX.setupBasics");
 
-        GFX.supportsDepthTextures = false;// todo true??
+        // todo true??
+        GFX.supportsDepthTextures = !runsInBrowser();
         RenderGraph.INSTANCE.setThrowExceptions(true);
 
-        log("Checking for exceptions");
-
         GFX.check();
-        tick.stop("Render step zero");
-
-        log("Calling gameInit()");
 
         instance.gameInit();
+
         tick.stop("Game Init");
-
-        log("Finished main");
-
     }
 
     public static void update(int width, int height, float dt) {
@@ -154,8 +140,7 @@ public class Engine {
         window.setHeight(height);
         window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
         WindowManagement.updateWindows();
-        me.anno.Time.updateTime(dt, System.nanoTime());
-        // GFXBase.renderFrame();
+        Time.updateTime(dt, System.nanoTime());
         renderFrame2(window); // easier, less stuff from other systems
     }
 
@@ -186,28 +171,17 @@ public class Engine {
 
     public static void mouseDown(int key) {
         if (window == null) return;
-        Input.INSTANCE.onMousePress(window, Key.Companion.byId(mapMouseButtons(key)));
+        Input.INSTANCE.onMousePress(window, Key.Companion.byId(key));
     }
 
     public static void mouseUp(int key) {
         if (window == null) return;
-        Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(mapMouseButtons(key)));
+        Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key));
     }
 
     public static void mouseWheel(float dx, float dy) {
         if (window == null) return;
         Input.INSTANCE.onMouseWheel(window, dx, dy, true);
-    }
-
-    private static int mapMouseButtons(int key) {
-        switch (key) {
-            case 1:
-                return 2;
-            case 2:
-                return 1;
-            default:
-                return key;
-        }
     }
 
     public static void keyModState(int state) {

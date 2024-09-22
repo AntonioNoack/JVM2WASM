@@ -236,46 +236,14 @@ public class JVM32 {
     @NoThrow
     private static int resolveIndirectByClass(int clazz, int methodPtr) {
         // unsafe memory -> from ~8ms/frame to ~6.2ms/frame
+        // log("resolveIndirect", clazz, methodPtr);
         int x = resolveIndirectByClassUnsafe(clazz, methodPtr);
         if (x < 0) {
             Class<Object> class1 = ptrTo(findClass(clazz));
             log("resolveIndirectByClass", class1.getName());
-            throwJs("classIndex, methodPtr, resolved:", clazz, methodPtr,x);
+            throwJs("classIndex, methodPtr, resolved:", clazz, methodPtr, x);
         }
         return x;
-        /* log("resolve", clazz, methodIndex);
-        // log("resolveIndirect", clazz);
-        // log("resolveIndirect-table0", indirectTable());
-        // fast path for loops
-        if (clazz == riLastClass && methodPtr == riLastMethod) return riLastImpl;
-        if (ge_ub(clazz, numClasses())) {
-            log("Memory corruption!", clazz, numClasses());
-            throw new MemoryCorruption();
-        }
-        int methodTable = read32(indirectTable() + (clazz << 2));
-        // log("resolveIndirect-table", methodTable);
-        if (methodTable == 0) {
-            log("Illegal class:", clazz);
-            throw new IllegalStateException("Class is not constructable");
-        }
-        int tableLength = read32(methodTable);
-        if (methodPtr <= 0 || methodPtr > tableLength) {
-            log("Class:", clazz);
-            log("Illegal index, length:", methodPtr, tableLength);
-            throwJs();
-        }
-        int impl = read32(methodTable + methodPtr);
-        if (impl < 0) {
-            log("resolveIndirect-class", clazz);
-            log("resolveIndirect-table0", indirectTable());
-            log("resolveIndirect-table", methodTable);
-            log("resolveIndirect-methodIdx", methodPtr);
-            throw new AbstractMethodError();
-        }
-        riLastClass = clazz;
-        riLastMethod = methodPtr;
-        riLastImpl = impl;
-        return impl;*/
     }
 
     @NoThrow
@@ -329,13 +297,15 @@ public class JVM32 {
     public static int resolveInterfaceByClass(int clazz, int methodId) {
         // log("resolve2", clazz, methodId);
         // log("class:", clazz);
-        if (clazz < 0 || clazz >= numClasses()) throw new IllegalStateException("Class index out of bounds");
+        if (unsignedGreaterThanEqual(clazz, numClasses())) {
+            throwJs("Class index out of bounds");
+        }
         int tablePtr = read32(inheritanceTable() + (clazz << 2));
         // log("tablePtr", tablePtr);
         if (tablePtr == 0) {
             log("No class table entry was found!", clazz);
             log("method:", methodId);
-            throw new RuntimeException("No class table entry was found!");
+            throwJs("No class table entry was found!");
         }
         int numInterfaces = read32(tablePtr + 8);
         /*log("#interfaces:", numInterfaces);
@@ -349,12 +319,25 @@ public class JVM32 {
         int min = 0;
         int max = tableLength - 1;
 
+        // log("resolveInterface", clazz, methodId, tableLength);
+        int id = max - min < 16 ?
+                searchInterfaceLinear(min, max, methodId, tablePtr, tableLength) :
+                searchInterfaceBinary(min, max, methodId, tablePtr, tableLength);
+
+        if (id == -1) {
+            // return -1 - min
+            reportNotFound(clazz, methodId, tableLength, tablePtr);
+        }
+
+        return id;
+    }
+
+    private static int searchInterfaceBinary(int min, int max, int methodId, int tablePtr, int tableLength) {
         while (max >= min) {
             int mid = (min + max) >> 1;
             int addr = tablePtr + (mid << 3);
             int cmp = read32(addr) - methodId;
             if (cmp == 0) {
-                // log("resolved interface", clazz, methodId);
                 return read32(addr + 4);
             }
             if (cmp < 0) {
@@ -365,7 +348,22 @@ public class JVM32 {
                 max = mid - 1;
             }
         }
+        return -1;
+    }
 
+    private static int searchInterfaceLinear(int min, int max, int methodId, int tablePtr, int tableLength) {
+        while (max >= min) {
+            int addr = tablePtr + (min << 3);
+            int cmp = read32(addr) - methodId;
+            if (cmp == 0) {
+                return read32(addr + 4);
+            }
+            min++;
+        }
+        return -1;
+    }
+
+    private static void reportNotFound(int clazz, int methodId, int tableLength, int tablePtr) {
         // return -1 - min
         log("Method could not be found", clazz);
         log("  id, length:", methodId, tableLength);
@@ -374,7 +372,6 @@ public class JVM32 {
             log("  ", read32(addr), read32(addr + 4));
         }
         throwJs("Method could not be found");
-        return -1;
     }
 
     @Alias(names = "resolveInterface")

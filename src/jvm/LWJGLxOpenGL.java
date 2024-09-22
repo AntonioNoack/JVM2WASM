@@ -411,11 +411,6 @@ public class LWJGLxOpenGL {
             "return gl.getParameter(arg0)")
     public static native int glGetIntegerImpl(int i);
 
-    @Alias(names = "org_lwjgl_opengl_GL46C_glGetIntegerv_IAIV")
-    public static void glGetIntegerv_IAIV(int id, int[] dst) {
-        throw new IllegalStateException("Operation not (yet?) supported, use glGetInteger or ask me");
-    }
-
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetString_ILjava_lang_String")
     public static String org_lwjgl_opengl_GL11C_glGetString_ILjava_lang_String(int mode) {
         switch (mode) {
@@ -744,9 +739,8 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV")
-    public static void glGetIntegeri_v_IIAIV(int query, int index, int[] dst) {
-        throwJs("Not supported/implemented");
-    }
+    @JavaScript(code = "throw 'Not supported/implemented'")
+    public static native void glGetIntegeri_v_IIAIV(int query, int index, int[] dst);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_AIV")
@@ -1175,7 +1169,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL45C_glCreateVertexArrays_I")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL45C_glCreateVertexArrays_I'")
+    @JavaScript(code = "return map(gl.createVertexArray())")
     public static native int glCreateVertexArrays_I();
 
     @NoThrow
@@ -1237,9 +1231,13 @@ public class LWJGLxOpenGL {
     public static native int glCheckFramebufferStatus_II(int target);
 
     @NoThrow
+    @JavaScript(code = "")
+    public static native void objectLabel(int type, int ptr, String name);
+
+    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glObjectLabel_IILjava_lang_CharSequenceV")
     public static void glObjectLabel_IILjava_lang_CharSequenceV(int type, int ptr, CharSequence name) {
-        // could be helpful in the future
+        objectLabel(type, ptr, name.toString());
     }
 
     @NoThrow
@@ -1273,19 +1271,22 @@ public class LWJGLxOpenGL {
     private static native void org_lwjgl_opengl_GL15C_glDeleteQueries_IV(int id);
 
     @NoThrow
+    @JavaScript(code = "/* idk */")
+    public static native void glPushDebugGroup(int target, int custom, String name);
+
+    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glPushDebugGroup_IILjava_lang_CharSequenceV")
     public static void glPushDebugGroup_IILjava_lang_CharSequenceV(int target, int custom, CharSequence name) {
-        // idc
+        glPushDebugGroup(target, custom, name.toString());
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glPopDebugGroup_V")
-    public static void glPopDebugGroup_V() {
-        // idc
-    }
+    @JavaScript(code = "/* idk */")
+    public static native void glPopDebugGroup_V();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL20C_glDrawBuffers_IV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL20C_glDrawBuffers_IV'")
+    @JavaScript(code = "gl.drawBuffers([arg0])")
     private static native void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(int i);
 }

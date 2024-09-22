@@ -540,7 +540,7 @@ var clInitFlagTable = 0
 val staticLookup = HashMap<String, Int>()
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     println("[appendStaticInstanceTable]")
-    val debugInfo = StringBuilder2(1024)
+    val debugInfo = StringBuilder2()
     staticTablePtr = ptr0
     clInitFlagTable = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
     var ptr = clInitFlagTable + numClasses // 1 byte for flag for init
@@ -555,17 +555,21 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
             // println("writing $i static $className to $ptr, size: $size")
             staticBuffer.writeLE32(ptr)
             staticLookup[className] = ptr
-            debugInfo.append("[").append(i).append("] ")
-                .append(className).append(": *").append(ptr).append("\n")
-            fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name, data) ->
-                debugInfo.append("  *").append(data.offset).append(": ").append(name)
-                    .append(": ").append(data.type).append("\n")
+            if (printDebug) {
+                debugInfo.append("[").append(i).append("] ")
+                    .append(className).append(": *").append(ptr).append("\n")
+                fieldOffsets.fields.entries.sortedBy { it.value.offset }.forEach { (name, data) ->
+                    debugInfo.append("  *").append(data.offset).append(": ").append(name)
+                        .append(": ").append(data.type).append("\n")
+                }
             }
             ptr += size
         }
     }
-    debugFolder.getChild("staticInstances.txt")
-        .writeBytes(debugInfo.values, 0, debugInfo.size)
+    if (printDebug) {
+        debugFolder.getChild("staticInstances.txt")
+            .writeBytes(debugInfo.values, 0, debugInfo.size)
+    }
     val ptr2 = appendData(printer, staticTablePtr, staticBuffer)
     assertTrue(ptr >= ptr2)
     return ptr
@@ -575,6 +579,7 @@ var methodTablePtr = 0
 var aidtCtr = 50 // disabled
 fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     println("[appendInvokeDynamicTable]")
+    val debugInfo = StringBuilder2()
 
     methodTablePtr = ptr0
 
@@ -615,8 +620,13 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
         if (gIndex.classNames[i] !in dIndex.constructableClasses) {
             if (print) println("writing $i: $clazz to null, because not constructable")
             methodTable.writeLE32(0)
+            if (printDebug) {
+                debugInfo.append("[").append(i).append("]: ").append(clazz).append(" not constructable\n")
+            }
         } else {
-            // todo: if all is the same as the parent class, we could link to the parent class :)
+            if (printDebug) {
+                debugInfo.append("[").append(i).append("]: ").append(clazz).append("\n")
+            }
             methodTable.writeLE32(ptr)
             val dynIndexToMethod = arrayOfNulls<InterfaceSig>(dynMethods.size)
             table2.writeLE32(dynMethods.size * 4)
@@ -649,7 +659,11 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                     numOk++
                     table2.writeLE32(dynIndexI.second)
                     if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexI")
-                } else if (methodIsAbstract(mapped ?: impl)) {
+                    if (printDebug) {
+                        debugInfo.append("  ").append(idx).append(": ")
+                            .append(dynIndexI.second).append(" // ").append(mapped).append("\n")
+                    }
+                } else if (methodIsAbstract(mapped)) {
                     numAbstract++
                     // to do redirect to an error function or to -1; don't warn then
                     table2.writeLE32(-1)
@@ -658,9 +672,10 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         if (mapped != sig) printUsed(mapped)
                     }
                     if (print || aidtCtr++ < 50) println("  $idx -> -1") // , available:
-                    /*for (m in hIndex.methods[clazz]!!.filter { it.name == sig.name }) {
-                        printUsed(m)
-                    }*/
+                    if (printDebug) {
+                        debugInfo.append("  ").append(idx).append(": ")
+                            .append(sig0).append(" -> -1 // ").append(mapped).append("\n")
+                    }
                 } else {
                     if (mapped in dIndex.usedMethods) {
                         numFixed++
@@ -672,9 +687,17 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         dynIndex[name] = mapped to dynIndexJ
                         table2.writeLE32(dynIndexJ)
                         if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexJ*")
+                        if (printDebug) {
+                            debugInfo.append("  ").append(idx).append(": ")
+                                .append(dynIndexJ).append("* // ").append(mapped).append("\n")
+                        }
                     } else {
                         numBroken++
                         table2.writeLE32(-1)
+                        if (printDebug) {
+                            debugInfo.append("  ").append(idx).append(": ")
+                                .append(sig0).append(" -> -1X // ").append(mapped).append("\n")
+                        }
                         if (true) {
 
                             println("[WARN] $sig ($i/$idx) is missing from dynIndex")
@@ -716,6 +739,10 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
     println("dynamic table, ok: $numOk, abstract: $numAbstract, broken: $numBroken, fixed: $numFixed, index-size: ${dynIndex.size}")
     appendData(printer, ptr0, methodTable)
     appendData(printer, ptr0 + numClasses * 4, table2)
+    if (printDebug) {
+        debugFolder.getChild("inheritanceTable1.txt")
+            .writeBytes(debugInfo.values, 0, debugInfo.size)
+    }
     return ptr
 }
 

@@ -48,15 +48,6 @@ i32 arrayOverhead = 4 + 4;
 int width = 800, height = 600;
 double mouseX = width * 0.5, mouseY = height * 0.5;
 
-// imports
-void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(i32, i32) { }
-void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
-void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
-void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
-void java_lang_System_gc_V() { gcCtr = 1000000; }
-void jvm_GC_markJSReferences_V() { }
-void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
-
 #include <sstream>
 #include <iostream>
 std::string strToCpp(i32 addr) {
@@ -69,6 +60,18 @@ std::string strToCpp(i32 addr) {
     }
     return os.str();
 }
+
+// imports
+void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(i32 runnable, i32 name) {
+    std::cerr << "Running async as sync: " << strToCpp(name) << std::endl;
+    runRunnable(runnable);
+}
+void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
+void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
+void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
+void java_lang_System_gc_V() { gcCtr = 1000000; }
+void jvm_GC_markJSReferences_V() { }
+void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
 
 i32 jvm_JVM32_log_III(i32 code, i32 r) { std::cout << code << ", " << r << std::endl; return r; }
 void jvm_JVM32_log_DV(f64 x) { std::cout << x << std::endl; }
@@ -116,7 +119,9 @@ void jvm_LWJGLxOpenGL_texImage2DAny_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 
 }
 void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
     // std::cout << "glTexImage2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ", " << f << ", " << g << ", " << h << ")" << std::endl;
-    if(c == 33340) c = 0x822C; // GL_RG32UI -> GL_RG16
+    if(c == 0x8236) c = 0x822A; // GL_R32UI -> GL_R16
+    if(c == 0x823C) c = 0x822C; // GL_RG32UI -> GL_RG16
+    if(c == 0x8D70) c = 0x805B; // GL_RGBA32UI -> GL_RGBA16
     glTexImage2D(a,b,c,d,e,f,g,h,nullptr);
 }
 void jvm_LWJGLxOpenGL_texImage3DAny_IIIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j, i32 k) {
@@ -227,8 +232,12 @@ void jvm_LWJGLxOpenGL_bufferSubData8_IJIIV(i32 buffer, i64 offset, i32 data, i32
 void jvm_LWJGLxOpenGL_bufferSubData16_IJIIV(i32 buffer, i64 offset, i32 data, i32 length) {
     glBufferSubData(buffer, offset, (u32) (length << 1), (char*) memory + (u32)data);
 }
-void jvm_LWJGLxOpenGL_glUniform1fv_IIIV(i32 u, i32 addr, i32 count) { }
-void jvm_LWJGLxOpenGL_glUniform4fv_IIIV(i32 u, i32 addr, i32 count) { }
+void jvm_LWJGLxOpenGL_glUniform1fv_IIIV(i32 u, i32 addr, i32 count) {
+    glUniform1fv(u, count, (float*)((char*)memory+addr));
+}// (GLint location, GLsizei count, const GLfloat * value)
+void jvm_LWJGLxOpenGL_glUniform4fv_IIIV(i32 u, i32 addr, i32 count) {
+    glUniform4fv(u, count>>2, (float*)((char*)memory+addr)); // correct??
+}
 void jvm_LWJGLxOpenGL_uniformMatrix2fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
     glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (u32)data)); // correct???
 }
@@ -249,10 +258,18 @@ i32 fcmpg(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 i32 fcmpl(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 
 i32 engine_Engine_fillURL_ACI(i32) { return 0; }
+
 i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(i32, i32, i32) { return 0; }
-i32 engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFI(i32, f32, i32, i32, i32, i32, i32, i32, f32) { return 0; }
-i32 engine_TextGen_genTexTexture_Ljava_lang_StringFLjava_lang_StringIII(i32, f32, i32, i32, i32) { return 0; }
-i32 engine_TextGen_measureText1_Ljava_lang_StringFLjava_lang_StringI(i32, f32, i32) { return 0; }
+i32 engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFI(
+    i32 fontName, f32 fontSize, i32 text0, i32 width, i32 height, i32 depth, i32 textColor, i32 backgroundColor, f32 y0
+) { return 0; }
+i32 engine_TextGen_genTexTexture_Ljava_lang_StringFLjava_lang_StringIII(
+    i32 fontName, f32 fontSize, i32 text, i32 widthLimit, i32 heightLimit
+) { return 0; }
+i32 engine_TextGen_measureText1_Ljava_lang_StringFLjava_lang_StringI(
+    i32 fontName, f32 fontSize, i32 text
+) { return 0; }
+
 i32 java_io_BufferedInputStream_fill_V(i32) { return 0; }
 i32 java_io_RandomAccessFile_close0_V(i32) { return 0; }
 i32 java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return 0; }
@@ -446,8 +463,26 @@ i32 org_lwjgl_opengl_GL46C_glCreateShader_II(i32 type) { return glCreateShader(t
 i32 org_lwjgl_opengl_GL46C_glGenFramebuffers_I() { GLuint result = 0; glGenFramebuffers(1, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGenRenderbuffers_I() { GLuint result = 0; glGenRenderbuffers(1, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGetError_I() { return glGetError(); }
-i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGetProgrami_III(i32 a, i32 b) { GLint result = 0; glGetProgramiv(a,b,&result); return result; }
+i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
+void jvm_LWJGLxOpenGL_objectLabel_IILjava_lang_StringV(i32 type, i32 ptr, i32 name) {
+    std::string name1 = strToCpp(name);
+    glObjectLabel(type, ptr, name1.size(), name1.c_str());
+}
+void jvm_LWJGLxOpenGL_glPushDebugGroup_IILjava_lang_StringV(i32 a, i32 b, i32 name) {
+    // (GLenum source, GLuint id, GLsizei length, const GLchar * message)
+    std::string name1 = strToCpp(name);
+    glPushDebugGroup(a, b, name1.size(), name1.c_str());
+}
+void org_lwjgl_opengl_GL46C_glPopDebugGroup_V() {
+    glPopDebugGroup();
+}
+void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstArray) {
+    if(al(dstArray).v0 < 1) return;
+    GLint dst = 0;
+    glGetIntegeri_v(type, index, &dst);
+    w32(dstArray + arrayOverhead, dst);
+}
 
 
 i32 kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return 0; }
@@ -512,6 +547,9 @@ i32i32 kotlin_jvm_internal_MutablePropertyReference_getGetter_Lkotlin_reflect_KP
 i32i32 kotlin_jvm_internal_PropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return {}; }
 f64 jvm_JavaUtil_seedUniquifier_D() {
     return java_lang_System_currentTimeMillis_J();
+}
+i32 engine_Engine_runsInBrowser_Z(){
+    return 0;
 }
 
 GLFWwindow* window = nullptr;
@@ -586,10 +624,6 @@ void createWindow() {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return;
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     std::cout << "Creating window " << width << " x " << height << std::endl;
     window = glfwCreateWindow(width, height, "Rem's Engine", nullptr, nullptr);
     if (window == nullptr) {
@@ -598,7 +632,72 @@ void createWindow() {
         return;
     }
     glfwMakeContextCurrent(window);
-    // todo continue
+}
+
+void handleError(i32 error) {
+    if (error != 0) {
+        java_lang_Throwable_printStackTrace_V(error);
+    }
+}
+
+void handleResize(GLFWwindow* window, int sx, int sy) {
+    width = sx;
+    height = sy;
+}
+
+void handleKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    handleError(engine_Engine_keyModState_IV(mods));
+    switch(action) {
+        case 0: { // release
+            handleError(engine_Engine_keyUp_IV(key));
+            break;
+        }
+        case 1: { // press
+            handleError(engine_Engine_keyDown_IV(key));
+            break;
+        }
+        case 2: { // repeat
+            handleError(engine_Engine_keyTyped_IV(key));
+            break;
+        }
+    }
+}
+
+void handleMouseButton(GLFWwindow* window, int key, int action, int mods) {
+    handleError(engine_Engine_keyModState_IV(mods));
+    switch(action) {
+        case 0: { // release
+            handleError(engine_Engine_mouseUp_IV(key));
+            break;
+        }
+        case 1: { // press
+            handleError(engine_Engine_mouseDown_IV(key));
+            break;
+        }
+    }
+}
+
+void handleCursorPos(GLFWwindow* window, double px, double py) {
+    mouseX = px;
+    mouseY = py;
+    handleError(engine_Engine_mouseMove_FFV((float) px, (float) py));
+}
+
+void handleScroll(GLFWwindow* window, double dx, double dy) {
+    handleError(engine_Engine_mouseWheel_FFV((float) dx, (float) dy));
+}
+
+void handleChar(GLFWwindow* window, unsigned int key, int mods) {
+    handleError(engine_Engine_charTyped_IIV(key, mods));
+}
+
+void attachGLFWListeners() {
+    glfwSetFramebufferSizeCallback(window, handleResize);
+    glfwSetKeyCallback(window, handleKey);
+    glfwSetMouseButtonCallback(window, handleMouseButton);
+    glfwSetCursorPosCallback(window, handleCursorPos);
+    glfwSetScrollCallback(window, handleScroll);
+    glfwSetCharModsCallback(window, handleChar);
 }
 
 i64 lastTime = 0L;
@@ -632,22 +731,23 @@ int main() {
         return -2;
     }
 
-    bool supportsFP16 = false;
-    bool supportsFP32 = true;
     i32 err = 0;
     err = init();
     if(err != 0) {
         java_lang_Throwable_printStackTrace_V(err);
         return -3;
     }
-    err = engine_Engine_main_Ljava_lang_StringZZV(0, supportsFP16, supportsFP32);
+    err = engine_Engine_main_Ljava_lang_StringV(0);
     if(err != 0) {
         java_lang_Throwable_printStackTrace_V(err);
         return -4;
     }
 
+    attachGLFWListeners();
+
     // while not done,
     float x = 1, dt = 1.0 / 60.0;
+    i64 lastTime = java_lang_System_nanoTime_J();
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -667,7 +767,7 @@ int main() {
         }
 
         if(gcCtr++ > 200) {
-            std::cout << "Running GC" << std::endl;
+            // std::cout << "Running GC" << std::endl;
             gc();
             gcCtr = 0;
         }
@@ -676,9 +776,13 @@ int main() {
         // todo if GC timer reaches X, run GC
 
         glfwSwapBuffers(window);
+        i64 thisTime = java_lang_System_nanoTime_J();
+        dt = (thisTime - lastTime) / 1e9;
+        lastTime = thisTime;
+        std::cout << "dt: " << dt << std::endl;
     }
 
-    std::cout << "Closing" << std::endl;
+    // std::cout << "Closing" << std::endl;
     glfwTerminate();
 
     return 0;

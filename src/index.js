@@ -166,12 +166,12 @@ try {
         	canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
         if(!gl) pleaseWait.innerText = "WebGL is not supported!"
 
-        var supportsFP16 = !!gl.getExtension("EXT_color_buffer_half_float")
-        var supportsFP32 = !!gl.getExtension("EXT_color_buffer_float")
+        /*var supportsFP16 = !!*/gl.getExtension("EXT_color_buffer_half_float")
+        /*var supportsFP32 = !!*/gl.getExtension("EXT_color_buffer_float")
         gl.getExtension('WEBGL_color_buffer_float')
 
         console.log("Calling main function")
-        safe(lib.engine_Engine_main_Ljava_lang_StringZZV(0, supportsFP16, supportsFP32))
+        safe(lib.engine_Engine_main_Ljava_lang_StringV(0))
         console.log("Called main function")
 
         var fi = 0
@@ -210,10 +210,14 @@ try {
         if(lib && inited) lib.engine_Engine_mouseMove_FFV(mouseX,mouseY)
     }
 
+    function mapMouseButton(i){
+        return i == 2 ? 1 : i == 1 ? 2 : i;
+    }
+
     document.onmousedown = function(e){
         if(lib && inited) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
-            lib.engine_Engine_mouseDown_IV(e.button)
+            lib.engine_Engine_mouseDown_IV(mapMouseButton(e.button))
             e.preventDefault()
         }
     }
@@ -221,15 +225,15 @@ try {
     document.onmouseup = function(e) {
         if(lib && inited) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
-            lib.engine_Engine_mouseUp_IV(e.button)
+            lib.engine_Engine_mouseUp_IV(mapMouseButton(e.button))
             e.preventDefault()
         }
     }
 
     document.oncontextmenu = function(e){
         if(lib && inited){
-            lib.engine_Engine_mouseDown_IV(2)
-            lib.engine_Engine_mouseUp_IV(2)
+            lib.engine_Engine_mouseDown_IV(1)
+            lib.engine_Engine_mouseUp_IV(1)
             e.preventDefault()
             return false
         }

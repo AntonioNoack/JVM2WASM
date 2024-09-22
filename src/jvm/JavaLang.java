@@ -13,9 +13,7 @@ import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.*;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Random;
+import java.util.*;
 
 import static jvm.JVM32.*;
 import static jvm.Utils.cl;
@@ -918,7 +916,7 @@ public class JavaLang {
             Class<V> clazz = ptrTo(findClass(i));
             // log("instance of class?", clazz instanceof Class ? 1 : 0);
             // log("class", i, clazz.getName());
-            if (name.equals(clazz.getName())) return clazz;
+            if (Objects.equals(name, clazz.getName())) return clazz;
         }
         throw new ClassNotFoundException();
     }
@@ -961,18 +959,12 @@ public class JavaLang {
 
     @Alias(names = "java_lang_System_getProperty_Ljava_lang_StringLjava_lang_String")
     public static String System_getProperty(String key) {
-        // todo should be a definable map
+        if (key == null) return null;
         switch (key) {
             case "os.name":
                 return "Linux Web";
             case "user.home":
                 return "/user/virtual";
-            case "java.vm.name":
-                return "JVM2WASM";
-            case "java.vm.vendor":
-                return "AntonioNoack";
-            case "java.vm.version":
-                return "1.0.0";
         }
         return null;
     }
@@ -987,6 +979,12 @@ public class JavaLang {
     @Alias(names = "java_lang_Class_registerNatives_V")
     public static void java_lang_Class_registerNatives_V() {
 
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_System_lineSeparator_Ljava_lang_String")
+    public static String System_lineSeparator() {
+        return "\n";
     }
 
     @Alias(names = "java_lang_Class_isPrimitive_Z")
@@ -1289,9 +1287,11 @@ public class JavaLang {
         return false;
     }
 
+    @SuppressWarnings("CallToThreadRun")
     @Alias(names = "java_lang_Thread_start_V")
     public static <V> void java_lang_Thread_start_V(Thread thread) {
         log("Warning: starting threads is not yet supported!", thread.getName());
+        thread.run();
     }
 
     @NoThrow
