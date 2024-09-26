@@ -4,11 +4,9 @@ import me.anno.fonts.Font
 import me.anno.fonts.TextGenerator
 import me.anno.fonts.mesh.CharacterOffsetCache.Companion.getOffsetCache
 import me.anno.gpu.GFX.maxTextureSize
+import me.anno.gpu.debug.DebugGPUStorage
 import me.anno.gpu.drawing.DrawTexts.simpleChars
-import me.anno.gpu.texture.Clamping
-import me.anno.gpu.texture.Filtering
 import me.anno.gpu.texture.ITexture2D
-import me.anno.gpu.texture.Texture2D.Companion.allocate
 import me.anno.gpu.texture.Texture2D.Companion.bindTexture
 import me.anno.gpu.texture.Texture2DArray
 import me.anno.utils.async.Callback
@@ -45,23 +43,15 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         bindTexture(tex.target, tex.pointer)
         val mask = (1 shl 24) - 1
         TextGen.genASCIITexture(
-            font.name,
-            font.size,
+            font.name, font.size,
             simpleChars[0][0].code,  // letters are consecutive, so first letter is enough :)
-            width,
-            height,
-            simpleChars.size,
+            width, height, simpleChars.size,
             textColor and mask,
             backgroundColor and mask,
             1f + height / 1.3f + extraPadding
         )
-
-        val size1 = width.toLong() * height * simpleChars.size shl 2
-        tex.locallyAllocated = allocate(tex.locallyAllocated, size1)
-        tex.internalFormat = GL11C.GL_RGBA8
-        tex.wasCreated = true
-        tex.filtering(Filtering.TRULY_NEAREST)
-        tex.clamping(Clamping.CLAMP)
+        tex.afterUpload(GL11C.GL_RGBA8, 4, false)
+        DebugGPUStorage.tex2da.add(tex)
         callback.ok(tex)
     }
 

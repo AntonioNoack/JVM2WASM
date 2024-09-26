@@ -179,7 +179,7 @@ try {
         var fakeFpsMultiplier = 1 // not really working, the engine is rendering only necessary frames 😅
         window.inited = true
         function render(time) {
-            console.log("Rendering frame", time)
+            // console.log("Rendering frame", time)
             if(window.ec > 20) window.stop = true
             if(canvas.width != innerWidth || canvas.height != innerHeight) {
                 console.log("Resolution changed")
@@ -188,13 +188,13 @@ try {
             }
             var dt = (time-lastTime)*1e-3/fakeFpsMultiplier
             for(var i=0;i<fakeFpsMultiplier;i++) {
-                console.log("Calling Engine.update")
+                // console.log("Calling Engine.update")
                 safe(lib.engine_Engine_update_IIFV(innerWidth, innerHeight, dt))
             }
             lastTime = time
             if(window.gcCtr++ >= 200) {
                 window.gcCtr = 0
-                console.log("Running GC")
+                // console.log("Running GC")
                 safe(lib.gc())
             }
             if(!window.stop) requestAnimationFrame(render)
@@ -324,7 +324,8 @@ try {
 
     // todo touch events
 
-    var glMap = window.glMap = [null]
+    const glMap = window.glMap = [null]
+    window.glTimeQueries = {}
     window.map = function(v){
         var id = glMap.length
         glMap[id] = v

@@ -471,7 +471,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @JavaScript(code = "" +
-            "/*console.log('glTexImage3D', arguments);*/\n" +
+            "console.log('glTexImage3D', arguments);\n" +
             "gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
             "   arg8 == gl.UNSIGNED_INT ?" +
             "   new Uint32Array(memory.buffer, arg9, arg10>>2):" +
@@ -597,8 +597,7 @@ public class LWJGLxOpenGL {
         if (data == null) {
             texImage2DNullptr(target, level, format, w, h, border, dataFormat, dataType);
         } else {
-            texImage2DAny(target, level, format, w, h, border, dataFormat, dataType,
-                    getBufferAddr(data), data.remaining() << 1);
+            texImage2DAny(target, level, format, w, h, border, dataFormat, dataType, getBufferAddr(data), data.remaining() << 1);
         }
     }
 
@@ -607,8 +606,7 @@ public class LWJGLxOpenGL {
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ByteBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
-        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType,
-                getBufferAddr(data), data.remaining());
+        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType, getBufferAddr(data), data.remaining());
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIILjava_nio_FloatBufferV")
@@ -616,8 +614,7 @@ public class LWJGLxOpenGL {
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, FloatBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
-        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType,
-                getBufferAddr(data), data.remaining() << 2);
+        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType, getBufferAddr(data), data.remaining() << 2);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIILjava_nio_ShortBufferV")
@@ -625,8 +622,7 @@ public class LWJGLxOpenGL {
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ShortBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
-        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType,
-                getBufferAddr(data), data.remaining() << 1);
+        texSubImage2D(target, level, format, w, h, border, dataFormat, dataType, getBufferAddr(data), data.remaining() << 1);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIILjava_nio_ByteBufferV")
@@ -636,8 +632,7 @@ public class LWJGLxOpenGL {
         if (data == null) {
             texImage3DNullptr(target, level, format, w, h, d, border, dataFormat, dataType);
         } else {
-            texImage3DAny(target, level, format, w, h, d, border, dataFormat, dataType,
-                    getBufferAddr(data), data.remaining());
+            texImage3DAny(target, level, format, w, h, d, border, dataFormat, dataType, getBufferAddr(data), data.remaining());
         }
     }
 
@@ -848,16 +843,6 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL15C_glGetQueryObjecti_III")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glGetQueryObjecti_III'")
-    public static native int GL15C_glGetQueryObjecti_III(int a, int b);
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ'")
-    public static native long GL33C_glGetQueryObjecti64_IIJ(int a, int b);
-
-    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ShortBufferV")
     public static void glBufferSubData_IJLjava_nio_ShortBufferV(int i, long offset, ShortBuffer data)
             throws NoSuchFieldException, IllegalAccessException {
@@ -913,13 +898,13 @@ public class LWJGLxOpenGL {
     private static native void bufferData16(int target, int addr, int length, int usage);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ByteBufferIV")
-    public static void org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ByteBufferIV(int target, ByteBuffer data, int usage)
+    public static void GL15C_glBufferData_ILjava_nio_ByteBufferIV(int target, ByteBuffer data, int usage)
             throws NoSuchFieldException, IllegalAccessException {
         bufferData8(target, getBufferAddr(data), data.remaining(), usage);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ShortBufferIV")
-    public static void org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ShortBufferIV(int target, ShortBuffer data, int usage)
+    public static void GL15C_glBufferData_ILjava_nio_ShortBufferIV(int target, ShortBuffer data, int usage)
             throws NoSuchFieldException, IllegalAccessException {
         bufferData16(target, getBufferAddr(data), data.remaining(), usage);
     }
@@ -930,11 +915,11 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @JavaScript(code = "gl.bufferSubData(arg0,arg1,new Uint8Array(memory.buffer,arg2,arg3))")
+    @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint8Array(memory.buffer,arg2,arg3))")
     private static native void bufferSubData8(int target, long offset, int addr, int length);
 
     @NoThrow
-    @JavaScript(code = "gl.bufferSubData(arg0,arg1,new Uint16Array(memory.buffer,arg2,arg3))")
+    @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint16Array(memory.buffer,arg2,arg3))")
     private static native void bufferSubData16(int target, long offset, int addr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ByteBufferV")
@@ -1061,7 +1046,9 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV")
-    @JavaScript(code = "/*console.log('glRenderbufferStorage', arguments);*/gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
+    @JavaScript(code = "" +
+            "if(arg1 == 33191 || arg1 == 6402) arg1 = 33190;\n" + // DEPTH_COMPONENT32 and DEPTH_COMPONENT isn't supported, but DEPTH_COMPONENT24 is
+            "gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
     public static native void glRenderbufferStorage(int target, int format, int width, int height);
 
     @NoThrow
@@ -1076,13 +1063,24 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBeginQuery_IIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glBeginQuery_IIV'")
+    @JavaScript(code = "if(arg0 != 35007) { gl.beginQuery(arg0,unmap(arg1)); } else { glTimeQueries[arg1] = 1; }")
+    // GL_TIME_ELAPSED isn't supported
     public static native void glBeginQuery_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
-    @JavaScript(code = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
+    @JavaScript(code = "if(arg0 != 35007) gl.endQuery(arg0)")
     public static native void glEndQuery_IV(int a);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL15C_glGetQueryObjecti_III")
+    @JavaScript(code = "return glTimeQueries[arg0] ? 0 : gl.getQueryParameter(unmap(arg0), arg1)")
+    public static native int GL15C_glGetQueryObjecti_III(int a, int b);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ")
+    @JavaScript(code = "return glTimeQueries[arg0] ? 0 : gl.getQueryParameter(unmap(arg0), arg1)")
+    public static native long GL33C_glGetQueryObjecti64_IIJ(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glMemoryBarrier_IV")
@@ -1108,28 +1106,28 @@ public class LWJGLxOpenGL {
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIADV")
     public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIADV(
             int a, int b, int c, int d, int e, int f, int g, int h, double[] data) {
-        texImage2DAny(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length);
+        texImage2DAny(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 3);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIADV")
     public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIADV(
             int a, int b, int c, int d, int e, int f, int g, int h, double[] data) {
-        texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length);
+        texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 3);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIAFV")
     public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIAFV(
             int a, int b, int c, int d, int e, int f, int g, int h, float[] data) {
-        texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length);
+        texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 2);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIIAIV")
     public static void org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIIAIV(
             int a, int b, int c, int d, int e, int f, int g, int h, int i, int[] data) {
-        texImage3DAny(a, b, c, d, e, f, g, h, i, getAddr(data) + arrayOverhead, data.length);
+        texImage3DAny(a, b, c, d, e, f, g, h, i, getAddr(data) + arrayOverhead, data.length << 2);
     }
 
     @NoThrow
@@ -1256,18 +1254,18 @@ public class LWJGLxOpenGL {
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_AIV")
     private static void org_lwjgl_opengl_GL15C_glGenQueries_AIV(int[] ids) {
         for (int i = 0; i < ids.length; i++) {
-            ids[i] = glGenQueries();
+            ids[i] = GL15C_glGenQueries_I();
         }
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_I")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glGenQueries_I'")
-    private static native int org_lwjgl_opengl_GL15C_glGenQueries_I();
+    @JavaScript(code = "return map(gl.createQuery())")
+    private static native int GL15C_glGenQueries_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_IV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glDeleteQueries_IV'")
+    @JavaScript(code = "gl.deleteQuery(unmap(arg0))")
     private static native void org_lwjgl_opengl_GL15C_glDeleteQueries_IV(int id);
 
     @NoThrow

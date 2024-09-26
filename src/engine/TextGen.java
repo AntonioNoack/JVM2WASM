@@ -113,9 +113,10 @@ public class TextGen {
 			"ctx.textAlign='center'\n" +
 			"ctx.font=(arg1|0)+'px '+str(arg0);\n" +
 			"for(let i=0;i<d;i++) ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
-			"gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h*d).data);\n" +
-			"return w;")
-	public static native int genASCIITexture(
+			"let buffer = ctx.getImageData(0,0,w,h*d).data;\n" +
+			//"for(let i=0;i<buffer.length;i++) buffer[i] = 127;\n" +
+			"gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n")
+	public static native void genASCIITexture(
 			String font, float fontSize, int text0, int width, int height, int depth,
 			int textColor, int backgroundColor, float y0);
 }

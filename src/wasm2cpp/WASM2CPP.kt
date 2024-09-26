@@ -6,6 +6,8 @@ import utils.StringBuilder2
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
+var skipStackPush = true
+
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 
 val functionsByName = HashMap<String, FunctionImpl>()
@@ -159,6 +161,4 @@ fun wasm2cpp() {
         .writeBytes(writer.values, 0, writer.size)
 
     clock.total("WASM2CPP")
-
-    // todo run it in a helper Java environment for libraries???
 }

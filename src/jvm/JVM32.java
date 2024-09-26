@@ -11,7 +11,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.GC.largestGaps;
+import static jvm.GC.*;
 import static jvm.JVMValues.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
@@ -697,12 +697,12 @@ public class JVM32 {
 
         int ptr;
         // enough space for the first allocations
-        if (!GCX.isInited) {
-            ptr = allocateNewSpace(size);
-        } else {
-            // try to find a freed place in GC first
+        if (GCX.hasGaps) {
+            // try to find a freed place in gaps first
             ptr = GC.findGap(size);
             if (ptr == 0) ptr = allocateNewSpace(size);
+        } else {
+            ptr = allocateNewSpace(size);
         }
 
         int endPtr = ptr + size;

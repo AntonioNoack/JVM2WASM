@@ -1,11 +1,14 @@
 
 #include <chrono>
 #include <cmath>
+#include <vector>
 #include <iostream>
 #include <iomanip>
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <thread>
+#include <mutex>
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -40,11 +43,19 @@ void gc() {
 #include "jvm2wasm.cpp"
 #endif
 
+// memory stuff
 size_t allocatedSize = 0;
 i32 gcCtr = 0;
 i32 objectOverhead = 4;
 i32 arrayOverhead = 4 + 4;
 
+// ParallelGC stuff
+bool useParallelGC = false;
+volatile i32 parallelGCStage = 0;
+bool shutdown = false;
+std::thread* gcThread = nullptr;
+
+// GLFW-stuff
 int width = 800, height = 600;
 double mouseX = width * 0.5, mouseY = height * 0.5;
 
@@ -61,10 +72,24 @@ std::string strToCpp(i32 addr) {
     return os.str();
 }
 
+// realloc could be handled with a mutex, too...
+std::mutex mallocMutex;
+void lockMallocMutex(){
+    mallocMutex.lock();
+}
+void unlockMallocMutex(){
+    mallocMutex.unlock();
+}
+
+i32 isParallelGC() {
+    return useParallelGC ? 1 : 0;
+}
+
 // imports
-void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(i32 runnable, i32 name) {
-    std::cerr << "Running async as sync: " << strToCpp(name) << std::endl;
-    runRunnable(runnable);
+void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(i32 runnable, i32 namePtr) {
+    std::string name = strToCpp(namePtr);
+    std::cerr << "Running async as sync: " << name << std::endl;
+    if(name != "Saving main.config") runRunnable(runnable);
 }
 void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
@@ -91,7 +116,57 @@ void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32 a, i
 void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << strToCpp(b) << std::endl; }
 void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringZV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
 void jvm_JVM32_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::endl; }
-void jvm_JVM32_trackCalloc_IV(i32) { }
+
+std::vector<i32> callocStatistics;
+void jvm_JVM32_trackCalloc_IV(i32 classId) {
+    if(classId >= 0 && classId < callocStatistics.size()) {
+        callocStatistics[classId]++;
+    }
+}
+
+void initClassStatistics() {
+    callocStatistics = std::vector<i32>(global_X, 0);
+}
+
+void printClassStatistics() {
+    i32 N = callocStatistics.size();
+
+    std::vector<std::pair<i32, i32>> indexed_values;
+    indexed_values.reserve(N);
+    i32 total = 0;
+    for (i32 i = 0; i < N; i++) {
+        i32 count = callocStatistics[i];
+        if (count > 0) {
+            total += count;
+            indexed_values.emplace_back(count, i);
+        }
+    }
+
+    i32 K = std::min((i32) 50, (i32) indexed_values.size());
+
+    // Use partial_sort to sort the top K largest elements
+    std::partial_sort(indexed_values.begin(), 
+                      indexed_values.begin() + K, 
+                      indexed_values.end(),
+                      [](const auto& a, const auto& b) {
+                          return a.first > b.first; // Sort by value in descending order
+                      });
+
+    // Output the largest K elements along with their indices
+    std::cout << "Allocations: " << total << "x" << std::endl;
+    for (i32 i = 0; i < K; i++) {
+        auto [count, classIndex] = indexed_values[i];
+        if (count == 0) break;
+        i32 clazz = findClass(classIndex);
+        i32 clazzName = java_lang_Class_getName_Ljava_lang_String(clazz).v0;
+        std::cout << count << "x " << strToCpp(clazzName) << std::endl;
+    }
+    std::cout << std::endl;
+
+    for(i32 i = 0; i < N; i++) {
+        callocStatistics[i] = 0;
+    }
+}
 
 std::string coutBuffer("");
 std::string cerrBuffer("");
@@ -136,9 +211,16 @@ void jvm_LWJGLxOpenGL_texSubImage2D_IIIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 
     glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
 }
 f32 org_lwjgl_opengl_GL11C_glGetFloat_IF(i32 type) { float v = 0.0; glGetFloatv(type,&v); return v; }
-void jvm_LWJGLxOpenGL_drawBuffersCreate_V() { }
-void jvm_LWJGLxOpenGL_drawBuffersExec_V() { }
-void jvm_LWJGLxOpenGL_drawBuffersPush_IV(i32) { }
+
+std::vector<GLenum> drawBufferTmp;
+void jvm_LWJGLxOpenGL_drawBuffersCreate_V() {}
+void jvm_LWJGLxOpenGL_drawBuffersExec_V() {
+    glDrawBuffers(drawBufferTmp.size(), drawBufferTmp.data());
+    drawBufferTmp.clear();
+}
+void jvm_LWJGLxOpenGL_drawBuffersPush_IV(i32 i) {
+    drawBufferTmp.push_back(i);
+}
 void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32 shader, i32 index, i32 name) {
     std::string name1 = strToCpp(name);
     glBindAttribLocation(shader, index, name1.c_str()); // is 0-terminated
@@ -242,10 +324,10 @@ void jvm_LWJGLxOpenGL_uniformMatrix2fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
     glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (u32)data)); // correct???
 }
 void jvm_LWJGLxOpenGL_uniformMatrix3fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix2fv(u,len/9,t,(float*)((char*) memory + (u32)data)); // correct???
+    glUniformMatrix3fv(u,len/9,t,(float*)((char*) memory + (u32)data)); // correct???
 }
 void jvm_LWJGLxOpenGL_uniformMatrix4x3fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix4fv(u,len/12,t,(float*)((char*) memory + (u32)data));
+    glUniformMatrix4x3fv(u,len/12,t,(float*)((char*) memory + (u32)data));
 }
 void jvm_LWJGLxOpenGL_uniformMatrix4fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
     glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (u32)data));
@@ -260,9 +342,9 @@ i32 fcmpl(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 i32 engine_Engine_fillURL_ACI(i32) { return 0; }
 
 i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(i32, i32, i32) { return 0; }
-i32 engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFI(
+void engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFV(
     i32 fontName, f32 fontSize, i32 text0, i32 width, i32 height, i32 depth, i32 textColor, i32 backgroundColor, f32 y0
-) { return 0; }
+) { }
 i32 engine_TextGen_genTexTexture_Ljava_lang_StringFLjava_lang_StringIII(
     i32 fontName, f32 fontSize, i32 text, i32 widthLimit, i32 heightLimit
 ) { return 0; }
@@ -333,9 +415,17 @@ i32 java_util_zip_Deflater_initIDs_V() { return 0; }
 i32 java_util_zip_Inflater_end_JV(i64) { return 0; }
 i32 java_util_zip_Inflater_initIDs_V() { return 0; }
 
+std::vector<void*> garbageWhileGC;
 i32 jvm_JVM32_getAllocatedSize_I() { return allocatedSize; }
 i32 jvm_JVM32_grow_IZ(i32 numExtraPages) { 
     size_t extraSize = numExtraPages << 16;
+    if(parallelGCStage == 1) {
+        std::cerr << "Reallocating during GC!!" << std::endl;
+        while(parallelGCStage == 1) {
+            // we're running in parallel, so we must not take away the original memory
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
     void* newMemory = realloc(memory, allocatedSize + extraSize);
     if(newMemory) {
         memory = newMemory;
@@ -624,6 +714,7 @@ void createWindow() {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return;
     }
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true); // enable debugging
     std::cout << "Creating window " << width << " x " << height << std::endl;
     window = glfwCreateWindow(width, height, "Rem's Engine", nullptr, nullptr);
     if (window == nullptr) {
@@ -632,6 +723,7 @@ void createWindow() {
         return;
     }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 }
 
 void handleError(i32 error) {
@@ -691,6 +783,19 @@ void handleChar(GLFWwindow* window, unsigned int key, int mods) {
     handleError(engine_Engine_charTyped_IIV(key, mods));
 }
 
+void APIENTRY debugCallback(GLenum source, 
+                            GLenum type, 
+                            unsigned int id, 
+                            GLenum severity, 
+                            GLsizei length, 
+                            const char *message, 
+                            const void *userParam){
+    if (source != GL_DEBUG_SOURCE_API) {
+        std::string message1(message, length);
+        std::cout << "Debug: " << source << ", " << type << ", " << id << ", " << severity << ", " << message1 << std::endl;
+    }
+}
+
 void attachGLFWListeners() {
     glfwSetFramebufferSizeCallback(window, handleResize);
     glfwSetKeyCallback(window, handleKey);
@@ -698,6 +803,13 @@ void attachGLFWListeners() {
     glfwSetCursorPosCallback(window, handleCursorPos);
     glfwSetScrollCallback(window, handleScroll);
     glfwSetCharModsCallback(window, handleChar);
+
+    // (GLDEBUGPROC callback, const void * userParam)
+    glDebugMessageCallback(debugCallback, NULL);
+    if ((org_lwjgl_opengl_GL46C_glGetInteger_II(GL_CONTEXT_FLAGS) & GL_CONTEXT_FLAG_DEBUG_BIT) == 0) {
+        std::cerr << "[GL] Warning: A non-debug context may not produce any debug output." << std::endl;
+        glEnable(GL_DEBUG_OUTPUT);
+    }
 }
 
 i64 lastTime = 0L;
@@ -715,6 +827,23 @@ void notifySampler(std::string funcName) {
     }*/
 }
 
+void runGCThread() {
+    while(!shutdown) {
+        if (parallelGCStage == 1) {
+            parallelGC1();
+            parallelGCStage = 2;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+}
+
+void startGCThread(){
+    if(useParallelGC) {
+        gcThread = new std::thread(runGCThread);
+    }
+}
+
 // Linux:
 // g++ -std=c++20 jvm2wasm.cpp -fmax-errors=20
 
@@ -722,6 +851,7 @@ int main() {
 
     initMemory();
     initFunctionTable();
+    initClassStatistics();
 
     createWindow();
     if (!window) return -1;
@@ -744,10 +874,14 @@ int main() {
     }
 
     attachGLFWListeners();
+    startGCThread();
+
+    printClassStatistics();
 
     // while not done,
     float x = 1, dt = 1.0 / 60.0;
     i64 lastTime = java_lang_System_nanoTime_J();
+    i32 csCtr = 0;
     while(!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -766,10 +900,26 @@ int main() {
             break;
         }
 
-        if(gcCtr++ > 200) {
+        /*if(++csCtr >= 2000) {
+            printClassStatistics();
+            csCtr = 0;
+        }*/
+
+        if(true || ++gcCtr >= 200) {
             // std::cout << "Running GC" << std::endl;
-            gc();
-            gcCtr = 0;
+            if(useParallelGC) {
+                if(parallelGCStage == 0) {
+                    parallelGC0();
+                    parallelGCStage = 1;
+                } else if(parallelGCStage == 2) {
+                    parallelGC2();
+                    parallelGCStage = 0;
+                    gcCtr = 0;
+                }
+            } else {
+                gc();
+                gcCtr = 0;
+            }
         }
 
         // todo run graphics
@@ -779,11 +929,15 @@ int main() {
         i64 thisTime = java_lang_System_nanoTime_J();
         dt = (thisTime - lastTime) / 1e9;
         lastTime = thisTime;
-        std::cout << "dt: " << dt << std::endl;
+        // std::cout << "dt: " << dt << ", fps: " << (1.0/dt) << std::endl;
     }
 
     // std::cout << "Closing" << std::endl;
+    shutdown = true;
     glfwTerminate();
+    if(gcThread) {
+        gcThread->join();
+    }
 
     return 0;
 }

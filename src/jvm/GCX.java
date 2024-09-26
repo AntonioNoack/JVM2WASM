@@ -1,5 +1,5 @@
 package jvm;
 
 public class GCX {
-    public static boolean isInited = false;
+    public static boolean hasGaps = false;
 }

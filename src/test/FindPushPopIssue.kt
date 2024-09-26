@@ -1,12 +1,12 @@
 package test
 
-import me.anno.utils.OS.documents
 import me.anno.utils.types.Strings.indexOf2
+import utils.dstFolder
 
 fun main() {
     // there was more pushes than pops...
     //  find out why, and fix it
-    val text = documents.getChild("IdeaProjects/JVM2WASM/tmp/jvm2wasm.wat").readTextSync()
+    val text = dstFolder.getChild("jvm2wasm.wat").readTextSync()
     var i = 0
     val prefix = "call \$stackPush"
     while (true) {

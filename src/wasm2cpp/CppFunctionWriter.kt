@@ -73,7 +73,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         defineFunctionHead(function, true)
         writer.append(" {\n")
 
-        if ('_' in function.funcName) {
+        if (false && '_' in function.funcName) {
             // writer.append("std::cout << \"[\" << (global_Q0 - global_Q) << \"] ").append(function.funcName).append("\" << std::endl;\n")
             writer.append("notifySampler(\"").append(function.funcName).append("\");\n")
         }
@@ -144,10 +144,12 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             return
         }
 
-        /*if (funcName == "stackPush" || funcName == "stackPop") {
-            if (funcName == "stackPush") pop("i32")
-            return
-        }*/
+        if (skipStackPush) {
+            if (funcName == "stackPush" || funcName == "stackPop") {
+                if (funcName == "stackPush") pop("i32")
+                return
+            }
+        }
 
         if (funcName.startsWith("swap")) {
             stack.add(stack.size - 2, stack.removeLast())

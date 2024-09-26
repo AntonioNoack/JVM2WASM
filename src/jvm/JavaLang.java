@@ -674,8 +674,8 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Class_getDeclaredMethods_ALjava_lang_reflect_Method")
-    public static <V> int Class_getDeclaredMethods(Class<V> clazz) {
-        return read32(getAddr(clazz) + objectOverhead + 8);
+    public static <V> Method[] Class_getDeclaredMethods(Class<V> clazz) {
+        return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
     }
 
     private static final NoSuchMethodException noSuchMethodEx = new NoSuchMethodException();
@@ -683,7 +683,7 @@ public class JavaLang {
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class[] parameters) throws NoSuchMethodException {
         if (name == null) return null;
-        Method[] methods = ptrTo(Class_getDeclaredMethods(self));
+        Method[] methods = Class_getDeclaredMethods(self);
         for (Method method : methods) {
             if (matches(method, name, parameters)) return method;
         }
@@ -1384,8 +1384,8 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method")
-    public static Object[] java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Object self) {
-        return empty;// todo
+    public static <V> Method[] java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Class<V> self) {
+        return Class_getDeclaredMethods(self);
     }
 
     @Alias(names = "java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor")
@@ -1395,8 +1395,8 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method")
-    public static Object[] java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method(Object self, boolean sth) {
-        return empty;// todo
+    public static <V> Method[] java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method(Class<V> self, boolean sth) {
+        return Class_getDeclaredMethods(self);
     }
 
     private static Constructor<Object>[] constructors;
@@ -1492,7 +1492,7 @@ public class JavaLang {
 
     @Alias(names = "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter")
     public static Object[] Executable_getParameters(Object self) {
-        return empty;// todo implement for panels...
+        return empty;// todo implement for panel-constructors...
     }
 
     @Alias(names = "java_lang_Double_parseDouble_Ljava_lang_StringD")

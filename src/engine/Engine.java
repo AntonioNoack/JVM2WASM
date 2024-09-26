@@ -9,17 +9,21 @@ import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.Time;
 import me.anno.cache.AsyncCacheData;
+import me.anno.config.DefaultConfig;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
 import me.anno.engine.ui.render.RenderMode;
+import me.anno.engine.ui.render.SceneView;
 import me.anno.fonts.Font;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
 import me.anno.gpu.GFX;
 import me.anno.gpu.OSWindow;
 import me.anno.gpu.WindowManagement;
-import me.anno.gpu.texture.*;
+import me.anno.gpu.texture.ITexture2D;
+import me.anno.gpu.texture.Texture2D;
+import me.anno.gpu.texture.TextureCache;
 import me.anno.graph.visual.render.RenderGraph;
 import me.anno.image.Image;
 import me.anno.input.Clipboard;
@@ -32,6 +36,7 @@ import me.anno.io.files.inner.temporary.InnerTmpFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
+import me.anno.ui.debug.TestEngine;
 import me.anno.utils.Clock;
 import me.anno.utils.OS;
 import me.anno.utils.async.Callback;
@@ -45,7 +50,6 @@ import java.util.Collections;
 import java.util.List;
 
 import static engine.GFXBase2Kt.renderFrame2;
-import static engine.TestSceneKt.testScene;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
@@ -104,14 +108,13 @@ public class Engine {
 
         log("Created IcoSphere");
 
-        panel = testScene(icoSphere, sceneView -> {
+        panel = SceneView.Companion.testScene(icoSphere, sceneView -> {
             sceneView.getRenderView().setRenderMode(RenderMode.Companion.getDEFAULT());
             return Unit.INSTANCE;
         });
 
         panel.setWeight(1f);
-        instance = new SimpleStudio(panel);
-
+        instance = new TestEngine("Engine", () -> Collections.singletonList(panel));
         instance.run(false);
 
         Clock tick = new Clock("Engine");
@@ -124,13 +127,15 @@ public class Engine {
 
         tick.stop("GFX.setupBasics");
 
-        // todo true??
+        // todo does WebGL ever support depth textures?
         GFX.supportsDepthTextures = !runsInBrowser();
         RenderGraph.INSTANCE.setThrowExceptions(true);
 
         GFX.check();
 
         instance.gameInit();
+        EngineBase.Companion.setShowFPS(true);
+        DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", true);
 
         tick.stop("Game Init");
     }
@@ -215,6 +220,11 @@ public class Engine {
         return baseURL;
     }
 
+    @Alias(names = "me_anno_io_utils_StringMap_saveMaybe_Ljava_lang_StringV")
+    private static void saveMaybe(StringMap self, String name) { // engine gets stuck after calling this :/
+        // todo make this work???
+    }
+
     @Alias(names = "me_anno_io_files_Reference_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
     public static FileReference Reference_createReference(String str) {
         String str2 = str.indexOf('\\') >= 0 ? str.replace('\\', '/') : str;
@@ -297,14 +307,14 @@ public class Engine {
             texture.setHeight(h);
             texture.setCreatedW(w);
             texture.setCreatedH(h);
-            texture.setLocallyAllocated(Texture2D.Companion.allocate(texture.getLocallyAllocated(), ((long) w * h) << 2));
             texture.setInternalFormat(GL11C.GL_RGB8);
-            texture.setWasCreated(true);
-            texture.setFiltering(Filtering.TRULY_NEAREST);
-            texture.setClamping(Clamping.REPEAT);
-            texture.ensureFilterAndClamping(Filtering.NEAREST, Clamping.CLAMP);
+            texture.afterUpload(false, 4, 4);
         }
-        if (callback != null) callback.ok(texture);
+        if (texture != null) texture.checkSession();
+        log("Finishing texture", String.valueOf(texture), String.valueOf(texture != null && texture.isCreated()));
+        if (callback != null) {
+            callback.ok(texture);
+        }
     }
 
     @Alias(names = "me_anno_image_ImageGPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_Texture2D")
@@ -643,13 +653,8 @@ public class Engine {
 
     @NoThrow
     @JavaScript(code = "" +
-            "gcLock(arg0);\n" +
-            "let name = str(arg1);\n" +
-            "setTimeout(() => {\n" +
-            "	console.log('running thread', name, arg0);\n" +
-            "	safe(window.lib.runRunnable(arg0));\n" +
-            "	gcUnlock(arg0);\n" +
-            "});\n")
+            "console.log('running thread', str(arg1));\n" +
+            "safe(window.lib.runRunnable(arg0));\n")
     private static native void runAsyncImpl(Function0<Object> runnable, String name);
 
     @Export

@@ -1,5 +1,9 @@
 package jvm.custom;
 
+import annotations.NoThrow;
+
+import java.util.Arrays;
+
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This
  * implementation provides all of the optional map operations, and permits
@@ -100,11 +104,13 @@ public class IntHashSet {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero, or if the load factor is nonpositive.
      */
-    public IntHashSet(int initialCapacity, float loadFactor) {
-        if (initialCapacity < 0)
+    private IntHashSet(int initialCapacity, float loadFactor) {
+        if (initialCapacity < 0) {
             throw new IllegalArgumentException("Illegal Initial Capacity: " + initialCapacity);
-        if (loadFactor <= 0 || Float.isNaN(loadFactor))
+        }
+        if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
             throw new IllegalArgumentException("Illegal Load factor: " + loadFactor);
+        }
         if (initialCapacity == 0)
             initialCapacity = 1;
         this.loadFactor = loadFactor;
@@ -135,6 +141,7 @@ public class IntHashSet {
     /**
      * Returns the number of key-value mappings in this map.
      */
+    @NoThrow
     public int size() {
         return count;
     }
@@ -145,6 +152,7 @@ public class IntHashSet {
      *
      * @param key key whose presence in this Map is to be tested.
      */
+    @NoThrow
     public boolean contains(int key) {
         IEntry[] tab = this.table;
         int index = (key & 0x7FFFFFFF) % tab.length;
@@ -161,6 +169,7 @@ public class IntHashSet {
      * with a larger capacity. This method is called automatically when the
      * number of keys in this map exceeds its capacity and load factor.
      */
+    @NoThrow
     private void rehash() {
         int oldCapacity = this.table.length;
         IEntry[] oldMap = this.table;
@@ -188,7 +197,7 @@ public class IntHashSet {
      * If the map previously contained a mapping for this key, the old
      * value is replaced.
      *
-     * @param key   key with which the specified value is to be associated.
+     * @param key key with which the specified value is to be associated.
      * @return whether the set was modified
      */
     public boolean add(int key) {
@@ -215,6 +224,11 @@ public class IntHashSet {
         return true;
     }
 
+    public void clear() {
+        Arrays.fill(table, null);
+        count = 0;
+    }
+
     /**
      * Removes the mapping for this key from this map if present.
      *
@@ -224,6 +238,7 @@ public class IntHashSet {
      * also indicate that the map previously associated {@code null}
      * with the specified key.
      */
+    @NoThrow
     public boolean remove(int key) {
         IEntry[] tab = this.table;
 
@@ -231,10 +246,11 @@ public class IntHashSet {
 
         for (IEntry e = tab[index], prev = null; e != null; prev = e, e = e.next) {
             if (key == e.key) {
-                if (prev != null)
+                if (prev != null) {
                     prev.next = e.next;
-                else
+                } else {
                     tab[index] = e.next;
+                }
 
                 count--;
                 // e.value = null;, probably just for GC...

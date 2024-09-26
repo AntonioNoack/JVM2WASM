@@ -1,11 +1,5 @@
 package jvm.custom;
 
-import annotations.NoThrow;
-
-import java.util.Objects;
-
-import static jvm.LWJGLxOpenGL.rgba2argb;
-
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This
  * implementation provides all of the optional map operations, and permits
@@ -71,7 +65,10 @@ import static jvm.LWJGLxOpenGL.rgba2argb;
  *
  * @author Based on Sun's java.util.HashMap (modified by koliver)
  */
-public class IntHashMap<V> {
+@SuppressWarnings("unused")
+public class IntIntHashMap {
+
+    private static final int DEFAULT_CAPACITY = 101;
 
     /**
      * The hash table data.
@@ -103,17 +100,13 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero, or if the load factor is nonpositive.
      */
-    @NoThrow
-    public IntHashMap(int initialCapacity, float loadFactor) {
+    public IntIntHashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException("Illegal Initial Capacity: " + initialCapacity);
-        if (!(loadFactor > 0.1f && loadFactor < 1f))
+        if (loadFactor <= 0 || Float.isNaN(loadFactor))
             throw new IllegalArgumentException("Illegal Load factor: " + loadFactor);
         if (initialCapacity == 0)
             initialCapacity = 1;
-        if ((initialCapacity & (initialCapacity - 1)) != 0) {
-            throw new IllegalArgumentException("Illegal Initial Capacity: " + initialCapacity);
-        }
         this.loadFactor = loadFactor;
         this.table = new IEntry[initialCapacity];
         this.threshold = (int) (initialCapacity * loadFactor);
@@ -127,15 +120,21 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero.
      */
-    @NoThrow
-    public IntHashMap(int initialCapacity) {
+    public IntIntHashMap(int initialCapacity) {
         this(initialCapacity, 0.75f);
+    }
+
+    /**
+     * Constructs a new, empty map with a default capacity, {@code 101}, and load
+     * factor, which is {@code 0.75}.
+     */
+    public IntIntHashMap() {
+        this(DEFAULT_CAPACITY, 0.75f);
     }
 
     /**
      * Returns the number of key-value mappings in this map.
      */
-    @NoThrow
     public int size() {
         return count;
     }
@@ -146,16 +145,12 @@ public class IntHashMap<V> {
      *
      * @param value value whose presence in this map is to be tested.
      */
-    @NoThrow
-    public boolean containsValue(Object value) {
+    public boolean containsValue(int value) {
         IEntry[] tab = this.table;
-        for (int i = tab.length; i-- > 0; ) {
-            for (IEntry e = tab[i]; e != null; e = e.next) {
-                if (Objects.equals(value, e.value)) {
+        for (int i = tab.length; i-- > 0; )
+            for (IEntry e = tab[i]; e != null; e = e.next)
+                if (value == e.value)
                     return true;
-                }
-            }
-        }
         return false;
     }
 
@@ -165,10 +160,9 @@ public class IntHashMap<V> {
      *
      * @param key key whose presence in this Map is to be tested.
      */
-    @NoThrow
     public boolean containsKey(int key) {
         IEntry[] tab = this.table;
-        int index = hashKey(key, tab.length);
+        int index = (key & 0x7FFFFFFF) % tab.length;
         for (IEntry e = tab[index]; e != null; e = e.next) {
             if (e.key == key) {
                 return true;
@@ -188,17 +182,17 @@ public class IntHashMap<V> {
      * @param key key whose associated value is to be returned.
      * @return the value to which this map maps the specified key.
      */
-    @NoThrow
-    public V get(int key) {
+    public int get(int key, int defaultValue) {
         IEntry[] tab = this.table;
-        int index = hashKey(key, tab.length);
+
+        int index = (key & 0x7FFFFFFF) % tab.length;
         for (IEntry e = tab[index]; e != null; e = e.next) {
             if (e.key == key) {
-                //noinspection unchecked
-                return (V) e.value;
+                return e.value;
             }
         }
-        return null;
+
+        return defaultValue;
     }
 
     /**
@@ -206,12 +200,11 @@ public class IntHashMap<V> {
      * with a larger capacity. This method is called automatically when the
      * number of keys in this map exceeds its capacity and load factor.
      */
-    @NoThrow
     private void rehash() {
         int oldCapacity = this.table.length;
         IEntry[] oldMap = this.table;
 
-        int newCapacity = Math.max(oldCapacity * 2, 16);
+        int newCapacity = oldCapacity * 2 + 1;
         IEntry[] newMap = new IEntry[newCapacity];
 
         this.threshold = (int) (newCapacity * loadFactor);
@@ -222,16 +215,11 @@ public class IntHashMap<V> {
                 IEntry e = old;
                 old = old.next;
 
-                int index = hashKey(e.key, newCapacity);
+                int index = (e.key & 0x7FFFFFFF) % newCapacity;
                 e.next = newMap[index];
                 newMap[index] = e;
             }
         }
-    }
-
-    @NoThrow
-    private int hashKey(int key, int capacity) {
-        return ((key ^ rgba2argb(key)) & 0x7fffffff) & (capacity - 1);
     }
 
     /**
@@ -246,18 +234,16 @@ public class IntHashMap<V> {
      * also indicate that the HashMap previously associated
      * {@code null} with the specified key.
      */
-    @NoThrow
-    public V put(int key, V value) {
+    public int put(int key, int value, int defaultValue) {
         // Makes sure the key is not already in the HashMap.
         IEntry[] tab = table;
-        int index = hashKey(key, tab.length);
+        int index = (key & 0x7FFFFFFF) % tab.length;
         // first look if there was an old value at key
         for (IEntry e = tab[index]; e != null; e = e.next) {
             if (key == e.key) {
-                Object old = e.value;
+                int old = e.value;
                 e.value = value;
-                //noinspection unchecked
-                return (V) old;
+                return old;
             }
         }
 
@@ -266,14 +252,14 @@ public class IntHashMap<V> {
             rehash();
 
             tab = this.table;
-            index = hashKey(key, tab.length);
+            index = (key & 0x7FFFFFFF) % tab.length;
         }
 
         // Creates the new entry.
         IEntry e = new IEntry(key, value, tab[index]);
         tab[index] = e;
         count++;
-        return null;
+        return defaultValue;
     }
 
     /**
@@ -285,11 +271,11 @@ public class IntHashMap<V> {
      * also indicate that the map previously associated {@code null}
      * with the specified key.
      */
-    @NoThrow
-    public V remove(int key) {
+    public int remove(int key, int defaultValue) {
         IEntry[] tab = this.table;
 
-        int index = hashKey(key, tab.length);
+        int index = (key & 0x7FFFFFFF) % tab.length;
+
         for (IEntry e = tab[index], prev = null; e != null; prev = e, e = e.next) {
             if (key == e.key) {
                 if (prev != null)
@@ -298,20 +284,17 @@ public class IntHashMap<V> {
                     tab[index] = e.next;
 
                 count--;
-                Object result = e.value;
-                e.value = null;
-                //noinspection unchecked
-                return (V) result;
+                // e.value = null;, probably just for GC...
+                return e.value;
             }
         }
 
-        return null;
+        return defaultValue;
     }
 
     /**
      * Removes all mappings from this map.
      */
-    @NoThrow
     public void clear() {
         IEntry[] tab = this.table;
         for (int index = tab.length; --index >= 0; )
@@ -319,14 +302,12 @@ public class IntHashMap<V> {
         count = 0;
     }
 
-    @NoThrow
     private static class IEntry {
         final int key;
-        Object value;
+        int value;
         IEntry next;
 
-        @NoThrow
-        IEntry(int key, Object value, IEntry next) {
+        IEntry(int key, int value, IEntry next) {
             this.key = key;
             this.value = value;
             this.next = next;
@@ -337,12 +318,12 @@ public class IntHashMap<V> {
             if (!(o instanceof IEntry))
                 return false;
             IEntry e = (IEntry) o;
-            return e.key == key & Objects.equals(e.value, value);
+            return e.key == key & e.value == value;
         }
 
         @Override
         public int hashCode() {
-            return key ^ Objects.hashCode(value);
+            return key ^ Integer.hashCode(value);
         }
 
     }
