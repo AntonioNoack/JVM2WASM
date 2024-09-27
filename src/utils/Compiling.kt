@@ -19,6 +19,7 @@ import listEntryPoints
 import listLibrary
 import listSuperClasses
 import me.anno.utils.structures.Compare.ifSame
+import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
@@ -248,7 +249,7 @@ fun resolveGenericTypes() {
 fun findNoThrowMethods() {
     println("[findNoThrowMethods]")
     for ((sig, annotations) in hIndex.annotations) {
-        if (annotations.any { it.clazz == "annotations/NoThrow" }) {
+        if (annotations.any2 { it.clazz == "annotations/NoThrow" }) {
             cannotThrow.add(methodName(sig))
         }
     }

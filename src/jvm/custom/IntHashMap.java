@@ -1,9 +1,11 @@
 package jvm.custom;
 
 import annotations.NoThrow;
+import me.anno.utils.structures.arrays.IntArrayList;
 
 import java.util.Objects;
 
+import static jvm.JVM32.log;
 import static jvm.LWJGLxOpenGL.rgba2argb;
 
 /**
@@ -121,7 +123,7 @@ public class IntHashMap<V> {
 
     /**
      * Constructs a new, empty map with the specified initial capacity
-     * and default load factor, which is {@code 0.75}.
+     * and default load factor, which is {@code 0.5}.
      *
      * @param initialCapacity the initial capacity of the HashMap.
      * @throws IllegalArgumentException if the initial capacity is less
@@ -129,7 +131,7 @@ public class IntHashMap<V> {
      */
     @NoThrow
     public IntHashMap(int initialCapacity) {
-        this(initialCapacity, 0.75f);
+        this(initialCapacity, 0.5f);
     }
 
     /**
@@ -290,7 +292,9 @@ public class IntHashMap<V> {
         IEntry[] tab = this.table;
 
         int index = hashKey(key, tab.length);
+        int steps = 0;
         for (IEntry e = tab[index], prev = null; e != null; prev = e, e = e.next) {
+            steps++;
             if (key == e.key) {
                 if (prev != null)
                     prev.next = e.next;
@@ -300,11 +304,13 @@ public class IntHashMap<V> {
                 count--;
                 Object result = e.value;
                 e.value = null;
+                log("Removed X using Y steps, size", key, steps, size());
                 //noinspection unchecked
                 return (V) result;
             }
         }
 
+        log("Searched X using Y steps, size", key, steps, size());
         return null;
     }
 
@@ -345,6 +351,17 @@ public class IntHashMap<V> {
             return key ^ Objects.hashCode(value);
         }
 
+    }
+
+    @NoThrow
+    public void collectKeys(IntArrayList dst) {
+        dst.clear();
+        dst.ensureCapacity(size() + 1);
+        for (IEntry entry : table) {
+            if (entry != null) {
+                dst.addUnsafe(entry.key);
+            }
+        }
     }
 
 }

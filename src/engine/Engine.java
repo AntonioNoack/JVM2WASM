@@ -2,7 +2,7 @@ package engine;
 
 import annotations.*;
 import jvm.FillBuffer;
-import jvm.GC;
+import jvm.GCTraversal;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
@@ -622,7 +622,7 @@ public class Engine {
                 size = arrayOverhead + (arrayLength(instance) << getTypeShift(clazz));
             } else {
                 // handle class instance
-                size = GC.classSizes[clazz];
+                size = GCTraversal.classSizes[clazz];
             }
 
             size = adjustCallocSize(size);

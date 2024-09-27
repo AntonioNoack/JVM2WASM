@@ -61,6 +61,7 @@ class MethodTranslator(
 
     private val sig = MethodSig.c(clazz, name, descriptor)
     private val canThrowError = canThrowError(sig)
+    private val canPush = enableTracing && canThrowError
 
     private val localVariables = ArrayList<LocalVar>()
     private val activeLocalVars = ArrayList<LocalVar>()
@@ -1158,13 +1159,13 @@ class MethodTranslator(
     }
 
     private fun stackPush() {
-        if (canThrowError && enableTracing) {
+        if (canPush) {
             printer.append("  i32.const ").append(getCallIndex()).append(" call \$stackPush\n")
         }
     }
 
     private fun stackPop() {
-        if (canThrowError && enableTracing) {
+        if (canPush) {
             printer.append("  call \$stackPop\n")
         }
     }

@@ -1,12 +1,16 @@
 package jvm.custom;
 
+import jvm.JVM32;
+
 import java.lang.ref.ReferenceQueue;
 
 import static jvm.GC.lockMallocMutex;
 import static jvm.GC.unlockMallocMutex;
+import static jvm.JVM32.getAllocationStart;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 
+@SuppressWarnings("rawtypes")
 public class WeakRef<V> {
 
     public static final IntHashMap<WeakRef> weakRefInstances = new IntHashMap<>(256);
@@ -16,9 +20,11 @@ public class WeakRef<V> {
 
     public WeakRef(V instance) {
         address = getAddr(instance);
-        lockMallocMutex();
-        next = weakRefInstances.put(address, this);
-        unlockMallocMutex();
+        if (JVM32.unsignedGreaterThanEqual(address, getAllocationStart())) {
+            lockMallocMutex();
+            next = weakRefInstances.put(address, this);
+            unlockMallocMutex();
+        } // else don't register, because instance isn't tracked
     }
 
     @SuppressWarnings("unused")

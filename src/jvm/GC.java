@@ -5,12 +5,13 @@ import annotations.JavaScript;
 import annotations.NoThrow;
 import jvm.custom.WeakRef;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
-
+import static jvm.GCGapFinder.findLargestGaps;
+import static jvm.GCGapFinder.insertGapMaybe;
+import static jvm.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
-import static jvm.JavaLang.*;
+import static jvm.JVMValues.failedToAllocateMemory;
+import static jvm.JVMValues.reachedMemoryLimit;
+import static jvm.JavaLang.getAddr;
 
 public class GC {
 
@@ -18,12 +19,11 @@ public class GC {
 
     public static byte iteration = 0;
 
-    public static final int GCOffset = 3;
+    public static final int GC_OFFSET = 3;
+    public static final int BYTE_ARRAY_CLASS = 5;
 
     public static int[] largestGaps = new int[16];// 16 pointers
     private static int[] largestGapsTmp = new int[16];
-    private static boolean hasGapsTmp = false;
-
 
     public static int generation = 1;
 
@@ -34,29 +34,46 @@ public class GC {
     @NoThrow
     @Alias(names = "gc")
     public static void invokeGC() {
-        // log("Running GC");
-        GCX.hasGaps = false;
         // run gc:
         // - nothing is running -> we can safely ignore the stack
-        iteration++;
-        generation++;
+        nextGeneration();
         long t0 = System.nanoTime();
-        traverseStaticInstances();
-        markJSReferences();
+        traverseAliveInstances();
         long t1 = System.nanoTime();
-        GCX.hasGaps = findLargestGaps(largestGaps, null);
+        findLargestGaps(largestGaps, null);
+        GCX.hasGaps = hasGaps();
         long t2 = System.nanoTime();
         log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
+    }
+
+    @NoThrow
+    @Alias(names = "concurrentGC0")
+    public static void concurrentGC0() {
+        nextGeneration();
+        long t0 = System.nanoTime();
+        traverseAliveInstances();
+        long t1 = System.nanoTime();
+        GCGapFinder.findLargestGapsInit(largestGaps);
+        long t2 = System.nanoTime();
+        log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
+    }
+
+    @NoThrow
+    @Alias(names = "concurrentGC1")
+    public static boolean concurrentGC1() {
+        boolean done = GCGapFinder.findLargestGapsStep(largestGaps, null);
+        if (done) {
+            GCX.hasGaps = hasGaps();
+        }
+        return done;
     }
 
     @NoThrow // primary thread
     @Alias(names = "parallelGC0")
     public static void parallelGC0() {
-        iteration++;
-        generation++;
+        nextGeneration();
         long t0 = System.nanoTime();
-        traverseStaticInstances();
-        markJSReferences();
+        traverseAliveInstances();
         // if we want to use gaps while collecting gaps,
         //  we need to jump over the gaps-in-use
         long t1 = System.nanoTime();
@@ -67,18 +84,112 @@ public class GC {
     @Alias(names = "parallelGC1")
     public static void parallelGC1() {
         long t1 = System.nanoTime();
-        hasGapsTmp = findLargestGaps(largestGapsTmp, largestGaps);
+        findLargestGaps(largestGapsTmp, largestGaps);
         long t2 = System.nanoTime();
         log("GC-ParallelGaps:", (int) (t2 - t1), generation);
+    }
+
+    @NoThrow
+    private static void traverseAliveInstances() {
+        // this is called from JS/C++-main loop, so the stack is empty and can be skipped
+        traverseStaticInstances();
+        markJSReferences();
+    }
+
+    @NoThrow
+    private static void nextGeneration() {
+        iteration++;
+        generation++;
     }
 
     @NoThrow // primary thread
     @Alias(names = "parallelGC2")
     public static void parallelGC2() {
+        // mergeGaps();
+        swapGaps();
+        GCX.hasGaps = hasGaps();
+    }
+
+    @NoThrow
+    private static void swapGaps() {
         int[] tmp = largestGapsTmp;
         largestGapsTmp = largestGaps;
         largestGaps = tmp;
-        GCX.hasGaps = hasGapsTmp;
+    }
+
+    @NoThrow
+    private static void mergeGaps() {
+        for (int gap : largestGapsTmp) {
+            if (instanceOf(gap, BYTE_ARRAY_CLASS)) {
+                int available = arrayLength(gap) + arrayOverhead;
+                insertGapMaybe(gap, available, largestGaps);
+            }
+        }
+    }
+
+    @NoThrow
+    private static boolean hasGaps() {
+        for (int gap : largestGaps) {
+            if (instanceOf(gap, BYTE_ARRAY_CLASS)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static int allocateNewSpace(int size) {
+        lockMallocMutex();
+        int ptr = allocateNewSpace0(size);
+        unlockMallocMutex();
+        return ptr;
+    }
+
+    private static int allocateNewSpace0(int size) {
+        int ptr = getNextPtr();
+        // log("allocated", ptr, size);
+
+        // clean memory
+        int endPtr = ptr + size;
+
+        // if ptr + size has a memory overflow over 0, throw OOM
+        if (unsignedLessThan(endPtr, ptr)) {
+            log("Memory overflow, size is probably too large", ptr, size);
+            throw reachedMemoryLimit;
+        }
+
+        // check if we have enough size
+        int allocatedSize = getAllocatedSize() - (b2i(!criticalAlloc) << 16);
+        if (unsignedLessThan(allocatedSize, endPtr)) {
+
+            // if not, call grow()
+            // how much do we want to grow?
+            int allocatedPages = allocatedSize >>> 16;
+            // once this limit has been hit, only throw once
+            int maxNumPages = 65536;// 128 ~ 16 MB; 4 GB = 65536;
+            int remainingPages = maxNumPages - allocatedPages;
+            int amountToGrow = allocatedPages >> 1;
+            int minPagesToGrow = (endPtr >>> 16) + 1 - allocatedPages;
+            if (amountToGrow > remainingPages) amountToGrow = remainingPages;
+            // should be caught by ptr<0 && endPtr > 0
+            if (minPagesToGrow > remainingPages) {
+                log("Cannot grow enough", minPagesToGrow, remainingPages);
+                throw reachedMemoryLimit;
+            }
+            if (amountToGrow < minPagesToGrow) amountToGrow = minPagesToGrow;
+            if (!grow(amountToGrow)) {
+                // if grow() fails, throw OOM error
+                log("grow() failed", amountToGrow);
+                throw failedToAllocateMemory;
+            } else {
+                // log("Grew", minPagesToGrow, amountToGrow);
+                if (reachedMemoryLimit == null) log("Mmh, awkward");
+            }
+        }
+
+        // prevent the very first allocations from overlapping
+        ptr = getNextPtr();
+        setNextPtr(ptr + size);
+        return ptr;
     }
 
     @NoThrow
@@ -127,109 +238,29 @@ public class GC {
     }
 
     @NoThrow
-    private static int getInstanceSize(int instance, int clazz) {
-        int size;
-        if (unsignedLessThan(clazz - 1, 9)) { // clazz > 0 && clazz < 10
-            // handle arrays by size
-            size = arrayOverhead + (arrayLength(instance) << getTypeShift(clazz));
-        } else {
-            // handle class instance
-            int sizesPtr = getAddr(classSizes) + arrayOverhead;
-            size = read32(sizesPtr + (clazz << 2));
-        }
-        return size;
-    }
-
-    @NoThrow
     @Alias(names = "isParallelGC")
     @JavaScript(code = "return false;")
-    private static native boolean isParallelGC();
+    static native boolean isParallelGC();
 
-    /**
-     * iterate over all memory
-     * - if instance is unused, free it = create byte[]
-     * - if instance is monitored using WeakRef, mark it as still available
-     * - find the largest unused memory spaces for reusing old space
-     */
     @NoThrow
-    private static boolean findLargestGaps(int[] largestGaps, int[] gapsInUse) {
-
-        // - find the largest gaps to reuse the memory there
-        // for that, iterate over all allocated memory
-        int instance = getAllocationStart();
-        final int iter = iteration;
-        final int endPtr = getNextPtr();
-        boolean wasUsed = true;
-        int gapStart = instance;
-        Arrays.fill(largestGaps, 0);
-        final int nc = numClasses();
-
-        // log("Scanning", instance, endPtr, iter);
-
-        if (classSizes.length != nc) {
-            throwJs("ClassSizes.length != nc");
+    static boolean unregisterWeakRef(int instance) {
+        lockMallocMutex();
+        @SuppressWarnings("rawtypes")
+        WeakRef weakRef = WeakRef.weakRefInstances.remove(instance);
+        boolean wasReferenced = weakRef != null;
+        unlockMallocMutex();
+        while (weakRef != null) {
+            weakRef.address = 0;
+            @SuppressWarnings("rawtypes")
+            WeakRef nextRef = weakRef.next;
+            weakRef.next = null; // doesn't matter anymore, so unlink them for GC
+            weakRef = nextRef;
         }
-
-        int gapCounter = 0;
-
-        smallestSize = arrayOverhead << 1;
-        smallestSizeIndex = 0;
-
-        freeMemory = 0;
-
-        boolean isParallelGC = isParallelGC();
-        while (unsignedLessThan(instance, endPtr)) {
-
-            // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
-            int clazz = readClass(instance);
-            int size = getInstanceSize(instance, clazz);
-            size = adjustCallocSize(size);
-
-            boolean isUsed = read8(instance + GCOffset) == iter;
-            if (!isUsed) {
-                // isUsed needs to be re-set, if we have parallelGC, because the instance might be around again
-                // WeakRef-references need to be deleted in ordinary and parallel GC
-                isUsed = wasUsedByWeakRef(instance) & isParallelGC;
-            }
-
-            if (isUsed != wasUsed) {
-                if (isUsed) {
-                    gapCounter++;
-                    // handle empty space in between
-                    // what if this is > 2 GiB? will be an illegal array length ->
-                    // nobody will access it anyway -> doesn't matter, as long as we compute everything with unsigned ints :)
-                    int available = instance - gapStart;
-                    freeMemory += available;
-                    if (unsignedGreaterThan(available, smallestSize)) {
-                        // log("Handling", instance, clazz);
-                        // log("Found gap :)", available);
-                        if (!contains(gapStart, gapsInUse)) {
-                            handleGap(available, gapStart, largestGaps);
-                        } // else skip gap for now
-                    } // else gap too small for us to care for
-                    // retry to find the error
-                } else {
-                    gapStart = instance;
-                }
-                wasUsed = isUsed;
-            }
-
-            instance += size;
-        }
-
-        // if the last object is not being used, we can reduce the nextPtr() by its size
-        if (!wasUsed && getNextPtr() == endPtr) {
-            setNextPtr(gapStart);
-            // log("Reduced max memory to, by", gapStart, endPtr - gapStart);
-        }
-
-        // log("Done Scanning :), instances:", numInstances);
-        // log("Gaps:", gapCounter);
-        return gapCounter > 0;
+        return wasReferenced;
     }
 
     @NoThrow
-    private static boolean contains(int gapStart, int[] gapsInUse) {
+    static boolean contains(int gapStart, int[] gapsInUse) {
         if (gapsInUse == null) return false;
         int ptr = getAddr(gapsInUse);
         int length = arrayLength(ptr); // will be 16
@@ -244,201 +275,11 @@ public class GC {
     }
 
     @NoThrow
-    private static boolean wasUsedByWeakRef(int instance) {
-        lockMallocMutex();
-        WeakRef weakRef = WeakRef.weakRefInstances.remove(instance);
-        boolean wasReferenced = weakRef != null;
-        unlockMallocMutex();
-        while (weakRef != null) {
-            weakRef.address = 0;
-            WeakRef nextRef = weakRef.next;
-            weakRef.next = null; // doesn't matter anymore, so unlink them for GC
-            weakRef = nextRef;
-        }
-        return wasReferenced;
-    }
-
-    @NoThrow
     @Alias(names = "lockMallocMutex")
     public static native void lockMallocMutex();
 
     @NoThrow
     @Alias(names = "unlockMallocMutex")
     public static native void unlockMallocMutex();
-
-    private static int smallestSize, smallestSizeIndex;
-
-    @NoThrow
-    private static void handleGap(int available, int gapStart, int[] largestGaps) {
-
-        // first step: replace with byte array, so that next time we can skip over it faster
-        // clear(gapStart, gapStart + available);
-
-        lockMallocMutex();
-        write32(gapStart, 5); // byte array, generation 0
-        write32(gapStart + objectOverhead, available - arrayOverhead); // length
-        unlockMallocMutex();
-
-        int smallestSizeIndex = GC.smallestSizeIndex;
-        largestGaps[smallestSizeIndex] = gapStart;
-
-        // reevaluate smallest size
-        int smallestSize = available;
-        for (int i = 0; i < 16; i++) {
-            int array = largestGaps[i];
-            int prev = array == 0 ? 0 : arrayLength(array);
-            if (unsignedLessThan(prev, smallestSize)) {
-                smallestSize = prev;
-                smallestSizeIndex = i;
-            }
-        }
-
-        GC.smallestSize = smallestSize;
-        GC.smallestSizeIndex = smallestSizeIndex;
-
-    }
-
-    @NoThrow
-    private static void traverseStaticInstances() {
-        int ptr = getAddr(staticFields);
-        int length = arrayLength(ptr);
-        ptr += arrayOverhead;
-        int endPtr = ptr + (length << 2);
-        // log("Traversing static instances", ptr, endPtr);
-        while (ptr < endPtr) {
-            int fieldAddr = read32(ptr);
-            int fieldValue = read32(fieldAddr);
-            traverse(fieldValue);
-            ptr += 4;
-        }
-    }
-
-    @NoThrow
-    @Alias(names = "gcMarkUsed")
-    private static void traverse(int instance) {
-        // check addr for ignored sections and NULL
-        if (unsignedGreaterThanEqual(instance, getAllocationStart())) {
-            int statePtr = instance + GCOffset;
-            byte state = read8(statePtr);
-            byte iter = iteration;
-            // log("Traversal", addr, iter, state);
-            if (state != iter) {
-                write8(statePtr, iter);
-                int clazz = readClass(instance);
-                if (clazz == 1) {
-                    traverseObjectArray(instance);
-                } else {
-                    traverseInstance(instance, clazz);
-                }
-            }// else already done
-        }// else ignore it
-    }
-
-    @NoThrow
-    private static void traverseObjectArray(int instance) {
-        int length = arrayLength(instance);
-        int ptr = instance + arrayOverhead;
-        int endPtr = ptr + (length << 2);
-        while (unsignedLessThan(ptr, endPtr)) {
-            traverse(read32(ptr));
-            ptr += 4;
-        }
-    }
-
-    @NoThrow
-    private static void traverseInstance(int instance, int clazz) {
-        int fields = read32(getAddr(fieldsByClass) + arrayOverhead + (clazz << 2));// fieldsByClass[clazz]
-        if (fields == 0) return; // no fields to process
-        int size = arrayLength(fields);
-        fields += arrayOverhead;
-        int endPtr = fields + (size << 2);
-        while (fields < endPtr) {
-            int offset = read32(fields);
-            traverse(read32(instance + offset));
-            fields += 4;
-        }
-    }
-
-    private static int[][] fieldsByClass;
-    private static int[] staticFields;
-    public static int[] classSizes;
-
-    private static void createGCFieldTable() {
-        // classes
-        int nc = numClasses();
-        int[][] fieldsByClass2 = new int[nc][];
-        fieldsByClass = fieldsByClass2;
-        int[] classSizes2 = new int[nc];
-        classSizes = classSizes2;
-        int staticFieldCtr = 0;
-        for (int i = 0; i < nc; i++) {
-            classSizes2[i] = JVM32.getInstanceSize(i);
-            Class<Object> clazz = ptrTo(findClass(i));
-            int fields = getFields(clazz);
-            if (fields == 0) continue;
-            // count fields
-            int fieldCtr = 0;
-            int length = arrayLength(fields);
-            int ptr = fields + arrayOverhead;
-            for (int j = 0; j < length; j++) {
-                Field field = ptrTo(read32(ptr));
-                int mods = field.getModifiers();
-                // check if type is relevant
-                if (!Modifier.isNative(mods)) {
-                    if (Modifier.isStatic(mods)) {
-                        staticFieldCtr++;
-                    } else {
-                        fieldCtr++;
-                    }
-                }
-                ptr += 4;
-            }
-            if (fieldCtr > 0) {
-                int[] offsets = new int[fieldCtr];
-                fieldsByClass2[i] = offsets;
-                ptr = fields + arrayOverhead;
-                fieldCtr = 0;
-                for (int j = 0; j < length; j++) {
-                    Field field = ptrTo(read32(ptr));
-                    int mods = field.getModifiers();
-                    // check if type is relevant
-                    if (!Modifier.isNative(mods) && !Modifier.isStatic(mods)) {// masking could be optimized
-                        offsets[fieldCtr++] = getFieldOffset(field);
-                    }
-                    ptr += 4;
-                }
-            }
-        }
-        int ctr = 0;
-        int[] staticFields2 = new int[staticFieldCtr];
-        // log("Counted {} static fields", staticFieldCtr);
-        staticFields = staticFields2;
-        for (int i = 0; i < nc; i++) {
-            Class<Object> clazz = ptrTo(findClass(i));
-            int fields = getFields(clazz);
-            if (fields == 0) continue;
-            // count fields
-            int length = arrayLength(fields);
-            int staticOffset = findStatic(i, 0);
-            int ptr = fields + arrayOverhead;
-            for (int j = 0; j < length; j++) {
-                Field field = ptrTo(read32(ptr));
-                int mods = field.getModifiers();
-                // check if type is relevant
-                if (!Modifier.isNative(mods)) {
-                    if (Modifier.isStatic(mods)) {
-                        staticFields2[ctr++] = staticOffset + getFieldOffset(field);
-                    }
-                }
-                ptr += 4;
-            }
-        }
-    }
-
-    static {
-        log("Creating GC field table");
-        createGCFieldTable();
-        log("Finished initializing GC");
-    }
 
 }

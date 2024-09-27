@@ -55,6 +55,10 @@ volatile i32 parallelGCStage = 0;
 bool shutdown = false;
 std::thread* gcThread = nullptr;
 
+// ConcurrentGC stuff
+bool useConcurrentGC = true;
+i32 concurrentGCStage = 0;
+
 // GLFW-stuff
 int width = 800, height = 600;
 double mouseX = width * 0.5, mouseY = height * 0.5;
@@ -73,12 +77,12 @@ std::string strToCpp(i32 addr) {
 }
 
 // realloc could be handled with a mutex, too...
-std::mutex mallocMutex;
+std::recursive_mutex mallocMutex;
 void lockMallocMutex(){
-    mallocMutex.lock();
+    if(useParallelGC) mallocMutex.lock();
 }
 void unlockMallocMutex(){
-    mallocMutex.unlock();
+    if(useParallelGC) mallocMutex.unlock();
 }
 
 i32 isParallelGC() {
@@ -905,16 +909,26 @@ int main() {
             csCtr = 0;
         }*/
 
-        if(true || ++gcCtr >= 200) {
+        if (++gcCtr >= 2000) {
             // std::cout << "Running GC" << std::endl;
-            if(useParallelGC) {
-                if(parallelGCStage == 0) {
+            if (useParallelGC) {
+                if (parallelGCStage == 0) {
                     parallelGC0();
                     parallelGCStage = 1;
-                } else if(parallelGCStage == 2) {
+                } else if (parallelGCStage == 2) {
                     parallelGC2();
                     parallelGCStage = 0;
                     gcCtr = 0;
+                }
+            } else if (useConcurrentGC) {
+                if (concurrentGCStage == 0) {
+                    concurrentGC0();
+                    concurrentGCStage = 1;
+                } else {
+                    if (concurrentGC1()) {
+                        concurrentGCStage = 0;
+                        gcCtr = 0;
+                    } // else stage stays the same
                 }
             } else {
                 gc();

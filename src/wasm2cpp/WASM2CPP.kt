@@ -6,7 +6,7 @@ import utils.StringBuilder2
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-var skipStackPush = true
+var skipStackPush = false
 
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 

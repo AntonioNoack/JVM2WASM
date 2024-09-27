@@ -74,7 +74,7 @@ var addDebugMethods = false
 // if this flag is true, fields that aren't read won't be written
 var fieldsRWRequired = false
 
-val stackSize = if (enableTracing) 1024 * 32 else 0
+val stackSize = if (enableTracing) 1024 * 1024 else 0
 
 val classReplacements = hashMapOf(
     "java/util/concurrent/ConcurrentHashMap" to "java/util/HashMap",

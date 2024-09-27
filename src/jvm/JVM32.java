@@ -11,8 +11,8 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.GC.*;
-import static jvm.JVMValues.*;
+import static jvm.GC.largestGaps;
+import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 
@@ -439,10 +439,10 @@ public class JVM32 {
     }
 
     @Alias(names = "gis")
-    public static int getInstanceSize(int clazz) {
+    public static int getInstanceSizeC(int classIndex) {
         // look up class table for size
-        if (clazz == 0 || (clazz >= 17 && clazz < 25)) return arrayOverhead;
-        int tableAddress = read32(inheritanceTable() + (clazz << 2));
+        if (classIndex == 0 || (classIndex >= 17 && classIndex < 25)) return arrayOverhead;
+        int tableAddress = read32(inheritanceTable() + (classIndex << 2));
         return read32(tableAddress + 4);
     }
 
@@ -461,7 +461,7 @@ public class JVM32 {
             throwJs("Class cannot be created");
         }*/
         if (trackAllocations) trackCalloc(clazz);
-        int instanceSize = getInstanceSize(clazz);
+        int instanceSize = getInstanceSizeC(clazz);
         if (instanceSize <= 0)
             throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
         int newInstance = calloc(instanceSize);
@@ -472,7 +472,7 @@ public class JVM32 {
             printStackTrace();
         }*/
 
-        write32(newInstance, clazz | (GC.iteration << 24));
+        writeClass(newInstance, clazz);
         return newInstance;
     }
 
@@ -540,7 +540,7 @@ public class JVM32 {
         }*/
 
         // log("calloc/2", clazz, instanceSize, newInstance);
-        write32(newInstance, clazz); // [] has index 1
+        writeClass(newInstance, clazz); // [] has index 1
         write32(newInstance + objectOverhead, length); // array length
         // log("instance:", newInstance);
         return newInstance;
@@ -635,6 +635,7 @@ public class JVM32 {
     public static native boolean grow(int numPages);
 
     @NoThrow
+
     public static int adjustCallocSize(int size) {
         // 4 is needed for GPU stuff, or we'd have to reallocate it on the JS side
         return ((size + 3) >>> 2) << 2;
@@ -642,52 +643,9 @@ public class JVM32 {
 
     public static boolean criticalAlloc = false;
 
-    private static int allocateNewSpace(int size) {
-        int ptr = getNextPtr();
-        // log("allocated", ptr, size);
-
-        // clean memory
-        int endPtr = ptr + size;
-
-        // if ptr + size has a memory overflow over 0, throw OOM
-        if (unsignedLessThan(endPtr, ptr)) {
-            log("Memory overflow, size is probably too large", ptr, size);
-            throw reachedMemoryLimit;
-        }
-
-        // check if we have enough size
-        int allocatedSize = getAllocatedSize() - (b2i(!criticalAlloc) << 16);
-        if (unsignedLessThan(allocatedSize, endPtr)) {
-
-            // if not, call grow()
-            // how much do we want to grow?
-            int allocatedPages = allocatedSize >>> 16;
-            // once this limit has been hit, only throw once
-            int maxNumPages = 65536;// 128 ~ 16 MB; 4 GB = 65536;
-            int remainingPages = maxNumPages - allocatedPages;
-            int amountToGrow = allocatedPages >> 1;
-            int minPagesToGrow = (endPtr >>> 16) + 1 - allocatedPages;
-            if (amountToGrow > remainingPages) amountToGrow = remainingPages;
-            // should be caught by ptr<0 && endPtr > 0
-            if (minPagesToGrow > remainingPages) {
-                log("Cannot grow enough", minPagesToGrow, remainingPages);
-                throw reachedMemoryLimit;
-            }
-            if (amountToGrow < minPagesToGrow) amountToGrow = minPagesToGrow;
-            if (!grow(amountToGrow)) {
-                // if grow() fails, throw OOM error
-                log("grow() failed", amountToGrow);
-                throw failedToAllocateMemory;
-            } else {
-                // log("Grew", minPagesToGrow, amountToGrow);
-                if (reachedMemoryLimit == null) log("Mmh, awkward");
-            }
-        }
-
-        // prevent the very first allocations from overlapping
-        ptr = getNextPtr();
-        setNextPtr(ptr + size);
-        return ptr;
+    @NoThrow
+    public static void writeClass(int ptr, int clazz) {
+        write32(ptr, clazz | (GC.iteration << 24));
     }
 
     @Alias(names = "_c")
@@ -700,9 +658,11 @@ public class JVM32 {
         if (GCX.hasGaps) {
             // try to find a freed place in gaps first
             ptr = GC.findGap(size);
-            if (ptr == 0) ptr = allocateNewSpace(size);
+            if (ptr == 0) {
+                ptr = GC.allocateNewSpace(size);
+            }
         } else {
-            ptr = allocateNewSpace(size);
+            ptr = GC.allocateNewSpace(size);
         }
 
         int endPtr = ptr + size;
@@ -866,11 +826,13 @@ public class JVM32 {
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(int a, int b);
 
+
     @Alias(names = "al")
     public static int arrayLength(int instance) {
         if (instance == 0) throw new NullPointerException("[].length");
         return read32(instance + objectOverhead);
     }
+
 
     @Alias(names = "isOOB")
     public static void checkOutOfBounds(int instance, int index) {
@@ -1077,6 +1039,9 @@ public class JVM32 {
     @WASM(code = "i32.load")
     public static native int read32(int addr);
 
+    /**
+     * returns the class index for the given instance
+     */
     @NoThrow
     @WASM(code = "i32.load i32.const 16777215 i32.and")
     public static native int readClass(int addr);
@@ -1135,7 +1100,10 @@ public class JVM32 {
         return b;
     }
 
+    private static boolean canWarnStackOverflow = true;
+
     @NoThrow
+
     @Alias(names = "stackPush")
     public static void pushCall(int idx) {
         int stackPointer = getStackPtr() - 4;
@@ -1146,7 +1114,11 @@ public class JVM32 {
         if (unsignedGreaterThanEqual(stackPointer, limit)) {
             write32(stackPointer, idx);
         } else if (stackPointer == limit - 4) {
-            log("Warning: Exited stack space, meaning 256k recursive calls");
+            if (canWarnStackOverflow) {
+                canWarnStackOverflow = false;
+                log("Warning: Exited stack space, meaning",
+                        (getStackPtr0() - getStackLimit()) >> 2, " recursive calls");
+            }
         }
         setStackPtr(stackPointer);
     }
@@ -1168,6 +1140,7 @@ public class JVM32 {
     public static native void setStackPtr(int addr);
 
     @NoThrow
+
     @Alias(names = "stackPop")
     public static void popCall() {
         popCall0();
