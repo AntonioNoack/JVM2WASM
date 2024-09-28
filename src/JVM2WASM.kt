@@ -485,7 +485,7 @@ fun jvm2wasm() {
 
     val parentClazz = "kotlin/jvm/internal/PropertyReference1Impl"
     val clazzMissing = "me/anno/ecs/systems/Systems\$registerSystem\$1\$1"
-    println("SuperClass: ${hIndex.superClass[clazzMissing]}, Interfaces: ${hIndex.interfaces[clazzMissing]}")
+    println("  SuperClass: ${hIndex.superClass[clazzMissing]}, Interfaces: ${hIndex.interfaces[clazzMissing]}")
     val parentMissing = MethodSig.c(
         parentClazz, "get",
         "(Ljava_lang_Object;)Ljava_lang_Object;"
@@ -580,17 +580,17 @@ fun jvm2wasm() {
     headerPrinter.append(bodyPrinter)
     headerPrinter.append(") ;; end of module\n")
 
-    println("total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
+    println("  Total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
 
     /*for (it in gIndex.interfaceIndex.entries.sortedBy { it.value }) {
         println("${it.value}: ${it.key}")
     }*/
 
-    println("setter/getter: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
+    println("  Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
 
     compileToWASM(headerPrinter)
 
-    println("${dIndex.constructableClasses.size}/${gIndex.classNames.size} classes are constructable")
+    println("  ${dIndex.constructableClasses.size}/${gIndex.classNames.size} classes are constructable")
 
     /*for ((name, size) in gIndex.classNames
         .map { it to gIndex.getFieldOffsets(it, false).offset }

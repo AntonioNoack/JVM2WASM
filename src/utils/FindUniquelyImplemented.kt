@@ -5,6 +5,64 @@ import gIndex
 import hIndex
 import me.anno.utils.structures.maps.CountMap
 
+val methodVariants = HashMap<MethodSig, HashSet<MethodSig>>()
+
+fun getMethodVariants(sig: MethodSig): Set<MethodSig> {
+    return if (sig.clazz in dIndex.constructableClasses) {
+        methodVariants.getOrPut(sig) {
+            val variants = HashSet<MethodSig>()
+            val mapped = hIndex.getAlias(sig)
+            variants.add(mapped)
+            val children = hIndex.childClasses[sig.clazz]
+            if (children != null) {
+                for (child in children) {
+                    variants.addAll(getMethodVariants(sig.withClass(child)))
+                }
+            }
+            variants
+        }
+    } else emptySet()
+}
+
+fun countMethodVariants(sig: MethodSig): Int {
+    return getMethodVariants(sig).size
+}
+
+fun markChildMethodsFinal(sig: MethodSig) {
+    if (sig.clazz in dIndex.constructableClasses) {
+        hIndex.finalMethods.add(sig)
+        val children = hIndex.childClasses[sig.clazz] ?: return
+        for (childClass in children) {
+            markChildMethodsFinal(sig.withClass(childClass))
+        }
+    }
+}
+
+fun findMethodsWithoutChildClasses(): Int {
+
+    val finalMethods0 = hIndex.finalMethods.size
+    for (clazz in gIndex.classNames) {
+        if (clazz !in dIndex.constructableClasses) continue
+        if (hIndex.childClasses[clazz]?.any { it in dIndex.constructableClasses } != true) {
+            // no constructable child classes -> all its methods must be final
+            val methods = hIndex.methods[clazz] ?: continue
+            hIndex.finalMethods.addAll(methods)
+        } else if (clazz in dIndex.constructableClasses) {
+            // if all children have the same implementation, it's final for all of them, too
+            val methods = hIndex.methods[clazz] ?: continue
+            for (method in methods) {
+                if (method !in hIndex.finalMethods) {
+                    if (countMethodVariants(method) == 1) {
+                        // mark all child methods final
+                        markChildMethodsFinal(method)
+                    }
+                }
+            }
+        }
+    }
+    return hIndex.finalMethods.size - finalMethods0
+}
+
 /**
  * find functions with a single implementation only, and make it final
  * */
@@ -16,17 +74,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
 
     // of all classes without constructable child classes,
     // all their methods are final
-    var finalMethods = 0
-    for (clazz in gIndex.classNames) {
-        if (hIndex.childClasses[clazz]?.any { it in dIndex.constructableClasses } != true) {
-            val methods = hIndex.methods[clazz] ?: continue
-            for (method in methods) {
-                if (hIndex.finalMethods.add(method)) { // finding new final methods :)
-                    finalMethods++
-                }
-            }
-        }
-    }
+    var finalMethods = findMethodsWithoutChildClasses()
 
     val methodCounter = CountMap<InterfaceSig>(usedMethods.size)
     for (sig in usedMethods) {
@@ -63,6 +111,11 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         }
     }
 
-    println("found $finalMethods uniquely implemented methods and made them final :)")
+    println("  found $finalMethods uniquely implemented methods and made them final :)")
+
+    // HashSet and LinkedHashSet share the same implementation
+    // printUsed(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z"))
+    // printUsed(MethodSig.c("java/util/LinkedHashSet", "add", "(Ljava/lang/Object;)Z"))
+    // assertTrue(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z") in hIndex.finalMethods)
 
 }

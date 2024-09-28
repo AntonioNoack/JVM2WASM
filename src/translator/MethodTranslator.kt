@@ -968,8 +968,8 @@ class MethodTranslator(
 
         val sig = hIndex.getAlias(sig0)
 
-        val meth = hIndex.methods.getOrPut(owner) { HashSet() }
-        if (sig == sig0 && meth.add(sig0) && static) {
+        val methodsByOwner = hIndex.methods.getOrPut(owner) { HashSet() }
+        if (sig == sig0 && methodsByOwner.add(sig0) && static) {
             hIndex.staticMethods.add(sig0)
         }
 

@@ -5,6 +5,7 @@ fun createJSImports(
     jsPseudoImplemented: Map<String, MethodSig>,
     numPages: Int
 ) {
+    println("[createJSImports]")
     val jsFileText = StringBuilder2(256)
     fun jsHeader(name: String, sig: MethodSig) {
         jsFileText.append("  ").append(name).append("(")

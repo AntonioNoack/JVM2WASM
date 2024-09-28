@@ -89,7 +89,7 @@ public class GCGapFinder {
     }
 
     public static boolean findLargestGapsStep(int[] largestGaps, int[] gapsInUse) {
-        int remainingBudget = 20_000; // why soo few???
+        int remainingBudget = 20_000;
 
         // - find the largest gaps to reuse the memory there
         // for that, iterate over all allocated memory

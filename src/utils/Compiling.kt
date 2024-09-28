@@ -18,6 +18,7 @@ import jvm.JVM32.*
 import listEntryPoints
 import listLibrary
 import listSuperClasses
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
@@ -130,7 +131,7 @@ fun resolveGenericTypes() {
             val generics = hIndex.generics[clearSuperType]
 
             if (generics == null) {
-                println("Missing generics of $clearSuperType by $superType")
+                println("  Missing generics of $clearSuperType by $superType")
                 continue
             }
 
@@ -186,8 +187,8 @@ fun resolveGenericTypes() {
                             val sig3 = candidates.first()
                             if (sig2 == sig3) throw NotImplementedError()
                             hIndex.setAlias(sig2, sig3)
-                            println("Arguments mismatch!, assumed only viable to match")
-                        } else println("Arguments mismatch!")
+                            println("  Arguments mismatch!, assumed only viable to match")
+                        } else println("  Arguments mismatch!")
                         continue
                     }
 
@@ -203,13 +204,13 @@ fun resolveGenericTypes() {
                     if (mappedParams.size != params.size) {
                         if (candidates.size == 1) {
                             // map candidate
-                            println("Using only candidate, bc didn't find all mappings for $clazz, $method")
+                            println("  Using only candidate, bc didn't find all mappings for $clazz, $method")
                             val sig2 = method.withClass(clazz)
                             val sig3 = candidates.first()
                             if (sig2 == sig3) throw NotImplementedError()
                             hIndex.setAlias(sig2, sig3)
                         } else {
-                            println("Didn't find all mappings for $clazz, $method!")
+                            println("  Didn't find all mappings for $clazz, $method!")
                         }
                         continue
                     }
@@ -238,7 +239,7 @@ fun resolveGenericTypes() {
                         val sig2 = method.withClass(clazz)
                         if (sig2 == implMethod) throw NotImplementedError()
                         hIndex.setAlias(sig2, implMethod)
-                    } else println("warn! no mapping found for [$clazz]: $generics to $superType by $params, $candidates")
+                    } else println("  warn! no mapping found for [$clazz]: $generics to $superType by $params, $candidates")
 
                 }
             }
@@ -360,23 +361,25 @@ fun replaceRenamedDependencies() {
 }
 
 fun checkMissingClasses() {
+    println("[checkMissingClasses]")
     for (clazz in hIndex.methods.keys) {
         val superClass = hIndex.superClass[clazz] ?: continue
         if (clazz !in (hIndex.childClasses[superClass] ?: emptySet())) {
-            throw IllegalStateException("Missing $clazz in $superClass")
+            assertFail("Missing $clazz in $superClass")
         }
     }
 }
 
 fun resolveAll(entryClasses: Set<String>, entryPoints: Set<MethodSig>) {
-    println("// starting resolve")
+    println("[resolveAll]")
     val t0 = System.nanoTime()
     dIndex.resolve(entryClasses, entryPoints, ::cannotUseClass)
     val t1 = System.nanoTime()
-    println("// finished resolve in ${((t1 - t0) * 1e-9).f3()}s")
+    println("  Finished resolve in ${((t1 - t0) * 1e-9).f3()}s")
 }
 
 fun indexFieldsInSyntheticMethods() {
+    println("[indexFieldsInSyntheticMethods]")
     for ((name, dlu) in DelayedLambdaUpdate.needingBridgeUpdate) {
         if (name in dIndex.constructableClasses) {
             dlu.indexFields()
@@ -411,6 +414,7 @@ fun calculateFieldOffsets() {
 
 fun printInterfaceIndex() {
     if (printDebug) {
+        println("[printInterfaceIndex]")
         val debugInfo = StringBuilder2()
         gIndex.interfaceIndex.entries.sortedBy { it.value }
             .forEach { (sig, index) ->
@@ -773,6 +777,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
 }
 
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
+    println("[printMethodImplementations]")
     bodyPrinter.ensureExtra(gIndex.translatedMethods
         .filter { methodName(it.key) in usedMethods }
         .values.sumOf { it.length })
@@ -784,7 +789,7 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
         } else if (!name.startsWith("new_") && !name.startsWith("static_") &&
             sig !in hIndex.getterMethods && sig !in hIndex.setterMethods
         ) {
-            println("Not actually used: $name")
+            println("  Not actually used: $name")
         }// else we don't care we didn't use it
     }
 }

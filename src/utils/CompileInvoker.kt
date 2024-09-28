@@ -5,6 +5,7 @@ import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import me.anno.utils.OS.documents
+import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.types.Floats.f3
 import me.anno.utils.types.Strings.distance
@@ -26,7 +27,7 @@ fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.clazz): String? {
 
 val builder = Builder(512)
 fun printUsed(sig: MethodSig) {
-    builder.append(sig).append(":")
+    builder.append("  ").append(sig).append(":")
     if (sig in (hIndex.methods[sig.clazz] ?: emptySet())) builder.append(" known")
     if (sig in dIndex.usedMethods) builder.append(" used")
     else {
@@ -96,10 +97,10 @@ fun compileToWASM(printer: StringBuilder2) {
         it.write(printer.values, 0, printer.size)
     }
 
-    println("#strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize}")
+    println("  Number of constant Strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize.toLong().formatFileSize()}")
 
     val t1 = System.nanoTime()
-    println("total Kotlin time: ${((t1 - t0) * 1e-9).f3()}s")
+    println("  Total Kotlin time: ${((t1 - t0) * 1e-9).f3()}s")
 
     val process = Runtime.getRuntime().exec("wsl")
     printAsync(process.inputStream, false)
@@ -111,7 +112,7 @@ fun compileToWASM(printer: StringBuilder2) {
     process.waitFor()
 
     val t2 = System.nanoTime()
-    println("total time: ${((t2 - t0) * 1e-9).f3()}s")
+    println("  Total time: ${((t2 - t0) * 1e-9).f3()}s")
 
 }
 

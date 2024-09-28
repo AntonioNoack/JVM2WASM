@@ -20,7 +20,7 @@ fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable:
     fun isConstructable() = clazz in dIndex.constructableClasses
     if (throwNotConstructable && !(isConstructable() || isStatic) && methodSig in hIndex.methods[clazz]!!) {
         printUsed(methodSig)
-        println("child classes: ${hIndex.superClass.entries.filter { it.value == clazz }.map { it.key }}")
+        println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz }.map { it.key }}")
         LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz)")
     }
 

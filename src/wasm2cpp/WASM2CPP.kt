@@ -6,7 +6,7 @@ import utils.StringBuilder2
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-var skipStackPush = false
+var skipStackPush = true
 
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 
@@ -146,11 +146,11 @@ fun wasm2cpp() {
     writer.append("void notifySampler(std::string funcName);\n")
 
     try {
-       /* parser.functions.removeIf {
-            it.funcName != "me_anno_gpu_deferred_DeferredSettings_appendLayerWriters_Ljava_lang_StringBuilderLme_anno_utils_structures_arrays_BooleanArrayListZV"
-        }*/
+        /* parser.functions.removeIf {
+             it.funcName != "me_anno_gpu_deferred_DeferredSettings_appendLayerWriters_Ljava_lang_StringBuilderLme_anno_utils_structures_arrays_BooleanArrayListZV"
+         }*/
         defineFunctionImplementations(parser)
-       fillInFunctionTable(parser)
+        fillInFunctionTable(parser)
     } catch (e: Throwable) {
         e.printStackTrace()
     }

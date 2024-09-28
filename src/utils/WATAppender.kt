@@ -37,7 +37,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
     val clazzIndex = gIndex.getClassIndex("java/lang/Class")
     val classSize = fields.offset
 
-    println("class fields: ${fields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
+    println("  class fields: ${fields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
 
     val classData = ByteArrayOutputStream2(classSize * numClasses)
     for (i in 0 until numClasses) {
@@ -156,9 +156,9 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                 }
             }
 
-            if (clazz < 10) println("fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
+            if (clazz < 10) println("  fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
                     fields2.joinToString { "${gIndex.getString(it.first)}" })
-            else if (clazz == 10 && numClasses > 11) println("...")
+            else if (clazz == 10 && numClasses > 11) println("  ...")
 
             if (clazz > 0 && gIndex
                     .getFieldOffsets(hIndex.superClass[className]!!, false)
@@ -333,7 +333,7 @@ fun appendDynamicFunctionTable(
         ActuallyUsedIndex.add(dynIndexSig, sig)
     }
     printer.append(")\n")
-    println("filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
+    println("  filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
 }
 
 var printDebug = true
@@ -615,10 +615,10 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
 
         val print = i == 1929
         // could be written to a file for debugging
-        if (print) println("dynMethodIndex[$i: $clazz]: $dynMethods")
+        if (print) println("  dynMethodIndex[$i: $clazz]: $dynMethods")
 
         if (gIndex.classNames[i] !in dIndex.constructableClasses) {
-            if (print) println("writing $i: $clazz to null, because not constructable")
+            if (print) println("  writing $i: $clazz to null, because not constructable")
             methodTable.writeLE32(0)
             if (printDebug) {
                 debugInfo.append("[").append(i).append("]: ").append(clazz).append(" not constructable\n")
@@ -635,7 +635,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                 dynIndexToMethod[idx] = m
             }
             // val print = i == 39
-            if (print || aidtCtr < 50) println("writing $i: $clazz to $ptr, ${dynIndexToMethod.toList()}")
+            if (print || aidtCtr < 50) println("  writing $i: $clazz to $ptr, ${dynIndexToMethod.toList()}")
             for (idx in dynIndexToMethod.indices) {
 
                 val sig0 = dynIndexToMethod[idx]!!
@@ -653,7 +653,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                 // if method is missing, find replacement
                 val mapped = hIndex.getAlias(impl)
                 val name = methodName(mapped)
-                if (print) println("$idx, $sig0 -> $sig, $impl, $mapped")
+                if (print) println("  $idx, $sig0 -> $sig, $impl, $mapped")
                 val dynIndexI = dynIndex[name]
                 if (dynIndexI != null) {
                     numOk++
@@ -671,7 +671,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         printUsed(sig)
                         if (mapped != sig) printUsed(mapped)
                     }
-                    if (print || aidtCtr++ < 50) println("  $idx -> -1") // , available:
+                    if (print || aidtCtr++ < 50) println("    $idx -> -1") // , available:
                     if (printDebug) {
                         debugInfo.append("  ").append(idx).append(": ")
                             .append(sig0).append(" -> -1 // ").append(mapped).append("\n")
@@ -686,7 +686,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         val dynIndexJ = dynIndex.size
                         dynIndex[name] = mapped to dynIndexJ
                         table2.writeLE32(dynIndexJ)
-                        if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexJ*")
+                        if (print || aidtCtr++ < 50) println("    $idx -> $dynIndexJ*")
                         if (printDebug) {
                             debugInfo.append("  ").append(idx).append(": ")
                                 .append(dynIndexJ).append("* // ").append(mapped).append("\n")
@@ -700,9 +700,9 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         }
                         if (true) {
 
-                            println("[WARN] $sig ($i/$idx) is missing from dynIndex")
+                            println("  [WARN] $sig ($i/$idx) is missing from dynIndex")
                             printUsed(sig)
-                            println("  $idx -> -1*")
+                            println("    $idx -> -1*")
 
                             if (false) {
                                 // to do check if any super class or interface is being used...
@@ -736,7 +736,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
             // if (print) throw IllegalStateException("debug")
         }
     }
-    println("dynamic table, ok: $numOk, abstract: $numAbstract, broken: $numBroken, fixed: $numFixed, index-size: ${dynIndex.size}")
+    println("  dynamic table, ok: $numOk, abstract: $numAbstract, broken: $numBroken, fixed: $numFixed, index-size: ${dynIndex.size}")
     appendData(printer, ptr0, methodTable)
     appendData(printer, ptr0 + numClasses * 4, table2)
     if (printDebug) {
