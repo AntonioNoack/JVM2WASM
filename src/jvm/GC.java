@@ -5,6 +5,7 @@ import annotations.JavaScript;
 import annotations.NoThrow;
 import jvm.custom.WeakRef;
 
+import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.GCGapFinder.findLargestGaps;
 import static jvm.GCGapFinder.insertGapMaybe;
 import static jvm.GCTraversal.traverseStaticInstances;

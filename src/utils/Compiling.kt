@@ -22,11 +22,9 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
-import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Floats.f3
 import org.objectweb.asm.*
-import org.objectweb.asm.Opcodes.ACC_INTERFACE
 import replaceClass1
 import resolvedMethods
 import translator.ClassTranslator
@@ -509,7 +507,7 @@ fun indexMethodsIntoGIndex(
     }
 
     for (clazz in predefinedClasses) {
-        if (!(hIndex.classFlags[clazz] ?: 0).hasFlag(ACC_INTERFACE)) {
+        if (!hIndex.isInterfaceClass(clazz)) {
             gIndex.getDynMethodIdx(clazz)
         }
     }
@@ -566,7 +564,7 @@ fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<Me
     for (func in dIndex.usedMethods
         .filter {
             it in hIndex.abstractMethods &&
-                    !(hIndex.classFlags[it.clazz] ?: 0).hasFlag(ACC_INTERFACE) &&
+                    !hIndex.isInterfaceClass(it.clazz) &&
                     it !in missingMethods
         }
         .sortedBy { methodName(it) }
@@ -632,7 +630,7 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
                 hIndex.setAlias(sig, superMethod)
             }
         } else {
-            if (hIndex.classFlags[sig.clazz]?.hasFlag(ACC_INTERFACE) == true) {
+            if (hIndex.isInterfaceClass(sig.clazz)) {
                 // println("Skipping $sig")
                 continue
             }
@@ -776,6 +774,8 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
     return dynIndex
 }
 
+val helperFunctions = HashMap<String, StringBuilder2>()
+
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
     println("[printMethodImplementations]")
     bodyPrinter.ensureExtra(gIndex.translatedMethods
@@ -791,5 +791,8 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
         ) {
             println("  Not actually used: $name")
         }// else we don't care we didn't use it
+    }
+    for ((_, impl) in helperFunctions) {
+        bodyPrinter.append(impl)
     }
 }

@@ -3,6 +3,7 @@ package engine;
 import annotations.*;
 import jvm.FillBuffer;
 import jvm.GCTraversal;
+import jvm.JavaLang;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
@@ -40,6 +41,7 @@ import me.anno.ui.debug.TestEngine;
 import me.anno.utils.Clock;
 import me.anno.utils.OS;
 import me.anno.utils.async.Callback;
+import org.apache.logging.log4j.LoggerImpl;
 import org.lwjgl.opengl.GL11C;
 
 import java.io.File;
@@ -48,8 +50,10 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import static engine.GFXBase2Kt.renderFrame2;
+import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
@@ -672,5 +676,12 @@ public class Engine {
 
     @Alias(names = "me_anno_engine_OfficialExtensions_register_V")
     private static void me_anno_engine_OfficialExtensions_register_V(Object self) {
+    }
+
+    @NoThrow
+    @Alias(names = "org_apache_logging_log4j_LoggerImpl_printRaw_Ljava_lang_StringLjava_lang_StringV")
+    public static void LoggerImpl_printRaw(LoggerImpl self, String prefix, String line) {
+        boolean justLog = !(Objects.equals(prefix, "ERR!") || Objects.equals(prefix, "WARN"));
+        JavaLang.printString(line, justLog);
     }
 }

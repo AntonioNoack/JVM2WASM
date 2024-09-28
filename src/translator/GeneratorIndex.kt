@@ -2,6 +2,7 @@ package translator
 
 import byteStrings
 import dependency.ActuallyUsedIndex
+import gIndex
 import hIndex
 import isRootType
 import jvm.JVM32.*
@@ -12,7 +13,6 @@ import me.anno.utils.types.Booleans.toInt
 import replaceClass1
 import utils.*
 
-@Suppress("PropertyName")
 object GeneratorIndex {
 
     val actuallyUsed = ActuallyUsedIndex
@@ -201,8 +201,8 @@ object GeneratorIndex {
         return if (lockedDynIndex) {
             clazzMap[InterfaceSig.c(name, descriptor)]
                 ?: kotlin.run {
-                    val mapped = hIndex.methodAliases[methodName(clazz, name, descriptor)]
-                    if (mapped != null && (mapped.clazz != clazz || mapped.name != name || mapped.descriptor != descriptor)) {
+                    val mapped = hIndex.getAlias(MethodSig.c(clazz, name, descriptor))
+                    if (mapped.clazz != clazz || mapped.name != name || mapped.descriptor != descriptor) {
                         getDynMethodIdx(mapped.clazz, mapped.name, mapped.descriptor)
                     } else {
                         printUsed(MethodSig.c(clazz, name, descriptor))

@@ -15,6 +15,7 @@ import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.*;
 import java.util.*;
 
+import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.Utils.cl;
 
@@ -232,7 +233,10 @@ public class JavaLang {
         int src1 = getAddr(src), dst1 = getAddr(dst);
 
         int clazz1 = readClass(src1), clazz2 = readClass(dst1);
-        if (clazz1 != clazz2) throw new RuntimeException("Mismatched types");
+        if (clazz1 != clazz2) {
+            log("Mismatched classes:", clazz1, clazz2);
+            throw new RuntimeException("Mismatched types");
+        }
 
         int delta = arrayOverhead;
         int shift = getTypeShift(clazz1);// shall be executed here to confirm that this is arrays
@@ -548,6 +552,10 @@ public class JavaLang {
     @NoThrow
     @JavaScript(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)ec++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
     public static native void printFlush(boolean justLog);
+
+    @NoThrow
+    @JavaScript(code = "let strI = str(arg0); (arg1?console.log:console.error)(strI);")
+    public static native void printString(String line, boolean justLog);
 
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")

@@ -26,7 +26,7 @@ fun findMethod(clazz: String, name: String, desc: String, throwNotConstructable:
 
     // checking whether method maybe is abstract...
     val superClass = hIndex.superClass[clazz]
-    if ((hIndex.classFlags[clazz] ?: 0).hasFlag(Opcodes.ACC_ABSTRACT) && methodSig in hIndex.abstractMethods) {
+    if (hIndex.isAbstractClass(clazz) && methodSig in hIndex.abstractMethods) {
         if (debugFindMethod) println("method & clazz are abstract -> returning $methodSig")
         val superMethodSig = if (superClass != null) findMethod(superClass, name, desc, throwNotConstructable) else null
         return superMethodSig ?: methodSig

@@ -16,8 +16,6 @@ import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
 import java.io.FileNotFoundException
-import java.io.InputStream
-import java.io.InputStreamReader
 import kotlin.math.sin
 
 const val api = ASM9
@@ -62,8 +60,12 @@ var useWASMExceptions = false
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
 var ignoreNonCriticalNullPointers = true
+var checkArrayAccess = false
+var checkNullPointers = false
+
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings
+var crashOnAllExceptions = false // todo not yet supported
 val byteStrings = useUTF8Strings || replaceStringInternals
 
 var disableAudio = true
@@ -74,7 +76,7 @@ var addDebugMethods = false
 // if this flag is true, fields that aren't read won't be written
 var fieldsRWRequired = false
 
-val stackSize = if (enableTracing) 1024 * 1024 else 0
+val stackSize = if (enableTracing) 1024 * 32 else 0
 
 val classReplacements = hashMapOf(
     "java/util/concurrent/ConcurrentHashMap" to "java/util/HashMap",
@@ -106,7 +108,12 @@ val classReplacements = hashMapOf(
     "java/awt/Dimension" to "jvm/custom/awt/Dimension",
     "java/lang/ThreadLocal" to "jvm/custom/ThreadLocal2",
     "java/lang/RuntimePermission" to "jvm/custom/RTPermission",
-)
+).apply {
+    if (!checkArrayAccess) {
+        put("jvm/ArrayAccessSafe", "jvm/ArrayAccessUnchecked")
+    }
+}
+
 
 fun replaceClass0(clazz: String?) = classReplacements[clazz] ?: clazz
 fun replaceClass1(clazz: String) = classReplacements[clazz] ?: clazz
@@ -143,12 +150,9 @@ fun listEntryPoints(clazz: (String) -> Unit) {
 
 val cannotThrow = HashSet<String>(256)
 
-fun cannotThrowError(methodSig: MethodSig): Boolean {
-    return methodName(methodSig) in cannotThrow
-}
-
 fun canThrowError(methodSig: MethodSig): Boolean {
-    return !cannotThrowError(methodSig)
+    if (crashOnAllExceptions) return false
+    return methodName(methodSig) !in cannotThrow
 }
 
 val cl: ClassLoader = JVM32::class.java.classLoader
@@ -163,6 +167,12 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
     clazz("jvm/JVM32")
     clazz("jvm/GC")
     clazz("jvm/MemDebug")
+
+    if (checkArrayAccess) {
+        clazz("jvm/ArrayAccessSafe")
+    } else {
+        clazz("jvm/ArrayAccessUnchecked")
+    }
 
     // for debugging
     if (addDebugMethods) {

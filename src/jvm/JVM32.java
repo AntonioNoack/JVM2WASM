@@ -11,6 +11,7 @@ import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
+import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GC.largestGaps;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getAddr;
@@ -134,12 +135,25 @@ public class JVM32 {
     public static int checkCast(int instance, int clazz) {
         if (instance == 0) return 0;
         if (!instanceOf(instance, clazz)) {
-            Class<Object> isClass = ptrTo(findClass(readClass(instance)));
-            Class<Object> checkClass = ptrTo(findClass(clazz));
-            log(isClass.getName(), "is not instance of", checkClass.getName(), instance);
-            throw new ClassCastException();
+            failCastCheck(instance, clazz);
         }
         return instance;
+    }
+
+    @Alias(names = "ccx")
+    public static int checkCastExact(int instance, int clazz) {
+        if (instance == 0) return 0;
+        if (!instanceOfExact(instance, clazz)) {
+            failCastCheck(instance, clazz);
+        }
+        return instance;
+    }
+
+    private static void failCastCheck(int instance, int clazz) {
+        Class<Object> isClass = ptrTo(findClass(readClass(instance)));
+        Class<Object> checkClass = ptrTo(findClass(clazz));
+        log(isClass.getName(), "is not instance of", checkClass.getName(), instance);
+        throw new ClassCastException();
     }
 
     // can be removed in the future, just good for debugging
@@ -396,6 +410,12 @@ public class JVM32 {
             throwJs();
         }
         return instanceOfByClass(testedClass, clazz);
+    }
+
+    @NoThrow
+    @Alias(names = "iox")
+    public static boolean instanceOfExact(int instance, int clazz) {
+        return (instance != 0) & (readClass(instance) == clazz);
     }
 
     @NoThrow
@@ -826,14 +846,6 @@ public class JVM32 {
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(int a, int b);
 
-
-    @Alias(names = "al")
-    public static int arrayLength(int instance) {
-        if (instance == 0) throw new NullPointerException("[].length");
-        return read32(instance + objectOverhead);
-    }
-
-
     @Alias(names = "isOOB")
     public static void checkOutOfBounds(int instance, int index) {
         if (instance == 0) throw new NullPointerException("isOOB");
@@ -907,94 +919,6 @@ public class JVM32 {
     @WASM(code = "i64.trunc_f64_s")
     public static native long _d2l(double v);
 
-    @Alias(names = "i64ArrayStore")
-    public static void arrayStore(int instance, int index, long value) {
-        checkOutOfBounds(instance, index, 8);
-        write64(instance + arrayOverhead + (index << 3), value);
-    }
-
-    @Alias(names = "i32ArrayStore")
-    public static void arrayStore(int instance, int index, int value) {
-        checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
-        if (clazz != 1 && clazz != 2) throwJs("Incorrect clazz! i32", instance, clazz);
-        write32(instance + arrayOverhead + (index << 2), value);
-    }
-
-    @Alias(names = "f64ArrayStore")
-    public static void arrayStore(int instance, int index, double value) {
-        checkOutOfBounds(instance, index, 9);
-        write64(instance + arrayOverhead + (index << 3), value);
-    }
-
-    @Alias(names = "f32ArrayStore")
-    public static void arrayStore(int instance, int index, float value) {
-        checkOutOfBounds(instance, index, 3);
-        write32(instance + arrayOverhead + (index << 2), value);
-    }
-
-    @Alias(names = "i16ArrayStore")
-    public static void arrayStore(int instance, int index, short value) {
-        checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
-        if (clazz != 6 && clazz != 7) throwJs("Incorrect clazz! i16", instance, clazz);
-        write16(instance + arrayOverhead + (index << 1), value);
-    }
-
-    @Alias(names = "i8ArrayStore")
-    public static void arrayStore(int instance, int index, byte value) {
-        checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
-        if (clazz != 4 && clazz != 5) throw new ClassCastException("Incorrect clazz!");
-        write8(instance + arrayOverhead + index, value);
-    }
-
-    @Alias(names = "i64ArrayLoad")
-    public static long arrayLoad64(int instance, int index) {
-        checkOutOfBounds(instance, index, 8);
-        return read64(instance + arrayOverhead + (index << 3));
-    }
-
-    @Alias(names = "i32ArrayLoad")
-    public static int arrayLoad32(int instance, int index) {
-        checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
-        if (clazz != 1 && clazz != 2) throw new ClassCastException("Incorrect clazz!");
-        return read32(instance + arrayOverhead + (index << 2));
-    }
-
-    @Alias(names = "f64ArrayLoad")
-    public static double arrayLoad64f(int instance, int index) {
-        checkOutOfBounds(instance, index, 9);
-        return read64f(instance + arrayOverhead + (index << 3));
-    }
-
-    @Alias(names = "f32ArrayLoad")
-    public static float arrayLoad32f(int instance, int index) {
-        checkOutOfBounds(instance, index, 3);
-        return read32f(instance + arrayOverhead + (index << 2));
-    }
-
-    @Alias(names = "u16ArrayLoad")
-    public static char arrayLoad16u(int instance, int index) {
-        checkOutOfBounds(instance, index, 6);
-        return read16u(instance + arrayOverhead + (index << 1));
-    }
-
-    @Alias(names = "s16ArrayLoad")
-    public static short arrayLoad16s(int instance, int index) {
-        checkOutOfBounds(instance, index, 7);
-        return read16s(instance + arrayOverhead + (index << 1));
-    }
-
-    @Alias(names = "i8ArrayLoad")
-    public static byte arrayLoad8(int instance, int index) {
-        checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
-        if (clazz != 4 && clazz != 5) throw new ClassCastException("Incorrect clazz!");
-        return read8(instance + arrayOverhead + index);
-    }
-
     @NoThrow
     @WASM(code = "v128.const i64x2 0 0 v128.store")
     public static native void clear128(int addr);
@@ -1038,6 +962,15 @@ public class JVM32 {
     @NoThrow
     @WASM(code = "i32.load")
     public static native int read32(int addr);
+
+    /**
+     * returns the class index for the given instance
+     */
+    @NoThrow
+    @Alias(names = "readClass")
+    public static int readClass1(int addr) {
+        return readClass(addr);
+    }
 
     /**
      * returns the class index for the given instance

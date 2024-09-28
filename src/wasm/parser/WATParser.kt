@@ -407,7 +407,7 @@ class WATParser {
                     // println("returning from ${getStackDepth()}: $result")
                     return FunctionBlock(i + 1, result)
                 }
-                else -> throw NotImplementedError()
+                else -> throw IllegalStateException("Unexpected ${list.getType(i)} in function block")
             }
         }
     }

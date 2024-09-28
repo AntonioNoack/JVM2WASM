@@ -12,7 +12,9 @@ fun getMethodVariants(sig: MethodSig): Set<MethodSig> {
         methodVariants.getOrPut(sig) {
             val variants = HashSet<MethodSig>()
             val mapped = hIndex.getAlias(sig)
-            variants.add(mapped)
+            if (mapped in hIndex.jvmImplementedMethods || mapped in hIndex.customImplementedMethods) {
+                variants.add(mapped)
+            }
             val children = hIndex.childClasses[sig.clazz]
             if (children != null) {
                 for (child in children) {

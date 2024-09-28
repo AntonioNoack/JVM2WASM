@@ -115,7 +115,7 @@ class DelayedLambdaUpdate(
     }
 
     private val isInterface
-        get() = (hIndex.classFlags[calledMethod.clazz] ?: 0).hasFlag(ACC_INTERFACE) &&
+        get() = hIndex.isInterfaceClass(calledMethod.clazz) &&
                 calledMethod in hIndex.abstractMethods
     private val callingStatic get() = calledMethod in hIndex.staticMethods
     private val needsSelf get() = (!callingStatic || !isInterface)

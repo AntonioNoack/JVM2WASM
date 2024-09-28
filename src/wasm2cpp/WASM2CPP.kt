@@ -6,11 +6,15 @@ import utils.StringBuilder2
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-var skipStackPush = true
+var enableCppTracing = false
 
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 
 val functionsByName = HashMap<String, FunctionImpl>()
+
+fun main() {
+    wasm2cpp()
+}
 
 fun makeFloat(str: String): String {
     return if ('.' !in str) "$str.0" else str
@@ -98,10 +102,6 @@ fun fillInFunctionTable(parser: WATParser) {
             .append(functionTable[i]).append(";\n")
     }
     writer.append("}\n")
-}
-
-fun main() {
-    wasm2cpp()
 }
 
 fun wasm2cpp() {

@@ -105,7 +105,6 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero, or if the load factor is nonpositive.
      */
-    @NoThrow
     public IntHashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException("Illegal Initial Capacity: " + initialCapacity);
@@ -129,7 +128,6 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero.
      */
-    @NoThrow
     public IntHashMap(int initialCapacity) {
         this(initialCapacity, 0.5f);
     }

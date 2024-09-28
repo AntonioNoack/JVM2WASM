@@ -4,6 +4,8 @@ import annotations.Boring
 import annotations.NotCalled
 import api
 import canThrowError
+import checkArrayAccess
+import checkNullPointers
 import dIndex
 import dependency.ActuallyUsedIndex
 import enableTracing
@@ -17,8 +19,11 @@ import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.assertions.assertFalse
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
+import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
@@ -325,25 +330,25 @@ class MethodTranslator(
                 stackPush()
                 printer.pop(ptrType).poppush(i32).append("  call \$i32ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x2f -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(i64).append("  call \$i64ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x30 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f32).append("  call \$f32ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x31 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f64).append("  call \$f64ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x32 -> {
                 stackPush()
@@ -352,50 +357,49 @@ class MethodTranslator(
                     else "  call \$i64ArrayLoad\n"
                 )
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x33 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32).append("  call \$i8ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x34 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32).append("  call \$u16ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x35 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32).append("  call \$s16ArrayLoad\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
-
             0x4f -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i32ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x50 -> {
                 stackPush()
                 printer.pop(i64).pop(i32).pop(ptrType).append("  call \$i64ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x51 -> {
                 stackPush()
                 printer.pop(f32).pop(i32).pop(ptrType).append("  call \$f32ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x52 -> {
                 stackPush()
                 printer.pop(f64).pop(i32).pop(ptrType).append("  call \$f64ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x53 -> {
                 stackPush()
@@ -404,25 +408,25 @@ class MethodTranslator(
                     else "  call \$i64ArrayStore\n"
                 )
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x54 -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i8ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x55 -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i16ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0x56 -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i16ArrayStore\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
 
             // returnx is important: it shows to cancel the flow = jump to end
@@ -480,7 +484,7 @@ class MethodTranslator(
                 val type1 = stack.last()
                 printer.push(type1)
                 if (type1 == i32) {
-                    dupI32()
+                    printer.dupI32()
                     printer.append('\n')
                 } else {
                     printer.append("  call \$dup")
@@ -661,11 +665,11 @@ class MethodTranslator(
                 stackPush()
                 printer.pop(ptrType).push(i32).append("  call \$al\n")
                 stackPop()
-                handleThrowable()
+                if (checkArrayAccess) handleThrowable()
             }
             0xbf -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
-                dupI32()
+                printer.dupI32()
                 handleThrowable(true)
                 printer.pop(ptrType)
             }
@@ -924,12 +928,14 @@ class MethodTranslator(
         if (ret != "V") printer.push(jvm2wasm1(ret))
     }
 
-    private fun checkNotNull0(clazz: String, name: String, getCaller: () -> Unit) {
-        getCaller()
-        printer.append(" i32.const ").append(gIndex.getString(clazz))
-        printer.append(" i32.const ").append(gIndex.getString(name))
-        printer.append(" call \$checkNotNull\n")
-        handleThrowable()
+    private fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
+        if (checkNullPointers) {
+            getCaller(printer)
+            printer.append(" i32.const ").append(gIndex.getString(clazz))
+            printer.append(" i32.const ").append(gIndex.getString(name))
+            printer.append(" call \$checkNotNull\n")
+            handleThrowable()
+        }
     }
 
     override fun visitMethodInsn(
@@ -941,6 +947,23 @@ class MethodTranslator(
     ) {
         val owner = replaceClass1(owner0)
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
+    }
+
+    fun findAllConstructableChildren(clazz0: String): HashSet<String> {
+        val allChildren = HashSet<String>()
+        fun addChildren(clazz: String) {
+            if (!hIndex.isAbstractClass(clazz)) {
+                allChildren.add(clazz)
+            }
+            val children = hIndex.childClasses[clazz] ?: return
+            for (child in children) {
+                if (child in dIndex.constructableClasses) {
+                    addChildren(child)
+                }
+            }
+        }
+        addChildren(clazz0)
+        return allChildren
     }
 
     fun visitMethodInsn2(
@@ -975,43 +998,77 @@ class MethodTranslator(
 
         var calledCanThrow = canThrowError(sig)
 
-        fun getCaller() {
+        fun getCaller(printer: Builder) {
             if (splitArgs.isNotEmpty()) {
                 printer.append("  call $").append(gIndex.getNth(listOf(ptrType) + splitArgs))
-            } else dupI32()
+            } else printer.dupI32()
+        }
+
+        fun Builder.fixThrowable(sigJ: MethodSig) {
+            if (calledCanThrow != canThrowError(sigJ)) {
+                if (calledCanThrow) {
+                    append(" i32.const 0")
+                } else {
+                    append(" call \$panic")
+                }
+            }
+        }
+
+        fun callSingleOption(sigJ: MethodSig) {
+            stackPush()
+            if (!ignoreNonCriticalNullPointers) {
+                checkNotNull0(owner, name, ::getCaller)
+            }
+            printer.append(";; single for $sig0 -> $sigJ\n")
+            ActuallyUsedIndex.add(this.sig, sigJ)
+            printer.append("  call \$").append(methodName(sigJ))
+            printer.fixThrowable(sigJ)
+            printer.append("\n")
+            pop(splitArgs, false, ret)
+            stackPop()
         }
 
         when (opcode0) {
-            0xb9 -> { // invoke interface
-                // load interface/function index
-                getCaller()
-                printer.append(" i32.const ").append(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor)))
-                // looks up class, goes to interface list, binary searches function, returns func-ptr
-                // instance, function index -> instance, function-ptr
-                stackPush()
-                printer.push(i32).append(" call \$resolveInterface\n")
-                stackPop() // so we can track the call better
-                handleThrowable() // if it's not found or nullptr
-                printer.pop(i32) // pop instance
-                pop(splitArgs, false, ret)
+            0xb9 -> {
 
-                stackPush()
+                // todo the same as with resolveIndirect:
+                //   if there is only a few options, resolve them with a tree
+                val variants = getMethodVariants(sig0)
+                if (variants.size == 1) {
+                    callSingleOption(variants.first())
+                } else {
 
-                printer
-                    .append("  call_indirect (type ")
-                    .append(gIndex.getType(descriptor, calledCanThrow))
-                ActuallyUsedIndex.add(this.sig, sig)
-                if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
-                else printer.append(")\n")
+                    // invoke interface
+                    // load interface/function index
+                    getCaller(printer)
+                    printer.append(" i32.const ").append(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor)))
+                    // looks up class, goes to interface list, binary searches function, returns func-ptr
+                    // instance, function index -> instance, function-ptr
+                    stackPush()
+                    printer.push(i32).append(" call \$resolveInterface\n")
+                    stackPop() // so we can track the call better
+                    handleThrowable() // if it's not found or nullptr
+                    printer.pop(i32) // pop instance
+                    pop(splitArgs, false, ret)
 
-                stackPop()
+                    stackPush()
+
+                    printer
+                        .append("  call_indirect (type ")
+                        .append(gIndex.getType(descriptor, calledCanThrow))
+                    ActuallyUsedIndex.add(this.sig, sig)
+                    if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
+                    else printer.append(")\n")
+
+                    stackPop()
+                }
             }
             0xb6 -> { // invoke virtual
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
 
                     stackPush()
 
-                    getCaller()
+                    getCaller(printer)
 
                     // todo store this index in a table instead?
                     printer.append(" i32.const ")
@@ -1038,6 +1095,10 @@ class MethodTranslator(
                         // handleThrowable(true)
                     } else throw IllegalStateException()*/
                 } else if (sig0 in hIndex.finalMethods) {
+
+                    val sigs = getMethodVariants(sig0)
+                    assertTrue(sigs.size < 2) { "Unclear $sig0 -> $sig?" }
+                    val sig = sigs.firstOrNull() ?: sig
 
                     val setter = hIndex.setterMethods[sig]
                     val getter = hIndex.getterMethods[sig]
@@ -1088,35 +1149,160 @@ class MethodTranslator(
                     }
                 } else {
 
-                    // method can have well-defined place in class :) -> just precalculate that index
-                    // looks up the class, and in the class-function lut, it looks up the function ptr
-                    // get the Nth element on the stack, where N = |args|
-                    // problem: we don't have generic functions, so we need all combinations
-                    getCaller()
-                    // +1 for internal VM offset
-                    // << 2 for access without shifting
-                    // println("$clazz/${this.name}/${this.descriptor} -> $sig0 -> $sig")
-                    // printUsed(MethodSig(clazz, this.name, this.descriptor))
-                    stackPush()
-                    val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
-                    printer.append(" i32.const ").append(funcPtr)
-                        // instance, function index -> function-ptr
-                        .append(" call \$resolveIndirect ;; $sig0\n")
-                        .push(i32)
-                    stackPop()
-                    handleThrowable()
-                    printer.pop(i32)
-                    pop(splitArgs, false, ret)
-                    printer
-                        .append("  call_indirect (type ")
-                        .append(gIndex.getType(descriptor, calledCanThrow))
-                        .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
-                    ActuallyUsedIndex.add(this.sig, sig)
+                    fun callIndirect() {
+                        // method can have well-defined place in class :) -> just precalculate that index
+                        // looks up the class, and in the class-function lut, it looks up the function ptr
+                        // get the Nth element on the stack, where N = |args|
+                        // problem: we don't have generic functions, so we need all combinations
+                        getCaller(printer)
+                        // +1 for internal VM offset
+                        // << 2 for access without shifting
+                        // println("$clazz/${this.name}/${this.descriptor} -> $sig0 -> $sig")
+                        // printUsed(MethodSig(clazz, this.name, this.descriptor))
+                        stackPush()
+                        val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
+                        printer.append(" i32.const ").append(funcPtr)
+                            // instance, function index -> function-ptr
+                            .append(" call \$resolveIndirect ;; $sig0\n")
+                            .push(i32)
+                        stackPop()
+                        handleThrowable()
+                        printer.pop(i32)
+                        pop(splitArgs, false, ret)
+                        printer
+                            .append("  call_indirect (type ")
+                            .append(gIndex.getType(descriptor, calledCanThrow))
+                            .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
+                        ActuallyUsedIndex.add(this.sig, sig)
+                    }
+
+                    val maxOptions = 0 // 16 = when working, 0 = when broken :/
+                    val options = getMethodVariants(sig0)
+                    if (options.size == 1) {
+                        callSingleOption(options.first())
+                    } else if (options.size < maxOptions) {
+
+                        // todo this isn't working correctly yet :/, wrong things are called, or the result is incorrect
+                        // todo where do we ensure that it isn't null???
+
+                        // find all viable children
+                        // group them by implementation
+                        val allChildren = findAllConstructableChildren(sig0.clazz)
+
+                        val groupedByClass = allChildren
+                            .groupBy { hIndex.getAlias(sig0.withClass(it)) }
+                            .map { it.key to it.value }
+                            .filter { it.second.isNotEmpty() }
+                            .sortedBy { it.second.size } // biggest case last
+
+                        val numTests = (0 until groupedByClass.lastIndex)
+                            .sumOf { groupedByClass[it].second.size }
+
+                        if (numTests < maxOptions) {
+
+                            fun printCallPyramid(printer: Builder) {
+
+                                val checkForInvalidClasses = false
+
+                                printer.append(";; tree for $sig0 -> $options\n")
+                                if (groupedByClass.size > 1 || checkForInvalidClasses) {
+                                    getCaller(printer)
+                                    printer.append(" call \$readClass\n  ")
+                                }
+
+                                val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
+                                for (j in 0 until jMax) {
+                                    val (toBeCalled, classes2) = groupedByClass[j]
+                                    val notLast = j != jMax - 1
+                                    val numDupI32s = classes2.size - 1 + notLast.toInt()
+                                    for (k in 0 until numDupI32s) {
+                                        printer.dupI32()
+                                    }
+                                    if (numDupI32s > 0) printer.append("\n  ")
+                                    for (k in classes2.indices) {
+                                        printer.append("i32.const ")
+                                            .append(gIndex.getClassIndex(classes2[k]))
+                                            .append(" i32.eq")
+                                        if (k > 0) printer.append(" i32.or")
+                                        printer.append(" ;; ").append(classes2[k]).append("\n  ")
+                                    }
+                                    // write params and result
+                                    printer.append("(if (param i32") // first i32 is for 'this' for call
+                                    for (argI in splitArgs) printer.append(" ").append(argI)
+                                    if (notLast) printer.append(" i32") // 'this' for type-checking
+                                    printer.append(") (result")
+                                    if (ret != "V") printer.append(" ").append(jvm2wasm(ret))
+                                    if (calledCanThrow) printer.append(" i32")
+                                    printer.append(") (then\n    ")
+                                    if (notLast) printer.append("drop ") // drop 'this' for type-checking
+                                    printer.append("call \$").append(methodName(toBeCalled)).append("\n  ")
+                                    printer.fixThrowable(toBeCalled)
+                                    printer.append(") (else\n")
+                                }
+                                if (checkForInvalidClasses) {
+                                    printer.append("    call \$jvm_JVM32_throwJs_V\n")
+                                    printer.append("    unreachable\n")
+                                } else {
+                                    val sigJ = groupedByClass.last().first
+                                    printer.append("    call \$").append(methodName(sigJ))
+                                    printer.fixThrowable(sigJ)
+                                    printer.append("\n  ")
+                                }
+                                for (j in 0 until jMax) {
+                                    printer.append("))")
+                                }
+                                printer.append("\n")
+                            }
+
+                            stackPush()
+                            checkNotNull0(owner, name, ::getCaller)
+
+                            if (numTests < 3) {
+                                printCallPyramid(printer)
+                            } else {
+                                val helperName = "tree_${sig0.toString().escapeChars()}"
+                                helperFunctions.getOrPut(helperName) {
+                                    val printer = StringBuilder2()
+                                    printer.append("(func \$").append(helperName)
+                                        .append(" (param ").append(ptrType) // 'this'
+                                    for (arg in splitArgs) printer.append(' ').append(arg)
+                                    printer.append(") (result")
+                                    if (ret != "V") printer.append(' ').append(jvm2wasm(ret))
+                                    if (canThrowError) printer.append(' ').append(ptrType)
+                                    printer.append(")\n")
+                                    // local variable for dupi32
+                                    printer.append("  (local ").append(tmpI32).append(' ').append(ptrType).append(")\n")
+                                    // load all parameters onto the stack
+                                    for (k in 0 until splitArgs.size + 1) {
+                                        printer.append("  local.get ").append(k).append('\n')
+                                    }
+                                    printCallPyramid(printer)
+                                    printer.append("  return\n)\n")
+                                    printer
+                                }
+                                printer.append("  call \$").append(helperName).append("\n")
+                            }
+
+                            pop(splitArgs, false, ret)
+                            stackPop()
+
+                        } else {
+                            // if there is too many tests, use resolveIndirect
+                            callIndirect()
+                        }
+                    } else callIndirect()
                 }
+
+                /*if (sig.name == "nextInt") {
+                    throw IllegalStateException("stack: $stack")
+                }*/
+
             }
             // typically, <init>, but also can be private or super function; -> no resolution required
             0xb7 -> {
-                if (!ignoreNonCriticalNullPointers) checkNotNull0(owner, name, ::getCaller)
+                if (!ignoreNonCriticalNullPointers) {
+                    checkNotNull0(owner, name, ::getCaller)
+                }
                 pop(splitArgs, false, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
@@ -1124,10 +1310,8 @@ class MethodTranslator(
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
-                    if (sig in hIndex.abstractMethods) throw IllegalStateException()
+                    assertFalse(sig in hIndex.abstractMethods)
                     ActuallyUsedIndex.add(this.sig, sig)
-                    if (name2 == "me_anno_gpu_OSWindow_addCallbacks_V")
-                        throw IllegalStateException()
                     printer.append("  call \$").append(name2).append('\n')
                     stackPop()
                 }
@@ -1141,7 +1325,7 @@ class MethodTranslator(
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
-                    if (sig in hIndex.abstractMethods) throw IllegalStateException()
+                    assertFalse(sig in hIndex.abstractMethods)
                     ActuallyUsedIndex.add(this.sig, sig)
                     printer.append("  call \$").append(name2)
                     if (comments) printer.append(" ;; static call\n")
@@ -1151,6 +1335,7 @@ class MethodTranslator(
             }
             else -> throw NotImplementedError("unknown call ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface\n")
         }
+
         if (calledCanThrow && checkThrowable) {
             handleThrowable()
         }
@@ -1349,9 +1534,8 @@ class MethodTranslator(
 
                         // if condition
                         // throwable -> throwable, throwable, int - instanceOf > throwable, jump-condition
-                        dupI32(handler.printer)
-                        handler.printer.append(" i32.const ")
-                            .append(gIndex.getClassIndex(catcher.type)).append(" call \$io")
+                        handler.printer.dupI32()
+                        handler.printer.append(" ").appendInstanceOf(catcher.type)
                         if (comments) handler.printer.append(" ;; handler #$i/${catchers.size}/$throwable\n")
                         else handler.printer.append('\n')
 
@@ -1507,7 +1691,7 @@ class MethodTranslator(
                 // check cast
                 stackPush()
                 printer.pop(ptrType).push(ptrType)
-                printer.append("  i32.const ").append(gIndex.getClassIndex(type)).append(" call \$cc")
+                printer.append("  ").printCastClass(type)
                 if (comments) printer.append(" ;; $type\n")
                 else printer.append('\n')
                 stackPop()
@@ -1516,11 +1700,35 @@ class MethodTranslator(
             0xc1 -> {
                 // instance of
                 printer.pop(ptrType).push(i32)
-                printer.append("  i32.const ").append(gIndex.getClassIndex(type)).append(" call \$io")
+                printer.append("  ").appendInstanceOf(type)
                 if (comments) printer.append(" ;; $type\n")
                 else printer.append('\n')
             }
             else -> throw NotImplementedError("[type] unknown ${OpCode[opcode]}, $type\n")
+        }
+    }
+
+    private fun Builder.printCastClass(clazz: String) {
+        val children = hIndex.childClasses[clazz]
+        append("i32.const ").append(gIndex.getClassIndex(clazz))
+        if (children == null || children.none { it in dIndex.constructableClasses }) {
+            append(" call \$ccx")
+        } else {
+            append(" call \$cc")
+        }
+    }
+
+    private fun Builder.appendInstanceOf(clazz: String) {
+        if (clazz in dIndex.constructableClasses) {
+            val children = hIndex.childClasses[clazz]
+            append("i32.const ").append(gIndex.getClassIndex(clazz))
+            if (children == null || children.none { it in dIndex.constructableClasses }) {
+                append(" call \$iox")
+            } else {
+                append(" call \$io")
+            }
+        } else {
+            append("drop i32.const 0")
         }
     }
 
@@ -1704,11 +1912,16 @@ class MethodTranslator(
         visitFieldInsn2(opcode, replaceClass1(owner0), name, descriptor, true)
     }
 
-    private fun dupI32(printer: Builder = this.printer) {
+    private fun Builder.dupI32(): Builder {
         val tmp = tmpI32
-        printer.append("  local.set ").append(tmp)
-            .append(" local.get ").append(tmp)
-            .append(" local.get ").append(tmp)
+        if (tmp == "\$l0" && endsWith("local.set \$l0 local.get \$l0 local.get \$l0")) {
+            append(" local.get \$l0")
+        } else {
+            append("  local.set ").append(tmp)
+                .append(" local.get ").append(tmp)
+                .append(" local.get ").append(tmp)
+        }
+        return this
     }
 
     fun visitFieldInsn2(opcode: Int, owner: String, name: String, descriptor: String, checkNull: Boolean) {
@@ -1822,8 +2035,7 @@ class MethodTranslator(
                 // second part of check is <self>
                 if (checkNull && !(!isStatic && printer.endsWith("local.get 0\n"))) {
                     checkNotNull0(owner, name) {
-                        dupI32()
-                        printer.append('\n')
+                        printer.dupI32().append('\n')
                     }
                 }
                 printer.pop(ptrType).push(wasmType)
@@ -1867,13 +2079,9 @@ class MethodTranslator(
                             .append(" i32.add local.get 1 ")
                             .append(getStoreInstr(descriptor))
                     } else {
-                        // todo instead of calling a function twice, we could also create generic functions for this :)
+                        // we'd need to call a function twice, so call a generic functions for this
                         printer.append("  i32.const ").append(fieldOffset)
                             .append(" call \$setField${getStoreSymbol(descriptor)}")
-                        /*printer.append("  call \$swap$ptrType$wasmType\n") // value <-> instance
-                            .append("  i32.const ").append(fieldOffset)
-                            .append(" i32.add call \$swap$wasmType$ptrType ") // instance <-> value
-                            .append(getStoreInstr(descriptor))*/
                     }
                     if (comments) {
                         if (owner == clazz) printer.append(" ;; set field '$name'\n")

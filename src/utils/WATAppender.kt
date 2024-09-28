@@ -368,8 +368,6 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
             val superClass = hIndex.superClass[clazz]
                 ?: throw NullPointerException("Super class of $clazz ($classId) is unknown")
 
-            val flags = hIndex.classFlags[clazz] ?: 0
-
             // filter for existing interfaces :)
             val interfaces = HashSet<String>()
             fun addI(clazz: String) {
@@ -431,7 +429,9 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
 
             // these functions only need to be available, if the class is considered constructable
 
-            if (clazz in dIndex.constructableClasses && !flags.hasFlag(ACC_ABSTRACT) && !flags.hasFlag(ACC_INTERFACE)) {
+            if (clazz in dIndex.constructableClasses &&
+                !hIndex.isAbstractClass(clazz) &&
+                !hIndex.isInterfaceClass(clazz)) {
 
                 if (printDebug) {
                     debugInfo.append("  constructable & !abstract & !interface\n")
@@ -470,7 +470,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                     }
                 }
 
-                if (flags.hasFlag(ACC_ENUM)) {
+                if (hIndex.isEnumClass(clazz)) {
                     val impl = findMethod(clazz, "<clinit>", "()V")
                     implFunctions0[staticInitIdx] = impl!!
                     val name = methodName(impl)

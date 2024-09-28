@@ -4,6 +4,7 @@ import annotations.NoThrow;
 import jvm.custom.WeakRef;
 import me.anno.utils.structures.arrays.IntArrayList;
 
+import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.GC.*;
 import static jvm.GCTraversal.classSizes;
 import static jvm.JVM32.*;

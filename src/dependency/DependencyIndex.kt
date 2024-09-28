@@ -486,14 +486,14 @@ object DependencyIndex {
                     if (usedFieldsR != null) for (fi in usedFieldsR) {
                         if (fi.static && (!strict || fi in this.usedFieldsW)) {
                             val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V")
-                            if (/*hIndex.methods[fi.clazz]?.contains(sig1) == true && */sig1 !in this.usedMethods)
+                            if (sig1 !in this.usedMethods)
                                 newRemaining.add(sig1)
                         }
                     }
                     if (usedFieldsW != null) for (fi in usedFieldsW) {
                         if (fi.static && (!strict || fi in this.usedFieldsR)) {
                             val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V")
-                            if (/*hIndex.methods[fi.clazz]?.contains(sig1) == true && */sig1 !in this.usedMethods)
+                            if (sig1 !in this.usedMethods)
                                 newRemaining.add(sig1)
                         }
                     }

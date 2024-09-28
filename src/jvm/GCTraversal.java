@@ -6,6 +6,7 @@ import annotations.NoThrow;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
+import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.GC.GC_OFFSET;
 import static jvm.GC.iteration;
 import static jvm.JVM32.*;

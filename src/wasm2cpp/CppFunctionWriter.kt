@@ -59,10 +59,17 @@ fun defineFunctionImplementations(parser: WATParser) {
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
     val functions = parser.functions
+    functions.sortBy { it.funcName != "java_io_FilterInputStream_skip_JJ" }
     for (fi in functions.indices) {
         val function = functions[fi]
         // if (function.funcName == "stackPush" || function.funcName == "stackPop") continue
-        FunctionWriter(function, parser)
+        val pos0 = writer.size
+        try {
+            FunctionWriter(function, parser)
+        } catch (e: Exception) {
+            println(writer.toString(pos0, writer.size))
+            throw RuntimeException("Failed writing ${function.funcName}", e)
+        }
     }
     writer.append('\n')
 }
@@ -100,7 +107,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     fun pop(type: String): String {
         val i0 = stack.removeLast()
         // println("pop -> $i0 + $stack")
-        assertEquals(type, i0.type)
+        assertEquals(type, i0.type) { "pop -> $i0 + $stack" }
         return i0.name
     }
 
@@ -144,7 +151,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             return
         }
 
-        if (skipStackPush) {
+        if (!enableCppTracing) {
             if (funcName == "stackPush" || funcName == "stackPop") {
                 if (funcName == "stackPush") pop("i32")
                 return
@@ -153,6 +160,11 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
         if (funcName.startsWith("swap")) {
             stack.add(stack.size - 2, stack.removeLast())
+            return
+        }
+
+        if (funcName.startsWith("dupi") || funcName.startsWith("dupf")) {
+            stack.add(stack.last())
             return
         }
 
@@ -349,6 +361,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
                 begin().append("if (").append(condition).append(") {\n")
                 val stackSave = ArrayList(stack)
+                stackSave.subList(baseSize, stackSave.size).clear()
                 stack.subList(0, baseSize).clear()
                 val stackForReset = ArrayList(stack)
 
@@ -368,8 +381,8 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
                 fun writeBranchContents(instructions: List<Instruction>) {
                     depth++
-                    for (instr in instructions) {
-                        writeInstruction(instr)
+                    for (j in instructions.indices) {
+                        writeInstruction(instructions[j])
                     }
                     packResultsIntoOurStack(instructions)
                     depth--
@@ -562,6 +575,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
         }
         for (instr in function.body) {
+            // println("instr $instr, stack: ${stack.map { it.type }}")
             writeInstruction(instr)
         }
         when (function.body.lastOrNull()) {

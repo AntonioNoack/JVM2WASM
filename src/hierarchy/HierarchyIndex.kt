@@ -1,5 +1,7 @@
 package hierarchy
 
+import me.anno.utils.types.Booleans.hasFlag
+import org.objectweb.asm.Opcodes.*
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
@@ -75,5 +77,20 @@ object HierarchyIndex {
     val setterMethods = HashMap<MethodSig, FieldSig>(cap2)
     val getterMethods = HashMap<MethodSig, FieldSig>(cap2)
     // todo inline functions, which consist of a constant only
+
+    fun isAbstractClass(clazz: String): Boolean {
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_ABSTRACT)
+    }
+
+    fun isInterfaceClass(clazz: String): Boolean {
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_INTERFACE)
+    }
+
+    fun isEnumClass(clazz: String): Boolean {
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_ENUM)
+    }
 
 }
