@@ -5,6 +5,7 @@ import annotations.NotCalled
 import api
 import canThrowError
 import checkArrayAccess
+import checkClassCasts
 import checkNullPointers
 import dIndex
 import dependency.ActuallyUsedIndex
@@ -23,13 +24,13 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
-import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass1
 import translator.GeneratorIndex.pair
 import translator.GeneratorIndex.tri
+import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
 import kotlin.collections.set
@@ -64,8 +65,8 @@ class MethodTranslator(
         currentNode.inputStack = emptyList()
     }
 
-    private val sig = MethodSig.c(clazz, name, descriptor)
-    private val canThrowError = canThrowError(sig)
+    val sig = MethodSig.c(clazz, name, descriptor)
+    val canThrowError = canThrowError(sig)
     private val canPush = enableTracing && canThrowError
 
     private val localVariables = ArrayList<LocalVar>()
@@ -916,7 +917,7 @@ class MethodTranslator(
         // println(" max stacks: $maxStack, max locals: $maxLocals")
     }
 
-    private fun pop(splitArgs: List<String>, static: Boolean, ret: String) {
+    fun pop(splitArgs: List<String>, static: Boolean, ret: String) {
         for (v in splitArgs.reversed()) {// arguments
             printer.pop(v)
         }
@@ -928,7 +929,7 @@ class MethodTranslator(
         if (ret != "V") printer.push(jvm2wasm1(ret))
     }
 
-    private fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
+    fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
         if (checkNullPointers) {
             getCaller(printer)
             printer.append(" i32.const ").append(gIndex.getString(clazz))
@@ -947,23 +948,6 @@ class MethodTranslator(
     ) {
         val owner = replaceClass1(owner0)
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
-    }
-
-    fun findAllConstructableChildren(clazz0: String): HashSet<String> {
-        val allChildren = HashSet<String>()
-        fun addChildren(clazz: String) {
-            if (!hIndex.isAbstractClass(clazz)) {
-                allChildren.add(clazz)
-            }
-            val children = hIndex.childClasses[clazz] ?: return
-            for (child in children) {
-                if (child in dIndex.constructableClasses) {
-                    addChildren(child)
-                }
-            }
-        }
-        addChildren(clazz0)
-        return allChildren
     }
 
     fun visitMethodInsn2(
@@ -1004,40 +988,10 @@ class MethodTranslator(
             } else printer.dupI32()
         }
 
-        fun Builder.fixThrowable(sigJ: MethodSig) {
-            if (calledCanThrow != canThrowError(sigJ)) {
-                if (calledCanThrow) {
-                    append(" i32.const 0")
-                } else {
-                    append(" call \$panic")
-                }
-            }
-        }
-
-        fun callSingleOption(sigJ: MethodSig) {
-            stackPush()
-            if (!ignoreNonCriticalNullPointers) {
-                checkNotNull0(owner, name, ::getCaller)
-            }
-            printer.append(";; single for $sig0 -> $sigJ\n")
-            ActuallyUsedIndex.add(this.sig, sigJ)
-            printer.append("  call \$").append(methodName(sigJ))
-            printer.fixThrowable(sigJ)
-            printer.append("\n")
-            pop(splitArgs, false, ret)
-            stackPop()
-        }
-
         when (opcode0) {
             0xb9 -> {
-
-                // todo the same as with resolveIndirect:
-                //   if there is only a few options, resolve them with a tree
                 val variants = getMethodVariants(sig0)
-                if (variants.size == 1) {
-                    callSingleOption(variants.first())
-                } else {
-
+                if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
                     // invoke interface
                     // load interface/function index
                     getCaller(printer)
@@ -1148,8 +1102,8 @@ class MethodTranslator(
                         }
                     }
                 } else {
-
-                    fun callIndirect() {
+                    val options = getMethodVariants(sig0)
+                    if (!resolveIndirect(sig0, splitArgs, ret, options, ::getCaller, calledCanThrow, owner)) {
                         // method can have well-defined place in class :) -> just precalculate that index
                         // looks up the class, and in the class-function lut, it looks up the function ptr
                         // get the Nth element on the stack, where N = |args|
@@ -1163,7 +1117,7 @@ class MethodTranslator(
                         val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
                         printer.append(" i32.const ").append(funcPtr)
                             // instance, function index -> function-ptr
-                            .append(" call \$resolveIndirect ;; $sig0\n")
+                            .append(" call \$resolveIndirect ;; $sig0, #${options.size}\n")
                             .push(i32)
                         stackPop()
                         handleThrowable()
@@ -1175,128 +1129,7 @@ class MethodTranslator(
                             .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
                         ActuallyUsedIndex.add(this.sig, sig)
                     }
-
-                    val maxOptions = 0 // 16 = when working, 0 = when broken :/
-                    val options = getMethodVariants(sig0)
-                    if (options.size == 1) {
-                        callSingleOption(options.first())
-                    } else if (options.size < maxOptions) {
-
-                        // todo this isn't working correctly yet :/, wrong things are called, or the result is incorrect
-                        // todo where do we ensure that it isn't null???
-
-                        // find all viable children
-                        // group them by implementation
-                        val allChildren = findAllConstructableChildren(sig0.clazz)
-
-                        val groupedByClass = allChildren
-                            .groupBy { hIndex.getAlias(sig0.withClass(it)) }
-                            .map { it.key to it.value }
-                            .filter { it.second.isNotEmpty() }
-                            .sortedBy { it.second.size } // biggest case last
-
-                        val numTests = (0 until groupedByClass.lastIndex)
-                            .sumOf { groupedByClass[it].second.size }
-
-                        if (numTests < maxOptions) {
-
-                            fun printCallPyramid(printer: Builder) {
-
-                                val checkForInvalidClasses = false
-
-                                printer.append(";; tree for $sig0 -> $options\n")
-                                if (groupedByClass.size > 1 || checkForInvalidClasses) {
-                                    getCaller(printer)
-                                    printer.append(" call \$readClass\n  ")
-                                }
-
-                                val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
-                                for (j in 0 until jMax) {
-                                    val (toBeCalled, classes2) = groupedByClass[j]
-                                    val notLast = j != jMax - 1
-                                    val numDupI32s = classes2.size - 1 + notLast.toInt()
-                                    for (k in 0 until numDupI32s) {
-                                        printer.dupI32()
-                                    }
-                                    if (numDupI32s > 0) printer.append("\n  ")
-                                    for (k in classes2.indices) {
-                                        printer.append("i32.const ")
-                                            .append(gIndex.getClassIndex(classes2[k]))
-                                            .append(" i32.eq")
-                                        if (k > 0) printer.append(" i32.or")
-                                        printer.append(" ;; ").append(classes2[k]).append("\n  ")
-                                    }
-                                    // write params and result
-                                    printer.append("(if (param i32") // first i32 is for 'this' for call
-                                    for (argI in splitArgs) printer.append(" ").append(argI)
-                                    if (notLast) printer.append(" i32") // 'this' for type-checking
-                                    printer.append(") (result")
-                                    if (ret != "V") printer.append(" ").append(jvm2wasm(ret))
-                                    if (calledCanThrow) printer.append(" i32")
-                                    printer.append(") (then\n    ")
-                                    if (notLast) printer.append("drop ") // drop 'this' for type-checking
-                                    printer.append("call \$").append(methodName(toBeCalled)).append("\n  ")
-                                    printer.fixThrowable(toBeCalled)
-                                    printer.append(") (else\n")
-                                }
-                                if (checkForInvalidClasses) {
-                                    printer.append("    call \$jvm_JVM32_throwJs_V\n")
-                                    printer.append("    unreachable\n")
-                                } else {
-                                    val sigJ = groupedByClass.last().first
-                                    printer.append("    call \$").append(methodName(sigJ))
-                                    printer.fixThrowable(sigJ)
-                                    printer.append("\n  ")
-                                }
-                                for (j in 0 until jMax) {
-                                    printer.append("))")
-                                }
-                                printer.append("\n")
-                            }
-
-                            stackPush()
-                            checkNotNull0(owner, name, ::getCaller)
-
-                            if (numTests < 3) {
-                                printCallPyramid(printer)
-                            } else {
-                                val helperName = "tree_${sig0.toString().escapeChars()}"
-                                helperFunctions.getOrPut(helperName) {
-                                    val printer = StringBuilder2()
-                                    printer.append("(func \$").append(helperName)
-                                        .append(" (param ").append(ptrType) // 'this'
-                                    for (arg in splitArgs) printer.append(' ').append(arg)
-                                    printer.append(") (result")
-                                    if (ret != "V") printer.append(' ').append(jvm2wasm(ret))
-                                    if (canThrowError) printer.append(' ').append(ptrType)
-                                    printer.append(")\n")
-                                    // local variable for dupi32
-                                    printer.append("  (local ").append(tmpI32).append(' ').append(ptrType).append(")\n")
-                                    // load all parameters onto the stack
-                                    for (k in 0 until splitArgs.size + 1) {
-                                        printer.append("  local.get ").append(k).append('\n')
-                                    }
-                                    printCallPyramid(printer)
-                                    printer.append("  return\n)\n")
-                                    printer
-                                }
-                                printer.append("  call \$").append(helperName).append("\n")
-                            }
-
-                            pop(splitArgs, false, ret)
-                            stackPop()
-
-                        } else {
-                            // if there is too many tests, use resolveIndirect
-                            callIndirect()
-                        }
-                    } else callIndirect()
                 }
-
-                /*if (sig.name == "nextInt") {
-                    throw IllegalStateException("stack: $stack")
-                }*/
-
             }
             // typically, <init>, but also can be private or super function; -> no resolution required
             0xb7 -> {
@@ -1343,13 +1176,13 @@ class MethodTranslator(
         return calledCanThrow
     }
 
-    private fun stackPush() {
+    fun stackPush() {
         if (canPush) {
             printer.append("  i32.const ").append(getCallIndex()).append(" call \$stackPush\n")
         }
     }
 
-    private fun stackPop() {
+    fun stackPop() {
         if (canPush) {
             printer.append("  call \$stackPop\n")
         }
@@ -1651,7 +1484,7 @@ class MethodTranslator(
         }
     }
 
-    private val tmpI32 by lazy { findOrDefineLocalVar(-3, "i32").wasmName }
+    val tmpI32 by lazy { findOrDefineLocalVar(-3, "i32").wasmName }
 
     override fun visitTypeAnnotation(
         typeRef: Int,
@@ -1689,13 +1522,15 @@ class MethodTranslator(
             }
             0xc0 -> {
                 // check cast
-                stackPush()
-                printer.pop(ptrType).push(ptrType)
-                printer.append("  ").printCastClass(type)
-                if (comments) printer.append(" ;; $type\n")
-                else printer.append('\n')
-                stackPop()
-                handleThrowable()
+                if (checkClassCasts) {
+                    stackPush()
+                    printer.pop(ptrType).push(ptrType)
+                    printer.append("  ").printCastClass(type)
+                    if (comments) printer.append(" ;; $type\n")
+                    else printer.append('\n')
+                    stackPop()
+                    handleThrowable()
+                }
             }
             0xc1 -> {
                 // instance of

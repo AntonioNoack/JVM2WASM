@@ -62,6 +62,7 @@ var enableTracing = true
 var ignoreNonCriticalNullPointers = true
 var checkArrayAccess = false
 var checkNullPointers = false
+var checkClassCasts = false
 
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings

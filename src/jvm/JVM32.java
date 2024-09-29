@@ -131,6 +131,7 @@ public class JVM32 {
     @JavaScript(code = "console.log(str(arg0), str(arg1));")
     public static native void log(String msg, String param);
 
+    // instance, class -> instance, error
     @Alias(names = "cc")
     public static int checkCast(int instance, int clazz) {
         if (instance == 0) return 0;
