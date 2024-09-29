@@ -48,6 +48,7 @@ size_t allocatedSize = 0;
 i32 gcCtr = 0;
 i32 objectOverhead = 4;
 i32 arrayOverhead = 4 + 4;
+constexpr bool countAllocations = false;
 
 enum GarbageCollector {
   GC_SERIAL,
@@ -56,7 +57,7 @@ enum GarbageCollector {
 };
 
 constexpr enum GarbageCollector chosenCollector = GC_CONCURRENT;
-constexpr int gcIntervalFrames = 0;
+constexpr int gcIntervalFrames = 2000;
 
 // ParallelGC stuff
 constexpr bool useParallelGC = (chosenCollector == GC_PARALLEL);
@@ -132,13 +133,15 @@ void jvm_JVM32_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::
 
 std::vector<i32> callocStatistics;
 void jvm_JVM32_trackCalloc_IV(i32 classId) {
-    if(classId >= 0 && classId < callocStatistics.size()) {
+    if (countAllocations && classId >= 0 && classId < callocStatistics.size()) {
         callocStatistics[classId]++;
     }
 }
 
 void initClassStatistics() {
-    callocStatistics = std::vector<i32>(global_X, 0);
+    if (countAllocations) {
+        callocStatistics = std::vector<i32>(global_X, 0);
+    }
 }
 
 void printClassStatistics() {
@@ -707,7 +710,8 @@ void unreachable(std::string msg) {
 
 void initMemory() {
 
-    size_t baseSizeInBlocks = (global_G0 >> 16) + 10; // 44 are requested
+    // 10 as some buffer for the first allocations
+    size_t baseSizeInBlocks = (global_G0 >> 16) + 10;
     allocatedSize = baseSizeInBlocks << 16;
 
     // allocate memory
@@ -718,30 +722,13 @@ void initMemory() {
         return;
     }
 
-    // go through folder, and load all related memory blocks
-    std::string path = "./data";
-    std::string prefix = "jvm2wasm-data-";
-    std::string suffix = ".bin";
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
-        auto pathI = entry.path();
-        std::string pathName = pathI.filename().string();
-        if(pathName.starts_with(prefix) && pathName.ends_with(suffix)) {
-            size_t separator = pathName.find('-', prefix.length());
-            if(separator < 0) continue;
-            std::string startS = pathName.substr(prefix.length(), separator - prefix.length());
-            std::string endS = pathName.substr(separator+1, pathName.length()-suffix.length()-(separator+1));
-            if(startS.length() < 1 || endS.length() < startS.length()) continue;
-            size_t startI = std::stol(startS);
-            size_t endI = std::stol(endS);
-            if(startI < 0 || endI <= startI || endI > allocatedSize) continue;
-            if(std::filesystem::file_size(pathI) != endI - startI) continue;
-            std::ifstream file(pathI, std::ios::binary);
-            file.read(((char*) memory) + startI, endI - startI);
-            if(!file) std::cerr << "Failed reading file " << pathName << std::endl;
-            std::cout << "[FS] Loaded " << startI << " - " << endI << " into memory" << std::endl;
-        }
-    }
-
+    // load memory block
+    std::string path = "runtime-data.bin";
+    std::ifstream file(path, std::ios::binary);
+    size_t size = std::min(std::filesystem::file_size(path), allocatedSize);
+    file.read((char*) memory, size);
+    if(!file) std::cerr << "Failed reading file " << path << std::endl;
+    std::cout << "Loaded " << size << " bytes into memory" << std::endl;
 
 }
 
@@ -912,7 +899,9 @@ int main() {
     attachGLFWListeners();
     startGCThread();
 
-    printClassStatistics();
+    if (countAllocations) {
+        printClassStatistics();
+    }
 
     // while not done,
     float x = 1, dt = 1.0 / 60.0;
@@ -936,13 +925,13 @@ int main() {
             break;
         }
 
-        /*if(++csCtr >= 2000) {
+        // can be used to see how many instances of what type were created
+        if(countAllocations && ++csCtr >= 2000) {
             printClassStatistics();
             csCtr = 0;
-        }*/
+        }
 
         if (++gcCtr >= gcIntervalFrames) {
-            // std::cout << "Running GC" << std::endl;
             if (useParallelGC) {
                 if (parallelGCStage == 0) {
                     parallelGC0();
@@ -968,17 +957,12 @@ int main() {
             }
         }
 
-        // todo run graphics
-        // todo if GC timer reaches X, run GC
-
         glfwSwapBuffers(window);
         i64 thisTime = java_lang_System_nanoTime_J();
         dt = (thisTime - lastTime) / 1e9;
         lastTime = thisTime;
-        // std::cout << "dt: " << dt << ", fps: " << (1.0/dt) << std::endl;
     }
 
-    // std::cout << "Closing" << std::endl;
     shutdown = true;
     glfwTerminate();
     if(gcThread) {

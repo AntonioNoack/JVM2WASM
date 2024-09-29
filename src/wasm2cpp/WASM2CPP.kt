@@ -125,10 +125,15 @@ fun wasm2cpp() {
 
     tmp.getChild("data").delete()
     tmp.getChild("data").mkdirs()
+
+    // todo can we pack this data into the .exe somehow???
+    val dataSize = parser.dataSections.maxOfOrNull { it.startIndex + it.content.size } ?: 0
+    val data = ByteArray(dataSize)
     for (section in parser.dataSections) {
-        tmp.getChild("data/jvm2wasm-data-${section.startIndex}-${section.startIndex + section.content.size}.bin")
-            .writeBytes(section.content)
+        section.content.copyInto(data, section.startIndex)
     }
+    tmp.getChild("runtime-data.bin")
+        .writeBytes(data)
 
     // produce a compilable .cpp from it
     writer.append("// header\n")
@@ -147,9 +152,6 @@ fun wasm2cpp() {
     writer.append("void notifySampler(std::string funcName);\n")
 
     try {
-        /* parser.functions.removeIf {
-             it.funcName != "me_anno_gpu_deferred_DeferredSettings_appendLayerWriters_Ljava_lang_StringBuilderLme_anno_utils_structures_arrays_BooleanArrayListZV"
-         }*/
         defineFunctionImplementations(parser)
         fillInFunctionTable(parser)
     } catch (e: Throwable) {

@@ -59,7 +59,7 @@ fun defineFunctionImplementations(parser: WATParser) {
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
     val functions = parser.functions
-    functions.sortBy { it.funcName != "java_io_FilterInputStream_skip_JJ" }
+    // functions.sortBy { it.funcName != "java_io_FilterInputStream_skip_JJ" }
     for (fi in functions.indices) {
         val function = functions[fi]
         // if (function.funcName == "stackPush" || function.funcName == "stackPop") continue
@@ -79,18 +79,13 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     init {
         defineFunctionHead(function, true)
         writer.append(" {\n")
-
-        if (false && '_' in function.funcName) {
-            // writer.append("std::cout << \"[\" << (global_Q0 - global_Q) << \"] ").append(function.funcName).append("\" << std::endl;\n")
-            writer.append("notifySampler(\"").append(function.funcName).append("\");\n")
-        }
     }
 
-    var depth = 1
-    val localsByName = function.locals
+    private var depth = 1
+    private val localsByName = function.locals
         .associateBy { it.name }
 
-    fun begin(): StringBuilder2 {
+    private fun begin(): StringBuilder2 {
         for (i in 0 until depth) {
             writer.append("  ")
         }
@@ -102,49 +97,43 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     }
 
     val stack = ArrayList<StackElement>()
-    var genI = 0
-    fun gen(): String = "tmp${genI++}"
-    fun pop(type: String): String {
+    private var genI = 0
+    private fun nextTemporaryVariable(): String = "tmp${genI++}"
+    private fun pop(type: String): String {
         val i0 = stack.removeLast()
         // println("pop -> $i0 + $stack")
         assertEquals(type, i0.type) { "pop -> $i0 + $stack" }
         return i0.name
     }
 
-    fun push(type: String, name: String = gen()): String {
+    private fun push(type: String, name: String = nextTemporaryVariable()): String {
         stack.add(StackElement(type, name))
         // println("push -> $stack")
         return name
     }
 
-    fun beginNew(type: String): StringBuilder2 {
+    private fun beginNew(type: String): StringBuilder2 {
         return begin().append(type).append(' ').append(push(type)).append(" = ")
     }
 
-    fun beginSetEnd(name: String, type: String) {
+    private fun beginSetEnd(name: String, type: String) {
         begin().append(name).append(" = ").append(pop(type)).end()
     }
 
     fun load(type: String, memoryType: String = type) {
         val ptr = pop("i32")
-        if (false && (function.funcName[0] != 'r' || function.funcName.length > 4)) {
-            begin().append("reading(sizeof(").append(memoryType).append("),")
-                .append(ptr).append(")").end()
-        }
         beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
             .append("))[0]").end()
     }
 
-    fun store(type: String, memoryType: String = type) {
+    private fun store(type: String, memoryType: String = type) {
         val value = pop(type)
         val ptr = pop("i32")
-        if (false) begin().append("writing(sizeof(").append(memoryType).append("),")
-            .append(ptr).append(",").append(value).append(")").end()
         begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
             .append("))[0] = ").append(value).end()
     }
 
-    fun writeCall(funcName: String, params: List<String>, results: List<String>) {
+    private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
 
         if (funcName.startsWith("getNth_")) {
             stack.add(stack[stack.size - params.size])
@@ -173,7 +162,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             return
         }
 
-        val tmp = if (results.isNotEmpty()) gen() else ""
+        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
         begin()
         if (results.isNotEmpty()) {
             for (ri in results.indices) {
@@ -201,7 +190,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         }
     }
 
-    fun writeInstruction(i: Instruction) {
+    private fun writeInstruction(i: Instruction) {
         when (i) {
             is ParamGet -> {
                 val index = i.index
@@ -358,7 +347,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     assertEquals(i.params.size, i.results.size)
                 }
 
-                val resultVars = i.results.map { gen() }
+                val resultVars = i.results.map { nextTemporaryVariable() }
                 for (ri in resultVars.indices) {
                     begin().append(i.results[ri]).append(' ')
                         .append(resultVars[ri]).append(" = 0").end()
@@ -423,8 +412,8 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             }
             is CallIndirect -> {
                 val type = parser.types[i.type]!!
-                val tmpType = gen()
-                val tmpVar = gen()
+                val tmpType = nextTemporaryVariable()
+                val tmpVar = nextTemporaryVariable()
                 // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
                 begin().append("using ").append(tmpType).append(" = ")
                 if (type.results.isEmpty()) {
@@ -446,7 +435,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 writeCall(tmpVar, type.params, type.results)
             }
             is LoopInstr -> {
-                val resultNames = i.results.map { gen() }
+                val resultNames = i.results.map { nextTemporaryVariable() }
                 for (j in i.results.indices) {
                     begin().append(i.results[j]).append(' ')
                         .append(resultNames[j]).append(" = 0;\n")
@@ -463,7 +452,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     assertEquals(0, isSwitchCase.cases[0].size)
                     val cases = isSwitchCase.cases.subList(1, isSwitchCase.cases.size) +
                             listOf(i.body.subList(1, i1))
-                    writeSwitchCase(isSwitchCase, cases)
+                    writeSwitchCase(cases)
                 } else {
                     for (ii in 0 until i1) {
                         writeInstruction(i.body[ii])
@@ -498,7 +487,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         }
     }
 
-    fun writeSwitchCase(i: SwitchCase, cases: List<List<Instruction>>) {
+    private fun writeSwitchCase(cases: List<List<Instruction>>) {
         // big monster, only 1 per function allowed, afaik
         // assertEquals(1, depth)
         assertEquals(0, stack.size)
