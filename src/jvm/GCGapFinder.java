@@ -27,11 +27,9 @@ public class GCGapFinder {
         }
     }
 
-
     private static int[] nextWeakRef;
     private static int nextWeakRefIndex;
     private static int nextWeakRefInstance;
-
 
     private static boolean handleWeakRefs(int instance) {
 

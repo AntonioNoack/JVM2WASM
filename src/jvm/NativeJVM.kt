@@ -91,11 +91,11 @@ fun appendNativeHelperFunctions(printer: StringBuilder2) {
     // to do implement this, when we have multi-threading
     printer.append("(func \$monitorEnter (param $ptrType))\n")
     printer.append("(func \$monitorExit (param $ptrType))\n")
-    printer.append("(func \$shallInitStatic (param i32) (result i32)\n" +
+    printer.append("(func \$wasStaticInited (param i32) (result i32)\n" +
             "  (local \$addr i32)\n" +
             "  global.get \$Z local.get 0 i32.add local.set \$addr\n" + // calculate flag address
-            "  local.get \$addr i32.load8_u\n" + // push result onto stack
-            "  local.get \$addr i32.const 1 i32.store8\n" + // set flag no matter what
+            "  local.get \$addr i32.load8_u\n" + // load result
+            "  local.get \$addr i32.const 1 i32.store8\n" + // set flag
             // return result
             ")\n")
 }

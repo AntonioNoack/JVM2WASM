@@ -49,14 +49,23 @@ i32 gcCtr = 0;
 i32 objectOverhead = 4;
 i32 arrayOverhead = 4 + 4;
 
+enum GarbageCollector {
+  GC_SERIAL,
+  GC_CONCURRENT,
+  GC_PARALLEL
+};
+
+constexpr enum GarbageCollector chosenCollector = GC_CONCURRENT;
+constexpr int gcIntervalFrames = 0;
+
 // ParallelGC stuff
-bool useParallelGC = false;
+constexpr bool useParallelGC = (chosenCollector == GC_PARALLEL);
 volatile i32 parallelGCStage = 0;
 bool shutdown = false;
 std::thread* gcThread = nullptr;
 
 // ConcurrentGC stuff
-bool useConcurrentGC = true;
+constexpr bool useConcurrentGC = (chosenCollector == GC_CONCURRENT);
 i32 concurrentGCStage = 0;
 
 // GLFW-stuff
@@ -598,12 +607,21 @@ i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
 i32 me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return 0; }
 i32 new_java_text_SimpleDateFormat_V(i32) { return 0; }
 i32 new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return 0; }
+#if 0
+void static_java_io_BufferedInputStream_V() { }
+void static_java_lang_reflect_AccessibleObject_V() { }
+void static_java_util_Date_V() { }
+void static_java_util_Formatter_V() { }
+void static_me_anno_audio_AudioFXCache_V() { }
+void static_me_anno_video_formats_gpu_GPUFrame_V() { }
+#else
 i32 static_java_io_BufferedInputStream_V() { return 0; }
 i32 static_java_lang_reflect_AccessibleObject_V() { return 0; }
 i32 static_java_util_Date_V() { return 0; }
 i32 static_java_util_Formatter_V() { return 0; }
 i32 static_me_anno_audio_AudioFXCache_V() { return 0; }
 i32 static_me_anno_video_formats_gpu_GPUFrame_V() { return 0; }
+#endif
 i32i32 java_lang_Class_copyConstructors_ALjava_lang_reflect_ConstructorALjava_lang_reflect_Constructor(i32) { return {}; }
 i32i32 java_lang_Class_getDeclaredConstructors0_ZALjava_lang_reflect_Constructor(i32, i32) { return { }; }
 i32i32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { return { }; }
@@ -923,7 +941,7 @@ int main() {
             csCtr = 0;
         }*/
 
-        if (++gcCtr >= 2000) {
+        if (++gcCtr >= gcIntervalFrames) {
             // std::cout << "Running GC" << std::endl;
             if (useParallelGC) {
                 if (parallelGCStage == 0) {

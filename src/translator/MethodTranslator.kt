@@ -106,7 +106,7 @@ class MethodTranslator(
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
                 printer.append("  i32.const ").append(clazz1)
-                    .append(" call \$shallInitStatic\n")
+                    .append(" call \$wasStaticInited\n")
                     .append(
                         if (canThrowError) "  (if (then i32.const 0 return))\n"
                         else "  (if (then return))\n"

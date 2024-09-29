@@ -67,6 +67,7 @@ var checkClassCasts = false
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings
 var crashOnAllExceptions = false // todo not yet supported
+var crashInStatic = false // crashes at runtime :/
 val byteStrings = useUTF8Strings || replaceStringInternals
 
 var disableAudio = true
@@ -153,6 +154,7 @@ val cannotThrow = HashSet<String>(256)
 
 fun canThrowError(methodSig: MethodSig): Boolean {
     if (crashOnAllExceptions) return false
+    if (crashInStatic && methodSig.name == "<clinit>") return false
     return methodName(methodSig) !in cannotThrow
 }
 

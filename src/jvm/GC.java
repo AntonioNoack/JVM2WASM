@@ -24,7 +24,7 @@ public class GC {
     public static final int BYTE_ARRAY_CLASS = 5;
 
     public static int[] largestGaps = new int[16];// 16 pointers
-    private static int[] largestGapsTmp = new int[16];
+    static int[] largestGapsTmp = new int[16];
 
     public static int generation = 1;
 

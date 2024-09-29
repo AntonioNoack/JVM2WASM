@@ -151,6 +151,11 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             return
         }
 
+        if (funcName == "wasStaticInited") {
+            beginNew("i32").append("0").end()
+            return
+        }
+
         if (!enableCppTracing) {
             if (funcName == "stackPush" || funcName == "stackPop") {
                 if (funcName == "stackPush") pop("i32")
@@ -269,7 +274,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 val offset = stack.size - function.results.size
                 assertTrue(offset >= 0)
                 begin().append("return")
-                when (stack.size) {
+                when (function.results.size) {
                     0 -> {}
                     1 -> writer.append(' ').append(stack[offset].name)
                     else -> {
@@ -570,6 +575,14 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     }
 
     init {
+        if (function.funcName.startsWith("static_")) {
+            writer.append("static bool wasCalled = false;\n")
+            writer.append(
+                if (function.results.isEmpty()) "if(wasCalled) return;\n"
+                else "if(wasCalled) return 0;\n"
+            )
+            writer.append("wasCalled = true;\n")
+        }
         for (local in function.locals) {
             if (local.name == "lbl") continue
             begin().append(local.type).append(' ').append(local.name).append(" = 0").end()

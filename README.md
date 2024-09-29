@@ -4,6 +4,8 @@ This project is a compiler from JVM to WASM for [Rem's Engine](https://github.co
 It has a [garbage collector](src/jvm/GC.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
 The target JVM language is Java 8 (lambdas).
 
+This project now has a second target with [WASM2CPP](#WASM2Cpp): Native desktop, compiling the generated WASM into C++.
+
 The generated code relies heavily on switch-statements, because structural analysis is hard, and I haven't implemented "pattern-independent structuring" (a paper, that solves it) yet.
 This makes it much slower than native code (50x-100x in [SciMark2](https://math.nist.gov/scimark2/)).
 
@@ -57,6 +59,40 @@ public static boolean Character_isDigit(int code) {
 @WASM(code = "i32.lt_u")
 public static native boolean unsignedLessThan(int a, int b);
 ```
+
+## WASM2CPP
+
+For running my engine in pure C++ environments, I also created a transpiler from WASM text to C++. The performance is ok-ish, running
+at 150 fps on my Ryzen 7950x3D with lots of security features disabled (max-performance mode), and rendering testSceneWithUI() with a low-poly sphere.
+The same program runs at 417 fps in Java, and ideally would achieve 600+ fps.
+
+The benefit of C++ over WASM is that jumps are supported natively, so there isn't much overhead for them.
+
+The standard-library for running in C++ is pretty bare-bones at the moment, not being able to load files, not having network access, and having no font mechanism except the engine fallback (7-segment-like).
+
+This C++-"port" should allow the engine to be compiled to any OS. There also isn't much "++" about it, most could be easily converted to C.
+
+## Garbage Collector
+The following section discusses my implemented garbage collectors, where performance has been tested in my C++-transpiled native environment
+on a Ryzen 7950x3D (one of the fastest CPUs available at this time).
+
+### Serial GC
+
+Serial GC is too slow: when it runs every frame, it reduces the FPS to 40 on my system. When it runs every X frames,
+the large accumulated backlog of old instances creates a large lag spike (200ms/50MB, X = 2000, from 50MB down to 20MB).
+It has the advantage of not accumulating new memory during collection.
+
+### Parallel GC
+
+C++ offers multi-threading, so I experimented with a parallely running GC: finding the largest gaps, which is the most expensive step,
+can be executed in parallel. The implementation is currently a little instable, crashing after 18,000 iterations in a stability test (when triggering GC every frame).
+Running GC every 2000 frames at 60 fps should be stable enough though (92+ hours runtime).
+
+### Concurrent GC
+
+Inspired by the parallel GC crashing during development, I also developed a concurrent garbage collector:
+the load is spread out over multiple frames, reducing FPS slightly (5ms first frame, ~1ms/frame) for a few frames, for a second.
+It only crashed after 236,000 iterations (why ever). This is the best choice for stability and performance.
 
 ## Used Libraries / Dependencies
 - [ObjectWeb ASM 9.3](https://asm.ow2.io/)
