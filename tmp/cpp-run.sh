@@ -1,1 +1,1 @@
-./build/Debug/JVM2CPP.exe
+./build/Release/JVM2CPP.exe

@@ -21,6 +21,16 @@ FetchContent_MakeAvailable(glfw)
 add_library(glad STATIC ${PROJECT_SOURCE_DIR}/glad/src/gl.c)
 target_include_directories(glad PUBLIC ${PROJECT_SOURCE_DIR}/glad/include)
 
+# Add stb image library
+#  stbi/include/stbi.h
+add_library(stbi STATIC ${PROJECT_SOURCE_DIR}/stbi/stbi.c)
+target_include_directories(stbi PUBLIC ${PROJECT_SOURCE_DIR}/stbi/include)
+
+# Required, why ever
+if(MSVC)
+    add_compile_options(/bigobj)
+endif()
+
 # Create the executable
 add_executable(JVM2CPP jvm2wasm-base.cpp)
 

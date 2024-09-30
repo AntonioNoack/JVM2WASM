@@ -867,9 +867,6 @@ void startGCThread(){
     }
 }
 
-// Linux:
-// g++ -std=c++20 jvm2wasm.cpp -fmax-errors=20
-
 int main() {
 
     initMemory();
