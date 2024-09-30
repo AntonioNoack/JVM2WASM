@@ -154,6 +154,7 @@ try {
     window.stop = false
     var t0 = new Date().getTime()
     window.gcCtr = 0
+    window.gcStage = 0
     async function startEngine() {
 
         if(window.inited) return
@@ -192,10 +193,14 @@ try {
                 safe(lib.engine_Engine_update_IIFV(innerWidth, innerHeight, dt))
             }
             lastTime = time
-            if(window.gcCtr++ >= 200) {
-                window.gcCtr = 0
-                // console.log("Running GC")
-                safe(lib.gc())
+            if (window.gcCtr++ >= 2000) {
+                if (window.gcStage == 0) {
+                    lib.concurrentGC0();
+                    window.gcStage = 1;
+                } else if (lib.concurrentGC1()) {
+                    window.gcStage = 0;
+                    window.gcCtr = 0;
+               } // else stage stays the same
             }
             if(!window.stop) requestAnimationFrame(render)
         }

@@ -30,8 +30,8 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         val widthLimit: Int = maxTextureSize
         val heightLimit: Int = maxTextureSize
 
-        val alignment = getOffsetCache(font)
-        val size = alignment.getOffset('w'.code, 'w'.code)
+        val offsetCache = getOffsetCache(font)
+        val size = offsetCache.getOffset('w'.code, 'w'.code)
         val width = min(widthLimit, size.roundToInt() + 1 + 2 * extraPadding)
         // leading + ascent + descent
         val height = min(heightLimit, font.sampleHeight + 2 * extraPadding)
@@ -65,6 +65,6 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         backgroundColor: Int,
         extraPadding: Int
     ) {
-        TextGen.generateTexture(font.name, text, font.size, widthLimit)
+        callback.ok(TextGen.generateTexture(font.name, text, font.size, widthLimit))
     }
 }

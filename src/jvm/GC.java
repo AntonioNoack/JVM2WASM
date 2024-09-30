@@ -277,10 +277,12 @@ public class GC {
 
     @NoThrow
     @Alias(names = "lockMallocMutex")
+    @JavaScript(code = "")
     public static native void lockMallocMutex();
 
     @NoThrow
     @Alias(names = "unlockMallocMutex")
+    @JavaScript(code = "")
     public static native void unlockMallocMutex();
 
 }

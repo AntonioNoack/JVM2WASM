@@ -68,13 +68,12 @@ public class Engine {
     private static void initBrowserFonts() {
         // todo setup everything that JVMPlugin would do...
         FontStats.INSTANCE.setQueryInstalledFontsImpl(Collections::emptyList);
-        FontStats.INSTANCE.setGetFontHeightImpl(font -> (double) font.getSize());
         FontStats.INSTANCE.setGetTextGeneratorImpl(font -> new TextGeneratorImpl(new Font(
                 font.getName(),
                 FontManager.INSTANCE.getAvgFontSize(font.getSizeIndex()),
                 font.getBold(),
                 font.getItalic())));
-        FontStats.INSTANCE.setGetTextLengthImpl((font, text) -> 100.0);
+        FontStats.INSTANCE.setGetTextLengthImpl((font, text) -> (double) TextGen.measureText1(font.getName(), font.getSize(), text));
     }
 
     @NoThrow
