@@ -103,14 +103,17 @@ public class TextGen {
     @NoThrow
     @JavaScript(code = "let w=arg3,h=arg4,d=arg5;\n" +
             "txtCanvas.width=w;txtCanvas.height=h*d;\n" +
-            "ctx.fillStyle='#'+arg7.toString(16).padStart(6,'0');\n" +
-            "ctx.fillRect(0,0,w,h*d)\n" +
-            "ctx.fillStyle='#'+arg6.toString(16).padStart(6,'0');\n" +
+            "let color0 = '#'+arg7.toString(16).padStart(6,'0');\n" +
+            "let color1 = '#'+arg6.toString(16).padStart(6,'0');\n" +
             "ctx.textAlign='center'\n" +
             "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
-            "for(let i=0;i<d;i++) ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
+            "for(let i=0;i<d;i++) {\n" +
+            "   ctx.fillStyle=color0;\n" + // clear space, just in case
+            "   ctx.fillRect(0,i*h,w,h);\n" +
+            "   ctx.fillStyle=color1;\n" +
+            "   ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
+            "}\n" +
             "let buffer = ctx.getImageData(0,0,w,h*d).data;\n" +
-            //"for(let i=0;i<buffer.length;i++) buffer[i] = 127;\n" +
             "gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n")
     public static native void genASCIITexture(
             String font, float fontSize, int text0, int width, int height, int depth,

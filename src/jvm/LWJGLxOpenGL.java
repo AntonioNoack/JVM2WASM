@@ -521,7 +521,7 @@ public class LWJGLxOpenGL {
     private static native void GL11C_glFinish_V();
 
     @NoThrow
-    @JavaScript(code = "console.log('glReadPixelsU8', arguments);if(0)gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
+    @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
     public static native void readPixelsU8(int x, int y, int w, int h, int format, int type, int data, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV")
@@ -530,7 +530,7 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @JavaScript(code = "console.log('glReadPixelsF32', arguments);gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
+    @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
     public static native void readPixelsF32(int x, int y, int w, int h, int format, int type, int dataPtr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV")
@@ -1063,23 +1063,23 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBeginQuery_IIV")
-    @JavaScript(code = "if(arg0 != 35007) { gl.beginQuery(arg0,unmap(arg1)); } else { glTimeQueries[arg1] = 1; }")
+    @JavaScript(code = "if(arg0 != 35007) { gl.beginQuery(arg0,unmap(arg1)); } else { glTimeQueries[arg1] = 1; glTimeQuery = arg1; glTimer = performance.now(); }")
     // GL_TIME_ELAPSED isn't supported
     public static native void glBeginQuery_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
-    @JavaScript(code = "if(arg0 != 35007) gl.endQuery(arg0)")
+    @JavaScript(code = "if(arg0 != 35007) { gl.endQuery(arg0); } else { glTimeQueries[glTimeQuery] = (1e6 * (performance.now() - glTimer)) | 0; }")
     public static native void glEndQuery_IV(int a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGetQueryObjecti_III")
-    @JavaScript(code = "return glTimeQueries[arg0] ? 0 : gl.getQueryParameter(unmap(arg0), arg1)")
+    @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
     public static native int GL15C_glGetQueryObjecti_III(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ")
-    @JavaScript(code = "return glTimeQueries[arg0] ? 0 : gl.getQueryParameter(unmap(arg0), arg1)")
+    @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
     public static native long GL33C_glGetQueryObjecti64_IIJ(int a, int b);
 
     @NoThrow

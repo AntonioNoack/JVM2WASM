@@ -331,6 +331,8 @@ try {
 
     const glMap = window.glMap = [null]
     window.glTimeQueries = {}
+    window.glTimeQuery = 0
+    window.glTimer = 0
     window.map = function(v){
         var id = glMap.length
         glMap[id] = v
