@@ -84,20 +84,23 @@ fun printUsed(sig: MethodSig) {
     }
 }
 
-val dstFolder = documents.getChild("IdeaProjects/JVM2WASM/tmp")
-val debugFolder = dstFolder.getChild("debug").apply {
+val wasmFolder = documents.getChild("IdeaProjects/JVM2WASM/wasm")
+val wasmTextFile = wasmFolder.getChild("jvm2wasm.wat")
+val debugFolder = wasmFolder.getChild("debug").apply {
     delete()
     mkdirs()
 }
 
 fun compileToWASM(printer: StringBuilder2) {
 
-    val tmp = dstFolder.getChild("jvm2wasm.wat")
-    tmp.outputStream().use {
+    wasmTextFile.outputStream().use {
         it.write(printer.values, 0, printer.size)
     }
 
-    println("  Number of constant Strings: ${gIndex.stringSet.size}, size: ${gIndex.totalStringSize.toLong().formatFileSize()}")
+    println(
+        "  Number of constant Strings: ${gIndex.stringSet.size}, " +
+                "size: ${gIndex.totalStringSize.toLong().formatFileSize()}"
+    )
 
     val t1 = System.nanoTime()
     println("  Total Kotlin time: ${((t1 - t0) * 1e-9).f3()}s")

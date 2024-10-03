@@ -8,6 +8,7 @@ import java.util.Locale;
 
 import static jvm.JVM32.*;
 import static jvm.JavaLang.*;
+import static jvm.JavaReflect.getClassIndex;
 
 public class StringsUTF8 {
 

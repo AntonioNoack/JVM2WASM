@@ -3,14 +3,6 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 
-import java.io.File;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-
-import static jvm.JVM32.*;
-import static jvm.JavaLang.getClassIndex;
-import static jvm.JavaLang.ptrTo;
-
 public class SunMisc {
 
     @NoThrow

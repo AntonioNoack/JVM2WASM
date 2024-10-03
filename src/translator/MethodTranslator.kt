@@ -6,6 +6,7 @@ import api
 import canThrowError
 import checkArrayAccess
 import checkClassCasts
+import checkIntDivisions
 import checkNullPointers
 import dIndex
 import dependency.ActuallyUsedIndex
@@ -583,34 +584,45 @@ class MethodTranslator(
             0x6a -> printer.pop(f32).poppush(f32).append("  f32.mul\n")
             0x6b -> printer.pop(f64).poppush(f64).append("  f64.mul\n")
             0x6c -> {
-                stackPush()
-                printer.poppush(i32).append("  call \$safeDiv32\n")
-                printer.pop(i32).poppush(i32)
-                stackPop()
-                handleThrowable()
+                if (checkIntDivisions) {
+                    stackPush()
+                    printer.poppush(i32).append("  call \$safeDiv32\n")
+                    printer.pop(i32).poppush(i32)
+                    stackPop()
+                    handleThrowable()
+                } else {
+                    printer.pop(i32).poppush(i32).append("  i32.div_s\n")
+                }
             }
             0x6d -> {
-                stackPush()
-                printer.poppush(i64).append("  call \$safeDiv64\n")
-                printer.pop(i64).poppush(i64)
-                stackPop()
-                handleThrowable()
+                if (checkIntDivisions) {
+                    stackPush()
+                    printer.poppush(i64).append("  call \$safeDiv64\n")
+                    printer.pop(i64).poppush(i64)
+                    stackPop()
+                    handleThrowable()
+                } else {
+                    printer.pop(i64).poppush(i64).append("  i64.div_s\n")
+                }
             }
             0x6e -> printer.pop(f32).poppush(f32).append("  f32.div\n")
             0x6f -> printer.pop(f64).poppush(f64).append("  f64.div\n")
             0x70 -> {
-                stackPush()
-                printer.poppush(i32).append("  call \$checkNonZero32\n")
-                stackPop()
-                handleThrowable()
-                printer.pop(i32).poppush(i32)
-                printer.append("  i32.rem_s\n")
+                if (checkIntDivisions) {
+                    stackPush()
+                    printer.poppush(i32).append("  call \$checkNonZero32\n")
+                    stackPop()
+                    handleThrowable()
+                }
+                printer.pop(i32).poppush(i32).append("  i32.rem_s\n")
             }
             0x71 -> {
-                stackPush()
-                printer.poppush(i64).append("  call \$checkNonZero64\n")
-                stackPop()
-                handleThrowable()
+                if (checkIntDivisions) {
+                    stackPush()
+                    printer.poppush(i64).append("  call \$checkNonZero64\n")
+                    stackPop()
+                    handleThrowable()
+                }
                 printer.pop(i64).poppush(i64)
                 printer.append("  i64.rem_s\n")
             }

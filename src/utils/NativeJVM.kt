@@ -1,8 +1,7 @@
-package jvm
+package utils
 
 import exportHelpers
 import gIndex
-import utils.*
 
 fun appendNativeHelperFunctions(printer: StringBuilder2) {
 

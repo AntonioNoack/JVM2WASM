@@ -21,6 +21,7 @@ import listSuperClasses
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
+import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Floats.f3
@@ -311,17 +312,13 @@ fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {
         entryPoints.add(it)
     }
 
-    listEntryPoints(
-        { hIndex.exportedMethods.addAll(hIndex.methods[it] ?: emptySet()) },
-        { hIndex.exportedMethods.add(it) })
-
     return entryPoints to entryClasses
 }
 
 fun findExportedMethods() {
     println("[findExportedMethods]")
     for ((sig, a) in hIndex.annotations) {
-        if (a.any { it.clazz == "annotations/Export" }) {
+        if (a.any2 { it.clazz == "annotations/Export" }) {
             hIndex.exportedMethods.add(sig)
         }
     }
@@ -445,7 +442,7 @@ fun generateJavaScriptFile(missingMethods: HashSet<MethodSig>): Map<String, Pair
     val jsImplemented = HashMap<String, Pair<MethodSig, String>>() // name -> sig, impl
     for (sig in dIndex.usedMethods) {
         val annot = hIndex.annotations[sig] ?: continue
-        val js = annot.firstOrNull { it.clazz == "annotations/JavaScript" } ?: continue
+        val js = annot.firstOrNull2 { it.clazz == "annotations/JavaScript" } ?: continue
         val code = js.properties["code"] as String
         missingMethods.remove(sig)
         for (name in methodNames(sig)) {
@@ -558,7 +555,7 @@ fun findClassesToLoad(aliasedMethods: List<MethodSig>): List<String> {
 }
 
 fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
-    // todo we could optimize this and only create one method per call-signature
+    // todo we could (space-)optimize this and only create one method per call-signature
     println("[printAbstractMethods]")
     bodyPrinter.append(";; not implemented, abstract\n")
     for (func in dIndex.usedMethods

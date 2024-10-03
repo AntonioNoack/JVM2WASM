@@ -111,7 +111,7 @@ object ResolveIndirect {
                 if (groupedByClass.size > 1 || checkForInvalidClasses) {
                     getCaller(printer)
                     printer.append(" call \$readClass ")
-                        .append("local.set ").append(tmpI32).append("\n")
+                        .append("local.set ").append(tmpI32).append("\n  ")
                 }
 
                 val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
@@ -134,7 +134,7 @@ object ResolveIndirect {
                     printer.append(") (then\n    ")
                     printer.append("call \$").append(methodName(toBeCalled)).append("\n  ")
                     printer.fixThrowable(calledCanThrow, toBeCalled)
-                    printer.append(") (else\n")
+                    printer.append(") (else\n  ")
                 }
                 if (checkForInvalidClasses) {
                     printer.append("    call \$jvm_JVM32_throwJs_V\n")

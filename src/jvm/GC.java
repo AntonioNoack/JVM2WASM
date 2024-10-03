@@ -1,6 +1,7 @@
 package jvm;
 
 import annotations.Alias;
+import annotations.Export;
 import annotations.JavaScript;
 import annotations.NoThrow;
 import jvm.custom.WeakRef;
@@ -32,6 +33,7 @@ public class GC {
     @JavaScript(code = "markJSReferences()")
     private static native void markJSReferences();
 
+    @Export
     @NoThrow
     @Alias(names = "gc")
     public static void invokeGC() {
@@ -47,6 +49,7 @@ public class GC {
         log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
     }
 
+    @Export
     @NoThrow
     @Alias(names = "concurrentGC0")
     public static void concurrentGC0() {
@@ -59,6 +62,7 @@ public class GC {
         log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
     }
 
+    @Export
     @NoThrow
     @Alias(names = "concurrentGC1")
     public static boolean concurrentGC1() {

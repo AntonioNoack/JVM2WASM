@@ -2,36 +2,59 @@ package jvm;
 
 import annotations.NoThrow;
 
+import static jvm.JVM32.unsignedGreaterThan;
+import static jvm.JVM32.unsignedLessThanEqual;
+
+/**
+ * QuickSort for unsigned-int-arrays, in-place, stable and fast
+ */
 public class QuickSort {
 
     @NoThrow
-    public static void quickSort(int[] arr, int begin, int endIncl) {
-        if (begin < endIncl) {
-            int partitionIndex = partition(arr, begin, endIncl);
-
-            quickSort(arr, begin, partitionIndex - 1);
-            quickSort(arr, partitionIndex + 1, endIncl);
+    public static void quickSort(int[] values, int begin, int endIncl) {
+        if (begin + 12 < endIncl) {
+            int partitionIndex = partition(values, begin, endIncl);
+            quickSort(values, begin, partitionIndex - 1);
+            quickSort(values, partitionIndex + 1, endIncl);
+        } else if (begin < endIncl) {
+            // there is just a few elements so don't use the stack, and instead brute force
+            slowSort(values, begin, endIncl);
         }
     }
 
     @NoThrow
-    private static int partition(int[] arr, int begin, int endIncl) {
-        int pivot = arr[endIncl];
+    private static void slowSort(int[] values, int begin, int endIncl) {
+        for (int i = begin; i < endIncl; i++) {
+            for (int j = i + 1; j <= endIncl; j++) {
+                int vi = values[i];
+                int vj = values[j];
+                if (unsignedGreaterThan(vi, vj)) {
+                    values[j] = vi;
+                    values[i] = vj;
+                }
+            }
+        }
+    }
+
+    @NoThrow
+    private static int partition(int[] values, int begin, int endIncl) {
+        int pivot = values[endIncl];
         int i = (begin - 1);
 
         for (int j = begin; j < endIncl; j++) {
-            if (arr[j] <= pivot) {
+            int vj = values[j];
+            if (unsignedLessThanEqual(vj, pivot)) {
                 i++;
 
-                int swapTemp = arr[i];
-                arr[i] = arr[j];
-                arr[j] = swapTemp;
+                int vi = values[i];
+                values[j] = vi;
+                values[i] = vj;
             }
         }
 
-        int swapTemp = arr[i + 1];
-        arr[i + 1] = arr[endIncl];
-        arr[endIncl] = swapTemp;
+        int vi1 = values[i + 1];
+        values[i + 1] = values[endIncl];
+        values[endIncl] = vi1;
 
         return i + 1;
     }

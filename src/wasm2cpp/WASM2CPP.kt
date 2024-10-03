@@ -3,6 +3,7 @@ package wasm2cpp
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
 import utils.StringBuilder2
+import utils.wasmTextFile
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
@@ -22,7 +23,7 @@ fun makeFloat(str: String): String {
 }
 
 val writer = StringBuilder2(1024)
-val tmp = documents.getChild("IdeaProjects/JVM2WASM/tmp")
+val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/cpp")
 
 fun defineTypes() {
     writer.append("// types\n")
@@ -110,7 +111,7 @@ fun wasm2cpp() {
     val clock = Clock("WASM2CPP")
 
     // load wasm.wat file
-    val text = tmp.getChild("jvm2wasm.wat").readTextSync()
+    val text = wasmTextFile.readTextSync()
     clock.stop("Loading WAT")
 
     // tokenize it
@@ -123,16 +124,13 @@ fun wasm2cpp() {
     }
     parser.functions.removeIf { it.funcName.startsWith("getNth_") }
 
-    tmp.getChild("data").delete()
-    tmp.getChild("data").mkdirs()
-
     // todo can we pack this data into the .exe somehow???
     val dataSize = parser.dataSections.maxOfOrNull { it.startIndex + it.content.size } ?: 0
     val data = ByteArray(dataSize)
     for (section in parser.dataSections) {
         section.content.copyInto(data, section.startIndex)
     }
-    tmp.getChild("runtime-data.bin")
+    cppFolder.getChild("runtime-data.bin")
         .writeBytes(data)
 
     // produce a compilable .cpp from it
@@ -144,7 +142,7 @@ fun wasm2cpp() {
     defineReturnStructs(parser)
     val pos = writer.size
     defineImports(parser)
-    tmp.getChild("jvm2wasm-base.h")
+    cppFolder.getChild("jvm2wasm-base.h")
         .writeBytes(writer.values, pos, writer.size - pos)
     defineFunctionHeads(parser)
 
@@ -160,7 +158,7 @@ fun wasm2cpp() {
 
     clock.stop("Transpiling")
 
-    tmp.getChild("jvm2wasm.cpp")
+    cppFolder.getChild("jvm2wasm.cpp")
         .writeBytes(writer.values, 0, writer.size)
 
     clock.total("WASM2CPP")

@@ -10,12 +10,14 @@ import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.GC.GC_OFFSET;
 import static jvm.GC.iteration;
 import static jvm.JVM32.*;
-import static jvm.JVM32.log;
-import static jvm.JavaLang.*;
+import static jvm.JavaLang.getAddr;
+import static jvm.JavaLang.ptrTo;
+import static jvm.JavaReflect.getFieldOffset;
+import static jvm.JavaReflect.getFields;
 
 /**
  * "Mark" of mark-and-sweep
- * */
+ */
 public class GCTraversal {
 
     @NoThrow

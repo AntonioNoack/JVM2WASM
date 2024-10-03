@@ -10,7 +10,7 @@ import static jvm.LWJGLxOpenGL.rgba2argb;
 
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This
- * implementation provides all of the optional map operations, and permits
+ * implementation provides all the optional map operations, and permits
  * {@code null} values.  (The {@code IntHashMap} class is roughly
  * equivalent to {@code HashMap}, except that it uses {@code int}s as its keys.
  * This class makes no guarantees as to
@@ -41,7 +41,7 @@ import static jvm.LWJGLxOpenGL.rgba2argb;
  * but increase the lookup cost (reflected in most of the operations of the
  * {@code IntHashMap} class, including {@code get} and {@code put}).  The
  * expected number of entries in the map and its load factor should be taken
- * into account when setting its initial capacity, so as to minimize the
+ * into account when setting its initial capacity, to minimize the
  * number of {@code rehash} operations.  If the initial capacity is greater
  * than the maximum number of entries divided by the load factor, no
  * {@code rehash} operations will ever occur.<p>

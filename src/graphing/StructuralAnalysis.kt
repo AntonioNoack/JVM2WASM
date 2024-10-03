@@ -1,6 +1,5 @@
 package graphing
 
-import insn.Drop
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
@@ -1256,7 +1255,7 @@ object StructuralAnalysis {
             var dropCtr = 0
             while (true) {
                 val ix = 1 + 5 * dropCtr
-                if (!node.printer.startsWith(Drop, ix)) break
+                if (!node.printer.startsWith(" drop", ix)) break
                 dropCtr++
             }
             // load stack

@@ -87,6 +87,7 @@ public class Engine {
         }
     }
 
+    @Export
     @SuppressWarnings("ConfusingMainMethod")
     public static void main(String clazzName) {
 
@@ -143,55 +144,69 @@ public class Engine {
         tick.stop("Game Init");
     }
 
+    @Export
     public static void update(int width, int height, float dt) {
         window.setWidth(width);
         window.setHeight(height);
-        window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
+        // todo vsync is enabled when calling this (good), but when I "toggle Vsync" via the menu, it doesn't get toggled
+        // window.updateVsync();
+        if (runsInBrowser()) {
+            window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
+        }
         WindowManagement.updateWindows();
         Time.updateTime(dt, System.nanoTime());
         renderFrame2(window); // easier, less stuff from other systems
     }
 
+    @Export
     public static void mouseMove(float mouseX, float mouseY) {
         if (window == null) return;
         Input.INSTANCE.onMouseMove(window, mouseX, mouseY);
     }
 
+    @Export
     public static void keyDown(int key) {
         if (window == null) return;
         Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key), System.nanoTime());
     }
 
+    @Export
     public static void keyUp(int key) {
         if (window == null) return;
         Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key));
     }
 
+    @Export
     public static void keyTyped(int key) {
         if (window == null) return;
         Input.INSTANCE.onKeyTyped(window, Key.Companion.byId(key));
     }
 
+    @Export
     public static void charTyped(int key, int mods) {
         if (window == null) return;
         Input.INSTANCE.onCharTyped(window, key, mods);
     }
 
+    @Export
     public static void mouseDown(int key) {
         if (window == null) return;
         Input.INSTANCE.onMousePress(window, Key.Companion.byId(key));
     }
 
+    @Export
     public static void mouseUp(int key) {
         if (window == null) return;
         Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key));
     }
 
+    @Export
     public static void mouseWheel(float dx, float dy) {
         if (window == null) return;
         Input.INSTANCE.onMouseWheel(window, dx, dy, true);
     }
 
+    @Export
     public static void keyModState(int state) {
         // control: 2
         // shift: 1
@@ -297,12 +312,16 @@ public class Engine {
             "")
     private static native void generateTexture(String path, Texture2D texture, Callback<ITexture2D> callback);
 
+    @Export
+    @UsedIfIndexed
     @Alias(names = "prepareTexture")
     public static void prepareTexture(Texture2D texture) {
         texture.ensurePointer();
         Texture2D.Companion.bindTexture(texture.getTarget(), texture.getPointer());
     }
 
+    @Export
+    @UsedIfIndexed
     @Alias(names = "finishTexture")
     public static void finishTexture(Texture2D texture, int w, int h, Callback<ITexture2D> callback) {
         if (texture != null) {
@@ -328,10 +347,6 @@ public class Engine {
             if (file instanceof WebRef2) {
                 // call JS to generate a texture for us :)
                 Texture2D tex3 = new Texture2D(file.getName(), 1, 1, 1);
-                if (false) { // mark as used
-                    prepareTexture(tex3);
-                    finishTexture(tex3, -1, -1, null);
-                }
                 generateTexture(file.getAbsolutePath(), tex3, callback);
             } else {
                 log("Reading local images hasn't been implemented yet", file.getAbsolutePath());
@@ -661,6 +676,7 @@ public class Engine {
     private static native void runAsyncImpl(Function0<Object> runnable, String name);
 
     @Export
+    @UsedIfIndexed
     @Alias(names = "runRunnable")
     private static void runRunnable(Function0<Object> runnable) {
         runnable.invoke();
@@ -669,12 +685,18 @@ public class Engine {
     @NoThrow
     @Alias(names = "me_anno_cache_CacheSection_runAsync_Ljava_lang_StringLkotlin_jvm_functions_Function0V")
     public static void runAsync(Object self, String name, Function0<Object> runnable) {
-        if (false) runRunnable(runnable); // mark as used
         runAsyncImpl(runnable, name);
     }
 
     @Alias(names = "me_anno_engine_OfficialExtensions_register_V")
     private static void me_anno_engine_OfficialExtensions_register_V(Object self) {
+    }
+
+    @Alias(names = "org_apache_logging_log4j_LoggerImpl_print_Ljava_lang_StringLjava_lang_StringV")
+    public static void LoggerImpl_print(LoggerImpl self, String prefix, String text) {
+        // avoid printing line-by-line like the original, because JS saves the stack trace for each warning
+        String line2 = "[" + LoggerImpl.Companion.getTimeStamp() + "," + self.getPrefix() + self.getSuffix() + "] " + text;
+        LoggerImpl_printRaw(self, prefix, line2);
     }
 
     @NoThrow

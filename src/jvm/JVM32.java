@@ -1,9 +1,6 @@
 package jvm;
 
-import annotations.Alias;
-import annotations.JavaScript;
-import annotations.NoThrow;
-import annotations.WASM;
+import annotations.*;
 import jvm.lang.JavaLangAccessImpl;
 import sun.misc.SharedSecrets;
 
@@ -31,7 +28,9 @@ public class JVM32 {
     @WASM(code = "global.get $c")
     public static native int inheritanceTable();
 
+    @Export
     @NoThrow
+    @UsedIfIndexed
     @Alias(names = "oo")
     public static int getObjectOverhead() {
         return objectOverhead;
@@ -398,6 +397,7 @@ public class JVM32 {
         }
     }
 
+    @Export
     @NoThrow
     @Alias(names = "io")
     public static boolean instanceOf(int instance, int clazz) {
@@ -1105,6 +1105,8 @@ public class JVM32 {
         return findClass(classIndex) + objectOverhead + 12;
     }
 
+    @Export
+    @UsedIfIndexed
     @Alias(names = "init")
     public static void init() {
         // access static, so it is initialized

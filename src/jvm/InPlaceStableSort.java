@@ -8,6 +8,9 @@ import static jvm.JavaLang.ptrTo;
 
 // https://www.codeproject.com/Articles/26048/Fastest-In-Place-Stable-Sort
 // http://thomas.baudel.name/Visualisation/VisuTri/inplacestablesort.html
+/**
+ * sorting for object arrays, in-place, stable and fast
+ * */
 class InPlaceStableSort {
 
 	private static <V> int lower(int from, int to, V val, V[] o, Comparator<V> c) {

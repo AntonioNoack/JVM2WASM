@@ -123,10 +123,9 @@ public class LWJGLxGLFW {
     }
 
     @NoThrow
+    @JavaScript(code = "")
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwSwapInterval_IV")
-    public static void GLFW_glfwSwapInterval(int interval) {
-
-    }
+    public static native void GLFW_glfwSwapInterval(int interval);
 
     @NoThrow
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwSetWindowPos_JIIV")

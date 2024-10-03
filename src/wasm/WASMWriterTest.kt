@@ -1,16 +1,17 @@
 package wasm
 
 import me.anno.utils.structures.arrays.ByteArrayList
+import utils.wasmFolder
+import utils.wasmTextFile
 import wasm.parser.FunctionType
 import wasm.parser.WATParser
 import wasm.writer.*
 import wasm.writer.Function
-import wasm2cpp.tmp
 
 // this isn't working yet, and not fully implemented
 fun main() {
     // load wasm.wat file
-    val text = tmp.getChild("jvm2wasm.wat").readTextSync()
+    val text = wasmTextFile.readTextSync()
     // tokenize it
     val parser = WATParser()
     parser.parse(text)
@@ -67,7 +68,7 @@ fun main() {
     val stream = ByteArrayList(1024)
     val writer = BinaryWriter(stream, module)
     writer.write()
-    tmp.getChild("jvm2wasm.test.wasm")
+    wasmFolder.getChild("jvm2wasm.test.wasm")
         .writeBytes(stream.values, 0, stream.size)
 
 }

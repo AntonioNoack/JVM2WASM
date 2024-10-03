@@ -6,7 +6,7 @@ let module = null
 let instance = null
 let startTime = Date.now()
 
-import { autoJS } from "./tmp/index0.js";
+import { autoJS } from "./wasm/index0.js";
 import { webGPU } from './webgpu.js';
 
 window.inited = false
@@ -343,7 +343,7 @@ try {
 
     window.ec = 0
     window.lib = 0
-    var fetched = fetch("tmp/linux.wasm")
+    var fetched = fetch("wasm/linux.wasm")
 	fetched
         .then(response => response.arrayBuffer())
         .then(buffer => WebAssembly.instantiate(buffer, imports))

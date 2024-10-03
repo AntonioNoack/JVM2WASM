@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 
 import static jvm.JVM32.read32;
 import static jvm.JavaLang.*;
+import static jvm.JavaReflect.getFieldOffset;
 
 public class JavaIO {
 

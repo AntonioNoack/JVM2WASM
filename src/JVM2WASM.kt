@@ -3,7 +3,7 @@ import dependency.DependencyIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
 import jvm.JVM32
-import jvm.appendNativeHelperFunctions
+import utils.appendNativeHelperFunctions
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
@@ -51,7 +51,7 @@ const val api = ASM9
 
 // we even could compile scene files to WASM for extremely fast load times 😄
 
-var exportAll = true // 15% space-saving; 10% in compressed
+var exportAll = false // 15% space-saving; 10% in compressed
 var exportHelpers = exportAll
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
@@ -63,6 +63,7 @@ var ignoreNonCriticalNullPointers = true
 var checkArrayAccess = false
 var checkNullPointers = false
 var checkClassCasts = false
+var checkIntDivisions = false
 
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings
@@ -196,6 +197,8 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("jvm/JavaAWT")
     clazz("jvm/JavaConcurrent")
     clazz("jvm/JavaLang")
+    clazz("jvm/JavaReflect")
+    clazz("jvm/JavaThrowable")
     clazz("jvm/Chars")
 
     if (replaceStringInternals) {

@@ -17,8 +17,8 @@ import java.util.List;
 
 import static jvm.JVM32.findClass;
 import static jvm.JVM32.numClasses;
-import static jvm.JavaLang.getClassIndex;
 import static jvm.JavaLang.ptrTo;
+import static jvm.JavaReflect.getClassIndex;
 
 @SuppressWarnings("rawtypes")
 public class Kotlin {

@@ -1,6 +1,6 @@
 package annotations
 
 /**
- * will always be included in the export
+ * function to be used by JavaScript
  * */
 annotation class Export

@@ -54,7 +54,7 @@ public class JavaIO {
 	}
 
 	@Alias(names = "java_io_DefaultFileSystem_getFileSystem_Ljava_io_FileSystem")
-	public static FileSystem DefaultFileSystem_getFileSystem() {
+	private static FileSystem DefaultFileSystem_getFileSystem() {
 		if (fs == null) fs = new FileSystem() {
 
 			// todo make this a proper linux file system :)
@@ -83,7 +83,7 @@ public class JavaIO {
 			@Override
 			public int prefixLength(String s) {
 				// https://stackoverflow.com/questions/39267785/what-is-a-pathname-strings-prefix-and-its-length-in-java
-				return s.length() > 0 && s.charAt(0) == '/' ? 1 : 0;
+				return !s.isEmpty() && s.charAt(0) == '/' ? 1 : 0;
 			}
 
 			@Override

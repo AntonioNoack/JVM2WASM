@@ -24,5 +24,11 @@ hs_err_pid*
 
 *.7z
 *.wasm
-tmp/
 out/
+cpp/build/
+cpp/jvm2wasm.cpp
+cpp/jvm2wasm-base.h
+wasm/jvm2wasm.wat
+wasm/debug/
+wasm/linux.*
+wasm/index0.js

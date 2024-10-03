@@ -34,6 +34,6 @@ fun createJSImports(
     jsFileText.append("  \n  // Initially required memory in 64 kiB pages:\n")
     jsFileText.append("  initialMemorySize: ").append(numPages).append('\n')
     jsFileText.append("}\nexport { lib as \"autoJS\" }")
-    dstFolder.getChild("index0.js")
+    wasmFolder.getChild("index0.js")
         .writeBytes(jsFileText.values, 0, jsFileText.size)
 }
