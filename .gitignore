@@ -32,3 +32,4 @@ wasm/jvm2wasm.wat
 wasm/debug/
 wasm/linux.*
 wasm/index0.js
+/cpp/runtime-data.bin
