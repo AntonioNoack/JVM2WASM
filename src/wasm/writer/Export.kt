@@ -1,3 +1,3 @@
 package wasm.writer
 
-class Export(val kind: ExternalKind, val var_: Int)
+class Export(val kind: ExternalKind, val valueIndex: Int)

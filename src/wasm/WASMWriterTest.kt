@@ -58,10 +58,12 @@ fun main() {
             // todo set expression to i32.const <initial-value>
             Global(listOf(), typeToType["i32"]!!, it.isMutable)
         },
-        parser.functions.map {
-            // todo what is var_???
-            Export(ExternalKind.FUNC, 0)
-        },
+        parser.functions.withIndex()
+            .filter { it.value.isExported }
+            .map {
+                // what is var_? function index
+                Export(ExternalKind.FUNC, it.index)
+            },
         emptyList() // starts???
     )
 

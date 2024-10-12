@@ -78,7 +78,7 @@ fun defineImports(parser: WATParser) {
     for (import in parser.imports.sortedBy {
         it.results.size.toString() + it.funcName
     }) {
-        val func = FunctionImpl(import.funcName, import.params, import.results, emptyList(), emptyList())
+        val func = FunctionImpl(import.funcName, import.params, import.results, emptyList(), emptyList(), false)
         defineFunctionHead(func, false)
         writer.append(";\n")
         functionsByName[import.funcName] = func

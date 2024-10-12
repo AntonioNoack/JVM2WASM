@@ -1,0 +1,1 @@
+./wabt/build2/wasm2wat /mnt/c/Users/Antonio/Documents/IdeaProjects/JVM2WASM/wasm/jvm2wasm.test.wasm

@@ -140,6 +140,7 @@ public class Engine {
         instance.gameInit();
         EngineBase.Companion.setShowFPS(true);
         DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", true);
+        DefaultConfig.INSTANCE.set("debug.ui.showDebugFrames", true);
 
         tick.stop("Game Init");
     }

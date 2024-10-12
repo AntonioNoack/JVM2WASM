@@ -131,15 +131,19 @@ class BinaryWriter(
         writeSectionHeader(type)
     }
 
+    fun beginSection(type: SectionType, numElements: Int) {
+        println("Writing section $type, x$numElements @${stream.size}")
+        beginKnownSection(type)
+        writeU32Leb128(numElements)
+    }
+
     var lastSectionOffset = 0
     var lastSectionLebSizeGuess = 0
-    var sectionCount = 0
 
     fun endSection() {
         if (lastSectionLebSizeGuess == 0) throw IllegalStateException()
         writeFixupU32Leb128Size(lastSectionOffset, lastSectionLebSizeGuess)
         lastSectionLebSizeGuess = 0
-        sectionCount++
     }
 
     fun writeStr(name: String) {
@@ -242,19 +246,14 @@ class BinaryWriter(
         }
     }
 
-    fun writeExprList(func: Func?, expr: List<Expr>) {
-        for (exp in expr) {
-            writeExpr(func, exp)
+    private fun writeExprList(func: Func?, expressions: List<Expr>) {
+        for (i in expressions.indices) {
+            writeExpr(func, expressions[i])
         }
     }
 
     fun writeOpcode(opcode: Opcode) {
-        if (opcode.prefix != 0) {
-            stream.write(opcode.prefix)
-            writeU32Leb128(opcode.opcode)
-        } else {
-            stream.write(opcode.opcode)
-        }
+        stream.write(opcode.opcode)
     }
 
     fun writeInitExpr(expr: List<Expr>) {
@@ -262,174 +261,171 @@ class BinaryWriter(
         writeOpcode(Opcode.END)
     }
 
-    fun write() {
-        stream.writeLE32(BINARY_MAGIC)
-        stream.writeLE32(BINARY_VERSION)
-        if (module.types.isNotEmpty()) {
-            beginKnownSection(SectionType.TYPE)
-            writeU32Leb128(module.types.size)
-            for (type in module.types) {
-                when (type.kind) {
-                    TypeKind.FUNC -> {
-                        val funcType = type as FuncType
-                        writeType(TypeKind.FUNC)
-                        val sig = funcType.sig
-                        writeU32Leb128(sig.paramTypes.size)
-                        for (t in sig.paramTypes) {
-                            writeType(t)
-                        }
-                        writeU32Leb128(sig.resultTypes.size)
-                        for (t in sig.resultTypes) {
-                            writeType(t)
-                        }
-                    }
-                    TypeKind.STRUCT -> {
-                        val type2 = type as StructType
-                        writeType(TypeKind.STRUCT)
-                        writeU32Leb128(type2.fields.size)
-                        for (field in type2.fields) {
-                            writeType(field.type)
-                            stream.write(field.mutable.toInt())
-                        }
-                    }
-                    TypeKind.ARRAY -> {
-                        val type2 = type as ArrayType
-                        writeType(TypeKind.ARRAY)
-                        writeType(type2.field.type)
-                        stream.write(type2.field.mutable.toInt())
-                    }
-                    else -> {}
-                }
-            }
-            endSection()
+    private fun writeParams(params: List<Type>) {
+        writeU32Leb128(params.size)
+        for (i in params.indices) {
+            writeType(params[i])
         }
-        var numFuncImports = 0
-        var numTableImports = 0
-        var numMemoryImports = 0
-        var numTagImports = 0
-        var numGlobalImports = 0
-        if (module.imports.isNotEmpty()) {
-            beginKnownSection(SectionType.IMPORT)
-            for (i in module.imports.indices) {
-                val import = module.imports[i]
-                writeStr(import.moduleName)
-                writeStr(import.fieldName)
-                stream.write(import.kind.ordinal)
-                when (import.kind) {
-                    ExternalKind.FUNC -> {
-                        numFuncImports++
-                        writeU32Leb128((import as FuncImport).declIndex)
-                    }
-                    ExternalKind.TABLE -> {
-                        numTableImports++
-                        writeTable((import as TableImport).table)
-                    }
-                    ExternalKind.MEMORY -> {
-                        numMemoryImports++
-                        writeMemory((import as MemoryImport).memory)
-                    }
-                    ExternalKind.GLOBAL -> {
-                        numGlobalImports++
-                        writeGlobalHeader((import as GlobalImport).global)
-                    }
-                    ExternalKind.TAG -> {
-                        numTagImports++
-                        writeU32Leb128((import as TagImport).tag.funcTypeIndex)
-                    }
-                }
-            }
-            endSection()
-        }
-        val numFunctions = module.functions.size - numFuncImports
-        assertTrue(numFunctions >= 0)
-        if (numFunctions > 0) {
-            beginKnownSection(SectionType.FUNCTION)
-            writeU32Leb128(numFunctions)
-            for (i in numFuncImports until module.functions.size) {
-                writeU32Leb128(module.functions[i].typeIndex)
-            }
-            endSection()
-        }
-        val numTables = module.tables.size - numTableImports
-        assertTrue(numTables >= 0)
-        if (numFunctions > 0) {
-            beginKnownSection(SectionType.TABLE)
-            writeU32Leb128(numTables)
-            for (i in numMemoryImports until module.tables.size) {
-                writeTable(module.tables[i])
-            }
-            endSection()
-        }
-        val numMemories = module.memories.size - numMemoryImports
-        assertTrue(numMemories >= 0)
-        if (numMemories > 0) {
-            beginKnownSection(SectionType.MEMORY)
-            writeU32Leb128(numMemories)
-            for (i in numMemoryImports until module.memories.size) {
-                writeMemory(module.memories[i])
-            }
-            endSection()
-        }
-        val numTags = module.tags.size - numTagImports
-        assertTrue(numTags >= 0)
-        if (numTags > 0) {
-            beginKnownSection(SectionType.TAG)
-            writeU32Leb128(numTags)
-            for (i in numTagImports until module.tags.size) {
-                writeU32Leb128(module.tags[i].funcTypeIndex)
-            }
-            endSection()
-        }
-        val numGlobals = module.globals.size - numGlobalImports
-        assertTrue(numGlobals >= 0)
-        if (numGlobals > 0) {
-            beginKnownSection(SectionType.GLOBAL)
-            writeU32Leb128(numGlobals)
-            for (i in numGlobalImports until module.globals.size) {
-                val global = module.globals[i]
-                writeGlobalHeader(global)
-                writeInitExpr(global.initExpr)
-            }
-            endSection()
-        }
-        if (module.exports.isNotEmpty()) {
-            beginKnownSection(SectionType.EXPORT)
-            writeU32Leb128(module.exports.size)
-            for (export in module.exports) {
-                stream.write(export.kind.ordinal)
-                when (export.kind) {
-                    ExternalKind.FUNC -> {
-                        TODO()
-                    }
-                    ExternalKind.TABLE -> {
-                        TODO()
-                    }
-                    ExternalKind.MEMORY -> {
-                        TODO()
-                    }
-                    ExternalKind.GLOBAL -> {
-                        TODO()
-                    }
-                    ExternalKind.TAG -> {
-                        TODO()
-                    }
-                }
-            }
-            endSection()
-        }
-        /*if (module.starts.isNotEmpty()) {
-            val startFuncIndex = module.getFuncIndex(module.starts[0])
-            if (startFuncIndex != kInvalidIndex) {
-                beginKnownSection(SectionType.START)
-                writeU32Leb128(startFuncIndex)
-                endSection()
-            }
-        }
-        if (module.elemSegments.isNotEmtpty()) {
-            TODO()
-        }*/
-        TODO()
     }
 
+    private fun writeTypeSection() {
+        val types = module.types
+        if (types.isEmpty()) return
+        beginSection(SectionType.TYPE, types.size)
+        for (i in types.indices) {
+            val type = types[i]
+            when (type.kind) {
+                TypeKind.FUNC -> {
+                    val funcType = type as FuncType
+                    val sig = funcType.sig
+                    writeType(TypeKind.FUNC)
+                    writeParams(sig.paramTypes)
+                    writeParams(sig.resultTypes)
+                }
+                TypeKind.STRUCT -> {
+                    val type2 = type as StructType
+                    writeType(TypeKind.STRUCT)
+                    writeU32Leb128(type2.fields.size)
+                    for (field in type2.fields) {
+                        writeType(field.type)
+                        stream.write(field.mutable.toInt())
+                    }
+                }
+                TypeKind.ARRAY -> {
+                    val type2 = type as ArrayType
+                    writeType(TypeKind.ARRAY)
+                    writeType(type2.field.type)
+                    stream.write(type2.field.mutable.toInt())
+                }
+                else -> {}
+            }
+        }
+        endSection()
+    }
+
+    private fun writeImportSection() {
+        val imports = module.imports
+        if (imports.isEmpty()) return
+        beginSection(SectionType.IMPORT, imports.size)
+        for (i in imports.indices) {
+            val import = imports[i]
+            writeStr(import.moduleName)
+            writeStr(import.fieldName)
+            stream.write(import.kind.ordinal)
+            when (import.kind) {
+                ExternalKind.FUNC -> {
+                    numFuncImports++
+                    writeU32Leb128((import as FuncImport).declIndex)
+                }
+                ExternalKind.TABLE -> {
+                    numTableImports++
+                    writeTable((import as TableImport).table)
+                }
+                ExternalKind.MEMORY -> {
+                    numMemoryImports++
+                    writeMemory((import as MemoryImport).memory)
+                }
+                ExternalKind.GLOBAL -> {
+                    numGlobalImports++
+                    writeGlobalHeader((import as GlobalImport).global)
+                }
+                ExternalKind.TAG -> {
+                    numTagImports++
+                    writeU32Leb128((import as TagImport).tag.funcTypeIndex)
+                }
+            }
+        }
+        endSection()
+    }
+
+    private fun writeFunctionSection() {
+        val numFunctions = module.functions.size - numFuncImports
+        assertTrue(numFunctions >= 0)
+        if (numFunctions == 0) return
+        beginSection(SectionType.FUNCTION, numFunctions)
+        for (i in numFuncImports until module.functions.size) {
+            writeU32Leb128(module.functions[i].typeIndex)
+        }
+        endSection()
+    }
+
+    private fun writeTableSection() {
+        val numTables = module.tables.size - numTableImports
+        assertTrue(numTables >= 0)
+        if (numTables == 0) return
+        beginSection(SectionType.TABLE, numTables)
+        for (i in numMemoryImports until module.tables.size) {
+            writeTable(module.tables[i])
+        }
+        endSection()
+    }
+
+    private fun writeMemorySection() {
+        val numMemories = module.memories.size - numMemoryImports
+        assertTrue(numMemories >= 0)
+        if (numMemories == 0) return
+        beginSection(SectionType.MEMORY, numMemories)
+        for (i in numMemoryImports until module.memories.size) {
+            writeMemory(module.memories[i])
+        }
+        endSection()
+    }
+
+    private fun writeTagsSection() {
+        val numTags = module.tags.size - numTagImports
+        assertTrue(numTags >= 0)
+        if (numTags == 0) return
+        beginSection(SectionType.TAG, numTags)
+        for (i in numTagImports until module.tags.size) {
+            writeU32Leb128(module.tags[i].funcTypeIndex)
+        }
+        endSection()
+    }
+
+    private fun writeGlobalsSection() {
+        val numGlobals = module.globals.size - numGlobalImports
+        assertTrue(numGlobals >= 0)
+        if (numGlobals == 0) return
+        beginSection(SectionType.GLOBAL, numGlobals)
+        for (i in numGlobalImports until module.globals.size) {
+            val global = module.globals[i]
+            writeGlobalHeader(global)
+            writeInitExpr(global.initExpr)
+        }
+        endSection()
+    }
+
+    private fun writeExportsSection() {
+        if (module.exports.isEmpty()) return
+        beginSection(SectionType.EXPORT, module.exports.size)
+        for (export in module.exports) {
+            stream.write(export.kind.ordinal)
+            writeU32Leb128(export.valueIndex)
+        }
+        endSection()
+    }
+
+    private var numFuncImports = 0
+    private var numTableImports = 0
+    private var numMemoryImports = 0
+    private var numTagImports = 0
+    private var numGlobalImports = 0
+
+    private fun writeHeader() {
+        stream.writeLE32(BINARY_MAGIC)
+        stream.writeLE32(BINARY_VERSION)
+    }
+
+    fun write() {
+        writeHeader()
+        writeTypeSection()
+        writeImportSection() // must come before the rest
+        writeFunctionSection()
+        writeTableSection()
+        writeMemorySection()
+        writeTagsSection()
+        writeGlobalsSection()
+        writeExportsSection()
+    }
 
 }

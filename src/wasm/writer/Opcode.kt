@@ -1,49 +1,201 @@
 package wasm.writer
 
-val x = TypeKind.VOID
-val i32 = TypeKind.I32
-val i64 = TypeKind.I64
-val f32 = TypeKind.F32
-val f64 = TypeKind.F64
-
 // https://github.com/WebAssembly/wabt/blob/a4a77c18df16d6ee672f2a2564969bc9b2beef3a/include/wabt/opcode.def
-enum class Opcode(
-    val resultType: TypeKind,
-    val first: TypeKind,
-    val second: TypeKind,
-    val third: TypeKind,
-    val memorySize: Int,
-    val prefix: Int,
-    val opcode: Int,
-) {
+enum class Opcode(val opcode: Int) {
+    // control-flow
     UNREACHABLE(0),
     BLOCK(2),
     LOOP(3),
     IF(4),
     ELSE(5),
     END(0x0b),
+
+    // branching
     BR(0x0c),
-    BR_IF(x, i32, x, 0x0d),
-    BR_TABLE(x, i32, x, 0x0e),
+    BR_IF(0x0d),
+    BR_TABLE(0x0e),
     RETURN(0x0f),
+
     CALL(0x10),
     CALL_INDIRECT(0x11),
+
+    // call and immediate return = you can just jump to the start of the called method
     RETURN_CALL(0x12),
     RETURN_CALL_INDIRECT(0x13),
+
     DROP(0x1a),
+
+    LOCAL_GET(0x20),
+    LOCAL_SET(0x21),
+    LOCAL_TEE(0x22),
+    GLOBAL_GET(0x23),
+    GLOBAL_SET(0x24),
+
+    I32_LOAD(0x28),
+    I64_LOAD(0x29),
+    F32_LOAD(0x2a),
+    F64_LOAD(0x2b),
+    I32_LOAD8S(0x2c),
+    I32_LOAD8U(0x2d),
+    I32_LOAD16S(0x2e),
+    I32_LOAD16U(0x2f),
+
+    I32_STORE(0x36),
+    I64_STORE(0x37),
+    F32_STORE(0x38),
+    F64_STORE(0x39),
+    I32_STORE8(0x3a),
+    I32_STORE16(0x3b),
+
+    MEMORY_SIZE(0x3f),
+    MEMORY_GROW(0x40),
+
+    I32_CONST(0x41),
+    I64_CONST(0x42),
+    F32_CONST(0x43),
+    F64_CONST(0x44),
+
+    I32_EQZ(0x45),
+    I32_EQ(0x46),
+    I32_NE(0x47),
+    I32_LTS(0x48),
+    I32_LTU(0x49),
+    I32_GTS(0x4a),
+    I32_GTU(0x4b),
+    I32_LES(0x4c),
+    I32_LEU(0x4d),
+    I32_GES(0x4e),
+    I32_GEU(0x4f),
+
+    I64_EQZ(0x50),
+    I64_EQ(0x51),
+    I64_NE(0x52),
+    I64_LTS(0x53),
+    I64_LTU(0x54),
+    I64_GTS(0x55),
+    I64_GTU(0x56),
+    I64_LES(0x57),
+    I64_LEU(0x58),
+    I64_GES(0x59),
+    I64_GEU(0x5a),
+
+    F32_EQ(0x5b),
+    F32_NE(0x5c),
+    F32_LT(0x5d),
+    F32_GT(0x5e),
+    F32_LE(0x5f),
+    F32_GE(0x60),
+
+    F64_EQ(0x61),
+    F64_NE(0x62),
+    F64_LT(0x63),
+    F64_GT(0x64),
+    F64_LE(0x65),
+    F64_GE(0x66),
+
+    I32_CLZ(0x67), // count leading zeros
+    I32_CTZ(0x68), // count trailing zeros
+    I32_POPCNT(0x69), // population count = number of one-bits
+    I32_ADD(0x6a),
+    I32_SUB(0x6b),
+    I32_MUL(0x6c),
+    I32_DIVS(0x6d),
+    I32_DIVU(0x6e),
+    I32_REMS(0x6f),
+    I32_REMU(0x70),
+    I32_AND(0x71),
+    I32_OR(0x72),
+    I32_XOR(0x73),
+    I32_SHL(0x74),
+    I32_SHRS(0x75),
+    I32_SHRU(0x76),
+    I32_ROTL(0x77),
+    I32_ROTR(0x78),
+
+    I64_CLZ(0x79),
+    I64_CTZ(0x7a),
+    I64_POPCNT(0x7b),
+    I64_ADD(0x7c),
+    I64_SUB(0x7d),
+    I64_MUL(0x7e),
+    I64_DIVS(0x7f),
+    I64_DIVU(0x80),
+    I64_REMS(0x81),
+    I64_REMU(0x82),
+    I64_AND(0x83),
+    I64_OR(0x84),
+    I64_XOR(0x85),
+    I64_SHL(0x86),
+    I64_SHRS(0x87),
+    I64_SHRU(0x88),
+    I64_ROTL(0x89),
+    I64_ROTR(0x8a),
+
+    F32_ABS(0x8b),
+    F32_NEG(0x8c),
+    F32_CEIL(0x8d),
+    F32_FLOOR(0x8e),
+    F32_TRUNC(0x8f),
+    F32_NEAREST(0x90),
+    F32_SQRT(0x91),
+    F32_ADD(0x92),
+    F32_SUB(0x93),
+    F32_MUL(0x94),
+    F32_DIV(0x95),
+    F32_MIN(0x96),
+    F32_MAX(0x97),
+    F32_COPYSIGN(0x98),
+
+    F64_ABS(0x99),
+    F64_NEG(0x9a),
+    F64_CEIL(0x9b),
+    F64_FLOOR(0x9c),
+    F64_TRUNC(0x9d),
+    F64_NEAREST(0x9e),
+    F64_SQRT(0x9f),
+    F64_ADD(0xa0),
+    F64_SUB(0xa1),
+    F64_MUL(0xa2),
+    F64_DIV(0xa3),
+    F64_MIN(0xa4),
+    F64_MAX(0xa5),
+    F64_COPYSIGN(0xa6),
+
+    I32_WRAP_I64(0xa7),
+    I32_TRUNC_F32S(0xa8),
+    I32_TRUNC_F32U(0xa9),
+    I32_TRUNC_F64S(0xaa),
+    I32_TRUNC_F64U(0xab),
+
+    I64_EXTEND_I32S(0xac),
+    I64_EXTEND_I32U(0xad),
+    I64_TRUNC_F32S(0xae),
+    I64_TRUNC_F32U(0xaf),
+    I64_TRUNC_F64S(0xb0),
+    I64_TRUNC_F64U(0xb1),
+
+    F32_CONVERT_I32S(0xb2),
+    F32_CONVERT_I32U(0xb3),
+    F32_CONVERT_I64S(0xb4),
+    F32_CONVERT_I64U(0xb5),
+    F32_DEMOTE_F64(0xb6),
+
+    F64_CONVERT_I32S(0xb7),
+    F64_CONVERT_I32U(0xb8),
+    F64_CONVERT_I64S(0xb9),
+    F64_CONVERT_I64U(0xba),
+    F64_PROMOTE_F32(0xbb),
+
+    I32_REINTERPRET_F32(0xbc),
+    I64_REINTERPRET_F64(0xbd),
+    F32_REINTERPRET_I32(0xbe),
+    F64_REINTERPRET_I64(0xbf),
+
+    I32_EXTEND_8S(0xc0),
+    I32_EXTEND_16S(0xc1),
+    I64_EXTEND_8S(0xc2),
+    I64_EXTEND_16S(0xc3),
+    I64_EXTEND_32S(0xc4)
+
     ;
-
-    constructor(resultType: TypeKind, first: TypeKind, second: TypeKind, opcode: Int) :
-            this(resultType, first, second, x, 0, 0, opcode)
-
-    constructor(opcode: Int) :
-            this(x, x, x, x, 0, 0, opcode)
 }
-
-class Func
-abstract class Expr
-class Binary(val opcode: Opcode) : Expr()
-class Unary(val opcode: Opcode) : Expr()
-class Ternary(val opcode: Opcode) : Expr()
-class Block(val declIndex: Int, val expr: List<Expr>) : Expr()
-object Return : Expr()

@@ -1,9 +1,9 @@
 package wasm.writer
 
 enum class ExternalKind {
-    FUNC,
-    TABLE,
-    MEMORY,
-    GLOBAL,
-    TAG
+    FUNC, // function index
+    TABLE, // table index
+    MEMORY, // memory index
+    GLOBAL, // global index
+    TAG // not in the docs??
 }

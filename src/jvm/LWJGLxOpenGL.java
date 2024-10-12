@@ -1269,7 +1269,7 @@ public class LWJGLxOpenGL {
     private static native void org_lwjgl_opengl_GL15C_glDeleteQueries_IV(int id);
 
     @NoThrow
-    @JavaScript(code = "/* idk */")
+    @JavaScript(code = "")
     public static native void glPushDebugGroup(int target, int custom, String name);
 
     @NoThrow
@@ -1280,7 +1280,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glPopDebugGroup_V")
-    @JavaScript(code = "/* idk */")
+    @JavaScript(code = "")
     public static native void glPopDebugGroup_V();
 
     @NoThrow

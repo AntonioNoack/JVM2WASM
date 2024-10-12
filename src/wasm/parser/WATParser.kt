@@ -187,10 +187,14 @@ class WATParser {
                             // (func $dupi32 (export "dupi32") (param i32) (result i32 i32) local.get 0 local.get 0)
                             val funcName = list.consume(TokenType.DOLLAR, i++)
                             val locals = ArrayList<LocalVariable>()
+                            var isExported = false
                             while (list.getType(i) == TokenType.OPEN_BRACKET) {
                                 i++ // skip (
                                 when (list.consume(TokenType.NAME, i++)) {
-                                    "export" -> list.consume(TokenType.STRING, funcName, i++)
+                                    "export" -> {
+                                        isExported = true
+                                        list.consume(TokenType.STRING, funcName, i++)
+                                    }
                                     "param" -> {
                                         while (list.getType(i) != TokenType.CLOSE_BRACKET) {
                                             params.add(list.consume(TokenType.NAME, i++))
@@ -219,11 +223,8 @@ class WATParser {
                             // println("Function content '$funcName': ${content.toList()}")
                             functions.add(
                                 FunctionImpl(
-                                    funcName,
-                                    ArrayList(params),
-                                    ArrayList(results),
-                                    locals,
-                                    content
+                                    funcName, ArrayList(params), ArrayList(results),
+                                    locals, content, isExported
                                 )
                             )
                             params.clear()

@@ -14,11 +14,14 @@ enum class TypeKind(val id: Int) {
     FUNC(0x60),
     STRUCT(0x5f),
     ARRAY(0x5e),
-    VOID(0x40), // = ___
+    VOID(0x40),
 
-    // not official:
-    Any(0),
-    I8U(4),
-    I16U(6),
-    I32U(7),
+    ;
+
+    companion object {
+        val i32 = I32
+        val i64 = I64
+        val f32 = F32
+        val f64 = F64
+    }
 }
