@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.nio.charset.Charset;
 
 @SuppressWarnings("unused")
 public class OutputStreamWriterUTF8 extends Writer {
@@ -13,6 +14,11 @@ public class OutputStreamWriterUTF8 extends Writer {
 
     public OutputStreamWriterUTF8(OutputStream dst) {
         this.dst = dst;
+    }
+
+    // Used by HierarchicalDatabase.storeIndex -> OutputStream.writer()
+    public OutputStreamWriterUTF8(OutputStream dst, Charset charset) {
+        this(dst);
     }
 
     @Override

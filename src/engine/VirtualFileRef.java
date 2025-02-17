@@ -89,8 +89,9 @@ public class VirtualFileRef extends FileReference {
 		} else callback.err(new FileNotFoundException(path));
 	}
 
-	@NotNull
+    @NotNull
 	@Override
+	@SuppressWarnings("deprecation")
 	public InputStream inputStreamSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
@@ -107,6 +108,7 @@ public class VirtualFileRef extends FileReference {
 
 	@NotNull
 	@Override
+	@SuppressWarnings("deprecation")
 	public String readTextSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
@@ -144,6 +146,7 @@ public class VirtualFileRef extends FileReference {
 
 	@NotNull
 	@Override
+	@SuppressWarnings("deprecation")
 	public byte[] readBytesSync() {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);

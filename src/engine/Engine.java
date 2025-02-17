@@ -135,7 +135,7 @@ public class Engine {
         GFX.supportsDepthTextures = !runsInBrowser();
         RenderGraph.INSTANCE.setThrowExceptions(true);
 
-        GFX.check();
+        GFX.check("main");
 
         instance.gameInit();
         EngineBase.Companion.setShowFPS(true);

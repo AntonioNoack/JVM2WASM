@@ -1286,5 +1286,11 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL20C_glDrawBuffers_IV")
     @JavaScript(code = "gl.drawBuffers([arg0])")
-    private static native void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(int i);
+    private static native void glDrawBuffers_IV(int i);
+
+    @NoThrow
+    @JavaScript(code = "") // not supported :(
+    @Alias(names = "org_lwjgl_opengl_GL11C_glPolygonMode_IIV")
+    public static native void glPolygonMode_IIV(int x, int y);
+
 }

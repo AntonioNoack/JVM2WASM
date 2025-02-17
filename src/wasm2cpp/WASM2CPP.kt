@@ -8,6 +8,7 @@ import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
 var enableCppTracing = false
+var logCppFunctionCalls = true
 
 // todo try using this on Android XD
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore

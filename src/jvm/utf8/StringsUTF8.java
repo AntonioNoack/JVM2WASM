@@ -146,7 +146,7 @@ public class StringsUTF8 {
 
 	@Alias(names = "java_lang_String_indexOf_Ljava_lang_StringII")
 	public static int String_indexOf(String self, String other, int idx) {
-		if (other.length() == 0) return 0;
+		if (other.isEmpty()) return 0;
 		for (int i = idx, l = self.length() - other.length(); i <= l; i++) {
 			if (self.startsWith(other, i)) return i;
 		}
@@ -256,6 +256,7 @@ public class StringsUTF8 {
 
 	@NoThrow
 	private static byte[] getValue(String s) {
+		log("StringsUTF8.getValue()", getAddr(s));
 		return ptrTo(read32(getAddr(s) + objectOverhead));
 	}
 

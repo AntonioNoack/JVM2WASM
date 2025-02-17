@@ -14,6 +14,8 @@
 #include <GLFW/glfw3.h>
 #include "stbi/include/stbi.h"
 
+size_t allocatedSize = 0;
+
 // #define STANDALONE
 #ifdef STANDALONE
 
@@ -45,7 +47,6 @@ void gc() {
 #endif
 
 // memory stuff
-size_t allocatedSize = 0;
 i32 gcCtr = 0;
 i32 objectOverhead = 4;
 i32 arrayOverhead = 4 + 4;
@@ -298,6 +299,7 @@ void org_lwjgl_opengl_GL46C_glDrawElementsInstanced_IIIJIV(i32 x, i32 y, i32 z, 
 void org_lwjgl_opengl_GL46C_glDrawElements_IIIJV(i32 x, i32 y, i32 z, i64 w) { glDrawElements(x,y,z,(void*)w); }
 void org_lwjgl_opengl_GL46C_glEnableVertexAttribArray_IV(i32 x) { glEnableVertexAttribArray(x); }
 void org_lwjgl_opengl_GL46C_glEnable_IV(i32 x) { glEnable(x); }
+void org_lwjgl_opengl_GL11C_glPolygonMode_IIV(i32 x, i32 y) { /*glPolygonMode(x,y);*/ } // causes segfault?
 void org_lwjgl_opengl_GL46C_glFinish_V() { glFinish(); }
 void org_lwjgl_opengl_GL46C_glFlush_V() { glFlush(); }
 void org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV(i32 x, i32 y, i32 z, i32 w) { glFramebufferRenderbuffer(x,y,z,w); }
@@ -372,14 +374,17 @@ i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2
     i32 pathPtr, i32 texturePtr, i32 callback
 ) {
     std::string path = strToCpp(pathPtr);
+    std::cout << "Loading image '" << path << "'" << std::endl;
     int w, h, numChannels; // todo load async?
     unsigned char *data = stbi_load(path.c_str(), &w, &h, &numChannels, 4);
     if(data != nullptr && w > 0 && h > 0) {
+        std::cout << "Image Size: " << w << " x " << h << std::endl;
         prepareTexture(texturePtr);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
         finishTexture(texturePtr, w, h, callback);
     } else {
+        std::cout << "Image Size: undefined" << std::endl;
         finishTexture(0, -1, -1, callback);
     }
     return 0;

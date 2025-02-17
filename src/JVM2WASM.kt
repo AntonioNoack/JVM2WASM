@@ -60,7 +60,7 @@ var useWASMExceptions = false
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
 var ignoreNonCriticalNullPointers = true
-var checkArrayAccess = false
+var checkArrayAccess = false // todo this can no longer be set to true???
 var checkNullPointers = false
 var checkClassCasts = false
 var checkIntDivisions = false

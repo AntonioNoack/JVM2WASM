@@ -74,11 +74,19 @@ fun defineFunctionImplementations(parser: WATParser) {
     writer.append('\n')
 }
 
+val ignoredFuncNames = ("r8,r16,r32," +
+        "i8ArrayLoad,u16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
+        "i8ArrayStore,i16ArrayStore,i32ArrayStore,i64ArrayStore," +
+        "f32ArrayStore,f64ArrayStore,f32ArrayLoad,f64ArrayLoad,").split(',')
+
 class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
     init {
         defineFunctionHead(function, true)
         writer.append(" {\n")
+        if (logCppFunctionCalls && function.funcName !in ignoredFuncNames) {
+            writer.append("std::cout << \"").append(function.funcName).append("\" << std::endl;\n")
+        }
     }
 
     private var depth = 1
