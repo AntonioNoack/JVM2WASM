@@ -34,6 +34,80 @@ import translator.GeneratorIndex.tri
 import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
+import wasm.instr.*
+import wasm.instr.Const.Companion.f32Const
+import wasm.instr.Const.Companion.f64Const
+import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Const.Companion.i64Const
+import wasm.instr.Instructions.Drop
+import wasm.instr.Instructions.F32Add
+import wasm.instr.Instructions.F32Div
+import wasm.instr.Instructions.F32Load
+import wasm.instr.Instructions.F32Mul
+import wasm.instr.Instructions.F32Store
+import wasm.instr.Instructions.F32Sub
+import wasm.instr.Instructions.F32_CONVERT_I32S
+import wasm.instr.Instructions.F32_CONVERT_I64S
+import wasm.instr.Instructions.F32_DEMOTE_F64
+import wasm.instr.Instructions.F32_NEG
+import wasm.instr.Instructions.F32_REINTERPRET_I32
+import wasm.instr.Instructions.F64Add
+import wasm.instr.Instructions.F64Div
+import wasm.instr.Instructions.F64Load
+import wasm.instr.Instructions.F64Mul
+import wasm.instr.Instructions.F64Store
+import wasm.instr.Instructions.F64Sub
+import wasm.instr.Instructions.F64_CONVERT_I32S
+import wasm.instr.Instructions.F64_CONVERT_I64S
+import wasm.instr.Instructions.F64_NEG
+import wasm.instr.Instructions.F64_PROMOTE_F32
+import wasm.instr.Instructions.F64_REINTERPRET_I64
+import wasm.instr.Instructions.I32Add
+import wasm.instr.Instructions.I32And
+import wasm.instr.Instructions.I32EQ
+import wasm.instr.Instructions.I32EQZ
+import wasm.instr.Instructions.I32GES
+import wasm.instr.Instructions.I32GTS
+import wasm.instr.Instructions.I32LES
+import wasm.instr.Instructions.I32LTS
+import wasm.instr.Instructions.I32Load
+import wasm.instr.Instructions.I32Load16S
+import wasm.instr.Instructions.I32Load16U
+import wasm.instr.Instructions.I32Load8S
+import wasm.instr.Instructions.I32Mul
+import wasm.instr.Instructions.I32NE
+import wasm.instr.Instructions.I32Or
+import wasm.instr.Instructions.I32Shl
+import wasm.instr.Instructions.I32ShrS
+import wasm.instr.Instructions.I32ShrU
+import wasm.instr.Instructions.I32Store
+import wasm.instr.Instructions.I32Store16
+import wasm.instr.Instructions.I32Store8
+import wasm.instr.Instructions.I32Sub
+import wasm.instr.Instructions.I32XOr
+import wasm.instr.Instructions.I32_DIVS
+import wasm.instr.Instructions.I32_REM_S
+import wasm.instr.Instructions.I32_WRAP_I64
+import wasm.instr.Instructions.I64Add
+import wasm.instr.Instructions.I64And
+import wasm.instr.Instructions.I64EQ
+import wasm.instr.Instructions.I64Load
+import wasm.instr.Instructions.I64Mul
+import wasm.instr.Instructions.I64NE
+import wasm.instr.Instructions.I64Or
+import wasm.instr.Instructions.I64Shl
+import wasm.instr.Instructions.I64ShrS
+import wasm.instr.Instructions.I64ShrU
+import wasm.instr.Instructions.I64Store
+import wasm.instr.Instructions.I64Sub
+import wasm.instr.Instructions.I64XOr
+import wasm.instr.Instructions.I64_DIVS
+import wasm.instr.Instructions.I64_EXTEND_I32S
+import wasm.instr.Instructions.I64_REM_S
+import wasm.instr.Instructions.Return
+import wasm.instr.Instructions.Unreachable
+import wasm.parser.FunctionImpl
+import wasm.parser.LocalVariable
 import kotlin.collections.set
 
 /**
@@ -50,7 +124,9 @@ class MethodTranslator(
     private val stack = ArrayList<String>()
     private val argsMapping = HashMap<Int, Int>()
 
-    private val headPrinter = Builder(32) // header
+    private val localVariables1 = ArrayList<LocalVariable>()
+    lateinit var headPrinter1: FunctionImpl
+
     private var resultType = 'V'
 
     private val startLabel = Label()
@@ -90,7 +166,7 @@ class MethodTranslator(
             val wasm = hIndex.wasmNative[sig]
             if (wasm != null) {
                 printHeader(access)
-                printer.append(wasm)
+                printer.instr.addAll(wasm)
                 currentNode.isReturn = true
             } else {
                 // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
@@ -106,11 +182,13 @@ class MethodTranslator(
             if (name == "<clinit>") {
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
-                printer.append("  i32.const ").append(clazz1)
-                    .append(" call \$wasStaticInited\n")
+                printer.append(i32Const(clazz1))
+                    .append(Call("wasStaticInited"))
                     .append(
-                        if (canThrowError) "  (if (then i32.const 0 return))\n"
-                        else "  (if (then return))\n"
+                        IfBranch(
+                            if (canThrowError) listOf(i32Const(0), Return)
+                            else listOf(Return), emptyList(), emptyList(), emptyList()
+                        )
                     )
             }
         }
@@ -141,33 +219,20 @@ class MethodTranslator(
 
         resultType = descriptor[descriptor.indexOf(')') + 1]
         val name2 = methodName(sig)
-        headPrinter.append("(func $").append(name2)
 
         val mapped = hIndex.getAlias(sig)
         if (mapped != sig) {
             throw IllegalStateException("Must not translate $sig, because it is mapped to $mapped")
         }
-        if (exportAll || sig in hIndex.exportedMethods) {
-            headPrinter.append(" (export \"").append(name2).append("\")")
-        }
-        if (!static || args.isNotEmpty()) {
-            headPrinter.append(" (param")
-            if (!static) headPrinter.append(" ").append(ptrType)
-            for (arg in args) {
-                headPrinter.append(' ').append(jvm2wasm(arg))
-            }
-            headPrinter.append(")")
-        }
-        if (canThrowError) {
-            headPrinter.append(" (result ")
-            if (resultType != 'V') {
-                headPrinter.append(jvm2wasm1(resultType)).append(' ')
-            }
-            headPrinter.append("i32)")
-        } else if (resultType != 'V') {
-            headPrinter.append(" (result ").append(jvm2wasm1(resultType)).append(')')
-        }
-        headPrinter.append('\n')
+        val exported = exportAll || sig in hIndex.exportedMethods
+
+        val results = ArrayList<String>(2)
+        if (resultType != 'V') results.add(jvm2wasm1(resultType))
+        if (canThrowError) results.add(ptrType)
+        headPrinter1 = FunctionImpl(
+            name2, args.map { jvm2wasm(it) },
+            results, localVariables1, emptyList(), exported
+        )
     }
 
     override fun visitAnnotation(descriptor: String?, visible: Boolean): AnnotationVisitor? {
@@ -244,16 +309,17 @@ class MethodTranslator(
             currentNode.inputStack = ArrayList(this.stack)
 
         } else throw NotImplementedError()
-        if (printOps) printer.append(data).append('\n')
+        if (printOps) printer.comment(data)
     }
 
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         // increment the variable at that index
         if (printOps) println("  [$varIndex] += $increment")
         val type = findLocalVar(varIndex, i32)
-        printer.append("  local.get ").append(type.wasmName)
-        printer.append(" i32.const ").append(increment)
-        printer.append(" i32.add local.set ").append(type.wasmName).append('\n')
+        printer.append(LocalGet(type.wasmName))
+            .append(i32Const(increment))
+            .append(I32Add)
+            .append(LocalSet(type.wasmName))
     }
 
     @Boring
@@ -276,7 +342,7 @@ class MethodTranslator(
         // ensure we got the correct type
         if (printOps) {
             println("// $stack = $x")
-            printer.append("  ;; $stack = $x\n")
+            printer.comment("$stack = $x")
         }
         if (stack.isEmpty()) throw IllegalStateException("Expected $x, but stack was empty; $clazz, $name, $descriptor")
         val v = stack.last()
@@ -288,7 +354,7 @@ class MethodTranslator(
         // ensure we got the correct type
         if (printOps) {
             println("// $stack -= $x")
-            printer.append("  ;; $stack -= $x\n")
+            printer.comment("$stack -= $x")
         }
         if (stack.isEmpty()) throw IllegalStateException("Expected $x, but stack was empty; $clazz, $name, $descriptor")
         val v = stack.pop()
@@ -299,7 +365,7 @@ class MethodTranslator(
     private fun Builder.push(x: String): Builder {
         if (printOps) {
             println("// $stack += $x")
-            printer.append("  ;; $stack += $x\n")
+            printer.comment("$stack += $x")
         }
         stack.add(x)
         return this
@@ -310,123 +376,120 @@ class MethodTranslator(
         if (printOps) println("  [${OpCode[opcode]}]")
         when (opcode) {
             0x00 -> {} // nop
-            0x01 -> printer.push(ptrType).append(if (is32Bits) "  i32.const 0\n" else "  i64.const 0\n") // load null
-            0x02 -> printer.push(i32).append("  i32.const -1\n")
-            0x03 -> printer.push(i32).append("  i32.const 0\n")
-            0x04 -> printer.push(i32).append("  i32.const 1\n")
-            0x05 -> printer.push(i32).append("  i32.const 2\n")
-            0x06 -> printer.push(i32).append("  i32.const 3\n")
-            0x07 -> printer.push(i32).append("  i32.const 4\n")
-            0x08 -> printer.push(i32).append("  i32.const 5\n")
-            0x09 -> printer.push(i64).append("  i64.const 0\n")
-            0x0a -> printer.push(i64).append("  i64.const 1\n")
-            0x0b -> printer.push(f32).append("  f32.const 0\n")
-            0x0c -> printer.push(f32).append("  f32.const 1\n")
-            0x0d -> printer.push(f32).append("  f32.const 2\n")
-            0x0e -> printer.push(f64).append("  f64.const 0\n")
-            0x0f -> printer.push(f64).append("  f64.const 1\n")
+            0x01 -> printer.push(ptrType)
+                .append(if (is32Bits) i32Const(0) else i64Const(0)) // load null
+            0x02 -> printer.push(i32).append(i32Const(-1))
+            0x03 -> printer.push(i32).append(i32Const(0))
+            0x04 -> printer.push(i32).append(i32Const(1))
+            0x05 -> printer.push(i32).append(i32Const(2))
+            0x06 -> printer.push(i32).append(i32Const(3))
+            0x07 -> printer.push(i32).append(i32Const(4))
+            0x08 -> printer.push(i32).append(i32Const(5))
+            0x09 -> printer.push(i64).append(i64Const(0))
+            0x0a -> printer.push(i64).append(i64Const(1))
+            0x0b -> printer.push(f32).append(f32Const(0f))
+            0x0c -> printer.push(f32).append(f32Const(1f))
+            0x0d -> printer.push(f32).append(f32Const(2f))
+            0x0e -> printer.push(f64).append(f64Const(0.0))
+            0x0f -> printer.push(f64).append(f64Const(1.0))
 
             // in 0x15 .. 0x19 -> printer.append("  local.get [idx]")
 
             0x2e -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32).append("  call \$i32ArrayLoad\n")
+                printer.pop(ptrType).poppush(i32).append(Call("i32ArrayLoad"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x2f -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(i64).append("  call \$i64ArrayLoad\n")
+                printer.pop(ptrType).pop(i32).push(i64).append(Call("i64ArrayLoad"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x30 -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(f32).append("  call \$f32ArrayLoad\n")
+                printer.pop(ptrType).pop(i32).push(f32).append(Call("f32ArrayLoad"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x31 -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(f64).append("  call \$f64ArrayLoad\n")
+                printer.pop(ptrType).pop(i32).push(f64).append(Call("f64ArrayLoad"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x32 -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(ptrType).append(
-                    if (is32Bits) "  call \$i32ArrayLoad\n"
-                    else "  call \$i64ArrayLoad\n"
-                )
+                printer.pop(ptrType).pop(i32).push(ptrType)
+                    .append(Call(if (is32Bits) "i32ArrayLoad" else "i64ArrayLoad"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x33 -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32).append("  call \$i8ArrayLoad\n")
+                printer.pop(ptrType).poppush(i32).append(Call("i8ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x34 -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32).append("  call \$u16ArrayLoad\n")
+                printer.pop(ptrType).poppush(i32).append(Call("u16ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x35 -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32).append("  call \$s16ArrayLoad\n")
+                printer.pop(ptrType).poppush(i32).append(Call("s16ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x4f -> {
                 stackPush()
-                printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i32ArrayStore\n")
+                printer.pop(i32).pop(i32).pop(ptrType).append(Call("i32ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x50 -> {
                 stackPush()
-                printer.pop(i64).pop(i32).pop(ptrType).append("  call \$i64ArrayStore\n")
+                printer.pop(i64).pop(i32).pop(ptrType).append(Call("i64ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x51 -> {
                 stackPush()
-                printer.pop(f32).pop(i32).pop(ptrType).append("  call \$f32ArrayStore\n")
+                printer.pop(f32).pop(i32).pop(ptrType).append(Call("f32ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x52 -> {
                 stackPush()
-                printer.pop(f64).pop(i32).pop(ptrType).append("  call \$f64ArrayStore\n")
+                printer.pop(f64).pop(i32).pop(ptrType).append(Call("f64ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x53 -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).pop(ptrType).append(
-                    if (is32Bits) "  call \$i32ArrayStore\n"
-                    else "  call \$i64ArrayStore\n"
-                )
+                printer.pop(ptrType).pop(i32).pop(ptrType)
+                    .append(Call(if (is32Bits) "i32ArrayStore" else "i64ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x54 -> {
                 stackPush()
-                printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i8ArrayStore\n")
+                printer.pop(i32).pop(i32).pop(ptrType).append(Call("i8ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x55 -> {
                 stackPush()
-                printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i16ArrayStore\n")
+                printer.pop(i32).pop(i32).pop(ptrType).append(Call("i16ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
             0x56 -> {
                 stackPush()
-                printer.pop(i32).pop(i32).pop(ptrType).append("  call \$i16ArrayStore\n")
+                printer.pop(i32).pop(i32).pop(ptrType).append(Call("i16ArrayStore"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
@@ -454,10 +517,10 @@ class MethodTranslator(
                 }
 
                 if (canThrowError(sig) && !useWASMExceptions) {
-                    printer.append("  ").append(ptrType).append(".const 0\n") // no Throwable, normal exit
+                    printer.append(if (is32Bits) i32Const(0) else i64Const(0)) // no Throwable, normal exit
                 }
 
-                printer.append("  return\n")
+                printer.append(Return)
 
                 // marking this as the end
                 // if (printOps) println("marking $currentNode as return")
@@ -466,31 +529,29 @@ class MethodTranslator(
             }
             0x101 -> {
                 if (canThrowError) {
-                    printer.append("  return\n")
+                    printer.append(Return)
                     currentNode.isReturn = true
                 } else throw IllegalStateException()
             }
 
             0x57 -> {
                 val type1 = stack.last()
-                printer.pop(type1).append("  drop\n")
+                printer.pop(type1).append(Drop)
             }
             0x58 -> {
                 val type = stack.last()
-                printer.pop(type).append("  drop\n")
+                printer.pop(type).append(Drop)
                 if (!is32Bits) throw NotImplementedError("We'd need to differentiate ptrType from i64 for this to work correctly")
                 if (type == i32 || type == f32)
-                    printer.pop(stack.last()).append("  drop\n")
+                    printer.pop(stack.last()).append(Drop)
             }
             0x59 -> {// dup
                 val type1 = stack.last()
                 printer.push(type1)
                 if (type1 == i32) {
                     printer.dupI32()
-                    printer.append('\n')
                 } else {
-                    printer.append("  call \$dup")
-                        .append(type1).append('\n')
+                    printer.append(Call("dup$type1"))
                 }
             }
             0x5a -> {
@@ -499,8 +560,7 @@ class MethodTranslator(
                 stack.add(v0)
                 stack.add(v1)
                 stack.add(v0)
-                printer.append("  call \$dup_x1")
-                    .append(v0).append(v1).append('\n')
+                printer.append(Call("dup_x1$v0$v1"))
                 gIndex.usedDup_x1[pair(v0, v1)] = true
                 // value2, value1 →
                 // value1, value2, value1
@@ -513,8 +573,7 @@ class MethodTranslator(
                 stack.add(v2)
                 stack.add(v1)
                 stack.add(v0)
-                printer.append("  call \$dup_x2")
-                    .append(v0).append(v1).append(v2).append('\n')
+                printer.append(Call("dup_x2$v0$v1$v2"))
                 gIndex.usedDup_x2[tri(v0, v1, v2)] = true
             }
             0x5c -> {
@@ -526,11 +585,11 @@ class MethodTranslator(
                     val v0 = stack[stack.size - 2]
                     stack.add(v0)
                     stack.add(v1)
-                    printer.append("  call \$dup2").append(v0).append(v1).append('\n')
+                    printer.append(Call("dup2$v0$v1"))
                 } else {
                     // dup
                     stack.add(v1)
-                    printer.append("  call \$dup").append(v1).append('\n')
+                    printer.append(Call("dup$v1"))
                 }
             }
             0x5d -> {
@@ -548,8 +607,7 @@ class MethodTranslator(
                     stack.add(v3)
                     stack.add(v2)
                     stack.add(v1)
-                    printer.append("  call \$dup2_x1")
-                        .append(v1).append(v2).append(v3).append('\n')
+                    printer.append(Call("dup2_x1$v1$v2$v3"))
                     gIndex.usedDup2_x1[tri(v1, v2, v3)] = true
                 } else {
                     // value2, value1 ->
@@ -559,7 +617,7 @@ class MethodTranslator(
                 }
             }
             0x5e -> {
-                printer.append("  call \$dup2_x2\n")
+                printer.append(Call("dup2_x2"))
                 // if (x != null) log("mouseX", x[0] = getMouseX());
                 // if (y != null) log("mouseY", y[0] = getMouseY());
                 TODO("Implement dup2_x2 instruction")
@@ -568,115 +626,115 @@ class MethodTranslator(
                 val type1 = stack.last()
                 val type2 = stack[stack.size - 2]
                 if (type1 != type2) printer.pop(type1).pop(type2).push(type1).push(type2)
-                printer.append("  call \$swap").append(type1).append(type2).append('\n')
+                printer.append(Call("swap$type1$type2"))
             }
-            0x60 -> printer.pop(i32).poppush(i32).append("  i32.add\n")
-            0x61 -> printer.pop(i64).poppush(i64).append("  i64.add\n")
-            0x62 -> printer.pop(f32).poppush(f32).append("  f32.add\n")
-            0x63 -> printer.pop(f64).poppush(f64).append("  f64.add\n")
-            0x64 -> printer.pop(i32).poppush(i32).append("  i32.sub\n")
-            0x65 -> printer.pop(i64).poppush(i64).append("  i64.sub\n")
-            0x66 -> printer.pop(f32).poppush(f32).append("  f32.sub\n")
-            0x67 -> printer.pop(f64).poppush(f64).append("  f64.sub\n")
+            0x60 -> printer.pop(i32).poppush(i32).append(I32Add)
+            0x61 -> printer.pop(i64).poppush(i64).append(I64Add)
+            0x62 -> printer.pop(f32).poppush(f32).append(F32Add)
+            0x63 -> printer.pop(f64).poppush(f64).append(F64Add)
+            0x64 -> printer.pop(i32).poppush(i32).append(I32Sub)
+            0x65 -> printer.pop(i64).poppush(i64).append(I64Sub)
+            0x66 -> printer.pop(f32).poppush(f32).append(F32Sub)
+            0x67 -> printer.pop(f64).poppush(f64).append(F64Sub)
             // there are no signed/unsigned versions, because it only shows the last 32 bits
-            0x68 -> printer.pop(i32).poppush(i32).append("  i32.mul\n")
-            0x69 -> printer.pop(i64).poppush(i64).append("  i64.mul\n")
-            0x6a -> printer.pop(f32).poppush(f32).append("  f32.mul\n")
-            0x6b -> printer.pop(f64).poppush(f64).append("  f64.mul\n")
+            0x68 -> printer.pop(i32).poppush(i32).append(I32Mul)
+            0x69 -> printer.pop(i64).poppush(i64).append(I64Mul)
+            0x6a -> printer.pop(f32).poppush(f32).append(F32Mul)
+            0x6b -> printer.pop(f64).poppush(f64).append(F64Mul)
             0x6c -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i32).append("  call \$safeDiv32\n")
+                    printer.poppush(i32).append(Call("safeDiv32"))
                     printer.pop(i32).poppush(i32)
                     stackPop()
                     handleThrowable()
                 } else {
-                    printer.pop(i32).poppush(i32).append("  i32.div_s\n")
+                    printer.pop(i32).poppush(i32).append(I32_DIVS)
                 }
             }
             0x6d -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i64).append("  call \$safeDiv64\n")
+                    printer.poppush(i64).append(Call("safeDiv64"))
                     printer.pop(i64).poppush(i64)
                     stackPop()
                     handleThrowable()
                 } else {
-                    printer.pop(i64).poppush(i64).append("  i64.div_s\n")
+                    printer.pop(i64).poppush(i64).append(I64_DIVS)
                 }
             }
-            0x6e -> printer.pop(f32).poppush(f32).append("  f32.div\n")
-            0x6f -> printer.pop(f64).poppush(f64).append("  f64.div\n")
+            0x6e -> printer.pop(f32).poppush(f32).append(F32Div)
+            0x6f -> printer.pop(f64).poppush(f64).append(F64Div)
             0x70 -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i32).append("  call \$checkNonZero32\n")
+                    printer.poppush(i32).append(Call("checkNonZero32"))
                     stackPop()
                     handleThrowable()
                 }
-                printer.pop(i32).poppush(i32).append("  i32.rem_s\n")
+                printer.pop(i32).poppush(i32).append(I32_REM_S)
             }
             0x71 -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i64).append("  call \$checkNonZero64\n")
+                    printer.poppush(i64).append(Call("checkNonZero64"))
                     stackPop()
                     handleThrowable()
                 }
                 printer.pop(i64).poppush(i64)
-                printer.append("  i64.rem_s\n")
+                printer.append(I64_REM_S)
             }
-            0x72 -> printer.pop(f32).poppush(f32).append("  call \$f32rem\n")
-            0x73 -> printer.pop(f64).poppush(f64).append("  call \$f64rem\n")
-            0x74 -> printer.poppush(i32).append("  call \$i32neg\n")
-            0x75 -> printer.poppush(i64).append("  call \$i64neg\n")
-            0x76 -> printer.poppush(f32).append("  f32.neg\n")
-            0x77 -> printer.poppush(f64).append("  f64.neg\n")
-            0x78 -> printer.pop(i32).poppush(i32).append("  i32.shl\n")
-            0x79 -> printer.pop(i32).poppush(i64).append("  i64.extend_i32_s i64.shl\n")
-            0x7a -> printer.pop(i32).poppush(i32).append("  i32.shr_s\n")
-            0x7b -> printer.pop(i32).poppush(i64).append("  i64.extend_i32_s i64.shr_s\n")
-            0x7c -> printer.pop(i32).poppush(i32).append("  i32.shr_u\n")
-            0x7d -> printer.pop(i32).poppush(i64).append("  i64.extend_i32_s i64.shr_u\n")
-            0x7e -> printer.pop(i32).poppush(i32).append("  i32.and\n")
-            0x7f -> printer.pop(i64).poppush(i64).append("  i64.and\n")
-            0x80 -> printer.pop(i32).poppush(i32).append("  i32.or\n")
-            0x81 -> printer.pop(i64).poppush(i64).append("  i64.or\n")
-            0x82 -> printer.pop(i32).poppush(i32).append("  i32.xor\n")
-            0x83 -> printer.pop(i64).poppush(i64).append("  i64.xor\n")
+            0x72 -> printer.pop(f32).poppush(f32).append(Call("f32rem"))
+            0x73 -> printer.pop(f64).poppush(f64).append(Call("f64rem"))
+            0x74 -> printer.poppush(i32).append(Call("i32neg"))
+            0x75 -> printer.poppush(i64).append(Call("i64neg"))
+            0x76 -> printer.poppush(f32).append(F32_NEG)
+            0x77 -> printer.poppush(f64).append(F64_NEG)
+            0x78 -> printer.pop(i32).poppush(i32).append(I32Shl)
+            0x79 -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64Shl)
+            0x7a -> printer.pop(i32).poppush(i32).append(I32ShrS)
+            0x7b -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrS)
+            0x7c -> printer.pop(i32).poppush(i32).append(I32ShrU)
+            0x7d -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrU)
+            0x7e -> printer.pop(i32).poppush(i32).append(I32And)
+            0x7f -> printer.pop(i64).poppush(i64).append(I64And)
+            0x80 -> printer.pop(i32).poppush(i32).append(I32Or)
+            0x81 -> printer.pop(i64).poppush(i64).append(I64Or)
+            0x82 -> printer.pop(i32).poppush(i32).append(I32XOr)
+            0x83 -> printer.pop(i64).poppush(i64).append(I64XOr)
             // iinc, has a constant -> different function, i32.const <value>, i32.add
-            0x85 -> printer.pop(i32).push(i64).append("  i64.extend_i32_s\n") // i2l
-            0x86 -> printer.pop(i32).push(f32).append("  f32.convert_i32_s\n") // i2f
-            0x87 -> printer.pop(i32).push(f64).append("  f64.convert_i32_s\n") // i2d
-            0x88 -> printer.pop(i64).push(i32).append("  i32.wrap_i64\n") // l2i
-            0x89 -> printer.pop(i64).push(f32).append("  f32.convert_i64_s\n") // l2f
-            0x8a -> printer.pop(i64).push(f64).append("  f64.convert_i64_s\n") // l2d
-            0x8b -> printer.pop(f32).push(i32).append("  call \$f2i\n") // f2i
-            0x8c -> printer.pop(f32).push(i64).append("  call \$f2l\n") // f2l
-            0x8d -> printer.pop(f32).push(f64).append("  f64.promote_f32\n") // f2d
-            0x8e -> printer.pop(f64).push(i32).append("  call \$d2i\n") // d2i
-            0x8f -> printer.pop(f64).push(i64).append("  call \$d2l\n") // d2l
-            0x90 -> printer.pop(f64).push(f32).append("  f32.demote_f64\n") // d2f
+            0x85 -> printer.pop(i32).push(i64).append(I64_EXTEND_I32S) // i2l
+            0x86 -> printer.pop(i32).push(f32).append(F32_CONVERT_I32S) // i2f
+            0x87 -> printer.pop(i32).push(f64).append(F64_CONVERT_I32S) // i2d
+            0x88 -> printer.pop(i64).push(i32).append(I32_WRAP_I64) // l2i
+            0x89 -> printer.pop(i64).push(f32).append(F32_CONVERT_I64S) // l2f
+            0x8a -> printer.pop(i64).push(f64).append(F64_CONVERT_I64S) // l2d
+            0x8b -> printer.pop(f32).push(i32).append(Call("f2i")) // f2i
+            0x8c -> printer.pop(f32).push(i64).append(Call("f2l")) // f2l
+            0x8d -> printer.pop(f32).push(f64).append(F64_PROMOTE_F32) // f2d
+            0x8e -> printer.pop(f64).push(i32).append(Call("d2i"))
+            0x8f -> printer.pop(f64).push(i64).append(Call("d2l"))
+            0x90 -> printer.pop(f64).push(f32).append(F32_DEMOTE_F64) // d2f
 
             0x91 -> printer.poppush(i32)
-                .append("  i32.const 24 i32.shl\n")
-                .append("  i32.const 24 i32.shr_s\n")
+                .append(i32Const(24)).append(I32Shl)
+                .append(i32Const(24)).append(I32ShrS)
             0x92 -> printer.poppush(i32)
-                .append("  i32.const 65535 i32.and\n")
+                .append(i32Const(65535)).append(I32And)
             0x93 -> printer.poppush(i32)
-                .append("  i32.const 16 i32.shl\n")
-                .append("  i32.const 16 i32.shr_s\n")
+                .append(i32Const(16)).append(I32Shl)
+                .append(i32Const(16)).append(I32ShrS)
 
-            0x94 -> printer.pop(i64).pop(i64).push(i32).append("  call \$lcmp\n")
-            0x95 -> printer.pop(f32).pop(f32).push(i32).append("  call \$fcmpl\n") // -1 if NaN
-            0x96 -> printer.pop(f32).pop(f32).push(i32).append("  call \$fcmpg\n") // +1 if NaN
-            0x97 -> printer.pop(f64).pop(f64).push(i32).append("  call \$dcmpl\n") // -1 if NaN
-            0x98 -> printer.pop(f64).pop(f64).push(i32).append("  call \$dcmpg\n") // +1 if NaN
+            0x94 -> printer.pop(i64).pop(i64).push(i32).append(Call("lcmp"))
+            0x95 -> printer.pop(f32).pop(f32).push(i32).append(Call("fcmpl")) // -1 if NaN
+            0x96 -> printer.pop(f32).pop(f32).push(i32).append(Call("fcmpg")) // +1 if NaN
+            0x97 -> printer.pop(f64).pop(f64).push(i32).append(Call("dcmpl")) // -1 if NaN
+            0x98 -> printer.pop(f64).pop(f64).push(i32).append(Call("dcmpg")) // +1 if NaN
 
             0xbe -> {
                 // array length
                 stackPush()
-                printer.pop(ptrType).push(i32).append("  call \$al\n")
+                printer.pop(ptrType).push(i32).append(Call("al"))
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
@@ -688,8 +746,8 @@ class MethodTranslator(
             }
             // 0xc2 -> printer.pop(ptrType).append("  call \$monitorEnter\n") // monitor enter
             // 0xc3 -> printer.pop(ptrType).append("  call \$monitorExit\n") // monitor exit
-            0xc2 -> printer.pop(ptrType).append("  drop\n") // monitor enter
-            0xc3 -> printer.pop(ptrType).append("  drop\n") // monitor exit
+            0xc2 -> printer.pop(ptrType).append(Drop) // monitor enter
+            0xc3 -> printer.pop(ptrType).append(Drop) // monitor exit
             else -> throw NotImplementedError("unknown op ${OpCode[opcode]}\n")
         }
     }
@@ -710,7 +768,7 @@ class MethodTranslator(
         // DynPrinter.print(name, descriptor, method, args)
         if (printOps) {
             println("  [invoke dyn by $sig] $name, $descriptor, [${method.owner}, ${method.name}, tag: ${method.tag}, desc: ${method.desc}], [${args.joinToString()}]")
-            printer.append("  ;; invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]\n")
+            printer.comment("invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]\n")
         }
 
         val dst = args[1] as Handle
@@ -720,17 +778,15 @@ class MethodTranslator(
         val fields = dlu.fields
 
         // register new class (not visitable)
-        printer.append("  i32.const ").append(gIndex.getClassIndex(synthClassName))
+        printer.append(i32Const(gIndex.getClassIndex(synthClassName)))
         if (dlu.fields.isEmpty() && !dlu.usesSelf) {
             // no instance is needed 😁
-            printer.push(ptrType).append(" call \$cip")
-            if (comments) printer.append(" ;; ").append(synthClassName)
-            printer.append('\n')
+            printer.push(ptrType).append(Call("cip"))
+            if (comments) printer.comment(synthClassName)
         } else {
             stackPush()
-            printer.push(ptrType).append(" call \$cr")
-            if (comments) printer.append(" ;; ").append(synthClassName)
-            printer.append('\n')
+            printer.push(ptrType).append(Call("cr"))
+            if (comments) printer.comment(synthClassName)
             stackPop()
             handleThrowable()
         }
@@ -738,7 +794,7 @@ class MethodTranslator(
         if (fields.isNotEmpty()) {
             val createdInstance = findOrDefineLocalVar(-2, ptrType).wasmName
             printer.pop(ptrType)
-            printer.append("  local.set ").append(createdInstance).append('\n')
+            printer.append(LocalSet(createdInstance))
 
             ///////////////////////////////
             // implement the constructor //
@@ -746,27 +802,25 @@ class MethodTranslator(
             // is this the correct order? should be :)
             for (i in fields.lastIndex downTo 0) {
                 val arg = fields[i]
-                printer.append("  local.get ").append(createdInstance).append("\n  ") // instance
-                printer.append(ptrType).append(".const ")
+                printer.append(LocalGet(createdInstance)) // instance
                 val offset = gIndex.getFieldOffset(synthClassName, "f$i", arg, false)
                 if (offset == null) {
                     printUsed(sig)
                     println("constructor-dependency? ${synthClassName in dIndex.constructorDependencies[sig]!!}")
                     throw NullPointerException("Missing $synthClassName.f$i ($arg), constructable? ${synthClassName in dIndex.constructableClasses}")
                 }
-                printer.append(offset)
-                printer.append(" ").append(ptrType).append(".add")
-                if (comments) printer.append(";; set field #$i\n")
-                else printer.append('\n')
+                printer.append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
+                printer.append(if (is32Bits) I32Add else I64Add)
+                if (comments) printer.comment("set field #$i\n")
                 // swap ptr and value
-                printer.append("  call \$swap").append(jvm2wasm(arg)).append(ptrType)
-                printer.append("\n  ").append(getStoreInstr2(arg)).append('\n')
+                printer.append(Call("swap${jvm2wasm(arg)}$ptrType"))
+                printer.append(getStoreInstr2(arg))
                 printer.pop(jvm2wasm(arg))
             }
 
             // get the instance, ready to continue :)
             printer.push(ptrType)
-            printer.append("  local.get ").append(createdInstance).append('\n')
+            printer.append(LocalGet(createdInstance))
         }
 
     }
@@ -775,32 +829,31 @@ class MethodTranslator(
         if (printOps) println("  [jump] ${OpCode[opcode]} -> $label")
         when (opcode) {
             // consume two args for comparison
-            0x9f -> printer.pop(i32).pop(i32).append("  i32.eq\n")
-            0xa0 -> printer.pop(i32).pop(i32).append("  i32.ne\n")
-            0xa1 -> printer.pop(i32).pop(i32).append("  i32.lt_s\n")
-            0xa2 -> printer.pop(i32).pop(i32).append("  i32.ge_s\n")
-            0xa3 -> printer.pop(i32).pop(i32).append("  i32.gt_s\n")
-            0xa4 -> printer.pop(i32).pop(i32).append("  i32.le_s\n")
-            0xa5 -> printer.pop(ptrType).pop(ptrType).append("  ").append(ptrType).append(".eq\n")
-            0xa6 -> printer.pop(ptrType).pop(ptrType).append("  ").append(ptrType).append(".ne\n")
+            0x9f -> printer.pop(i32).pop(i32).append(I32EQ)
+            0xa0 -> printer.pop(i32).pop(i32).append(I32NE)
+            0xa1 -> printer.pop(i32).pop(i32).append(I32LTS)
+            0xa2 -> printer.pop(i32).pop(i32).append(I32GES)
+            0xa3 -> printer.pop(i32).pop(i32).append(I32GTS)
+            0xa4 -> printer.pop(i32).pop(i32).append(I32LES)
+            0xa5 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32EQ else I64EQ)
+            0xa6 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32NE else I64NE)
             0x100 -> {
                 // consume one arg for == null
-                printer.pop(ptrType).append(" i32.eqz\n") // todo can we switch true/false? would be nice here :)
+                printer.pop(ptrType).append(I32EQZ)
             }
             0x102 -> printer.pop(ptrType) // consume one arg for != null
-            0xc6 -> printer.pop(ptrType).append("  i32.eqz\n") // is null
+            0xc6 -> printer.pop(ptrType).append(I32EQZ) // is null
             0xc7 -> printer.pop(ptrType) // done automatically
             0xa7 -> {} // just goto -> stack doesn't change
-            0x99 -> printer.pop(i32)
-                .append("  i32.eqz\n") // == 0 // todo can we switch true/false? would be nice here :)
+            0x99 -> printer.pop(i32).append(I32EQZ) // == 0
             0x9a -> printer.pop(i32) // != 0; done automatically
-            0x9b -> printer.pop(i32).append("  i32.const 0 i32.lt_s\n") // < 0
-            0x9c -> printer.pop(i32).append("  i32.const 0 i32.ge_s\n") // >= 0
-            0x9d -> printer.pop(i32).append("  i32.const 0 i32.gt_s\n") // > 0
-            0x9e -> printer.pop(i32).append("  i32.const 0 i32.le_s\n") // <= 0
+            0x9b -> printer.pop(i32).append(i32Const(0)).append(I32LTS) // < 0
+            0x9c -> printer.pop(i32).append(i32Const(0)).append(I32GES) // >= 0
+            0x9d -> printer.pop(i32).append(i32Const(0)).append(I32GTS) // > 0
+            0x9e -> printer.pop(i32).append(i32Const(0)).append(I32LES) // <= 0
             else -> throw NotImplementedError(OpCode[opcode])
         }
-        if (comments) printer.append("  ;; jump ${OpCode[opcode]} -> $label, stack: $stack\n")
+        if (comments) printer.comment("jump ${OpCode[opcode]} -> $label, stack: $stack\n")
         afterJump(label, opcode == 0xa7)
     }
 
@@ -820,49 +873,46 @@ class MethodTranslator(
         // int, float, double, long, string, maybe more
         if (printOps) println("  [ldc] '$value', ${value.javaClass}")
         when (value) {
-            true -> printer.push(i32).append("  i32.const 1\n")
-            false -> printer.push(i32).append("  i32.const 0\n")
-            is Int -> printer.push(i32).append("  i32.const ").append(value).append('\n')
-            is Long -> printer.push(i64).append("  i64.const ").append(value).append('\n')
+            true -> printer.push(i32).append(i32Const(1))
+            false -> printer.push(i32).append(i32Const(0))
+            is Int -> printer.push(i32).append(i32Const(value))
+            is Long -> printer.push(i64).append(i64Const(value))
             is Float -> {
                 printer.push(f32)
                 if (value.isFinite()) {
-                    printer.append("  f32.const ").append(value).append('\n')
+                    printer.append(f32Const(value))
                 } else {
-                    printer.append("  i32.const ").append(value.toRawBits()).append('\n')
-                        .append("  f32.reinterpret_i32\n")
+                    printer.append(i32Const(value.toRawBits()))
+                        .append(F32_REINTERPRET_I32)
                 }
             }
             is Double -> {
                 printer.push(f64)
                 if (value.isFinite()) {
-                    printer.append("  f64.const ").append(value).append('\n')
+                    printer.append(f64Const(value))
                 } else {
-                    printer.append("  i64.const ").append(value.toRawBits()).append('\n')
-                        .append("  f64.reinterpret_i64\n")
+                    printer.append(i64Const(value.toRawBits()))
+                        .append(F64_REINTERPRET_I64)
                 }
             }
             is String -> { // pack string into constant memory, and load its address
                 printer.push(ptrType)
                 val address = gIndex.getString(value)
-                printer.append("  ").append(ptrType).append(".const ").append(address)
+                printer.append(if (is32Bits) i32Const(address) else i64Const(address.toLong()))
                 if (comments) {
-                    printer.append(" ;; \"").append(
+                    printer.comment(
                         value.shorten(100)
                             .filter { it in '0'..'9' || it in 'a'..'z' || it in 'A'..'Z' || it in ".,-!%/()={[]}" }
                             .toString()
-                    ).append("\"\n")
-                } else {
-                    printer.append('\n')
+                    )
                 }
             }
             is Type -> {
                 printer.push(i32)
                 // used for assert() with getClassLoader()
-                printer.append("  i32.const ").append(gIndex.getClassIndex(single(value.descriptor)))
-                printer.append(" call \$findClass")
-                if (comments) printer.append(" ;; class $value\n")
-                else printer.append('\n')
+                printer.append(i32Const(gIndex.getClassIndex(single(value.descriptor))))
+                printer.append(Call("findClass"))
+                if (comments) printer.comment("class $value\n")
             }
             else -> throw IllegalArgumentException("unknown '$value', ${value.javaClass}\n")
         }
@@ -873,7 +923,7 @@ class MethodTranslator(
     @Boring
     override fun visitLineNumber(line: Int, start: Label?) {
         if (printOps) println("Line $line: ($start)")
-        if (comments) printer.append("  ;; :$line\n")
+        if (comments) printer.comment(":$line\n")
         this.line = line
     }
 
@@ -882,7 +932,8 @@ class MethodTranslator(
         if (v != null) return v
         v = findOrDefineLocalVar(i, wasmType)
         // initialize it once at the start... "synthetic local variable" in JDGui
-        nodes.first().printer.prepend("$wasmType.const 0 local.set ${v.wasmName} ;; synthetic\n")
+        nodes.first().printer
+            .prepend(listOf(Const(ConstType.find(wasmType), "0"), LocalSet(v.wasmName)))
         return v
     }
 
@@ -920,7 +971,7 @@ class MethodTranslator(
         return localVars.getOrPut(Pair(name, wasmType)) {
             // register local variable
             val name2 = "\$l${localVars.size}"
-            headPrinter.append("  (local $name2 $wasmType)\n")
+            localVariables1.add(LocalVariable(name2, wasmType))
             name2
         }
     }
@@ -944,9 +995,9 @@ class MethodTranslator(
     fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
         if (checkNullPointers) {
             getCaller(printer)
-            printer.append(" i32.const ").append(gIndex.getString(clazz))
-            printer.append(" i32.const ").append(gIndex.getString(name))
-            printer.append(" call \$checkNotNull\n")
+            printer.append(i32Const(gIndex.getString(clazz)))
+            printer.append(i32Const(gIndex.getString(name)))
+            printer.append(Call("checkNotNull"))
             handleThrowable()
         }
     }
@@ -996,7 +1047,7 @@ class MethodTranslator(
 
         fun getCaller(printer: Builder) {
             if (splitArgs.isNotEmpty()) {
-                printer.append("  call $").append(gIndex.getNth(listOf(ptrType) + splitArgs))
+                printer.append(Call(gIndex.getNth(listOf(ptrType) + splitArgs)))
             } else printer.dupI32()
         }
 
@@ -1007,11 +1058,11 @@ class MethodTranslator(
                     // invoke interface
                     // load interface/function index
                     getCaller(printer)
-                    printer.append(" i32.const ").append(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor)))
+                    printer.append(i32Const(gIndex.getInterfaceIndex(InterfaceSig.c(name, descriptor))))
                     // looks up class, goes to interface list, binary searches function, returns func-ptr
                     // instance, function index -> instance, function-ptr
                     stackPush()
-                    printer.push(i32).append(" call \$resolveInterface\n")
+                    printer.push(i32).append(Call("resolveInterface"))
                     stackPop() // so we can track the call better
                     handleThrowable() // if it's not found or nullptr
                     printer.pop(i32) // pop instance
@@ -1019,12 +1070,9 @@ class MethodTranslator(
 
                     stackPush()
 
-                    printer
-                        .append("  call_indirect (type ")
-                        .append(gIndex.getType(descriptor, calledCanThrow))
+                    printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
                     ActuallyUsedIndex.add(this.sig, sig)
-                    if (comments) printer.append(") ;; invoke interface $owner, $name, $descriptor\n")
-                    else printer.append(")\n")
+                    if (comments) printer.comment("invoke interface $owner, $name, $descriptor\n")
 
                     stackPop()
                 }
@@ -1037,19 +1085,17 @@ class MethodTranslator(
                     getCaller(printer)
 
                     // todo store this index in a table instead?
-                    printer.append(" i32.const ")
-                        .append(-gIndex.getString(methodName(sig)))
+                    printer.append(i32Const(-gIndex.getString(methodName(sig))))
                         // instance, function index -> function-ptr
-                        .append(" call \$resolveIndirect ;; not constructable class, $sig\n")
+                        .append(Call("resolveIndirect"))
+                        .comment("not constructable class, $sig")
                         .push(i32)
                     handleThrowable()
                     printer.pop(i32)
                     pop(splitArgs, false, ret)
 
-                    printer
-                        .append("  call_indirect (type ")
-                        .append(gIndex.getType(descriptor, calledCanThrow))
-                        .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
+                    printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
+                    if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
 
                     stackPop()
 
@@ -1097,7 +1143,7 @@ class MethodTranslator(
                             // can be directly called
                             val inline = hIndex.inlined[sig]
                             if (inline != null) {
-                                printer.append("  ").append(inline).append('\n')
+                                printer.instr.addAll(inline)
                             } else {
                                 stackPush()
                                 val name2 = methodName(sig)
@@ -1108,7 +1154,7 @@ class MethodTranslator(
                                 ) throw IllegalStateException("$sig0 -> $sig must not be final!!!")
                                 if (sig in hIndex.abstractMethods) throw IllegalStateException()
                                 ActuallyUsedIndex.add(this.sig, sig)
-                                printer.append("  call \$").append(name2).append('\n')
+                                printer.append(Call(name2))
                                 stackPop()
                             }
                         }
@@ -1127,18 +1173,17 @@ class MethodTranslator(
                         // printUsed(MethodSig(clazz, this.name, this.descriptor))
                         stackPush()
                         val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
-                        printer.append(" i32.const ").append(funcPtr)
+                        printer.append(i32Const(funcPtr))
                             // instance, function index -> function-ptr
-                            .append(" call \$resolveIndirect ;; $sig0, #${options.size}\n")
+                            .append(Call("resolveIndirect"))
+                            .comment("$sig0, #${options.size}")
                             .push(i32)
                         stackPop()
                         handleThrowable()
                         printer.pop(i32)
                         pop(splitArgs, false, ret)
-                        printer
-                            .append("  call_indirect (type ")
-                            .append(gIndex.getType(descriptor, calledCanThrow))
-                            .append(if (comments) ") ;; invoke virtual $owner, $name, $descriptor\n" else ")\n")
+                        printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
+                        if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
                         ActuallyUsedIndex.add(this.sig, sig)
                     }
                 }
@@ -1151,13 +1196,13 @@ class MethodTranslator(
                 pop(splitArgs, false, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
-                    printer.append("  ").append(inline).append('\n')
+                    printer.instr.addAll(inline)
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
                     assertFalse(sig in hIndex.abstractMethods)
                     ActuallyUsedIndex.add(this.sig, sig)
-                    printer.append("  call \$").append(name2).append('\n')
+                    printer.append(Call(name2))
                     stackPop()
                 }
             }
@@ -1166,15 +1211,14 @@ class MethodTranslator(
                 pop(splitArgs, true, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
-                    printer.append("  ").append(inline).append('\n')
+                    printer.instr.addAll(inline)
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
                     assertFalse(sig in hIndex.abstractMethods)
                     ActuallyUsedIndex.add(this.sig, sig)
-                    printer.append("  call \$").append(name2)
-                    if (comments) printer.append(" ;; static call\n")
-                    else printer.append('\n')
+                    printer.append(Call(name2))
+                    if (comments) printer.comment("static call")
                     stackPop()
                 }
             }
@@ -1190,13 +1234,13 @@ class MethodTranslator(
 
     fun stackPush() {
         if (canPush) {
-            printer.append("  i32.const ").append(getCallIndex()).append(" call \$stackPush\n")
+            printer.append(i32Const(getCallIndex())).append(Call("stackPush"))
         }
     }
 
     fun stackPop() {
         if (canPush) {
-            printer.append("  call \$stackPop\n")
+            printer.append(Call("stackPop"))
         }
     }
 
@@ -1239,13 +1283,12 @@ class MethodTranslator(
         for (i in 0 until numDimensions) printer.pop(i32)
         printer.push(ptrType)
 
-        printer.append("  i32.const ").append(gIndex.getClassIndex(type))
+        printer.append(i32Const(gIndex.getClassIndex(type)))
         if (numDimensions == 1) {
-            printer.append(" call \$cna")
+            printer.append(Call("cna"))
         } else {
-            printer.append(" call \$cma").append(numDimensions)
+            printer.append(Call("cma$numDimensions"))
         }
-        printer.append('\n')
         stackPop()
         handleThrowable()
 
@@ -1282,9 +1325,9 @@ class MethodTranslator(
         if (printOps) println("  [lookup] switch $default, [${keys.joinToString()}], [${labels.joinToString()}]")
         val helper = findOrDefineLocalVar(Int.MAX_VALUE, i32).wasmName
         printer.pop(i32)
-        printer.append("  local.set ").append(helper).append('\n')
+        printer.append(LocalSet(helper))
         for (i in keys.indices) {
-            printer.append("  local.get ").append(helper).append(" i32.const ").append(keys[i]).append(" i32.eq\n")
+            printer.append(LocalGet(helper)).append(i32Const(keys[i])).append(I32EQ)
             afterJump(labels[i], false)
         }
         afterJump(default, true)
@@ -1306,7 +1349,7 @@ class MethodTranslator(
 
     override fun visitTryCatchBlock(start: Label, end: Label, handler: Label, type: String?) {
         catchers.add(Catcher(start, end, handler, type))
-        if (comments) printer.append("  ;; try-catch $start .. $end, handler $handler, type $type\n")
+        if (comments) printer.comment("try-catch $start .. $end, handler $handler, type $type\n")
         if (printOps) println("  ;; try-catch $start .. $end, handler $handler, type $type")
     }
 
@@ -1318,7 +1361,7 @@ class MethodTranslator(
             if (mustThrow) {
                 // throw :)
                 printer.append("  throw \$exTag\n")
-                printer.append("  unreachable\n")
+                printer.append(Unreachable)
                 currentNode.isReturn = true // kind of
             } else {
                 // nothing will be here :)
@@ -1327,7 +1370,7 @@ class MethodTranslator(
         }
 
         if (!canThrowError) {
-            printer.append("  call \$panic\n")
+            printer.append(Call("panic"))
             return
         }
 
@@ -1337,15 +1380,14 @@ class MethodTranslator(
         if (catchers.isNotEmpty()) {
 
             if (printOps) println("found catcher $catchers")
-            if (comments) printer.append("  ;; found catcher\n")
+            if (comments) printer.comment("found catcher")
 
             val oldStack = ArrayList(stack)
 
             if (catchers.size > 1 || (catchers[0].type != null && catchers[0].type != "java/lang/Throwable")) {
 
                 val throwable = findOrDefineLocalVar(thIndex--, ptrType).wasmName
-                if (comments) printer.append("  local.set $throwable ;; multiple/complex catchers\n")
-                else printer.append("  local.set ").append(throwable).append('\n')
+                printer.append(LocalSet(throwable)).comment("multiple/complex catchers")
 
                 var handler = Node(Label())
                 nodes.add(handler)
@@ -1353,7 +1395,7 @@ class MethodTranslator(
                 if (mustThrow) {
                     visitJumpInsn(0xa7, handler.label) // jump to handler
                 } else {
-                    printer.push(ptrType).append("  local.get $throwable\n")
+                    printer.push(ptrType).append(LocalGet(throwable))
                     visitJumpInsn(0x102, handler.label) // if not null, jump to handler
                 }
 
@@ -1363,11 +1405,10 @@ class MethodTranslator(
                 for ((i, catcher) in catchers.withIndex()) {
 
                     if (i == 0) {
-                        handler.printer.append(" ")
                         for (e in stack) {
-                            handler.printer.append(" drop")
+                            handler.printer.append(Drop)
                         }
-                        handler.printer.append(" local.get ").append(throwable).append('\n')
+                        handler.printer.append(LocalGet(throwable))
                     }
 
                     if (catcher.type == null) {
@@ -1380,9 +1421,8 @@ class MethodTranslator(
                         // if condition
                         // throwable -> throwable, throwable, int - instanceOf > throwable, jump-condition
                         handler.printer.dupI32()
-                        handler.printer.append(" ").appendInstanceOf(catcher.type)
-                        if (comments) handler.printer.append(" ;; handler #$i/${catchers.size}/$throwable\n")
-                        else handler.printer.append('\n')
+                        handler.printer.appendInstanceOf(catcher.type)
+                        if (comments) handler.printer.comment("handler #$i/${catchers.size}/$throwable")
 
                         // actual branch
                         val nextHandler = Node(Label())
@@ -1398,23 +1438,22 @@ class MethodTranslator(
                 }
 
                 // handle if all failed: throw error
-                if (comments) handler.printer.append(" ;; must throw\n")
+                if (comments) handler.printer.comment("must throw")
                 returnIfThrowable(true, handler)
 
             } else {
 
                 if (mustThrow) {
 
-                    if (comments) printer.append("  ;; throwing single generic catcher\n")
+                    if (comments) printer.comment("throwing single generic catcher")
 
                     if (printOps) println("--- handler: ${currentNode.label}")
 
                     val currentNode = currentNode
                     if (stack.isNotEmpty()) {
-                        printer.append(" ")
-                        for (e in stack.indices) // don't drop exception
-                            printer.append(" drop")
-                        printer.append("\n")
+                        for (e in stack.indices) { // don't drop exception
+                            printer.append(Drop)
+                        }
                     }
 
                     visitLabel(Label(), true)
@@ -1425,7 +1464,7 @@ class MethodTranslator(
 
                 } else {
 
-                    printer.append("  ;; maybe throwing single generic catcher\n")
+                    printer.comment("maybe throwing single generic catcher")
 
                     val mainHandler = Node(Label())
                     val throwable = findOrDefineLocalVar(thIndex--, ptrType).wasmName
@@ -1433,15 +1472,14 @@ class MethodTranslator(
                     if (printOps) println("--- handler: ${mainHandler.label}")
 
                     printer.push(ptrType)
-                    printer.append("  local.set ").append(throwable).append('\n')
-                    printer.append("  local.get ").append(throwable).append('\n')
+                    printer.append(LocalSet(throwable))
+                    printer.append(LocalGet(throwable))
                     visitJumpInsn(0x9a, mainHandler.label) // if not null
 
                     mainHandler.inputStack = ArrayList(stack)
                     mainHandler.outputStack = listOf(ptrType)
-                    mainHandler.printer.append(" ")
-                    for (e in stack) mainHandler.printer.append(" drop")
-                    mainHandler.printer.append(" local.get $throwable\n")
+                    for (e in stack) mainHandler.printer.append(Drop)
+                    mainHandler.printer.append(LocalGet(throwable))
                     mainHandler.isAlwaysTrue = true
                     mainHandler.ifTrue = catchers[0].handler
                     nodes.add(mainHandler)
@@ -1454,9 +1492,9 @@ class MethodTranslator(
         } else {
             if (comments) {
                 if (mustThrow) {
-                    printer.append("  ;; no catcher was found, returning\n")
+                    printer.comment("no catcher was found, returning")
                 } else {
-                    printer.append("  ;; no catcher was found, returning maybe\n")
+                    printer.comment("no catcher was found, returning maybe")
                 }
             }
             // easy, inline, without graph :)
@@ -1471,27 +1509,49 @@ class MethodTranslator(
         val printer = currentNode.printer
         if (mustThrow) {
             if (resultType == 'V') {
-                printer.append("  return\n")
+                printer.append(Return)
             } else {
                 val retType = jvm2wasm1(resultType)
-                printer.append("  ").append(retType)
-                    .append(".const 0 call \$swapi32").append(retType)
-                    .append(" return\n")
+                printer.append(
+                    when (retType) {
+                        "i32" -> i32Const(0)
+                        "i64" -> i64Const(0)
+                        "f32" -> f32Const(0f)
+                        "f64" -> f64Const(0.0)
+                        else -> throw NotImplementedError()
+                    }
+                ).append(Call("swapi32$retType"))
+                    .append(Return)
             }
-            if (!printer.endsWith("return\n") && !printer.endsWith("unreachable\n")) {
-                printer.append("  unreachable\n")
+            if (!printer.endsWith(Return) && !printer.endsWith(Unreachable)) {
+                printer.append(Unreachable)
             }
             currentNode.isReturn = true
         } else {
             val tmp = tmpI32
-            printer.append("  local.set ").append(tmp)
-            printer.append(" local.get ").append(tmp)
+            printer.append(LocalSet(tmp))
+            printer.append(LocalGet(tmp))
             if (resultType == 'V') {
-                printer.append(" (if (then local.get ").append(tmp).append(" return))\n")
+                printer.append(
+                    IfBranch(
+                        listOf(LocalGet(tmp), Return), emptyList(),
+                        emptyList(), emptyList()
+                    )
+                )
             } else {
-                printer.append(" (if (then ")
-                    .append(jvm2wasm1(resultType))
-                    .append(".const 0 local.get ").append(tmp).append(" return))\n")
+                val constExpr = when (jvm2wasm1(resultType)) {
+                    "i32" -> i32Const(0)
+                    "i64" -> i64Const(0)
+                    "f32" -> f32Const(0f)
+                    "f64" -> f64Const(0.0)
+                    else -> throw NotImplementedError()
+                }
+                printer.append(
+                    IfBranch(
+                        listOf(constExpr, LocalGet(tmp), Return), emptyList(),
+                        emptyList(), emptyList()
+                    )
+                )
             }
         }
     }
@@ -1516,9 +1576,8 @@ class MethodTranslator(
                 // new instance
                 stackPush()
                 printer.push(ptrType)
-                printer.append("  i32.const ").append(gIndex.getClassIndex(type)).append(" call \$cr")
-                if (comments) printer.append(" ;; $type\n")
-                else printer.append('\n')
+                printer.append(i32Const(gIndex.getClassIndex(type))).append(Call("cr"))
+                if (comments) printer.comment(type)
                 stackPop()
                 handleThrowable()
             }
@@ -1526,9 +1585,8 @@ class MethodTranslator(
                 // a-new array, type doesn't matter
                 stackPush()
                 printer.pop(i32).push(ptrType)
-                printer.append("  call \$ca")
-                if (comments) printer.append(" ;; $type\n")
-                else printer.append('\n')
+                printer.append(Call("ca"))
+                if (comments) printer.comment(type)
                 stackPop()
                 handleThrowable()
             }
@@ -1537,9 +1595,8 @@ class MethodTranslator(
                 if (checkClassCasts) {
                     stackPush()
                     printer.pop(ptrType).push(ptrType)
-                    printer.append("  ").printCastClass(type)
-                    if (comments) printer.append(" ;; $type\n")
-                    else printer.append('\n')
+                    printer.printCastClass(type)
+                    if (comments) printer.comment(type)
                     stackPop()
                     handleThrowable()
                 }
@@ -1547,9 +1604,8 @@ class MethodTranslator(
             0xc1 -> {
                 // instance of
                 printer.pop(ptrType).push(i32)
-                printer.append("  ").appendInstanceOf(type)
-                if (comments) printer.append(" ;; $type\n")
-                else printer.append('\n')
+                printer.appendInstanceOf(type)
+                if (comments) printer.comment(type)
             }
             else -> throw NotImplementedError("[type] unknown ${OpCode[opcode]}, $type\n")
         }
@@ -1557,25 +1613,25 @@ class MethodTranslator(
 
     private fun Builder.printCastClass(clazz: String) {
         val children = hIndex.childClasses[clazz]
-        append("i32.const ").append(gIndex.getClassIndex(clazz))
+        append(i32Const(gIndex.getClassIndex(clazz)))
         if (children == null || children.none { it in dIndex.constructableClasses }) {
-            append(" call \$ccx")
+            append(Call("ccx"))
         } else {
-            append(" call \$cc")
+            append(Call("cc"))
         }
     }
 
     private fun Builder.appendInstanceOf(clazz: String) {
         if (clazz in dIndex.constructableClasses) {
             val children = hIndex.childClasses[clazz]
-            append("i32.const ").append(gIndex.getClassIndex(clazz))
+            append(i32Const(gIndex.getClassIndex(clazz)))
             if (children == null || children.none { it in dIndex.constructableClasses }) {
-                append(" call \$iox")
+                append(Call("iox"))
             } else {
-                append(" call \$io")
+                append(Call("io"))
             }
         } else {
-            append("drop i32.const 0")
+            append(Drop).append(i32Const(0))
         }
     }
 
@@ -1600,9 +1656,8 @@ class MethodTranslator(
         }
         if (map != null) {
             when (opcode) {
-                in 0x15..0x2d -> printer.append("  local.get ").append(map)
-                    .append('\n') // iload, loads local variable at varIndex
-                in 0x36..0x4e -> printer.append("  local.set ").append(map).append('\n') // istore
+                in 0x15..0x2d -> printer.append(ParamGet(map)) // iload, loads local variable at varIndex
+                in 0x36..0x4e -> printer.append(ParamSet(map)) // istore
                 else -> throw NotImplementedError()
             }
         } else {
@@ -1619,17 +1674,15 @@ class MethodTranslator(
                 0x3a, in 0x4b..0x4e -> findOrDefineLocalVar(varIndex, ptrType)
                 else -> throw NotImplementedError()
             }.wasmName
-            printer.append(if (opcode <= 0x2d) "  local.get " else "  local.set ")
-            printer.append(varName)
-            printer.append('\n')
+            printer.append(if (opcode <= 0x2d) LocalGet(varName) else LocalSet(varName))
         }
     }
 
     override fun visitIntInsn(opcode: Int, operand: Int) {
         if (printOps) println("  [intInsn] ${OpCode[opcode]}($operand)")
         when (opcode) {
-            0x10 -> printer.push(i32).append("  i32.const ").append(operand).append('\n')
-            0x11 -> printer.push(i32).append("  i32.const ").append(operand).append('\n')
+            0x10 -> printer.push(i32).append(i32Const(operand))
+            0x11 -> printer.push(i32).append(i32Const(operand))
             0xbc -> { // new array
                 val type = when (operand) {
                     4 -> "[Z"
@@ -1645,8 +1698,8 @@ class MethodTranslator(
                 stackPush()
                 printer
                     .pop(i32).push(ptrType)
-                    .append("  i32.const ").append(gIndex.getClassIndex(type))
-                    .append(" call \$cna ;; ").append(type).append('\n')
+                    .append(i32Const(gIndex.getClassIndex(type)))
+                    .append(Call("cna")).comment(type)
                 stackPop()
                 handleThrowable()
             }
@@ -1693,7 +1746,7 @@ class MethodTranslator(
         printer = nextNode.printer
 
         if (printOps) println(" [label] $label")
-        if (comments) printer.append("  ;; $label\n")
+        if (comments) printer.comment(label.toString())
         for (v in localVariables) {
             when (label) {
                 v.start -> activeLocalVars.add(v)
@@ -1702,15 +1755,15 @@ class MethodTranslator(
         }
     }
 
-    private fun getLoadInstr(descriptor: String) = when (single(descriptor)) {
-        "Z", "B" -> "i32.load8_s"
-        "S" -> "i32.load16_s"
-        "C" -> "i32.load16_u"
-        "I" -> "i32.load"
-        "J" -> "i64.load"
-        "F" -> "f32.load"
-        "D" -> "f64.load"
-        else -> if (is32Bits) "i32.load" else "i64.load"
+    private fun getLoadInstr(descriptor: String): Instruction = when (single(descriptor)) {
+        "Z", "B" -> I32Load8S
+        "S" -> I32Load16S
+        "C" -> I32Load16U
+        "I" -> I32Load
+        "J" -> I64Load
+        "F" -> F32Load
+        "D" -> F64Load
+        else -> if (is32Bits) I32Load else I64Load
     }
 
     private fun getStoreInstr(descriptor: String) = getStoreInstr2(single(descriptor))
@@ -1725,28 +1778,28 @@ class MethodTranslator(
         else -> if (is32Bits) "I32" else "I64"
     }
 
-    private fun getStoreInstr2(descriptor: String) = when (descriptor) {
-        "Z", "B" -> "i32.store8"
-        "S", "C" -> "i32.store16"
-        "I" -> "i32.store"
-        "J" -> "i64.store"
-        "F" -> "f32.store"
-        "D" -> "f64.store"
-        else -> if (is32Bits) "i32.store" else "i64.store"
+    private fun getStoreInstr2(descriptor: String): Instruction = when (descriptor) {
+        "Z", "B" -> I32Store8
+        "S", "C" -> I32Store16
+        "I" -> I32Store
+        "J" -> I64Store
+        "F" -> F32Store
+        "D" -> F64Store
+        else -> if (is32Bits) I32Store else I64Store
     }
 
     private fun callClinit(clazz: String) {
         if (name == "<clinit>" && clazz == this.clazz) {
-            if (comments) printer.append("  ;; skipped <clinit>, we're inside of it\n")
+            if (comments) printer.comment("skipped <clinit>, we're inside of it")
             return
         } // it's currently being inited :)
         val sig = MethodSig.c(clazz, "<clinit>", "()V")
         if (hIndex.methods[clazz]?.contains(sig) != true) {
-            if (comments) printer.append("  ;; skipped <clinit>, because empty\n")
+            if (comments) printer.comment("skipped <clinit>, because empty")
             return
         }
         stackPush()
-        printer.append("  call $").append(methodName(sig)).append('\n')
+        printer.append(Call(methodName(sig)))
         ActuallyUsedIndex.add(this.sig, sig)
         stackPop()
         if (canThrowError(sig)) {
@@ -1761,12 +1814,13 @@ class MethodTranslator(
 
     private fun Builder.dupI32(): Builder {
         val tmp = tmpI32
-        if (tmp == "\$l0" && endsWith("local.set \$l0 local.get \$l0 local.get \$l0")) {
-            append(" local.get \$l0")
+        val lastInstr = instr.lastOrNull()
+        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is Const) {
+            append(lastInstr)
         } else {
-            append("  local.set ").append(tmp)
-                .append(" local.get ").append(tmp)
-                .append(" local.get ").append(tmp)
+            append(LocalSet(tmp))
+            append(LocalGet(tmp))
+            append(LocalGet(tmp))
         }
         return this
     }
@@ -1789,15 +1843,12 @@ class MethodTranslator(
             }
             if (!static) { // drop instance
                 printer.pop(ptrType)
-                printer.append("  drop\n")
+                printer.append(Drop)
             }
             if (setter) { // setter
                 // drop value
-                if (comments) {
-                    printer.append("  drop ;; final $sig\n")
-                } else {
-                    printer.append("  drop\n")
-                }
+                printer.append(Drop)
+                if (comments) printer.comment("final $sig\n")
             } else { // getter
                 visitLdcInsn(value) // too easy xD
             }
@@ -1806,17 +1857,19 @@ class MethodTranslator(
                 // get static
                 if (name in enumFieldsNames) {
                     callClinit(owner)
-                    printer.append("  i32.const ").append(gIndex.getClassIndex(owner)).append(" call \$findClass")
-                    printer.append(" i32.const ").append(
-                        gIndex.getFieldOffset(
-                            "java/lang/Class",
-                            "enumConstants",
-                            "[Ljava/lang/Object;",
-                            false
-                        )!!
-                    )
-                    if (comments) printer.append(" i32.add i32.load ;; enum values\n")
-                    else printer.append(" i32.add i32.load\n")
+                    printer.append(i32Const(gIndex.getClassIndex(owner)))
+                        .append(Call("findClass"))
+                        .append(
+                            i32Const(
+                                gIndex.getFieldOffset(
+                                    "java/lang/Class",
+                                    "enumConstants",
+                                    "[Ljava/lang/Object;",
+                                    false
+                                )!!
+                            )
+                        )
+                    printer.append(I32Add).append(I32Load).comment("enum values")
                     printer.push(wasmType)
                 } else if (fieldOffset != null) {
                     callClinit(owner)
@@ -1824,81 +1877,96 @@ class MethodTranslator(
                     // load class index
                     if (precalculateStaticFields) {
                         val staticPtr = staticLookup[owner]!! + fieldOffset
-                        printer.append("  i32.const ").append(staticPtr).append(' ')
+                        printer.append(i32Const(staticPtr))
                     } else {
                         printer
-                            .append("  i32.const ").append(gIndex.getClassIndex(owner))
-                            .append(" i32.const ").append(fieldOffset)
+                            .append(i32Const(gIndex.getClassIndex(owner)))
+                            .append(i32Const(fieldOffset))
                             // class index, field offset -> static value
-                            .append(" call \$findStatic ")
+                            .append(Call("findStatic"))
                     }
                     printer.append(getLoadInstr(descriptor))
-                    if (comments) printer.append(" ;; get static '$owner.$name'\n")
-                    else printer.append('\n')
+                    if (comments) printer.comment("get static '$owner.$name'")
                 } else {
-                    printer.push(wasmType)
-                    printer.append("  ").append(wasmType).append(".const 0\n")
+                    printer.push(wasmType).append(
+                        when (wasmType) {
+                            "i32" -> i32Const(0)
+                            "i64" -> i64Const(0)
+                            "f32" -> f32Const(0f)
+                            "f64" -> f64Const(0.0)
+                            else -> throw NotImplementedError()
+                        }
+                    )
                 }
             }
             0xb3 -> {
                 // put static
                 if (name in enumFieldsNames) {
-                    printer.append("  i32.const ").append(gIndex.getClassIndex(owner)).append(" call \$findClass")
-                    printer.append(" i32.const ").append(
-                        gIndex.getFieldOffset(
-                            "java/lang/Class",
-                            "enumConstants",
-                            "[Ljava/lang/Object;",
-                            false
-                        )!!
-                    )
-                    if (comments) printer.append(" i32.add call \$swapi32i32 i32.store ;; enum values\n")
-                    else printer.append(" i32.add call \$swapi32i32 i32.store\n")
+                    printer
+                        .append(i32Const(gIndex.getClassIndex(owner)))
+                        .append(Call("findClass"))
+                        .append(
+                            i32Const(
+                                gIndex.getFieldOffset(
+                                    "java/lang/Class",
+                                    "enumConstants",
+                                    "[Ljava/lang/Object;",
+                                    false
+                                )!!
+                            )
+                        )
+                    printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
+                    printer.comment("enum values")
                     printer.pop(wasmType)
                 } else if (fieldOffset != null) {
                     callClinit(owner)
                     printer.pop(wasmType)
                     if (precalculateStaticFields) {
                         val staticPtr = staticLookup[owner]!! + fieldOffset
-                        printer.append("  i32.const ").append(staticPtr)
+                        printer.append(i32Const(staticPtr))
                     } else {
                         printer
-                            .append("  i32.const ").append(gIndex.getClassIndex(owner))
-                            .append(" i32.const ").append(fieldOffset)
+                            .append(i32Const(gIndex.getClassIndex(owner)))
+                            .append(i32Const(fieldOffset))
                             // ;; class index, field offset -> static value
-                            .append(" call \$findStatic")
+                            .append(Call("findStatic"))
                     }
-                    printer.append(" call \$swap").append(jvm2wasm1(descriptor)).append("i32 ")
-                    printer.append(getStoreInstr(descriptor))
-                    if (comments) printer.append(" ;; put static '$owner.$name'\n")
-                    else printer.append('\n')
+                    printer.append(Call("swap${jvm2wasm1(descriptor)}i32"))
+                        .append(getStoreInstr(descriptor))
+                    if (comments) printer.comment("put static '$owner.$name'")
                 } else {
                     printer.pop(wasmType)
-                    printer.append("  drop\n")
+                    printer.append(Drop)
                 }
             }
             0xb4 -> {
                 // get field
                 // second part of check is <self>
-                if (checkNull && !(!isStatic && printer.endsWith("local.get 0\n"))) {
+                if (checkNull && !(!isStatic && printer.endsWith(LocalGet(0)))) {
                     checkNotNull0(owner, name) {
-                        printer.dupI32().append('\n')
+                        printer.dupI32()
                     }
                 }
                 printer.pop(ptrType).push(wasmType)
                 if (fieldOffset != null) {
-                    printer.append("  i32.const ").append(fieldOffset)
-                        .append(" i32.add ").append(getLoadInstr(descriptor))
+                    printer.append(i32Const(fieldOffset)).append(I32Add)
+                        .append(getLoadInstr(descriptor))
                     if (comments) {
-                        if (owner == clazz) printer.append(" ;; get field '$name'\n")
-                        else printer.append(" ;; get field '$owner.$name'\n")
-                    } else printer.append('\n')
+                        if (owner == clazz) printer.comment("get field '$name'")
+                        else printer.comment("get field '$owner.$name'")
+                    } else printer
                 } else {
-                    printer.append("  drop ").append(wasmType)
+                    printer.append(Drop).append(
+                        when (wasmType) {
+                            "i32" -> i32Const(0)
+                            "i64" -> i64Const(0)
+                            "f32" -> f32Const(0f)
+                            "f64" -> f64Const(0.0)
+                            else -> throw NotImplementedError()
+                        }
+                    )
                     if (comments) {
-                        printer.append(".const 0 ;; dropped getting $name\n")
-                    } else {
-                        printer.append(".const 0\n")
+                        printer.comment("dropped getting $name")
                     }
                 }
             }
@@ -1906,11 +1974,11 @@ class MethodTranslator(
                 // set field
                 // second part of check is <self>
                 if (checkNull &&
-                    !(!isStatic && printer.endsWith("local.get 0\n  local.get 1\n")) &&
-                    !(!isStatic && printer.endsWith("local.get 0\n  i32.const 0\n"))
+                    !(!isStatic && printer.endsWith(listOf(LocalGet(0), LocalGet(1)))) &&
+                    !(!isStatic && printer.endsWith(listOf(LocalGet(0), i32Const(0))))
                 ) {
                     checkNotNull0(owner, name) {
-                        printer.append("  call $").append(gIndex.getNth(listOf(ptrType, wasmType)))
+                        printer.append(Call(gIndex.getNth(listOf(ptrType, wasmType))))
                     }
                 }
                 printer.pop(wasmType).pop(ptrType)
@@ -1918,30 +1986,25 @@ class MethodTranslator(
 
                     // if endsWith local.get x2,
                     //  then optimize this to not use swaps
-                    val suffix = "  local.get 0\n  local.get 1\n"
+                    val suffix = listOf(LocalGet(0), LocalGet(1))
                     if (printer.endsWith(suffix)) {
-                        printer.size -= suffix.length
-                        printer.append("  local.get 0")
-                            .append(" i32.const ").append(fieldOffset)
-                            .append(" i32.add local.get 1 ")
+                        printer.drop().drop()
+                        printer.append(ParamGet(0))
+                            .append(i32Const(fieldOffset))
+                            .append(I32Add).append(ParamGet(1))
                             .append(getStoreInstr(descriptor))
                     } else {
                         // we'd need to call a function twice, so call a generic functions for this
-                        printer.append("  i32.const ").append(fieldOffset)
-                            .append(" call \$setField${getStoreSymbol(descriptor)}")
+                        printer.append(i32Const(fieldOffset))
+                            .append(Call("setField${getStoreSymbol(descriptor)}"))
                     }
                     if (comments) {
-                        if (owner == clazz) printer.append(" ;; set field '$name'\n")
-                        else printer.append(" ;; set field '$owner.$name'\n")
-                    } else printer.append('\n')
-
+                        if (owner == clazz) printer.comment("set field '$name'")
+                        else printer.comment("set field '$owner.$name'")
+                    }
                 } else {
-                    if (comments) {
-                        printer.append("  drop drop ;; dropped putting $name\n")
-                    } else {
-                        printer.drop()
-                        printer.drop()
-                    }
+                    printer.drop().drop()
+                    if (comments) printer.comment("dropped putting $name")
                 }
             }
             else -> throw NotImplementedError(OpCode[opcode])
@@ -1968,50 +2031,50 @@ class MethodTranslator(
             }
 
             var txt = transform(sig, nodes)
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
+            /*  txt = txt.replace(
+                  "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
+                          "  i32.const 0\n" +
+                          "  return", "return"
+              )
 
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then i32.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then i64.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then f32.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then f64.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "(if (then\n" +
-                        "  i32.const 0\n" +
-                        "  i32.const 0\n" +
-                        "  return\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "  i32.const 0\n" +
-                        "  return\n" +
-                        "))", "i32.eqz i32.const 0 return"
-            )
-            txt = txt.replace(
-                "(if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "i32.eqz"
-            )
+              txt = txt.replace(
+                  "local.set \$l0 local.get \$l0 (if (then i32.const 0 local.get \$l0 return))\n" +
+                          "  i32.const 0\n" +
+                          "  return", "return"
+              )
+              txt = txt.replace(
+                  "local.set \$l0 local.get \$l0 (if (then i64.const 0 local.get \$l0 return))\n" +
+                          "  i32.const 0\n" +
+                          "  return", "return"
+              )
+              txt = txt.replace(
+                  "local.set \$l0 local.get \$l0 (if (then f32.const 0 local.get \$l0 return))\n" +
+                          "  i32.const 0\n" +
+                          "  return", "return"
+              )
+              txt = txt.replace(
+                  "local.set \$l0 local.get \$l0 (if (then f64.const 0 local.get \$l0 return))\n" +
+                          "  i32.const 0\n" +
+                          "  return", "return"
+              )
+              txt = txt.replace(
+                  "(if (then\n" +
+                          "  i32.const 0\n" +
+                          "  i32.const 0\n" +
+                          "  return\n" +
+                          ") (else\n" +
+                          "  i32.const 1\n" +
+                          "  i32.const 0\n" +
+                          "  return\n" +
+                          "))", "i32.eqz i32.const 0 return"
+              )
+              txt = txt.replace(
+                  "(if (result i32) (then\n" +
+                          "  i32.const 0\n" +
+                          ") (else\n" +
+                          "  i32.const 1\n" +
+                          "))", "i32.eqz"
+              )*/
 
             // todo all replacement functions :)
 
@@ -2035,154 +2098,154 @@ class MethodTranslator(
                         "))", "f32.eq i32.eqz"
             )*/
 
-            txt = txt.replace(
-                "call \$lcmp\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "i64.eq"
-            )
+            /*   txt = txt.replace(
+                   "call \$lcmp\n" +
+                           "  (if (result i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "i64.eq"
+               )
 
-            txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.ge_s", "f32.ge")
-            txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.ge_s", "f64.ge")
-            txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.gt_s", "f32.gt")
-            txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.gt_s", "f64.gt")
-            txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.le_s", "f32.le")
-            txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.le_s", "f64.le")
-            txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.lt_s", "f32.lt")
-            txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.lt_s", "f64.lt")
-            txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.eq", "f32.eq")
-            txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.eq", "f64.eq")
+               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.ge_s", "f32.ge")
+               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.ge_s", "f64.ge")
+               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.gt_s", "f32.gt")
+               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.gt_s", "f64.gt")
+               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.le_s", "f32.le")
+               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.le_s", "f64.le")
+               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.lt_s", "f32.lt")
+               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.lt_s", "f64.lt")
+               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.eq", "f32.eq")
+               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.eq", "f64.eq")
 
-            // difference in effect? mmh...
-            // if they all work, we have simplified a lot of places :)
-            txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.ge_s", "f32.ge")
-            txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.ge_s", "f64.ge")
-            txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.gt_s", "f32.gt")
-            txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.gt_s", "f64.gt")
-            txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.le_s", "f32.le")
-            txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.le_s", "f64.le")
-            txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.lt_s", "f32.lt")
-            txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.lt_s", "f64.lt")
-            txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.eq", "f32.eq")
-            txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.eq", "f64.eq")
+               // difference in effect? mmh...
+               // if they all work, we have simplified a lot of places :)
+               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.ge_s", "f32.ge")
+               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.ge_s", "f64.ge")
+               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.gt_s", "f32.gt")
+               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.gt_s", "f64.gt")
+               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.le_s", "f32.le")
+               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.le_s", "f64.le")
+               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.lt_s", "f32.lt")
+               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.lt_s", "f64.lt")
+               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.eq", "f32.eq")
+               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.eq", "f64.eq")
 
-            txt = txt.replace("call \$lcmp\n  i32.const 0 i32.gt_s", "i64.gt_s")
-            txt = txt.replace("call \$lcmp\n  i32.const 0 i32.ge_s", "i64.ge_s")
-            txt = txt.replace("call \$lcmp\n  i32.const 0 i32.lt_s", "i64.lt_s")
-            txt = txt.replace("call \$lcmp\n  i32.const 0 i32.le_s", "i64.le_s")
-            txt = txt.replace("call \$lcmp\n  i32.const 0 i32.eq", "i64.eq")
+               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.gt_s", "i64.gt_s")
+               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.ge_s", "i64.ge_s")
+               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.lt_s", "i64.lt_s")
+               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.le_s", "i64.le_s")
+               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.eq", "i64.eq")
 
-            txt = txt.replace("local.get 0\n  drop", "")
-            txt = txt.replace("local.get 1\n  drop", "")
-            txt = txt.replace(
-                "i32.ne\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "i32.eq"
-            )
-            txt = txt.replace(
-                "i32.eq\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "i32.ne"
-            )
+               txt = txt.replace("local.get 0\n  drop", "")
+               txt = txt.replace("local.get 1\n  drop", "")
+               txt = txt.replace(
+                   "i32.ne\n" +
+                           "  (if (result i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "i32.eq"
+               )
+               txt = txt.replace(
+                   "i32.eq\n" +
+                           "  (if (result i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "i32.ne"
+               )
 
-            txt = txt.replace(
-                "call \$dcmpg\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "f64.eq"
-            )
-            txt = txt.replace(
-                "call \$fcmpg\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "f32.eq"
-            )
+               txt = txt.replace(
+                   "call \$dcmpg\n" +
+                           "  (if (result i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "f64.eq"
+               )
+               txt = txt.replace(
+                   "call \$fcmpg\n" +
+                           "  (if (result i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "f32.eq"
+               )
 
-            txt = txt.replace("i32.load\n  drop", "drop")
-            txt = txt.replace("i64.load\n  drop", "drop")
-            txt = txt.replace("f32.load\n  drop", "drop")
-            txt = txt.replace("f64.load\n  drop", "drop")
-            // these two don't exist!
-            // txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
-            // txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
-            txt = txt.replace(
-                "call \$dupi32 (if (param i32) (then i32.const 0 call \$swapi32i32 return) (else drop))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "f64.promote_f32\n" +
-                        "  f64.sqrt\n" +
-                        "  f32.demote_f64", "f32.sqrt"
-            )
-            // why ever these constructs exist...
-            txt = txt.replace(
-                "i32.ne\n" +
-                        "  (if (param i32) (result i32 i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "i32.eq"
-            )
-            txt = txt.replace(
-                "(if (result i32) (then\n" +
-                        "  i32.const 1\n" +
-                        ") (else\n" +
-                        "  i32.const 0\n" +
-                        "))", "i32.eqz i32.eqz"
-            )
+               txt = txt.replace("i32.load\n  drop", "drop")
+               txt = txt.replace("i64.load\n  drop", "drop")
+               txt = txt.replace("f32.load\n  drop", "drop")
+               txt = txt.replace("f64.load\n  drop", "drop")
+               // these two don't exist!
+               // txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
+               // txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
+               txt = txt.replace(
+                   "call \$dupi32 (if (param i32) (then i32.const 0 call \$swapi32i32 return) (else drop))\n" +
+                           "  i32.const 0\n" +
+                           "  return", "return"
+               )
+               txt = txt.replace(
+                   "f64.promote_f32\n" +
+                           "  f64.sqrt\n" +
+                           "  f32.demote_f64", "f32.sqrt"
+               )
+               // why ever these constructs exist...
+               txt = txt.replace(
+                   "i32.ne\n" +
+                           "  (if (param i32) (result i32 i32) (then\n" +
+                           "  i32.const 0\n" +
+                           ") (else\n" +
+                           "  i32.const 1\n" +
+                           "))", "i32.eq"
+               )
+               txt = txt.replace(
+                   "(if (result i32) (then\n" +
+                           "  i32.const 1\n" +
+                           ") (else\n" +
+                           "  i32.const 0\n" +
+                           "))", "i32.eqz i32.eqz"
+               )
 
-            txt = txt.replace(
-                "call \$fcmpl\n" +
-                        "  (if", "f32.ne\n  (if"
-            )
-            txt = txt.replace(
-                "call \$dcmpl\n" +
-                        "  (if", "f64.ne\n  (if"
-            )
-            txt = txt.replace(
-                "call \$fcmpg\n" +
-                        "  (if", "f32.ne\n  (if"
-            )
-            txt = txt.replace(
-                "call \$dcmpg\n" +
-                        "  (if", "f64.ne\n  (if"
-            )
+               txt = txt.replace(
+                   "call \$fcmpl\n" +
+                           "  (if", "f32.ne\n  (if"
+               )
+               txt = txt.replace(
+                   "call \$dcmpl\n" +
+                           "  (if", "f64.ne\n  (if"
+               )
+               txt = txt.replace(
+                   "call \$fcmpg\n" +
+                           "  (if", "f32.ne\n  (if"
+               )
+               txt = txt.replace(
+                   "call \$dcmpg\n" +
+                           "  (if", "f64.ne\n  (if"
+               )
 
-            txt = txt.replace(
-                "call \$fcmpl\n" +
-                        "  i32.eqz", "f32.eq"
-            )
-            txt = txt.replace(
-                "call \$dcmpl\n" +
-                        "  i32.eqz", "f64.eq"
-            )
-            txt = txt.replace(
-                "call \$fcmpg\n" +
-                        "  i32.eqz", "f32.eq"
-            )
-            txt = txt.replace(
-                "call \$dcmpg\n" +
-                        "  i32.eqz", "f64.eq"
-            )
-
+               txt = txt.replace(
+                   "call \$fcmpl\n" +
+                           "  i32.eqz", "f32.eq"
+               )
+               txt = txt.replace(
+                   "call \$dcmpl\n" +
+                           "  i32.eqz", "f64.eq"
+               )
+               txt = txt.replace(
+                   "call \$fcmpg\n" +
+                           "  i32.eqz", "f32.eq"
+               )
+               txt = txt.replace(
+                   "call \$dcmpg\n" +
+                           "  i32.eqz", "f64.eq"
+               )
+   */
             // then add the result to the actual printer
-            headPrinter.append(txt)
-            headPrinter.append(")\n")
+            // headPrinter.append(txt)
+            // headPrinter.append(")\n")
 
-            gIndex.translatedMethods[sig] = headPrinter.toString()
+            gIndex.translatedMethods[sig] = headPrinter1
         }
     }
 

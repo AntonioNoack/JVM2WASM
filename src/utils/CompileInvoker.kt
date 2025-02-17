@@ -25,7 +25,7 @@ fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.clazz): String? {
     return interfaces.firstNotNullOfOrNull { isUsedAsInterface(sig, it) }
 }
 
-val builder = Builder(512)
+val builder = StringBuilder2(512)
 fun printUsed(sig: MethodSig) {
     builder.append("  ").append(sig).append(":")
     if (sig in (hIndex.methods[sig.clazz] ?: emptySet())) builder.append(" known")

@@ -2,7 +2,6 @@ package translator
 
 import byteStrings
 import dependency.ActuallyUsedIndex
-import gIndex
 import hIndex
 import isRootType
 import jvm.JVM32.*
@@ -12,6 +11,9 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass1
 import utils.*
+import wasm.instr.ParamGet
+import wasm.parser.FunctionImpl
+import wasm.writer.Func
 
 object GeneratorIndex {
 
@@ -96,24 +98,18 @@ object GeneratorIndex {
         return wasmType
     }
 
-    val translatedMethods = HashMap<MethodSig, String>()
+    val translatedMethods = HashMap<MethodSig, FunctionImpl>()
 
-    data class NthGetter(val name: String, val method: String)
-
-    val nthGetterMethods = HashMap<List<String>, NthGetter>()
+    val nthGetterMethods = HashMap<List<String>, FunctionImpl>()
     fun getNth(typeStack: List<String>): String {
         return nthGetterMethods.getOrPut(typeStack) {
             val name = "getNth_${nthGetterMethods.size}"
-            val method = Builder(
-                "(func \$$name (param ${typeStack.joinToString(" ")}) " +
-                        "(result ${typeStack.joinToString(" ")} ${typeStack.first()})"
-            )
-            for (i in typeStack.indices) {
-                method.append(" local.get $i")
-            }
-            method.append(" local.get 0)\n") // the actual value, we're interested in
-            NthGetter(name, method.toString())
-        }.name
+            FunctionImpl(
+                    name, typeStack, typeStack + typeStack.first(),
+                    emptyList(), typeStack.indices.map { ParamGet(it) } + ParamGet(0),
+                    false
+                )
+        }.funcName
     }
 
     val usedDup_x1 = BooleanArray(16)
@@ -273,7 +269,7 @@ object GeneratorIndex {
     }
 
     val interfaceIndex = HashMap<InterfaceSig, Int>()
-    fun getInterfaceIndex(key:InterfaceSig): Int {
+    fun getInterfaceIndex(key: InterfaceSig): Int {
         // clazz isn't really needed, because there cannot be collisions
         return interfaceIndex.getOrPut(key) {
             // println("interface#${interfaceIndex.size} by $clazz: $name, $descriptor")

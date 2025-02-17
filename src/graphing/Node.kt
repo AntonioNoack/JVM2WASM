@@ -2,6 +2,7 @@ package graphing
 
 import org.objectweb.asm.Label
 import utils.Builder
+import wasm.instr.Comment
 
 class Node(val label: Label) {
 
@@ -22,16 +23,7 @@ class Node(val label: Label) {
     var printer = Builder(32)
 
     var hasNoCode = false
-    fun calcHasNoCode() = printer.length < 256 &&
-            printer.split('\n').all {
-                val ix = it.indexOf(";;")
-                if (ix >= 0) {
-                    it.substring(0, ix)
-                        .isBlank()
-                } else {
-                    it.isBlank()
-                }
-            }
+    fun calcHasNoCode(): Boolean = printer.instr.all { it is Comment }
 
     fun toString(mapper: (Label?) -> String): String {
         val name = mapper(label)

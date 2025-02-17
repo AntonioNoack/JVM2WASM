@@ -4,6 +4,7 @@ import hIndex
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
 import replaceClass1
+import wasm.instr.ConstType
 
 val f32 = "f32"
 val f64 = "f64"
@@ -79,12 +80,12 @@ fun split2(d: String, generics: Boolean = false): List<String> {
     return base
 }
 
-fun genericsTypies(sig: MethodSig): String {
-    return genericsTypies(sig.descriptor, sig in hIndex.staticMethods)
+fun genericsTypes(sig: MethodSig): String {
+    return genericsTypes(sig.descriptor, sig in hIndex.staticMethods)
 }
 
-fun genericsTypies(d: String, static: Boolean = true): String {
-    val result = Builder(d.length + 1)
+fun genericsTypes(d: String, static: Boolean = true): String {
+    val result = StringBuilder2(d.length + 1)
     if (!static) result.append('?')
     var i = 0
     while (i < d.length) {
@@ -117,7 +118,7 @@ fun genericsTypies(d: String, static: Boolean = true): String {
 }
 
 fun splitToType(d: String, canThrow: Boolean): String {
-    val result = Builder(d.length)
+    val result = StringBuilder2(d.length)
     result.append("\$")
     var i = 0
     while (i < d.length) {

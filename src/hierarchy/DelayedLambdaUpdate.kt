@@ -3,14 +3,14 @@ package hierarchy
 import dIndex
 import gIndex
 import hIndex
-import me.anno.utils.types.Booleans.hasFlag
-import utils.methodName2
 import org.objectweb.asm.Handle
-import org.objectweb.asm.Opcodes.ACC_INTERFACE
-import utils.split1
 import translator.MethodTranslator
 import utils.FieldSig
 import utils.MethodSig
+import utils.methodName2
+import utils.split1
+import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Instructions.Return
 
 class DelayedLambdaUpdate(
     private val source: String,
@@ -131,7 +131,7 @@ class DelayedLambdaUpdate(
 
         val print = false
 
-        printer.printer.append(";; synthetic lambda\n")
+        printer.printer.comment("synthetic lambda")
 
         if (print) {
             println()
@@ -150,11 +150,11 @@ class DelayedLambdaUpdate(
         if (needsSelf) {
             if (print) println("[0] += self")
             if (usesSelf) {
-                printer.printer.append(";; [0] += self\n")
+                printer.printer.comment("[0] += self")
                 printer.visitVarInsn(0x2a, 0) // local.get this
                 printer.visitFieldInsn2(0xb4, synthClassName, "self", "Ljava/lang/Object;", false) // get field
             } else {
-                printer.printer.append("  i32.const 0 ;; self, unused\n")
+                printer.printer.append(i32Const(0)).comment("self, unused")
             }
             if (!callingStatic) k--
         }
@@ -164,7 +164,7 @@ class DelayedLambdaUpdate(
             val fieldName = "f$i"
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[1] += $arg ($wanted)")
-            printer.printer.append(";; [1] += $arg\n")
+            printer.printer.comment("[1] += $arg\n")
             // load self for field
             printer.visitVarInsn(0x2a, 0) // local.get this
             printer.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
@@ -180,7 +180,7 @@ class DelayedLambdaUpdate(
             val arg = fields2[i]
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[2] += $arg ($wanted)")
-            printer.printer.append(";; [2] += $arg\n")
+            printer.printer.comment("[2] += $arg")
             val opcode = when (arg[0]) {
                 'Z', 'C', 'B', 'S', 'I' -> 0x15
                 'J' -> 0x16
@@ -239,7 +239,7 @@ class DelayedLambdaUpdate(
 
         if (!couldThrow) printer.visitLdcInsn(0) // calling this is easier than figuring our the return type for the correct return function
 
-        printer.printer.append("  return\n")
+        printer.printer.append(Return)
 
         printer.visitEnd()
 

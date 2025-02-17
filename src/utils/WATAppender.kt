@@ -11,7 +11,6 @@ import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
-import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import org.objectweb.asm.Opcodes.*
 import resources
@@ -452,7 +451,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                         }
                         if (print) println("[$clazz] $sig -> $impl")
                         // printUsed(impl)
-                        if (genericsTypies(sig) != genericsTypies(impl)) {
+                        if (genericsTypes(sig) != genericsTypes(impl)) {
                             println()
                             println("---")
                             printUsed(sig)
@@ -461,7 +460,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
                             println(methodName(impl))
                             throw IllegalStateException(
                                 "$sig cannot be linked to $impl, " +
-                                        "because ${genericsTypies(sig)} != ${genericsTypies(impl)}"
+                                        "because ${genericsTypes(sig)} != ${genericsTypes(impl)}"
                             )
                         }
                         implFunctions0[gIndex.getInterfaceIndex(InterfaceSig(sig))] = impl

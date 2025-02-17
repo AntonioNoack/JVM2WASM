@@ -29,6 +29,9 @@ import org.objectweb.asm.*
 import replaceClass1
 import resolvedMethods
 import translator.ClassTranslator
+import wasm.instr.Instruction
+import wasm.parser.FunctionImpl
+import wasm.parser.WATParser
 import java.io.IOException
 
 fun <V> eq(a: V, b: V) {
@@ -154,13 +157,13 @@ fun resolveGenericTypes() {
 
                 // first test, that there is valid candidates?
                 // same name, same number of params, not abstract
-                val typies = genericsTypies(method) // abstract method cannot be static
+                val typies = genericsTypes(method) // abstract method cannot be static
                 val candidates = baseMethods.filter {
                     it.name == method.name &&
                             it.descriptor != method.descriptor &&
                             it !in hIndex.abstractMethods &&
                             // test for same number of arguments & same-typy return type
-                            genericsTypies(it) == typies
+                            genericsTypes(it) == typies
                 }
                 if (candidates.isNotEmpty()) {
 
@@ -222,7 +225,7 @@ fun resolveGenericTypes() {
                     }
 
                     // generate a new signature
-                    val newDescBuilder = Builder(mappedDesc.sumOf { it.length } + 2)
+                    val newDescBuilder = StringBuilder2(mappedDesc.sumOf { it.length } + 2)
                     newDescBuilder.append('(')
                     for (j in 0 until mappedDesc.size - 1) {
                         newDescBuilder.append(mappedDesc[j])
@@ -426,16 +429,21 @@ fun assignNativeCode() {
         .mapNotNull { m ->
             val wasm = m.value.firstOrNull { it.clazz == "annotations/WASM" }
             if (wasm != null)
-                Triple(m.key, wasm.properties["code"] as String,
+                Triple(
+                    m.key, wasm.properties["code"] as String,
                     m.value.any { it.clazz == "annotations/NoInline" })
             else null
         }) {
         if (noinline) {
-            hIndex.wasmNative[method] = code
+            hIndex.wasmNative[method] = parseInlineWASM(code)
         } else {
-            hIndex.inlined[method] = code
+            hIndex.inlined[method] = parseInlineWASM(code)
         }
     }
+}
+
+fun parseInlineWASM(code: String): List<Instruction> {
+    return WATParser().parseExpression(code)
 }
 
 fun generateJavaScriptFile(missingMethods: HashSet<MethodSig>): Map<String, Pair<MethodSig, String>> {
@@ -771,14 +779,11 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
     return dynIndex
 }
 
-val helperFunctions = HashMap<String, StringBuilder2>()
+val helperFunctions = HashMap<String, FunctionImpl>()
 
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
     println("[printMethodImplementations]")
-    bodyPrinter.ensureExtra(gIndex.translatedMethods
-        .filter { methodName(it.key) in usedMethods }
-        .values.sumOf { it.length })
-    for ((sig, impl) in gIndex.translatedMethods.entries.sortedBy { it.value }) {
+    for ((sig, impl) in gIndex.translatedMethods) {
         val name = methodName(sig)
         // not truly used, even tho marked as such...
         if (name in usedMethods) {

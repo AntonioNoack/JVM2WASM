@@ -67,6 +67,10 @@ object Instructions {
     val F32_CONVERT_I64S = UnaryInstruction2("f32.convert_i64_s", "static_cast<f32>(", ")", "i64")
     val F64_CONVERT_I32S = UnaryInstruction2("f64.convert_i32_s", "static_cast<f64>(", ")", "i32")
     val F64_CONVERT_I64S = UnaryInstruction2("f64.convert_i64_s", "static_cast<f64>(", ")", "i64")
+
+    val F64_CONVERT_I32U = UnaryInstruction2("f64.convert_i32_u", "static_cast<f64>(", ")", "i32")
+    val F64_CONVERT_I64U = UnaryInstruction2("f64.convert_i64_u", "static_cast<f64>(", ")", "i64")
+
     val I32_REINTERPRET_F32 = UnaryInstruction2("i32.reinterpret_f32", "std::bit_cast<i32>(", ")", "f32")
     val F32_REINTERPRET_I32 = UnaryInstruction2("f32.reinterpret_i32", "std::bit_cast<f32>(", ")", "i32")
     val I64_REINTERPRET_F64 = UnaryInstruction2("i64.reinterpret_f64", "std::bit_cast<i64>(", ")", "f64")

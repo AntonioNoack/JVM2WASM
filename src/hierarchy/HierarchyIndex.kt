@@ -5,6 +5,7 @@ import org.objectweb.asm.Opcodes.*
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
+import wasm.instr.Instruction
 
 object HierarchyIndex {
 
@@ -60,8 +61,8 @@ object HierarchyIndex {
         childClasses.getOrPut(superClazz, ::HashSet).add(clazz)
     }
 
-    val inlined = HashMap<MethodSig, String>(cap2)
-    val wasmNative = HashMap<MethodSig, String>(cap2)
+    val inlined = HashMap<MethodSig, List<Instruction>>(cap2)
+    val wasmNative = HashMap<MethodSig, List<Instruction>>(cap2)
 
     val syntheticClasses = HashSet<String>(cap2)
 

@@ -87,24 +87,6 @@ class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
         return this
     }
 
-    fun prepend(str: StringBuilder2): StringBuilder2 {
-        return prepend(str.values, str.length)
-    }
-
-    fun prepend(str: String): StringBuilder2 {
-        val data = str.toByteArray()
-        return prepend(data, str.length)
-    }
-
-    private fun prepend(data: ByteArray, strLength: Int): StringBuilder2 {
-        ensureExtra(strLength)
-        val values = values
-        System.arraycopy(values, 0, values, strLength, length) // move back
-        System.arraycopy(data, 0, values, 0, strLength) // insert new data
-        size += strLength
-        return this
-    }
-
     fun append(any: Any): StringBuilder2 {
         return append(any.toString())
     }

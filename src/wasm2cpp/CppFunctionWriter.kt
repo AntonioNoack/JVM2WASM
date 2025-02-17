@@ -291,19 +291,18 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             }
             is Const -> {
                 when (i.type) {
-                    "f32" -> push(i.type, makeFloat(i.value) + "f")
-                    "f64" -> push(i.type, makeFloat(i.value))
-                    "i32" -> {
+                    ConstType.F32 -> push(i.type.name1, makeFloat(i.value) + "f")
+                    ConstType.F64 -> push(i.type.name1, makeFloat(i.value))
+                    ConstType.I32 -> {
                         val v = if (i.value == "-2147483648") "(i32)(1u << 31)"
                         else i.value
-                        push(i.type, v)
+                        push(i.type.name1, v)
                     }
-                    "i64" -> {
+                    ConstType.I64 -> {
                         val v = if (i.value == "-9223372036854775808") "(i64)(1llu << 63)"
                         else i.value + "ll"
-                        push(i.type, v)
+                        push(i.type.name1, v)
                     }
-                    else -> push(i.type, i.value)
                 }
             }
             is UnaryInstruction -> {
@@ -525,7 +524,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             if (last != Unreachable) {
                 assertTrue(last is LocalSet && last.name == "lbl")
                 val preLast = instructions[instructions.size - (skipped + 1)]
-                assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == "i32"))
+                assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == ConstType.I32))
                 // find end:
                 //   - i32.const 2 local.set $lbl
                 //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl

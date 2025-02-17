@@ -6,12 +6,16 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.types.Strings.indexOf2
 import wasm.instr.*
+import wasm.instr.Const.Companion.f32Const
+import wasm.instr.Const.Companion.f64Const
+import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Const.Companion.i64Const
 import wasm.instr.SimpleInstr.Companion.simpleInstructions
 import kotlin.math.min
 
 class WATParser {
 
-    var memorySizeInBlocks = -1
+    private var memorySizeInBlocks = -1
     val imports = ArrayList<Import>()
     val dataSections = ArrayList<DataSection>()
     val functionTable = ArrayList<String>()
@@ -27,6 +31,11 @@ class WATParser {
         // parse it
         val endI = parseBlock(tokens, 0)
         assertEquals(tokens.size, endI)
+    }
+
+    fun parseExpression(text: String): List<Instruction> {
+        val tokens = parseTokens(text)
+        return parseFunctionBlock(tokens, 0).instructions
     }
 
     private fun parseTokens(text: String): TokenList {
@@ -91,7 +100,7 @@ class WATParser {
         return list
     }
 
-    fun parseBlock(list: TokenList, i0: Int): Int {
+    private fun parseBlock(list: TokenList, i0: Int): Int {
         assertEquals(TokenType.OPEN_BRACKET, list.getType(i0))
         var i = i0 + 1
         while (true) {
@@ -274,7 +283,7 @@ class WATParser {
     private fun parseFunctionBlock(list: TokenList, i0: Int): FunctionBlock {
         val result = ArrayList<Instruction>()
         var i = i0
-        while (true) {
+        while (i < list.size) {
             when (list.getType(i)) {
                 TokenType.NAME -> {
                     when (val instrName = list.getString(i++)) {
@@ -294,10 +303,10 @@ class WATParser {
                         }
                         "global.get" -> result.add(GlobalGet(list.consume(TokenType.DOLLAR, i++)))
                         "global.set" -> result.add(GlobalSet(list.consume(TokenType.DOLLAR, i++)))
-                        "i32.const" -> result.add(Const("i32", list.consume(TokenType.NUMBER, i++)))
-                        "i64.const" -> result.add(Const("i64", list.consume(TokenType.NUMBER, i++)))
-                        "f32.const" -> result.add(Const("f32", list.consume(TokenType.NUMBER, i++)))
-                        "f64.const" -> result.add(Const("f64", list.consume(TokenType.NUMBER, i++)))
+                        "i32.const" -> result.add(i32Const(list.consume(TokenType.NUMBER, i++)))
+                        "i64.const" -> result.add(i64Const(list.consume(TokenType.NUMBER, i++)))
+                        "f32.const" -> result.add(f32Const(list.consume(TokenType.NUMBER, i++)))
+                        "f64.const" -> result.add(f64Const(list.consume(TokenType.NUMBER, i++)))
                         "call" -> result.add(Call(list.consume(TokenType.DOLLAR, i++)))
                         "call_indirect" -> {
                             // call_indirect (type $fR00)
@@ -411,6 +420,7 @@ class WATParser {
                 else -> throw IllegalStateException("Unexpected ${list.getType(i)} in function block")
             }
         }
+        return FunctionBlock(list.size, result)
     }
 
 }

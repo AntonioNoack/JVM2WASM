@@ -58,4 +58,8 @@ class TokenList(val text: String) {
         assertEquals(type, getType(i))
         return getString(i)
     }
+
+    override fun toString(): String {
+        return subList(0, size).toString()
+    }
 }

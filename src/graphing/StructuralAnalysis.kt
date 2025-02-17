@@ -1,11 +1,29 @@
 package graphing
 
-import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
 import utils.Builder
 import utils.MethodSig
 import utils.methodName
+import wasm.instr.*
+import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Instructions.Drop
+import wasm.instr.Instructions.I32EQ
+import wasm.instr.Instructions.I32EQZ
+import wasm.instr.Instructions.I32GES
+import wasm.instr.Instructions.I32GTS
+import wasm.instr.Instructions.I32LES
+import wasm.instr.Instructions.I32LTS
+import wasm.instr.Instructions.I32NE
+import wasm.instr.Instructions.I64EQ
+import wasm.instr.Instructions.I64GES
+import wasm.instr.Instructions.I64GTS
+import wasm.instr.Instructions.I64LES
+import wasm.instr.Instructions.I64LTS
+import wasm.instr.Instructions.I64NE
+import wasm.instr.Instructions.Return
+import wasm.instr.Instructions.Unreachable
+import wasm.parser.LocalVariable
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
@@ -19,48 +37,6 @@ object StructuralAnalysis {
     var printOps = prettyPrint
     var ignoreSize = false
     var compactStatePrinting = true
-
-    private fun Builder.appendIndent(str: Builder): Builder {
-        try {
-            if (prettyPrint) {
-                for ((idx, line) in str.split('\n').withIndex()) {
-                    if (idx > 0) append('\n')
-                    append("  ").append(line)
-                }
-            } else append(str)
-        } catch (e: OutOfMemoryError) {
-            val runtime = Runtime.getRuntime()
-            println(
-                "used: ${(runtime.totalMemory() - runtime.freeMemory()).formatFileSize(1024)}, " +
-                        "free: ${runtime.freeMemory().formatFileSize(1024)}, " +
-                        "length: ${length.toLong().formatFileSize(1024)}, " +
-                        "to append: ${str.length.toLong().formatFileSize(1024)}"
-            )
-            throw e
-        }
-        return this
-    }
-
-    private fun Builder.appendIndent2(str: Builder): Builder {
-        try {
-            if (prettyPrint) {
-                for ((idx, line) in str.split('\n').withIndex()) {
-                    if (idx > 0) append('\n')
-                    append("    ").append(line)
-                }
-            } else append(str)
-        } catch (e: OutOfMemoryError) {
-            val runtime = Runtime.getRuntime()
-            println(
-                "used: ${(runtime.totalMemory() - runtime.freeMemory()).formatFileSize(1024)}, " +
-                        "free: ${runtime.freeMemory().formatFileSize(1024)}, " +
-                        "length: ${length.toLong().formatFileSize(1024)}, " +
-                        "to append: ${str.length.toLong().formatFileSize(1024)}"
-            )
-            throw e
-        }
-        return this
-    }
 
     var lastSize = 0
 
@@ -85,11 +61,11 @@ object StructuralAnalysis {
                     }, ${node.inputStack} -> ${node.outputStack}"
                 )
                 printLine("")
-                for (line in node.printer.split('\n')) {
+                for (line in node.printer.instr) {
                     var ln = line
-                    for (node1 in nodes) {
-                        ln = ln.replace(node1.label.toString(), "[${node1.index}]")
-                    }
+                    //for (node1 in nodes) {
+                    //    ln = ln.replace(node1.label.toString(), "[${node1.index}]")
+                    //}
                     printLine("             $ln")
                 }
             }
@@ -133,9 +109,9 @@ object StructuralAnalysis {
         for (node in nodes) {
             node.hasNoCode = node.calcHasNoCode()
             if (node.isBranch) {
-                while (node.printer.endsWith("i32.eqz\n")) {// remove unnecessary null check before branch
-                    node.printer.size -= "i32.eqz\n".length
-                    while (node.printer.endsWith(" ")) node.printer.size-- // remove spaces
+                while (node.printer.endsWith(I32EQZ)) {// remove unnecessary null check before branch
+                    node.printer.instr.removeLast()
+                    // while (node.printer.endsWith(" ")) node.printer.size-- // remove spaces
                     val t = node.ifTrue!!
                     val f = node.ifFalse!!
                     node.ifTrue = f.label
@@ -307,76 +283,38 @@ object StructuralAnalysis {
 
             var changed2 = false
 
-            fun Builder.blockParams(inputs: List<String>?, outputs: List<String>?, postfix: String): Builder {
-                // write params and result
-                if (inputs?.isNotEmpty() == true) {
-                    append(" (param")
-                    for (input in inputs) {
-                        append(' ')
-                        append(input)
-                    }
-                    append(')')
-                }
-                if (outputs != null) {
-                    append(" (result")
-                    for (output in outputs) {
-                        append(' ')
-                        append(output)
-                    }
-                    append(')')
-                }// else if(printOps) append(";; no return values found in ${node.index}\n")
-                append(" ")
-                append(postfix)
-                append('\n')
-                return this
+            fun blockParamsGetParams(from: Node): List<String> {
+                return from.inputStack!!
             }
 
-            fun Builder.blockParams(from: Node, to: Node?, postfix: String, id: String): Builder {
-                // write params and result
-                if (from.inputStack?.isNotEmpty() == true) {
-                    append(" (param")
-                    for (input in from.inputStack!!) {
-                        append(' ')
-                        append(input)
-                    }
-                    append(')')
-                }
+            fun blockParamsGetResult(from: Node, to: Node?): List<String> {
                 if (to == null) {
                     // output must be equal to input
                     if (from.inputStack?.isNotEmpty() == true) {
-                        append(" (result")
-                        for (input in from.inputStack!!) {
-                            append(' ')
-                            append(input)
-                        }
-                        append(')')
+                        return from.inputStack!!
                     }
                 } else if (from.outputStack?.isNotEmpty() == true) {
                     if (!from.isReturn) {
-                        append(" (result")
-                        for (output in from.outputStack!!) {
-                            append(' ')
-                            append(output)
-                        }
-                        append(')')
-                    } else if (printOps) append(";; skipped return, because exit\n")
+                        return from.outputStack!!
+                    }
                 }// else if(printOps) append(";; no return values found in ${node.index}\n")
-                append(" ")
-                append(postfix)
-                append('\n')
-                return this
+                return emptyList()
             }
 
             fun makeNodeLoop(node: Node) {
                 val newPrinter = Builder(node.printer.length + 32)
                 val loopIdx = loopIndex++
-                newPrinter.append("  (loop \$b$loopIdx")
-                    .blockParams(node, null, "", "l308")
-                    .appendIndent(node.printer)
-                    .append("br \$b$loopIdx)\n")
+                val label = "b$loopIdx"
+                node.printer.instr.add(Jump(label))
+                newPrinter.append(
+                    LoopInstr(
+                        label, ArrayList(node.printer.instr),
+                        blockParamsGetResult(node, null)
+                    )
+                )
                 node.printer.clear()
                 node.printer.append(newPrinter)
-                node.printer.append("  unreachable\n")
+                node.printer.append(Unreachable)
                 node.isAlwaysTrue = false
                 node.ifTrue = null
                 node.ifFalse = null
@@ -390,7 +328,7 @@ object StructuralAnalysis {
             for (node in nodes) {
                 if (node.ifTrue == node.ifFalse?.label && node.ifTrue != null) {
                     node.ifTrue = null
-                    node.printer.append("  drop ;; ifTrue == ifFalse\n")
+                    node.printer.append(Drop).comment("ifTrue == ifFalse")
                     val ifFalse = node.ifFalse!!.inputs
                     ifFalse.remove(node)
                     ifFalse.remove(node)
@@ -519,17 +457,20 @@ object StructuralAnalysis {
                             (ignoreSize || (b0.inputs.size == 1 && b1.inputs.size == 1))
                         ) {
                             if (node === b0 || node === b1) throw IllegalStateException()
+
                             // join nodes
-                            node.printer.append("  (if")
-                                .blockParams(b1, b0, "(then", "l457")
-                                .appendIndent(b1.printer)
-                                .append(") (else\n")
-                                .appendIndent(b0.printer)
-                                .append("))\n")
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b1.printer.instr), ArrayList(b0.printer.instr),
+                                    blockParamsGetParams(b1),
+                                    blockParamsGetResult(b1, b0)
+                                )
+                            )
+
                             if (b1.isReturn && b0.isReturn &&
-                                !node.printer.endsWith("return\n") &&
-                                !node.printer.endsWith("unreachable\n")
-                            ) node.printer.append("  unreachable\n")
+                                !node.printer.endsWith(Return) &&
+                                !node.printer.endsWith(Unreachable)
+                            ) node.printer.append(Unreachable)
                             b0.inputs.remove(node)
                             b1.inputs.remove(node)
                             if (b0.inputs.isEmpty()) {
@@ -553,11 +494,16 @@ object StructuralAnalysis {
                         } else if (b0.isReturn && (ignoreSize || b0.inputs.size == 1)) {
                             // remove this branch
                             if (node === b0) throw IllegalStateException()
-                            node.printer.append("  i32.eqz\n")
-                            node.printer.append("  (if")
-                                .blockParams(b0, null, "(then", "l491")
-                                .appendIndent(b0.printer)
-                                .append("))\n")
+                            node.printer.append(I32EQZ)
+
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b0.printer.instr), emptyList(),
+                                    blockParamsGetParams(b0),
+                                    blockParamsGetResult(b0, null)
+                                )
+                            )
+
                             b0.inputs.remove(node)
                             if (b0.inputs.isEmpty()) {
                                 nodes.remove(b0)
@@ -575,10 +521,15 @@ object StructuralAnalysis {
                         } else if (b1.isReturn && (ignoreSize || b1.inputs.size == 1)) {
                             // remove this branch
                             if (node === b1) throw IllegalStateException()
-                            node.printer.append("  (if")
-                                .blockParams(b1, null, "(then", "l512")
-                                .appendIndent(b1.printer)
-                                .append(") (else))\n")
+
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b1.printer.instr), emptyList(),
+                                    blockParamsGetParams(b1),
+                                    blockParamsGetResult(b1, null)
+                                )
+                            )
+
                             b1.inputs.remove(node)
                             if (b1.inputs.isEmpty()) {
                                 nodes.remove(b1)
@@ -629,10 +580,14 @@ object StructuralAnalysis {
                             // loop(A, if() else break)
                             val printer = Builder(node.printer.length + 20)
                             val loopIdx = loopIndex++
-                            printer.append("  (loop \$b$loopIdx")
-                                .blockParams(node, null, "", "l566")
-                                .appendIndent(node.printer)
-                                .append("br_if \$b$loopIdx)\n")
+                            val label = "b$loopIdx"
+                            node.printer.append(JumpIf(label))
+                            printer.append(
+                                LoopInstr(
+                                    label, ArrayList(node.printer.instr),
+                                    blockParamsGetResult(node, null)
+                                )
+                            )
                             node.printer.clear()
                             node.printer.append(printer)
                             node.inputs.remove(node)
@@ -645,10 +600,16 @@ object StructuralAnalysis {
                             // loop(A, if() break)
                             val printer = Builder(node.printer.length + 20)
                             val loopIdx = loopIndex++
-                            printer.append("  (loop \$b$loopIdx")
-                                .blockParams(node, null, "", "l582")
-                                .appendIndent(node.printer)
-                                .append("i32.eqz br_if \$b$loopIdx)")
+                            val label = "b$loopIdx"
+                            node.printer
+                                .append(I32EQZ)
+                                .append(JumpIf(label))
+                            printer.append(
+                                LoopInstr(
+                                    label, ArrayList(node.printer.instr),
+                                    blockParamsGetResult(node, null)
+                                )
+                            )
                             node.printer.clear()
                             node.printer.append(printer)
                             node.inputs.remove(node)
@@ -677,11 +638,16 @@ object StructuralAnalysis {
                         if (!b0.isBranch && b0.inputs.size == 1 && b0.next == b1.label) {
                             // we can make b0 an optional part of node
                             if (node === b0) throw IllegalStateException()
-                            node.printer.append("  i32.eqz\n")
-                            node.printer.append("  (if")
-                                .blockParams(b0, null, "(then", "l615")
-                                .appendIndent(b0.printer)
-                                .append("))\n")
+                            node.printer.append(I32EQZ)
+
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b0.printer.instr), emptyList(),
+                                    blockParamsGetParams(b0),
+                                    blockParamsGetResult(b0, null)
+                                )
+                            )
+
                             nodes.remove(b0)
                             b1.inputs.remove(b0)
                             // node no longer is a branch
@@ -697,10 +663,15 @@ object StructuralAnalysis {
                         } else if (!b1.isBranch && b1.inputs.size == 1 && b1.next == b0.label) {
                             // we can make b1 optional
                             if (node === b1) throw IllegalStateException()
-                            node.printer.append("  (if")
-                                .blockParams(b1, null, "(then", "l634")
-                                .appendIndent(b1.printer)
-                                .append(") (else))\n")
+
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b1.printer.instr), emptyList(),
+                                    blockParamsGetParams(b1),
+                                    blockParamsGetResult(b1, null)
+                                )
+                            )
+
                             nodes.remove(b1)
                             b0.inputs.remove(b1)
                             if (printOps) println("-${b1.index} by 11")
@@ -731,18 +702,20 @@ object StructuralAnalysis {
                         ) {
                             // make node into a loop, which branches into b0/b1
                             if (node === b0 || node === b1) throw IllegalStateException()
-                            node.printer
-                                .append("  (if")
-                                .blockParams(b1, b0, "(then", "l669")
-                                .appendIndent(b1.printer)
-                                .append(") (else\n")
-                                .appendIndent(b0.printer)
-                                .append("))\n")
+
+                            node.printer.append(
+                                IfBranch(
+                                    ArrayList(b1.printer.instr), ArrayList(b0.printer.instr),
+                                    blockParamsGetParams(b1),
+                                    blockParamsGetResult(b1, b0)
+                                )
+                            )
+
                             if (b1.isReturn && b0.isReturn &&
-                                !node.printer.endsWith("return\n") &&
-                                !node.printer.endsWith("unreachable\n")
+                                !node.printer.endsWith(Return) &&
+                                !node.printer.endsWith(Unreachable)
                             ) {
-                                node.printer.append("  unreachable\n")
+                                node.printer.append(Unreachable)
                             }
                             val end = labelToNode[b0.next]!!
                             node.ifFalse = end
@@ -826,15 +799,23 @@ object StructuralAnalysis {
 
                             val newPrinter = Builder(nA.printer.length + insideLoop.printer.length + 32)
                             val loopIdx = loopIndex++
-                            newPrinter.append("  (loop \$b$loopIdx")
-                                .blockParams(nA.inputStack, nA.outputStack, "")
-                                .appendIndent(nA.printer)
+                            val label = "b$loopIdx"
+                            if (negate) insideLoop.printer.append(I32EQZ)
+                            insideLoop.printer.append(Jump(label))
+                            nA.printer.append(
+                                IfBranch(
+                                    ArrayList(insideLoop.printer.instr), emptyList(),
+                                    blockParamsGetParams(insideLoop),
+                                    blockParamsGetResult(insideLoop, null)
+                                )
+                            )
+                            newPrinter.append(
+                                LoopInstr(
+                                    label, ArrayList(nA.printer.instr),
+                                    blockParamsGetResult(nA, null)
+                                )
+                            )
                             nA.printer = newPrinter // replace for speed :)
-                            if (negate) nA.printer.append("  i32.eqz\n")
-                            nA.printer.append("  (if")
-                                .blockParams(insideLoop.inputStack, insideLoop.inputStack, "(then")
-                                .appendIndent2(insideLoop.printer)
-                                .append("  br \$b$loopIdx)))\n")
                             nA.ifTrue = null
                             nA.ifFalse = other
                             nA.inputs.remove(insideLoop) // it no longer links to next
@@ -859,140 +840,6 @@ object StructuralAnalysis {
             } while (changed)
 
             checkState()
-
-            // code duplication :/ ; only allowed for short methods
-            if (false) if (nodes.sumOf { it.printer.length } < 1024) for (i in nodes.indices.reversed()) { // prefer later nodes first
-                val node = nodes.getOrNull(i) ?: break
-                if (node.isBranch) {
-                    // check if there is a branch, where all sub-branches have the same exit
-                    var exit: Label? = null
-                    try {
-                        val doneNodes = HashSet<Node>() // because we can have loops
-                        fun hasSameExit(node: Node) {
-                            if (node.isReturn) {
-                                if (exit == node.label)
-                                    return // ok, same exit :)
-                                if (exit == null) {
-                                    exit = node.label // ok, found first exit
-                                    return
-                                }
-                                throw FoundEnd // no
-                            }
-                            val b1 = labelToNode[node.ifTrue]
-                            if (b1 != null && doneNodes.add(b1)) {
-                                hasSameExit(b1)
-                            }
-                            val b0 = node.ifFalse
-                            if (b0 != null && doneNodes.add(b0)) {
-                                hasSameExit(b0)
-                            }
-                        }
-                        hasSameExit(node.ifFalse!!)
-                        val falseSize = doneNodes.size
-                        doneNodes.clear()
-                        hasSameExit(labelToNode[node.ifTrue]!!)
-                        if (exit == null) {
-                            println("no exit found -> infinity loop?")
-                            throw FoundEnd
-                        }
-
-                        val trueSize = doneNodes.size
-
-                        fun createNewNode(oldNode: Node, mapping: HashMap<Label, Label>): Node {
-                            val label = Label()
-                            val newNode = Node(label)
-                            mapping[label] = label
-                            mapping[oldNode.label] = label
-                            labelToNode[label] = newNode
-                            newNode.index = nextNodeIndex++
-                            newNode.hasNoCode = oldNode.hasNoCode
-                            // if (nextNodeIndex > 240) throw IllegalStateException()
-                            nodes.add(newNode)
-                            return newNode
-                        }
-
-                        // if so, break up that branch by copy/paste
-                        fun copyWithNewLabels1(oldNode: Node?, mapping: HashMap<Label, Label>): Node? {
-                            if (oldNode == null) return null
-                            if (oldNode.label in mapping) return oldNode // done :)
-
-                            // not done, generate new node with new label
-                            val newNode = createNewNode(oldNode, mapping)
-
-                            // replace all references
-                            newNode.ifFalse =
-                                if (oldNode.ifFalse != null) copyWithNewLabels1(oldNode.ifFalse, mapping) else null
-                            newNode.ifTrue =
-                                if (oldNode.ifTrue != null) copyWithNewLabels1(
-                                    labelToNode[oldNode.ifTrue]!!,
-                                    mapping
-                                )!!.label else null
-                            // copy all data
-                            newNode.isAlwaysTrue = oldNode.isAlwaysTrue
-                            newNode.isReturn = oldNode.isReturn
-                            newNode.inputStack = oldNode.inputStack
-                            newNode.outputStack = oldNode.outputStack
-                            newNode.printer.append(oldNode.printer)
-                            return newNode
-                        }
-
-                        // if so, break up that branch by copy/paste
-                        fun copyWithNewLabels2(newNode: Node, mapping: HashMap<Label, Label>): Node {
-                            mapping[newNode.label] = newNode.label
-                            // not done, generate new node with new label
-                            // replace all references
-                            newNode.ifFalse =
-                                if (newNode.ifFalse != null) copyWithNewLabels1(newNode.ifFalse, mapping) else null
-                            newNode.ifTrue =
-                                if (newNode.ifTrue != null) copyWithNewLabels1(
-                                    labelToNode[newNode.ifTrue]!!,
-                                    mapping
-                                )!!.label else null
-                            // copy all data
-                            newNode.isAlwaysTrue = newNode.isAlwaysTrue
-                            newNode.isReturn = newNode.isReturn
-                            newNode.inputStack = newNode.inputStack
-                            newNode.outputStack = newNode.outputStack
-                            return newNode
-                        }
-
-                        if (printOps) println("breaking up branches at [${node.index}]")
-                        // printState()
-                        val mapping = HashMap<Label, Label>()
-                        // break up node by copying a branch
-                        val newNode: Node
-                        val oldNode: Node
-                        if (trueSize <= falseSize) {
-                            // copy true
-                            oldNode = labelToNode[node.ifTrue]!!
-                            newNode = if (oldNode.inputs.size == 1) {
-                                copyWithNewLabels2(oldNode, mapping)
-                            } else {
-                                copyWithNewLabels1(oldNode, mapping)!!
-                            }
-                            node.ifTrue = newNode.label
-                        } else {
-                            // copy false
-                            oldNode = node.ifFalse!!
-                            newNode = if (oldNode.inputs.size == 1) {
-                                copyWithNewLabels2(oldNode, mapping)
-                            } else {
-                                copyWithNewLabels1(oldNode, mapping)!!
-                            }
-                            node.ifFalse = newNode
-                        }
-
-                        // better than worrying about logic and correctness ^^
-                        recalculateInputs()
-
-                        changed2 = true
-                        if (printOps) printState()
-
-                    } catch (ignored: FoundEnd) {
-                        // no, this branch has multiple exits
-                    }
-                }
-            }
 
             if (changed2) continue
 
@@ -1021,13 +868,16 @@ object StructuralAnalysis {
     }
 
     val equalPairs = arrayOf(
-        "i32.lt_s\n", "i32.ge_s\n",
-        "i32.le_s\n", "i32.gt_s\n",
+        I32LTS, I32GES,
+        I32LES, I32GTS,
+
         // todo why is this an issue?
         // "i32.eq\n", "i32.ne\n",
-        "i64.lt_s\n", "i64.ge_s\n",
-        "i64.le_s\n", "i64.gt_s\n",
-        "i64.eq\n", "i64.ne\n",
+        I32EQ, I32NE,
+
+        I64LTS, I64GES,
+        I64LES, I64GTS,
+        I64EQ, I64NE,
         // nez doesn't exist :/
         // "i32.eqz\n", "i32.nez\n",
         // "i64.eqz\n", "i64.nez\n",
@@ -1055,20 +905,19 @@ object StructuralAnalysis {
         node.ifTrue = ifFalse.label
         node.ifFalse = ifTrue
         // swap conditional
-        fun replace(a: String, b: String) {
-            printer.size -= a.length
+        fun replaceLast(b: Instruction) {
+            printer.instr.removeLast()
             printer.append(b)
-            printer.size--
-            printer.append(" ;; xxx\n")
+            printer.comment("xxx")
         }
         for (i in equalPairs.indices step 2) {
             val a = equalPairs[i]
             val b = equalPairs[i + 1]
             if (printer.endsWith(a)) {
-                replace(a, b)
+                replaceLast(b)
                 return
             } else if (printer.endsWith(b)) {
-                replace(b, a)
+                replaceLast(a)
                 return
             }
         }
@@ -1079,7 +928,7 @@ object StructuralAnalysis {
              return
          }*/
         // negation :)
-        printer.append("  i32.eqz ;; xxx\n")
+        printer.append(I32EQZ)
     }
 
     private fun graphId(sig: MethodSig, nodes: List<Node>, labelToNode: Map<Label, Node>): String {
@@ -1135,15 +984,10 @@ object StructuralAnalysis {
 
     private fun createLargeSwitchStatement(sig: MethodSig, nodes0: List<Node>, labelToNode: Map<Label, Node>): String {
         val vs = StackVariables()
-        vs.varPrinter.append("(local \$lbl i32)\n")
-        if (true) {
-            val code = createLargeSwitchStatement1(sig, nodes0, labelToNode, vs)
-            for (i in code.lastIndex downTo 0) {
-                vs.varPrinter.append(code[i])
-            }
-        } else {
-            val code = createLargeSwitchStatement2(sig, nodes0, labelToNode, null, vs)
-            vs.varPrinter.append(code)
+        vs.varPrinter.localVariables.add(LocalVariable("lbl", "i32"))
+        val code = createLargeSwitchStatement1(sig, nodes0, labelToNode, vs)
+        for (i in code.lastIndex downTo 0) {
+            vs.varPrinter.append(code[i])
         }
         return vs.varPrinter.toString()
     }
@@ -1193,37 +1037,32 @@ object StructuralAnalysis {
 
         val printer = Builder(nodes.sumOf { it.printer.length + 20 })
         fun finishBlock(node: Node) {
+            val printer = node.printer
             if (node.isReturn) {
-                printer.append("unreachable\n")
+                printer.append(Unreachable)
             } else {
                 // todo if either one is exitNode, jump to end of switch() block
                 if (node.isBranch) {
                     // set end label
                     val trueIndex = labelToNode[node.ifTrue]!!.index
                     val falseIndex = node.ifFalse!!.index
-                    // todo check, which one is faster ^^ (no, implement the paper, so we don't have to use hundreds of switch-statements)
-                    if (false) {// use a "branch-less" formula ^^, probably useless
-                        printer.append("  i32.const 0 i32.ne i32.const ").append(trueIndex - falseIndex)
-                            .append(" i32.mul i32.const ").append(falseIndex)
-                            .append(" i32.add local.set \$lbl\n")
-                    } else {
-                        printer.append("  (if (result i32) (then i32.const ")
-                            .append(trueIndex)
-                            .append(") (else i32.const ")
-                            .append(falseIndex)
-                            .append(")) local.set \$lbl\n")
-                    }
+                    printer.append(
+                        IfBranch(
+                            listOf(i32Const(trueIndex)),
+                            listOf(i32Const(falseIndex)), emptyList(), listOf("i32")
+                        )
+                    ).append(LocalSet("lbl"))
                 } else {
                     // set end label
                     val next = labelToNode[node.next]!!.index
-                    printer.append("  i32.const ").append(next).append(" local.set \$lbl\n")
+                    printer.append(i32Const(next)).append(LocalSet("lbl"))
                 }
                 // store stack
                 val outputs = node.outputStack
                 if (!outputs.isNullOrEmpty()) {
-                    if (comments) printer.append("  ;; store stack\n")
+                    if (comments) printer.comment("store stack")
                     for ((idx, type) in outputs.withIndex().reversed()) {
-                        printer.append("  local.set ").append(vars.getStackVarName(idx, type)).append('\n')
+                        printer.append(LocalSet(vars.getStackVarName(idx, type)))
                     }
                 }
             }
@@ -1232,81 +1071,58 @@ object StructuralAnalysis {
         val loopIdx = loopIndex++
 
         if (firstIsLinear) {
-            if (comments) printer.append("  ;; execute -1\n")
-            printer.append(firstNode.printer, 0)
+            if (comments) printer.comment("execute -1")
+            printer.prepend(firstNode.printer)
             finishBlock(firstNode)
         } else {
-            printer.append("i32.const ")
-                .append(nodes.first().index)
-                .append(" local.set \$lbl\n")
+            printer
+                .append(i32Const(nodes.first().index))
+                .append(LocalSet("lbl"))
         }
 
-        printer.append(";; #").append(graphId).append(" \n")
-        printer.append("(loop \$b").append(loopIdx).append("\n  ")
-        for (i in nodes.indices) {
-            printer.append("(block ")
-        }
-        printer.append("\n  (block local.get \$lbl (br_table")
-        for (i in nodes.indices) {
-            printer.append(' ').append(i)
-        }
-        printer.append("))\n")
+        printer.comment("#$graphId")
+
         fun appendBlock(node: Node) {
             var dropCtr = 0
             while (true) {
-                val ix = 1 + 5 * dropCtr
-                if (!node.printer.startsWith(" drop", ix)) break
+                if (!node.printer.startsWith(Drop, dropCtr)) break
                 dropCtr++
             }
             // load stack
-            var s0 = 0
             val inputs = node.inputStack
             if (!inputs.isNullOrEmpty()) {
-                if (comments) printer.append("  ;; load stack\n")
+                if (comments) printer.comment("load stack")
                 for (idx in 0 until inputs.size - dropCtr) {
                     val type = inputs[idx]
-                    printer.append("  local.get ").append(vars.getStackVarName(idx, type)).append('\n')
+                    printer.append(LocalGet(vars.getStackVarName(idx, type)))
                 }
                 val dropped = min(inputs.size, dropCtr)
                 if (dropped > 0) {
-                    s0 = 1 + 5 * dropped
+                    // todo drop variables (?)
                 }
             }
             if (node != exitNode) {
                 // execute
-                if (comments) printer.append("  ;; execute ${node.index}\n")
-                printer.append(node.printer, s0)
+                if (comments) printer.comment("execute ${node.index}")
                 finishBlock(node)
                 // close block
-                printer.append("br \$b").append(loopIdx)
+                printer.append(Jump("b$loopIdx"))
             }
-            printer.append(") ;; block end\n")// else exit switch statement :)
         }
+
         for (node in nodes) {
             appendBlock(node)
         }
+
+        printer.append(SwitchCase(nodes.map { it.printer.instr }))
+
         if (exitNode != null) {
             appendBlock(exitNode)
-        }
-        if (exitNode == null) {
-            // close loop
-            printer.append(") unreachable\n")
         } else {
-            printer.append(")\n")
+            // close loop
+            printer.append(Unreachable)
         }
         return printer
-    }
-
-    class StackVariables {
-        val varPrinter = Builder(64)
-        val stackVariables = HashSet<String>()
-        fun getStackVarName(i: Int, type: String): String {
-            val name = "\$s$i$type"
-            if (stackVariables.add(name)) {
-                varPrinter.append("  (local $name $type)\n")
-            }
-            return name
-        }
     }
 
     /// todo there is a small set of near-exit nodes, that we are allowed to replicate: return true/false
@@ -1318,7 +1134,7 @@ object StructuralAnalysis {
         vars: StackVariables
     ): ArrayList<Builder> {
         // find all nodes, that separate the graph
-        if (true) for (separator in nodes0) {
+        for (separator in nodes0) {
             if (separator !== nodes0.first() && !separator.isReturn) {
 
                 val reached = HashSet<Node>()
@@ -1377,11 +1193,8 @@ object StructuralAnalysis {
                 }
             }
         }
+
         return arrayListOf(createLargeSwitchStatement2(sig, nodes0, labelToNode, null, vars))
-
     }
-
-    object FoundEnd : Throwable()
-
 }
 

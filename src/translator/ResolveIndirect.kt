@@ -9,6 +9,17 @@ import ignoreNonCriticalNullPointers
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.*
+import wasm.instr.Call
+import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Instructions.I32EQ
+import wasm.instr.Instructions.I32Or
+import wasm.instr.Instructions.Return
+import wasm.instr.Instructions.Unreachable
+import wasm.instr.LocalGet
+import wasm.instr.LocalSet
+import wasm.instr.ParamGet
+import wasm.parser.FunctionImpl
+import wasm.parser.LocalVariable
 
 object ResolveIndirect {
 
@@ -36,9 +47,9 @@ object ResolveIndirect {
     private fun Builder.fixThrowable(calledCanThrow: Boolean, sigJ: MethodSig) {
         if (calledCanThrow != canThrowError(sigJ)) {
             if (calledCanThrow) {
-                append(" i32.const 0")
+                append(i32Const(0))
             } else {
-                append(" call \$panic")
+                append(Call("panic"))
             }
         }
     }
@@ -52,11 +63,10 @@ object ResolveIndirect {
         if (!ignoreNonCriticalNullPointers) {
             checkNotNull0(owner, name, getCaller)
         }
-        printer.append(";; single for $sig0 -> $sigJ\n")
+        printer.comment("single for $sig0 -> $sigJ")
         ActuallyUsedIndex.add(this.sig, sigJ)
-        printer.append("  call \$").append(methodName(sigJ))
+        printer.append(Call(methodName(sigJ)))
         printer.fixThrowable(calledCanThrow, sigJ)
-        printer.append("\n")
         pop(splitArgs, false, ret)
         stackPop()
     }
@@ -107,11 +117,11 @@ object ResolveIndirect {
 
                 val checkForInvalidClasses = false
 
-                printer.append(";; tree for $sig0 -> $options\n")
+                printer.comment("tree for $sig0 -> $options")
                 if (groupedByClass.size > 1 || checkForInvalidClasses) {
                     getCaller(printer)
-                    printer.append(" call \$readClass ")
-                        .append("local.set ").append(tmpI32).append("\n  ")
+                    printer.append(Call("readClass"))
+                        .append(LocalSet(tmpI32))
                 }
 
                 val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
@@ -119,11 +129,11 @@ object ResolveIndirect {
                     val (toBeCalled, classes2) = groupedByClass[j]
                     for (k in classes2.indices) {
                         printer
-                            .append("local.get ").append(tmpI32)
-                            .append(" i32.const ").append(gIndex.getClassIndex(classes2[k]))
-                            .append(" i32.eq")
-                        if (k > 0) printer.append(" i32.or")
-                        printer.append(" ;; ").append(classes2[k]).append("\n  ")
+                            .append(LocalGet(tmpI32))
+                            .append(i32Const(gIndex.getClassIndex(classes2[k])))
+                            .append(I32EQ)
+                        if (k > 0) printer.append(I32Or)
+                        printer.comment(classes2[k])
                     }
                     // write params and result
                     printer.append("(if (param i32") // first i32 is for 'this' for call
@@ -132,23 +142,21 @@ object ResolveIndirect {
                     if (ret != "V") printer.append(" ").append(jvm2wasm(ret))
                     if (calledCanThrow) printer.append(" i32")
                     printer.append(") (then\n    ")
-                    printer.append("call \$").append(methodName(toBeCalled)).append("\n  ")
+                    printer.append(Call(methodName(toBeCalled)))
                     printer.fixThrowable(calledCanThrow, toBeCalled)
                     printer.append(") (else\n  ")
                 }
                 if (checkForInvalidClasses) {
-                    printer.append("    call \$jvm_JVM32_throwJs_V\n")
-                    printer.append("    unreachable\n")
+                    printer.append(Call("jvm_JVM32_throwJs_V"))
+                    printer.append(Unreachable)
                 } else {
                     val sigJ = groupedByClass.last().first
-                    printer.append("    call \$").append(methodName(sigJ))
+                    printer.append(Call(methodName(sigJ)))
                     printer.fixThrowable(calledCanThrow, sigJ)
-                    printer.append("\n  ")
                 }
                 for (j in 0 until jMax) {
                     printer.append("))")
                 }
-                printer.append("\n")
             }
 
             stackPush()
@@ -159,35 +167,33 @@ object ResolveIndirect {
             } else {
                 val helperName = "tree_${sig0.toString().escapeChars()}"
                 helperFunctions.getOrPut(helperName) {
-                    val printer = StringBuilder2()
-                    printer.append("(func \$").append(helperName)
-                        .append(" (param ").append(ptrType) // 'this'
-                    for (arg in splitArgs) printer.append(' ').append(arg)
-                    printer.append(") (result")
-                    if (ret != "V") printer.append(' ').append(jvm2wasm(ret))
-                    if (canThrowError) printer.append(' ').append(ptrType)
-                    printer.append(")\n")
+                    val results = ArrayList<String>(2)
+                    if (ret != "V") results.add(jvm2wasm(ret))
+                    if (canThrowError) results.add(ptrType)
+
                     // local variable for dupi32
-                    printer.append("  (local ").append(tmpI32).append(' ').append(ptrType).append(")\n")
+                    val printer = Builder()
                     // load all parameters onto the stack
                     for (k in 0 until splitArgs.size + 1) {
-                        printer.append("  local.get ").append(k).append('\n')
+                        printer.append(ParamGet(k))
                     }
                     printCallPyramid(printer)
-                    printer.append("  return\n)\n")
-                    printer
+                    printer.append(Return)
+
+                    FunctionImpl(
+                        helperName, listOf(ptrType) + splitArgs,
+                        results, listOf(LocalVariable(tmpI32, ptrType)),
+                        printer.instr, false,
+                    )
                 }
-                printer.append("  call \$").append(helperName).append("\n")
+                printer.append(Call(helperName))
             }
 
             pop(splitArgs, false, ret)
             stackPop()
 
             return true
-        } else {
-            // if there is too many tests, use resolveIndirect
-            return false
-        }
+        } else return false // if there is too many tests, use resolveIndirect
     }
 
 }

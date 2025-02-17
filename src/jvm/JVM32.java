@@ -920,9 +920,9 @@ public class JVM32 {
     @WASM(code = "i64.trunc_f64_s")
     public static native long _d2l(double v);
 
-    @NoThrow
+    /*@NoThrow
     @WASM(code = "v128.const i64x2 0 0 v128.store")
-    public static native void clear128(int addr);
+    public static native void clear128(int addr);*/
 
     @NoThrow
     @WASM(code = "i64.const 0 i64.store")

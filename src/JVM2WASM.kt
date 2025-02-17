@@ -3,7 +3,6 @@ import dependency.DependencyIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
 import jvm.JVM32
-import utils.appendNativeHelperFunctions
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
@@ -15,6 +14,7 @@ import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
+import wasm.instr.Instructions.F64_SQRT
 import java.io.FileNotFoundException
 import kotlin.math.sin
 
@@ -305,7 +305,7 @@ fun jvm2wasm() {
 
     val headerPrinter = StringBuilder2(256)
     val importPrinter = StringBuilder2(4096)
-    val bodyPrinter = Builder(4096)
+    val bodyPrinter = StringBuilder2(4096)
     val dataPrinter = StringBuilder2(4096)
 
     val predefinedClasses = listOf(
@@ -346,8 +346,8 @@ fun jvm2wasm() {
     findNoThrowMethods()
 
     // java_lang_StrictMath_sqrt_DD
-    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = "f64.sqrt"
-    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = "f64.sqrt"
+    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = listOf(F64_SQRT)
+    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = listOf(F64_SQRT)
 
     findAliases()
 
@@ -416,7 +416,7 @@ fun jvm2wasm() {
 
     /** translate method implementations */
     // find all aliases, that are being used
-    val aliasedMethods = dIndex.usedMethods.mapNotNull {
+    val aliasedMethods = dIndex.usedMethods.map {
         hIndex.getAlias(it)
     }
 
@@ -474,8 +474,7 @@ fun jvm2wasm() {
     }
 
     // append nth-getter-methods
-    for (desc in gIndex.nthGetterMethods
-        .map { it.value.method }.toSortedSet()) {
+    for (desc in gIndex.nthGetterMethods.map { it.value }) {
         bodyPrinter.append(desc)
     }
 
