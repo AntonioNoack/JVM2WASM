@@ -90,7 +90,7 @@ object StructuralAnalysis {
     /**
      * transform all nodes into some nice if-else-tree
      * */
-    fun transform(sig: MethodSig, nodes: MutableList<Node>): String {
+    fun joinNodes(sig: MethodSig, nodes: MutableList<Node>): Builder {
 
         val isLookingAtSpecial = false
         if (isLookingAtSpecial) {
@@ -101,8 +101,9 @@ object StructuralAnalysis {
         lastSize = nodes.size
 
         if (nodes.isEmpty()) throw IllegalArgumentException()
-        if (nodes.size == 1 && nodes[0].inputs.isEmpty())
-            return nodes[0].printer.toString()
+        if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
+            return nodes[0].printer
+        }
 
         val labelToNode = HashMap(nodes.associateBy { it.label })
 
@@ -302,15 +303,12 @@ object StructuralAnalysis {
             }
 
             fun makeNodeLoop(node: Node) {
-                val newPrinter = Builder(node.printer.length + 32)
                 val loopIdx = loopIndex++
                 val label = "b$loopIdx"
                 node.printer.instr.add(Jump(label))
-                newPrinter.append(
-                    LoopInstr(
-                        label, ArrayList(node.printer.instr),
-                        blockParamsGetResult(node, null)
-                    )
+                val newPrinter = LoopInstr(
+                    label, ArrayList(node.printer.instr),
+                    blockParamsGetResult(node, null)
                 )
                 node.printer.clear()
                 node.printer.append(newPrinter)
@@ -401,7 +399,7 @@ object StructuralAnalysis {
             checkState()
 
             if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
-                return nodes[0].printer.toString()
+                return nodes[0].printer
             }
 
             if (true) {
@@ -438,7 +436,7 @@ object StructuralAnalysis {
                         node.inputs.removeAll(toRemove)
                     }
                     nodes.removeAll(toRemove)
-                    if (nodes.size == 1) return nodes[0].printer.toString()
+                    if (nodes.size == 1) return nodes[0].printer
                 }
             }
 
@@ -550,7 +548,7 @@ object StructuralAnalysis {
             checkState()
 
             if (nodes.size == 1 && nodes[0].inputs.isEmpty())
-                return nodes[0].printer.toString()
+                return nodes[0].printer
 
             // find while-true loops
             do {
@@ -578,15 +576,12 @@ object StructuralAnalysis {
                             // A ? A : B
                             // -> A -> B
                             // loop(A, if() else break)
-                            val printer = Builder(node.printer.length + 20)
                             val loopIdx = loopIndex++
                             val label = "b$loopIdx"
                             node.printer.append(JumpIf(label))
-                            printer.append(
-                                LoopInstr(
-                                    label, ArrayList(node.printer.instr),
-                                    blockParamsGetResult(node, null)
-                                )
+                            val printer = LoopInstr(
+                                label, ArrayList(node.printer.instr),
+                                blockParamsGetResult(node, null)
                             )
                             node.printer.clear()
                             node.printer.append(printer)
@@ -598,17 +593,14 @@ object StructuralAnalysis {
                         } else if (node.ifFalse == node) {
                             // A ? B : A
                             // loop(A, if() break)
-                            val printer = Builder(node.printer.length + 20)
                             val loopIdx = loopIndex++
                             val label = "b$loopIdx"
                             node.printer
                                 .append(I32EQZ)
                                 .append(JumpIf(label))
-                            printer.append(
-                                LoopInstr(
-                                    label, ArrayList(node.printer.instr),
-                                    blockParamsGetResult(node, null)
-                                )
+                            val printer = LoopInstr(
+                                label, ArrayList(node.printer.instr),
+                                blockParamsGetResult(node, null)
                             )
                             node.printer.clear()
                             node.printer.append(printer)
@@ -982,14 +974,14 @@ object StructuralAnalysis {
         if (exitNode != null) exitNode.index = j
     }
 
-    private fun createLargeSwitchStatement(sig: MethodSig, nodes0: List<Node>, labelToNode: Map<Label, Node>): String {
+    private fun createLargeSwitchStatement(sig: MethodSig, nodes0: List<Node>, labelToNode: Map<Label, Node>): Builder {
         val vs = StackVariables()
         vs.varPrinter.localVariables.add(LocalVariable("lbl", "i32"))
         val code = createLargeSwitchStatement1(sig, nodes0, labelToNode, vs)
         for (i in code.lastIndex downTo 0) {
             vs.varPrinter.append(code[i])
         }
-        return vs.varPrinter.toString()
+        return vs.varPrinter
     }
 
     private fun createLargeSwitchStatement2(
@@ -1097,9 +1089,7 @@ object StructuralAnalysis {
                     printer.append(LocalGet(vars.getStackVarName(idx, type)))
                 }
                 val dropped = min(inputs.size, dropCtr)
-                if (dropped > 0) {
-                    // todo drop variables (?)
-                }
+                for (i in 0 until dropped) printer.append(Drop)
             }
             if (node != exitNode) {
                 // execute

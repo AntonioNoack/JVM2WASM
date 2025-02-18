@@ -41,7 +41,7 @@ fun <V> eq(a: V, b: V) {
 fun registerDefaultOffsets() {
 
     eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
-    eq(gIndex.getType("()V", true), "\$fRV0")
+    eq(gIndex.getType("()V", true), "fRV0")
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(replaceClass1("java/lang/String"))
@@ -783,7 +783,8 @@ val helperFunctions = HashMap<String, FunctionImpl>()
 
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
     println("[printMethodImplementations]")
-    for ((sig, impl) in gIndex.translatedMethods) {
+    for ((sig, impl) in gIndex.translatedMethods
+        .entries.sortedBy { it.value.funcName }) {
         val name = methodName(sig)
         // not truly used, even tho marked as such...
         if (name in usedMethods) {
@@ -794,7 +795,8 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
             println("  Not actually used: $name")
         }// else we don't care we didn't use it
     }
-    for ((_, impl) in helperFunctions) {
+    for (impl in helperFunctions
+        .values.sortedBy { it.funcName }) {
         bodyPrinter.append(impl)
     }
 }

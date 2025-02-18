@@ -119,7 +119,6 @@ fun genericsTypes(d: String, static: Boolean = true): String {
 
 fun splitToType(d: String, canThrow: Boolean): String {
     val result = StringBuilder2(d.length)
-    result.append("\$")
     var i = 0
     while (i < d.length) {
         fun readType(): Char {

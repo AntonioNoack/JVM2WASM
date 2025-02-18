@@ -7,7 +7,7 @@ import utils.wasmTextFile
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-var enableCppTracing = false
+var enableCppTracing = true
 var logCppFunctionCalls = true
 
 // todo try using this on Android XD

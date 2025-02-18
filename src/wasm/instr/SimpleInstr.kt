@@ -5,9 +5,7 @@ open class SimpleInstr(val name: String) : Instruction {
         simpleInstructions[name] = this
     }
 
-    override fun toString(): String {
-        return name
-    }
+    override fun toString(): String = name
 
     companion object {
         val simpleInstructions = HashMap<String, SimpleInstr>()

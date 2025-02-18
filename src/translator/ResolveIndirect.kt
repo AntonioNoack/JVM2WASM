@@ -9,15 +9,12 @@ import ignoreNonCriticalNullPointers
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.*
-import wasm.instr.Call
+import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32Or
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
-import wasm.instr.LocalGet
-import wasm.instr.LocalSet
-import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
 import wasm.parser.LocalVariable
 
@@ -113,6 +110,37 @@ object ResolveIndirect {
 
         if (numTests < maxOptions) {
 
+            fun createPyramidCondition(classes2: List<String>): ArrayList<Instruction> {
+                val result = ArrayList<Instruction>(classes2.size * 5)
+                for (k in classes2.indices) {
+                    result.add(LocalGet(tmpI32))
+                    result.add(i32Const(gIndex.getClassIndex(classes2[k])))
+                    result.add(I32EQ)
+                    if (k > 0) result.add(I32Or)
+                    result.add(Comment(classes2[k]))
+                }
+                return result
+            }
+
+            fun getArgs(): List<String> {
+                // first ptrType is for 'this' for call
+                return listOf(ptrType) + splitArgs
+            }
+
+            fun getResult(): List<String> {
+                val result = ArrayList<String>(2)
+                if (ret != "V") result.add(jvm2wasm(ret))
+                if (calledCanThrow) result.add(ptrType)
+                return result
+            }
+
+            fun createBody(sigJ: MethodSig): List<Instruction> {
+                val printer = Builder()
+                printer.append(Call(methodName(sigJ)))
+                printer.fixThrowable(calledCanThrow, sigJ)
+                return printer.instr
+            }
+
             fun printCallPyramid(printer: Builder) {
 
                 val checkForInvalidClasses = false
@@ -124,39 +152,18 @@ object ResolveIndirect {
                         .append(LocalSet(tmpI32))
                 }
 
+                var lastBranch: List<Instruction> =
+                    if (checkForInvalidClasses) listOf(Call("jvm_JVM32_throwJs_V"), Unreachable)
+                    else createBody(groupedByClass.last().first)
+
                 val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
-                for (j in 0 until jMax) {
+                for (j in jMax - 1 downTo 0) {
                     val (toBeCalled, classes2) = groupedByClass[j]
-                    for (k in classes2.indices) {
-                        printer
-                            .append(LocalGet(tmpI32))
-                            .append(i32Const(gIndex.getClassIndex(classes2[k])))
-                            .append(I32EQ)
-                        if (k > 0) printer.append(I32Or)
-                        printer.comment(classes2[k])
-                    }
-                    // write params and result
-                    printer.append("(if (param i32") // first i32 is for 'this' for call
-                    for (argI in splitArgs) printer.append(" ").append(argI)
-                    printer.append(") (result")
-                    if (ret != "V") printer.append(" ").append(jvm2wasm(ret))
-                    if (calledCanThrow) printer.append(" i32")
-                    printer.append(") (then\n    ")
-                    printer.append(Call(methodName(toBeCalled)))
-                    printer.fixThrowable(calledCanThrow, toBeCalled)
-                    printer.append(") (else\n  ")
+                    val nextBranch = createPyramidCondition(classes2)
+                    nextBranch.add(IfBranch(createBody(toBeCalled), lastBranch, getArgs(), getResult()))
+                    lastBranch = nextBranch
                 }
-                if (checkForInvalidClasses) {
-                    printer.append(Call("jvm_JVM32_throwJs_V"))
-                    printer.append(Unreachable)
-                } else {
-                    val sigJ = groupedByClass.last().first
-                    printer.append(Call(methodName(sigJ)))
-                    printer.fixThrowable(calledCanThrow, sigJ)
-                }
-                for (j in 0 until jMax) {
-                    printer.append("))")
-                }
+                printer.instr.addAll(lastBranch)
             }
 
             stackPush()

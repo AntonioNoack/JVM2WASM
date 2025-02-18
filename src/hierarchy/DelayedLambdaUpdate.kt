@@ -3,6 +3,8 @@ package hierarchy
 import dIndex
 import gIndex
 import hIndex
+import me.anno.utils.assertions.assertFalse
+import me.anno.utils.assertions.assertTrue
 import org.objectweb.asm.Handle
 import translator.MethodTranslator
 import utils.FieldSig
@@ -24,71 +26,78 @@ class DelayedLambdaUpdate(
         return type[0] != 'L' && type[0] != 'T' && type[0] !in "[A"
     }
 
-    private fun convert(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
-        if (isNative(arg)) {
-            when (arg) {
-                "I" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "box",
-                    "(I)Ljava/lang/Integer;",
-                    false,
-                    checkThrowable
-                )
-                "J" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "box",
-                    "(J)Ljava/lang/Long;",
-                    false,
-                    checkThrowable
-                )
-                "F" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "box",
-                    "(F)Ljava/lang/Float;",
-                    false,
-                    checkThrowable
-                )
-                "D" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "box",
-                    "(D)Ljava/lang/Double;",
-                    false,
-                    checkThrowable
-                )
-                else -> throw NotImplementedError("$arg/$arg2")
-            }
-        } else {
-            when (arg2) {
-                "I" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "unbox",
-                    "(Ljava/lang/Integer;)I",
-                    false,
-                    checkThrowable
-                )
-                "J" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "unbox",
-                    "(Ljava/lang/Long;)J",
-                    false,
-                    checkThrowable
-                )
-                "F" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "unbox",
-                    "(Ljava/lang/Float;)F",
-                    false,
-                    checkThrowable
-                )
-                "D" -> printer.visitMethodInsn2(
-                    0xb8,
-                    "jvm/Boxing", "unbox",
-                    "(Ljava/lang/Double;)D",
-                    false,
-                    checkThrowable
-                )
-                else -> throw NotImplementedError("$arg/$arg2")
-            }
+    private fun boxUnbox(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+        if (isNative(arg)) box(arg, arg2, printer, checkThrowable)
+        else unbox(arg, arg2, printer, checkThrowable)
+    }
+
+    private fun box(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+        assertTrue(isNative(arg))
+        when (arg) {
+            "I" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "box",
+                "(I)Ljava/lang/Integer;",
+                false,
+                checkThrowable
+            )
+            "J" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "box",
+                "(J)Ljava/lang/Long;",
+                false,
+                checkThrowable
+            )
+            "F" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "box",
+                "(F)Ljava/lang/Float;",
+                false,
+                checkThrowable
+            )
+            "D" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "box",
+                "(D)Ljava/lang/Double;",
+                false,
+                checkThrowable
+            )
+            else -> throw NotImplementedError("$arg/$arg2")
+        }
+    }
+
+    private fun unbox(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+        assertFalse(isNative(arg))
+        when (arg2) {
+            "I" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "unbox",
+                "(Ljava/lang/Integer;)I",
+                false,
+                checkThrowable
+            )
+            "J" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "unbox",
+                "(Ljava/lang/Long;)J",
+                false,
+                checkThrowable
+            )
+            "F" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "unbox",
+                "(Ljava/lang/Float;)F",
+                false,
+                checkThrowable
+            )
+            "D" -> printer.visitMethodInsn2(
+                0xb8,
+                "jvm/Boxing", "unbox",
+                "(Ljava/lang/Double;)D",
+                false,
+                checkThrowable
+            )
+            else -> throw NotImplementedError("$arg/$arg2")
         }
     }
 
@@ -164,12 +173,12 @@ class DelayedLambdaUpdate(
             val fieldName = "f$i"
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[1] += $arg ($wanted)")
-            printer.printer.comment("[1] += $arg\n")
+            printer.printer.comment("[1] += $arg")
             // load self for field
             printer.visitVarInsn(0x2a, 0) // local.get this
             printer.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
-                convert(arg, wanted ?: "", printer, true)
+                boxUnbox(arg, wanted ?: "", printer, true)
             }
         }
 
@@ -191,7 +200,7 @@ class DelayedLambdaUpdate(
             // index is not correctly incremented for double/long
             printer.visitVarInsn2(opcode, -1, i + 1)
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
-                convert(arg, wanted ?: "", printer, true)
+                boxUnbox(arg, wanted ?: "", printer, true)
             }
         }
 
@@ -233,16 +242,14 @@ class DelayedLambdaUpdate(
         val ret1 = bridgeMethod.descriptor.substring(ix2 + 1)
         if (ret0 != ret1 && isNative(ret0) != isNative(ret1)) {
             if (couldThrow) printer.handleThrowable()
-            convert(ret0, ret1, printer, false)
+            boxUnbox(ret0, ret1, printer, false)
             couldThrow = true
         }
 
         if (!couldThrow) printer.visitLdcInsn(0) // calling this is easier than figuring our the return type for the correct return function
 
         printer.printer.append(Return)
-
         printer.visitEnd()
-
     }
 
     companion object {

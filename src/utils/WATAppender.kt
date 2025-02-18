@@ -252,10 +252,10 @@ fun appendFunctionTypes(printer: StringBuilder2) {
     // append all wasm types
     // (type $ft (func (param i32)))
     for (type in gIndex.types.toSortedSet()) {
-        printer.append("(type ").append(type).append(" (func (param")
+        printer.append("(type \$").append(type).append(" (func (param")
         // define all params and result types
-        if (type.startsWith("\$f")) printer.append(' ').append(ptrType) // instance
-        else if (!type.startsWith("\$s")) throw IllegalStateException()
+        if (type.startsWith("f")) printer.append(' ').append(ptrType) // instance
+        else if (!type.startsWith("s")) throw IllegalStateException()
         loop@ for (j in 2 until type.length) {// parameters
             when (type[j]) {
                 'A', 'V' -> {}

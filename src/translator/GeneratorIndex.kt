@@ -87,7 +87,7 @@ object GeneratorIndex {
 
     init {
         // static call with no arguments, which can throw an exception
-        types.add("\$sRV0")
+        types.add("sRV0")
     }
 
     // register type in index list

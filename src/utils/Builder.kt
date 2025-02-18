@@ -47,8 +47,9 @@ class Builder(capacity: Int = 16) {
         return this.instr.lastOrNull() == instr
     }
 
-    fun endsWith(instr: List<Instruction>): Boolean {
-        return this.instr.subList(this.instr.size - instr.size, this.instr.size) == instr
+    fun endsWith(end: List<Instruction>): Boolean {
+        return instr.size >= end.size &&
+                instr.subList(instr.size - end.size, instr.size) == end
     }
 
     fun startsWith(instr: Instruction, i: Int): Boolean {

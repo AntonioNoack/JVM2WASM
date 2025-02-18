@@ -40,12 +40,14 @@ class WATParser {
 
     private fun parseTokens(text: String): TokenList {
         val list = TokenList(text)
+        var lineNumber = 0
         var i = 0
         while (i < text.length) {
             when (text[i++]) {
                 '(' -> list.push(TokenType.OPEN_BRACKET, i, i + 1)
                 ')' -> list.push(TokenType.CLOSE_BRACKET, i, i + 1)
-                ' ', '\n' -> {}
+                ' ' -> {}
+                '\n' -> lineNumber++
                 in 'a'..'z' -> {
                     val i0 = i - 1
                     while (i < text.length) {
@@ -91,9 +93,10 @@ class WATParser {
                     // comment
                     assertEquals(text[i].code, ';'.code)
                     i = text.indexOf2('\n', i) + 1
+                    lineNumber++
                 }
                 else -> throw NotImplementedError(
-                    text[i - 1].toString() + " from " + text.substring(i - 1, min(i + 100, text.length))
+                    text[i - 1].toString() + " from[$lineNumber] " + text.substring(i - 1, min(i + 100, text.length))
                 )
             }
         }
@@ -389,7 +392,7 @@ class WATParser {
                             list.consume(TokenType.OPEN_BRACKET, i++)
                             list.consume(TokenType.NAME, "br_table", i++)
                             for (j in 0 until depth) {
-                                list.consume(TokenType.NUMBER, "$j", i++)
+                                list.consume(TokenType.NUMBER, j.toString(), i++)
                             }
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                             val cases = ArrayList<List<Instruction>>()

@@ -15,7 +15,7 @@ import exportAll
 import gIndex
 import graphing.Node
 import graphing.StructuralAnalysis
-import graphing.StructuralAnalysis.transform
+import graphing.StructuralAnalysis.joinNodes
 import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
@@ -230,7 +230,7 @@ class MethodTranslator(
         if (resultType != 'V') results.add(jvm2wasm1(resultType))
         if (canThrowError) results.add(ptrType)
         headPrinter1 = FunctionImpl(
-            name2, args.map { jvm2wasm(it) },
+            name2, (if(isStatic) emptyList() else listOf(ptrType)) + args.map { jvm2wasm(it) },
             results, localVariables1, emptyList(), exported
         )
     }
@@ -768,7 +768,7 @@ class MethodTranslator(
         // DynPrinter.print(name, descriptor, method, args)
         if (printOps) {
             println("  [invoke dyn by $sig] $name, $descriptor, [${method.owner}, ${method.name}, tag: ${method.tag}, desc: ${method.desc}], [${args.joinToString()}]")
-            printer.comment("invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]\n")
+            printer.comment("invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]")
         }
 
         val dst = args[1] as Handle
@@ -811,7 +811,7 @@ class MethodTranslator(
                 }
                 printer.append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
                 printer.append(if (is32Bits) I32Add else I64Add)
-                if (comments) printer.comment("set field #$i\n")
+                if (comments) printer.comment("set field #$i")
                 // swap ptr and value
                 printer.append(Call("swap${jvm2wasm(arg)}$ptrType"))
                 printer.append(getStoreInstr2(arg))
@@ -853,7 +853,7 @@ class MethodTranslator(
             0x9e -> printer.pop(i32).append(i32Const(0)).append(I32LES) // <= 0
             else -> throw NotImplementedError(OpCode[opcode])
         }
-        if (comments) printer.comment("jump ${OpCode[opcode]} -> $label, stack: $stack\n")
+        if (comments) printer.comment("jump ${OpCode[opcode]} -> $label, stack: $stack")
         afterJump(label, opcode == 0xa7)
     }
 
@@ -901,9 +901,9 @@ class MethodTranslator(
                 printer.append(if (is32Bits) i32Const(address) else i64Const(address.toLong()))
                 if (comments) {
                     printer.comment(
-                        value.shorten(100)
+                        "\"" + value.shorten(100)
                             .filter { it in '0'..'9' || it in 'a'..'z' || it in 'A'..'Z' || it in ".,-!%/()={[]}" }
-                            .toString()
+                            .toString() + "\""
                     )
                 }
             }
@@ -912,7 +912,7 @@ class MethodTranslator(
                 // used for assert() with getClassLoader()
                 printer.append(i32Const(gIndex.getClassIndex(single(value.descriptor))))
                 printer.append(Call("findClass"))
-                if (comments) printer.comment("class $value\n")
+                if (comments) printer.comment("class $value")
             }
             else -> throw IllegalArgumentException("unknown '$value', ${value.javaClass}\n")
         }
@@ -923,7 +923,7 @@ class MethodTranslator(
     @Boring
     override fun visitLineNumber(line: Int, start: Label?) {
         if (printOps) println("Line $line: ($start)")
-        if (comments) printer.comment(":$line\n")
+        if (comments) printer.comment("line $line")
         this.line = line
     }
 
@@ -970,7 +970,7 @@ class MethodTranslator(
     private fun defineLocalVar(name: String?, wasmType: String): String {
         return localVars.getOrPut(Pair(name, wasmType)) {
             // register local variable
-            val name2 = "\$l${localVars.size}"
+            val name2 = "l${localVars.size}"
             localVariables1.add(LocalVariable(name2, wasmType))
             name2
         }
@@ -1072,7 +1072,7 @@ class MethodTranslator(
 
                     printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
                     ActuallyUsedIndex.add(this.sig, sig)
-                    if (comments) printer.comment("invoke interface $owner, $name, $descriptor\n")
+                    if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
                     stackPop()
                 }
@@ -1144,6 +1144,7 @@ class MethodTranslator(
                             val inline = hIndex.inlined[sig]
                             if (inline != null) {
                                 printer.instr.addAll(inline)
+                                printer.comment("virtual-inlined $sig")
                             } else {
                                 stackPush()
                                 val name2 = methodName(sig)
@@ -1197,6 +1198,7 @@ class MethodTranslator(
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
                     printer.instr.addAll(inline)
+                    printer.comment("special-inlined $sig")
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
@@ -1212,6 +1214,7 @@ class MethodTranslator(
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
                     printer.instr.addAll(inline)
+                    printer.comment("static-inlined $sig")
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
@@ -1349,7 +1352,7 @@ class MethodTranslator(
 
     override fun visitTryCatchBlock(start: Label, end: Label, handler: Label, type: String?) {
         catchers.add(Catcher(start, end, handler, type))
-        if (comments) printer.comment("try-catch $start .. $end, handler $handler, type $type\n")
+        if (comments) printer.comment("try-catch $start .. $end, handler $handler, type $type")
         if (printOps) println("  ;; try-catch $start .. $end, handler $handler, type $type")
     }
 
@@ -1848,7 +1851,7 @@ class MethodTranslator(
             if (setter) { // setter
                 // drop value
                 printer.append(Drop)
-                if (comments) printer.comment("final $sig\n")
+                if (comments) printer.comment("final $sig")
             } else { // getter
                 visitLdcInsn(value) // too easy xD
             }
@@ -1942,7 +1945,7 @@ class MethodTranslator(
             0xb4 -> {
                 // get field
                 // second part of check is <self>
-                if (checkNull && !(!isStatic && printer.endsWith(LocalGet(0)))) {
+                if (checkNull && !(!isStatic && printer.endsWith(ParamGet(0)))) {
                     checkNotNull0(owner, name) {
                         printer.dupI32()
                     }
@@ -1974,8 +1977,8 @@ class MethodTranslator(
                 // set field
                 // second part of check is <self>
                 if (checkNull &&
-                    !(!isStatic && printer.endsWith(listOf(LocalGet(0), LocalGet(1)))) &&
-                    !(!isStatic && printer.endsWith(listOf(LocalGet(0), i32Const(0))))
+                    !(!isStatic && printer.endsWith(listOf(ParamGet(0), ParamGet(1)))) &&
+                    !(!isStatic && printer.endsWith(listOf(ParamGet(0), i32Const(0))))
                 ) {
                     checkNotNull0(owner, name) {
                         printer.append(Call(gIndex.getNth(listOf(ptrType, wasmType))))
@@ -1986,7 +1989,7 @@ class MethodTranslator(
 
                     // if endsWith local.get x2,
                     //  then optimize this to not use swaps
-                    val suffix = listOf(LocalGet(0), LocalGet(1))
+                    val suffix = listOf(ParamGet(0), ParamGet(1))
                     if (printer.endsWith(suffix)) {
                         printer.drop().drop()
                         printer.append(ParamGet(0))
@@ -2030,222 +2033,12 @@ class MethodTranslator(
                 }
             }
 
-            var txt = transform(sig, nodes)
-            /*  txt = txt.replace(
-                  "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
-                          "  i32.const 0\n" +
-                          "  return", "return"
-              )
-
-              txt = txt.replace(
-                  "local.set \$l0 local.get \$l0 (if (then i32.const 0 local.get \$l0 return))\n" +
-                          "  i32.const 0\n" +
-                          "  return", "return"
-              )
-              txt = txt.replace(
-                  "local.set \$l0 local.get \$l0 (if (then i64.const 0 local.get \$l0 return))\n" +
-                          "  i32.const 0\n" +
-                          "  return", "return"
-              )
-              txt = txt.replace(
-                  "local.set \$l0 local.get \$l0 (if (then f32.const 0 local.get \$l0 return))\n" +
-                          "  i32.const 0\n" +
-                          "  return", "return"
-              )
-              txt = txt.replace(
-                  "local.set \$l0 local.get \$l0 (if (then f64.const 0 local.get \$l0 return))\n" +
-                          "  i32.const 0\n" +
-                          "  return", "return"
-              )
-              txt = txt.replace(
-                  "(if (then\n" +
-                          "  i32.const 0\n" +
-                          "  i32.const 0\n" +
-                          "  return\n" +
-                          ") (else\n" +
-                          "  i32.const 1\n" +
-                          "  i32.const 0\n" +
-                          "  return\n" +
-                          "))", "i32.eqz i32.const 0 return"
-              )
-              txt = txt.replace(
-                  "(if (result i32) (then\n" +
-                          "  i32.const 0\n" +
-                          ") (else\n" +
-                          "  i32.const 1\n" +
-                          "))", "i32.eqz"
-              )*/
-
-            // todo all replacement functions :)
-
-            // these somehow don't work :/
-            // they probably have different behaviours for NaN than we expect
-            /*txt = txt.replace(
-                "call \$dcmpg\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "f64.eq i32.eqz"
+            val jointBuilder = joinNodes(sig, nodes)
+            gIndex.translatedMethods[sig] = FunctionImpl(
+                headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
+                headPrinter1.locals + jointBuilder.localVariables, headPrinter1.body + jointBuilder.instr,
+                headPrinter1.isExported
             )
-
-            txt = txt.replace(
-                "call \$fcmpg\n" +
-                        "  (if (result i32) (then\n" +
-                        "  i32.const 0\n" +
-                        ") (else\n" +
-                        "  i32.const 1\n" +
-                        "))", "f32.eq i32.eqz"
-            )*/
-
-            /*   txt = txt.replace(
-                   "call \$lcmp\n" +
-                           "  (if (result i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "i64.eq"
-               )
-
-               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.ge_s", "f32.ge")
-               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.ge_s", "f64.ge")
-               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.gt_s", "f32.gt")
-               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.gt_s", "f64.gt")
-               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.le_s", "f32.le")
-               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.le_s", "f64.le")
-               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.lt_s", "f32.lt")
-               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.lt_s", "f64.lt")
-               txt = txt.replace("call \$fcmpg\n  i32.const 0 i32.eq", "f32.eq")
-               txt = txt.replace("call \$dcmpg\n  i32.const 0 i32.eq", "f64.eq")
-
-               // difference in effect? mmh...
-               // if they all work, we have simplified a lot of places :)
-               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.ge_s", "f32.ge")
-               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.ge_s", "f64.ge")
-               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.gt_s", "f32.gt")
-               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.gt_s", "f64.gt")
-               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.le_s", "f32.le")
-               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.le_s", "f64.le")
-               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.lt_s", "f32.lt")
-               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.lt_s", "f64.lt")
-               txt = txt.replace("call \$fcmpl\n  i32.const 0 i32.eq", "f32.eq")
-               txt = txt.replace("call \$dcmpl\n  i32.const 0 i32.eq", "f64.eq")
-
-               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.gt_s", "i64.gt_s")
-               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.ge_s", "i64.ge_s")
-               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.lt_s", "i64.lt_s")
-               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.le_s", "i64.le_s")
-               txt = txt.replace("call \$lcmp\n  i32.const 0 i32.eq", "i64.eq")
-
-               txt = txt.replace("local.get 0\n  drop", "")
-               txt = txt.replace("local.get 1\n  drop", "")
-               txt = txt.replace(
-                   "i32.ne\n" +
-                           "  (if (result i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "i32.eq"
-               )
-               txt = txt.replace(
-                   "i32.eq\n" +
-                           "  (if (result i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "i32.ne"
-               )
-
-               txt = txt.replace(
-                   "call \$dcmpg\n" +
-                           "  (if (result i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "f64.eq"
-               )
-               txt = txt.replace(
-                   "call \$fcmpg\n" +
-                           "  (if (result i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "f32.eq"
-               )
-
-               txt = txt.replace("i32.load\n  drop", "drop")
-               txt = txt.replace("i64.load\n  drop", "drop")
-               txt = txt.replace("f32.load\n  drop", "drop")
-               txt = txt.replace("f64.load\n  drop", "drop")
-               // these two don't exist!
-               // txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
-               // txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
-               txt = txt.replace(
-                   "call \$dupi32 (if (param i32) (then i32.const 0 call \$swapi32i32 return) (else drop))\n" +
-                           "  i32.const 0\n" +
-                           "  return", "return"
-               )
-               txt = txt.replace(
-                   "f64.promote_f32\n" +
-                           "  f64.sqrt\n" +
-                           "  f32.demote_f64", "f32.sqrt"
-               )
-               // why ever these constructs exist...
-               txt = txt.replace(
-                   "i32.ne\n" +
-                           "  (if (param i32) (result i32 i32) (then\n" +
-                           "  i32.const 0\n" +
-                           ") (else\n" +
-                           "  i32.const 1\n" +
-                           "))", "i32.eq"
-               )
-               txt = txt.replace(
-                   "(if (result i32) (then\n" +
-                           "  i32.const 1\n" +
-                           ") (else\n" +
-                           "  i32.const 0\n" +
-                           "))", "i32.eqz i32.eqz"
-               )
-
-               txt = txt.replace(
-                   "call \$fcmpl\n" +
-                           "  (if", "f32.ne\n  (if"
-               )
-               txt = txt.replace(
-                   "call \$dcmpl\n" +
-                           "  (if", "f64.ne\n  (if"
-               )
-               txt = txt.replace(
-                   "call \$fcmpg\n" +
-                           "  (if", "f32.ne\n  (if"
-               )
-               txt = txt.replace(
-                   "call \$dcmpg\n" +
-                           "  (if", "f64.ne\n  (if"
-               )
-
-               txt = txt.replace(
-                   "call \$fcmpl\n" +
-                           "  i32.eqz", "f32.eq"
-               )
-               txt = txt.replace(
-                   "call \$dcmpl\n" +
-                           "  i32.eqz", "f64.eq"
-               )
-               txt = txt.replace(
-                   "call \$fcmpg\n" +
-                           "  i32.eqz", "f32.eq"
-               )
-               txt = txt.replace(
-                   "call \$dcmpg\n" +
-                           "  i32.eqz", "f64.eq"
-               )
-   */
-            // then add the result to the actual printer
-            // headPrinter.append(txt)
-            // headPrinter.append(")\n")
-
-            gIndex.translatedMethods[sig] = headPrinter1
         }
     }
 

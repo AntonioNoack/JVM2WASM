@@ -1,7 +1,10 @@
 package wasm.instr
 
 class LocalGet(val name: String) : Instruction {
-    constructor(idx: Int) : this(idx.toString())
 
-    override fun toString(): String = "local.get $name"
+    init {
+        if (name.startsWith('$')) throw IllegalArgumentException(name)
+    }
+
+    override fun toString(): String = "local.get \$$name"
 }

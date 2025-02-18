@@ -1,5 +1,10 @@
 package wasm.instr
 
 class Call(val name: String) : Instruction {
-    override fun toString(): String = "call $name"
+
+    init {
+        if (name.startsWith('$')) throw IllegalArgumentException(name)
+    }
+
+    override fun toString(): String = "call \$$name"
 }

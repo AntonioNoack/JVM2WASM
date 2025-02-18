@@ -1,5 +1,10 @@
 package wasm.instr
 
 class LocalSet(val name: String) : Instruction {
-    override fun toString(): String = "local.set $name"
+
+    init {
+        if (name.startsWith('$')) throw IllegalArgumentException(name)
+    }
+
+    override fun toString(): String = "local.set \$$name"
 }
