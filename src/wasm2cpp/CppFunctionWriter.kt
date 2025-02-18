@@ -66,7 +66,7 @@ fun defineFunctionImplementations(parser: WATParser) {
         val pos0 = writer.size
         try {
             FunctionWriter(function, parser)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)
         }
@@ -211,20 +211,24 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 beginSetEnd(i.name, type)
             }
             is GlobalGet -> {
-                val global = parser.globals[i.name]!!
+                val global = parser.globals[i.name]
+                    ?: throw IllegalStateException("Missing global '${i.name}'")
                 beginNew(global.type).append(global.name).end()
             }
             is GlobalSet -> {
-                val global = parser.globals[i.name]!!
+                val global = parser.globals[i.name]
+                    ?: throw IllegalStateException("Missing global '${i.name}'")
                 beginSetEnd(global.name, global.type)
             }
             is LocalGet -> {
-                val local = localsByName[i.name]!!
+                val local = localsByName[i.name]
+                    ?: throw IllegalStateException("Missing local '${i.name}'")
                 assertNotEquals("lbl", i.name)
                 beginNew(local.type).append(local.name).end()
             }
             is LocalSet -> {
-                val local = localsByName[i.name]!!
+                val local = localsByName[i.name]
+                    ?: throw IllegalStateException("Missing local '${i.name}'")
                 if (i.name == "lbl") return
                 beginSetEnd(local.name, local.type)
             }

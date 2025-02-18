@@ -9,12 +9,13 @@ class Node(val label: Label) {
     var index = -1
     val inputs = HashSet<Node>()
 
-    var ifFalse: Node? = null
     var ifTrue: Label? = null
-    var isAlwaysTrue = false
-    var isReturn = false // mmh
-    val next get() = if (isAlwaysTrue) ifTrue else ifFalse?.label
+    var ifFalse: Node? = null
 
+    var isAlwaysTrue = false
+    var isReturn = false
+
+    val next get() = if (isAlwaysTrue) ifTrue else ifFalse?.label
     val isBranch get() = ifTrue != null && ifFalse != null && !isAlwaysTrue
 
     var inputStack: List<String>? = null

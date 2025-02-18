@@ -4,6 +4,7 @@ class IfBranch(
     val ifTrue: List<Instruction>, val ifFalse: List<Instruction>,
     val params: List<String>, val results: List<String>
 ) : Instruction {
+
     override fun toString(): String {
         val builder = StringBuilder()
         toString(0, builder)

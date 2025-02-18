@@ -1,7 +1,9 @@
 package graphing
 
+import jdk.nashorn.internal.ir.LoopNode
 import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
+import translator.MethodTranslator
 import utils.Builder
 import utils.MethodSig
 import utils.methodName
@@ -28,17 +30,41 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
 
-object StructuralAnalysis {
+class StructuralAnalysis(val methodTranslator: MethodTranslator) {
+    companion object {
 
-    var comments = false
+        val folder = File(System.getProperty("user.home"), "Desktop/Graphs")
 
-    private var prettyPrint = false
+        init {
+            folder.mkdir()
+        }
+
+        var comments = true
+
+        private var prettyPrint = false
+        var printOps = prettyPrint
+        var ignoreSize = false
+        var compactStatePrinting = true
+
+        var lastSize = 0
+
+        private val equalPairs0 = listOf(
+            I32EQ to I32NE,
+            I32LTS to I32GES,
+            I32LES to I32GTS,
+
+            I64EQ to I64NE,
+            I64LTS to I64GES,
+            I64LES to I64GTS,
+        )
+
+        val equalPairs = equalPairs0.associate { it } +
+                equalPairs0.associate { it.second to it.first }
+    }
+
+    val sig get() = methodTranslator.sig
+
     private var loopIndex = 0
-    var printOps = prettyPrint
-    var ignoreSize = false
-    var compactStatePrinting = true
-
-    var lastSize = 0
 
     fun printState(nodes: List<Node>, labelToNode: Map<Label, Node>, printLine: (String) -> Unit) {
 
@@ -87,89 +113,38 @@ object StructuralAnalysis {
         }
     }
 
-    /**
-     * transform all nodes into some nice if-else-tree
-     * */
-    fun joinNodes(sig: MethodSig, nodes: MutableList<Node>): Builder {
-
-        val isLookingAtSpecial = false
-        if (isLookingAtSpecial) {
-            prettyPrint = true
-            printOps = true
+    private fun removeNegations(node: Node, labelToNode: Map<Label, Node>) {
+        if (!node.isBranch) return
+        while (node.printer.endsWith(I32EQZ)) {// remove unnecessary null check before branch
+            node.printer.instr.removeLast()
+            val t = node.ifTrue!!
+            val f = node.ifFalse!!
+            node.ifTrue = f.label
+            node.ifFalse = labelToNode[t]!!
         }
+    }
 
-        lastSize = nodes.size
-
-        if (nodes.isEmpty()) throw IllegalArgumentException()
-        if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
-            return nodes[0].printer
-        }
-
-        val labelToNode = HashMap(nodes.associateBy { it.label })
-
+    private fun recalculateInputs(nodes: List<Node>, labelToNode: Map<Label, Node>) {
         for (node in nodes) {
-            node.hasNoCode = node.calcHasNoCode()
-            if (node.isBranch) {
-                while (node.printer.endsWith(I32EQZ)) {// remove unnecessary null check before branch
-                    node.printer.instr.removeLast()
-                    // while (node.printer.endsWith(" ")) node.printer.size-- // remove spaces
-                    val t = node.ifTrue!!
-                    val f = node.ifFalse!!
-                    node.ifTrue = f.label
-                    node.ifFalse = labelToNode[t]!!
-                }
-            }
+            node.inputs.clear()
         }
-
-        for (index in nodes.indices) {
-            nodes[index].index = index
-        }
-        var nextNodeIndex = nodes.size
-
-        fun printState() {
-            println()
-            println("state: ")
-            printState(nodes, labelToNode, ::println)
-        }
-
         for (node in nodes) {
-            if (node.isReturn) {
-                node.ifTrue = null
-                node.ifFalse = null
-            }
-            if (node.isAlwaysTrue) {
-                node.ifFalse = null
-            }
+            val tr = labelToNode[node.ifTrue]
+            tr?.inputs?.add(node)
         }
-
-        // add branching information to all nodes
-        fun recalculateInputs() {
-
-            for (node in nodes) {
-                node.inputs.clear()
-            }
-
-            for (node in nodes) {
-                val tr = labelToNode[node.ifTrue]
-                tr?.inputs?.add(node)
-            }
-
-            for (node in nodes) {
-                val tr = node.ifFalse
-                tr?.inputs?.add(node)
-            }
-
+        for (node in nodes) {
+            val tr = node.ifFalse
+            tr?.inputs?.add(node)
         }
-        recalculateInputs()
+    }
 
-        // remove nodes without input
-        while (nodes.removeIf {
-                it != nodes.first() && it.inputs.isEmpty()
-            }) {
-            recalculateInputs()
+    private fun removeNodesWithoutInputs(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
+        while (nodes.removeIf { it != nodes.first() && it.inputs.isEmpty() }) {
+            recalculateInputs(nodes, labelToNode)
         }
+    }
 
-        // remove nodes without code
+    private fun removeNodesWithoutCode(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
         for (i in nodes.indices.reversed()) {
             val node = nodes[i]
             if (node.hasNoCode && !node.isBranch) {
@@ -188,12 +163,14 @@ object StructuralAnalysis {
                 }
             }
         }
+    }
 
-        val uniqueNodes = HashMap<Triple<String, IntPair, List<String>?>, Node>()
-        val nodeMap = HashMap<Node, Node>()
+    private fun findDuplicateNodes(nodes: List<Node>, labelToNode: Map<Label, Node>): Map<Node, Node> {
+        val uniqueNodes = HashMap<Triple<List<Instruction>, IntPair, List<String>?>, Node>()
+        val getPrimaryNodeMap = HashMap<Node, Node>()
         for (node in nodes) {
             val key = Triple(
-                node.printer.toString(),
+                ArrayList(node.printer.instr),
                 IntPair(
                     labelToNode[node.ifTrue]?.index ?: -1,
                     node.ifFalse?.index ?: -1
@@ -202,12 +179,17 @@ object StructuralAnalysis {
             )
             val other = uniqueNodes[key]
             if (other != null) {
-                nodeMap[node] = other
+                getPrimaryNodeMap[node] = other
                 other.inputs.addAll(node.inputs)
             } else {
                 uniqueNodes[key] = node
             }
         }
+        return getPrimaryNodeMap
+    }
+
+    private fun removeDuplicateNodes(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
+        val nodeMap = findDuplicateNodes(nodes, labelToNode)
         if (nodeMap.isNotEmpty()) {
             nodes.removeIf { it in nodeMap.keys }
             for (node in nodes) {
@@ -222,7 +204,9 @@ object StructuralAnalysis {
                 }
             }
         }
+    }
 
+    private fun validateInputOutputStacks(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
         // check input- and output stacks
         val illegals = ArrayList<String>()
         for (node in nodes) {
@@ -242,25 +226,28 @@ object StructuralAnalysis {
         }
 
         if (illegals.isNotEmpty()) {
-            printState()
+            printState(nodes, labelToNode)
             for (ill in illegals) {
                 println(ill)
             }
             throw IllegalStateException("Illegal node in $sig")
         }
+    }
 
-        if (printOps) printState()
+    fun printState(nodes: List<Node>, labelToNode: Map<Label, Node>) {
+        println()
+        println("state: ")
+        printState(nodes, labelToNode, ::println)
+    }
 
+    private fun removeNodesWithoutCodeNorBranch(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
         for (i in nodes.indices) {
             val node = nodes.getOrNull(i) ?: break
             val next = node.next
             if (!node.isBranch && next != null && node.hasNoCode) {
                 // remove this node from inputs with the next one
                 val nextNode = labelToNode[next]
-                if (nextNode == null) {
-                    printState()
-                    throw IllegalStateException("Missing node for $next by ${node.index}, ${nodes.any { it.label == next }}")
-                }
+                    ?: throw IllegalStateException("Missing $next")
                 for (input in node.inputs) {
                     if (input.ifFalse == node) input.ifFalse = nextNode
                     if (input.ifTrue == node.label) input.ifTrue = next
@@ -271,10 +258,60 @@ object StructuralAnalysis {
                 nodes.remove(node)
                 if (printOps) {
                     println("removed ${node.index} \"${node.printer}\"")
-                    printState()
+                    printState(nodes, labelToNode)
                 }
             }
         }
+    }
+
+    /**
+     * transform all nodes into some nice if-else-tree
+     * */
+    fun joinNodes(nodes: MutableList<Node>): Builder {
+
+        val isLookingAtSpecial = false
+        if (isLookingAtSpecial) {
+            prettyPrint = true
+            printOps = true
+        }
+
+        lastSize = nodes.size
+
+        if (nodes.isEmpty()) throw IllegalArgumentException()
+        if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
+            return nodes[0].printer
+        }
+
+        val labelToNode = HashMap(nodes.associateBy { it.label })
+
+        for (node in nodes) {
+            node.hasNoCode = node.calcHasNoCode()
+            removeNegations(node, labelToNode)
+        }
+
+        for (index in nodes.indices) {
+            nodes[index].index = index
+        }
+
+        for (node in nodes) {
+            if (node.isReturn) {
+                node.ifTrue = null
+                node.ifFalse = null
+            }
+            if (node.isAlwaysTrue) {
+                node.ifFalse = null
+            }
+        }
+
+        recalculateInputs(nodes, labelToNode)
+        removeNodesWithoutInputs(nodes, labelToNode)
+        removeNodesWithoutCode(nodes, labelToNode)
+        removeDuplicateNodes(nodes, labelToNode)
+        validateInputOutputStacks(nodes, labelToNode)
+
+        if (printOps) printState(nodes, labelToNode)
+
+        removeNodesWithoutCodeNorBranch(nodes, labelToNode)
 
         fun checkState() {
             checkState(nodes, labelToNode)
@@ -389,7 +426,7 @@ object StructuralAnalysis {
                         changed = true
                         changed2 = true
                         if (printOps) {
-                            printState()
+                            printState(nodes, labelToNode)
                             println("-${prev.index} by 0")
                         }
                     }
@@ -483,7 +520,7 @@ object StructuralAnalysis {
                             changed = true
                             changed2 = true
                             if (printOps) {
-                                printState()
+                                printState(nodes, labelToNode)
                                 if (b0.inputs.isEmpty())
                                     println("-${b0.index} by 1")
                                 if (b1.inputs.isEmpty())
@@ -512,7 +549,7 @@ object StructuralAnalysis {
                             changed = true
                             changed2 = true
                             if (printOps) {
-                                printState()
+                                printState(nodes, labelToNode)
                                 if (b0.inputs.isEmpty())
                                     println("-${b0.index} by 3 | ${node.index} -> ${b0.index}/${b1.index}")
                             }
@@ -536,7 +573,7 @@ object StructuralAnalysis {
                             changed = true
                             changed2 = true
                             if (printOps) {
-                                printState()
+                                printState(nodes, labelToNode)
                                 if (b1.inputs.isEmpty())
                                     println("-${b1.index} by 4")
                             }
@@ -649,7 +686,7 @@ object StructuralAnalysis {
                             changed = true
                             changed2 = true
                             if (printOps) {
-                                printState()
+                                printState(nodes, labelToNode)
                                 println("-${b0.index} by 10")
                             }
                         } else if (!b1.isBranch && b1.inputs.size == 1 && b1.next == b0.label) {
@@ -849,31 +886,15 @@ object StructuralAnalysis {
             // if we're here, it's really complicated,
             // and there isn't any easy ends
 
-            if (printOps) printState()
+            if (printOps) printState(nodes, labelToNode)
 
             if (isLookingAtSpecial) {
                 throw IllegalStateException("Looking at something")
             }
 
-            return createLargeSwitchStatement(sig, nodes, labelToNode)
+            return createLargeSwitchStatement(nodes, labelToNode)
         }
     }
-
-    val equalPairs = arrayOf(
-        I32LTS, I32GES,
-        I32LES, I32GTS,
-
-        // todo why is this an issue?
-        // "i32.eq\n", "i32.ne\n",
-        I32EQ, I32NE,
-
-        I64LTS, I64GES,
-        I64LES, I64GTS,
-        I64EQ, I64NE,
-        // nez doesn't exist :/
-        // "i32.eqz\n", "i32.nez\n",
-        // "i64.eqz\n", "i64.nez\n",
-    )
 
     private fun normalizeGraph(nodes: List<Node>, labelToNode: Map<Label, Node>) {
         var changed = false
@@ -891,39 +912,23 @@ object StructuralAnalysis {
         // if (changed) printState(nodes, labelToNode, ::println)
     }
 
-    fun swapBranches(node: Node, ifTrue: Node, ifFalse: Node) {
+    private fun swapBranches(node: Node, ifTrue: Node, ifFalse: Node) {
         val printer = node.printer
         // swap branches :)
         node.ifTrue = ifFalse.label
         node.ifFalse = ifTrue
         // swap conditional
-        fun replaceLast(b: Instruction) {
+        val lastInstr = printer.instr.lastOrNull()
+        val invInstr = equalPairs[lastInstr]
+        if (invInstr != null) {
             printer.instr.removeLast()
-            printer.append(b)
-            printer.comment("xxx")
+            printer.instr.add(invInstr)
+        } else {
+            printer.append(I32EQZ)
         }
-        for (i in equalPairs.indices step 2) {
-            val a = equalPairs[i]
-            val b = equalPairs[i + 1]
-            if (printer.endsWith(a)) {
-                replaceLast(b)
-                return
-            } else if (printer.endsWith(b)) {
-                replaceLast(a)
-                return
-            }
-        }
-        /* if (printer.endsWith("i32.eqz\n")) {
-             // already negated :)
-             printer.size -= "i32.eqz\n".length
-             printer.append(" ;; xxx\n")
-             return
-         }*/
-        // negation :)
-        printer.append(I32EQZ)
     }
 
-    private fun graphId(sig: MethodSig, nodes: List<Node>, labelToNode: Map<Label, Node>): String {
+    private fun graphId(nodes: List<Node>, labelToNode: Map<Label, Node>): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
         if (false) normalizeGraph(nodes, labelToNode)
         val builder = StringBuilder(nodes.size * 5)
@@ -957,12 +962,6 @@ object StructuralAnalysis {
         return builder.toString()
     }
 
-    val folder = File(System.getProperty("user.home"), "Desktop/Graphs")
-
-    init {
-        folder.mkdir()
-    }
-
     private fun renumber(nodes: List<Node>, exitNode: Node? = null) {
         if (printOps) println("renumbering:")
         var j = 0
@@ -974,22 +973,29 @@ object StructuralAnalysis {
         if (exitNode != null) exitNode.index = j
     }
 
-    private fun createLargeSwitchStatement(sig: MethodSig, nodes0: List<Node>, labelToNode: Map<Label, Node>): Builder {
-        val vs = StackVariables()
-        vs.varPrinter.localVariables.add(LocalVariable("lbl", "i32"))
-        val code = createLargeSwitchStatement1(sig, nodes0, labelToNode, vs)
-        for (i in code.lastIndex downTo 0) {
-            vs.varPrinter.append(code[i])
+    val varPrinter = Builder(64)
+    private val stackVariables = HashSet<String>()
+    fun getStackVarName(i: Int, type: String): String {
+        val name = "s$i$type"
+        if (stackVariables.add(name)) {
+            methodTranslator.localVariables1.add(LocalVariable(name, type))
         }
-        return vs.varPrinter
+        return name
+    }
+
+    private fun createLargeSwitchStatement(nodes0: List<Node>, labelToNode: Map<Label, Node>): Builder {
+        methodTranslator.localVariables1.add(LocalVariable("lbl", "i32"))
+        val code = createLargeSwitchStatement1(sig, nodes0, labelToNode)
+        for (i in code.lastIndex downTo 0) {
+            varPrinter.append(code[i])
+        }
+        return varPrinter
     }
 
     private fun createLargeSwitchStatement2(
-        sig: MethodSig,
         nodes0: List<Node>,
         labelToNode: Map<Label, Node>,
         exitNode: Node?, // not included, next
-        vars: StackVariables
     ): Builder {
 
         // if (nodes.size == 2) throw IllegalStateException()
@@ -1002,7 +1008,7 @@ object StructuralAnalysis {
 
         // create graph id
         // to do store image of graph based on id
-        val graphId = graphId(sig, nodes, labelToNode)
+        val graphId = graphId(nodes, labelToNode)
         if (true) {
             val file = File(folder, graphId)
             if (!file.exists()) {
@@ -1054,13 +1060,14 @@ object StructuralAnalysis {
                 if (!outputs.isNullOrEmpty()) {
                     if (comments) printer.comment("store stack")
                     for ((idx, type) in outputs.withIndex().reversed()) {
-                        printer.append(LocalSet(vars.getStackVarName(idx, type)))
+                        printer.append(LocalSet(getStackVarName(idx, type)))
                     }
                 }
             }
         }
 
         val loopIdx = loopIndex++
+        val loopName = "b$loopIdx"
 
         if (firstIsLinear) {
             if (comments) printer.comment("execute -1")
@@ -1083,20 +1090,20 @@ object StructuralAnalysis {
             // load stack
             val inputs = node.inputStack
             if (!inputs.isNullOrEmpty()) {
-                if (comments) printer.comment("load stack")
+                if (comments) node.printer.comment("load stack")
                 for (idx in 0 until inputs.size - dropCtr) {
                     val type = inputs[idx]
-                    printer.append(LocalGet(vars.getStackVarName(idx, type)))
+                    node.printer.append(LocalGet(getStackVarName(idx, type)))
                 }
                 val dropped = min(inputs.size, dropCtr)
                 for (i in 0 until dropped) printer.append(Drop)
             }
             if (node != exitNode) {
                 // execute
-                if (comments) printer.comment("execute ${node.index}")
+                if (comments) node.printer.comment("execute ${node.index}")
                 finishBlock(node)
                 // close block
-                printer.append(Jump("b$loopIdx"))
+                node.printer.append(Jump(loopName))
             }
         }
 
@@ -1104,7 +1111,8 @@ object StructuralAnalysis {
             appendBlock(node)
         }
 
-        printer.append(SwitchCase(nodes.map { it.printer.instr }))
+        // good like that???
+        printer.append(LoopInstr(loopName, listOf(SwitchCase(nodes.map { it.printer.instr })), emptyList()))
 
         if (exitNode != null) {
             appendBlock(exitNode)
@@ -1120,8 +1128,7 @@ object StructuralAnalysis {
     private fun createLargeSwitchStatement1(
         sig: MethodSig,
         nodes0: List<Node>,
-        labelToNode: Map<Label, Node>,
-        vars: StackVariables
+        labelToNode: Map<Label, Node>
     ): ArrayList<Builder> {
         // find all nodes, that separate the graph
         for (separator in nodes0) {
@@ -1163,17 +1170,15 @@ object StructuralAnalysis {
                             reached.removeAll(revReached)
 
                             val code0 = createLargeSwitchStatement2(
-                                sig, nodes0.filter { it in reached },
+                                nodes0.filter { it in reached },
                                 labelToNode,
-                                separator,
-                                vars
+                                separator
                             )
 
                             val code1i = createLargeSwitchStatement1( // split second part :)
                                 sig, // first separator (enter node), then all else
                                 listOf(separator) + nodes0.filter { it in revReached && it != separator },
-                                labelToNode,
-                                vars
+                                labelToNode
                             )
 
                             code1i.add(code0)
@@ -1184,7 +1189,7 @@ object StructuralAnalysis {
             }
         }
 
-        return arrayListOf(createLargeSwitchStatement2(sig, nodes0, labelToNode, null, vars))
+        return arrayListOf(createLargeSwitchStatement2(nodes0, labelToNode, null))
     }
 }
 

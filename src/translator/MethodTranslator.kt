@@ -15,13 +15,14 @@ import exportAll
 import gIndex
 import graphing.Node
 import graphing.StructuralAnalysis
-import graphing.StructuralAnalysis.joinNodes
 import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
+import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
@@ -124,8 +125,15 @@ class MethodTranslator(
     private val stack = ArrayList<String>()
     private val argsMapping = HashMap<Int, Int>()
 
-    private val localVariables1 = ArrayList<LocalVariable>()
-    lateinit var headPrinter1: FunctionImpl
+    val localVariables1 = ArrayList<LocalVariable>()
+    private val activeLocalVars = ArrayList<LocalVar>()
+
+    data class LocalVar(
+        val descriptor: String,
+        val wasmType: String,
+        val wasmName: String,
+        val index: Int
+    )
 
     private var resultType = 'V'
 
@@ -146,18 +154,6 @@ class MethodTranslator(
     val canThrowError = canThrowError(sig)
     private val canPush = enableTracing && canThrowError
 
-    private val localVariables = ArrayList<LocalVar>()
-    private val activeLocalVars = ArrayList<LocalVar>()
-
-    data class LocalVar(
-        val descriptor: String,
-        val wasmType: String,
-        val wasmName: String,
-        val start: Label,
-        val end: Label,
-        val index: Int
-    )
-
     private val isStatic = access.hasFlag(ACC_STATIC)
 
     init {
@@ -165,7 +161,7 @@ class MethodTranslator(
             // if has @WASM annotation, use that code
             val wasm = hIndex.wasmNative[sig]
             if (wasm != null) {
-                printHeader(access)
+                printHeader()
                 printer.instr.addAll(wasm)
                 currentNode.isReturn = true
             } else {
@@ -178,7 +174,7 @@ class MethodTranslator(
                 println("// processing $clazz $name $descriptor")
                 println("////////////////////////\n")
             }
-            printHeader(access)
+            printHeader()
             if (name == "<clinit>") {
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
@@ -194,43 +190,25 @@ class MethodTranslator(
         }
     }
 
-    private fun printHeader(access: Int) {
-        val static = access.hasFlag(ACC_STATIC)
+    lateinit var args: List<String>
+    private fun printHeader() {
         // convert descriptor into list of classes for arguments
-        val args = split1(descriptor.substring(1, descriptor.lastIndexOf(')')))
-
+        args = split1(descriptor.substring(1, descriptor.lastIndexOf(')')))
         // special rules in Java:
         // double and long use two slots in localVariables
-        val nothingLabel = Label()
-        var numArgs = 0
-        var idx = 0
-        if (!static) {
-            activeLocalVars.add(LocalVar(clazz, ptrType, "0", nothingLabel, nothingLabel, 0))
-            argsMapping[numArgs++] = idx++
-        }
-        for (arg in args) {
-            activeLocalVars.add(LocalVar(arg, jvm2wasm(arg), "$idx", nothingLabel, nothingLabel, numArgs))
-            argsMapping[numArgs] = idx++
-            numArgs += when (arg) {
-                "D", "J" -> 2
-                else -> 1
-            }
-        }
-
         resultType = descriptor[descriptor.indexOf(')') + 1]
-        val name2 = methodName(sig)
-
         val mapped = hIndex.getAlias(sig)
-        if (mapped != sig) {
-            throw IllegalStateException("Must not translate $sig, because it is mapped to $mapped")
-        }
-        val exported = exportAll || sig in hIndex.exportedMethods
+        assertEquals(mapped, sig) { "Must not translate $sig, because it is mapped to $mapped" }
+    }
 
+    private fun createFuncHead(): FunctionImpl {
+        val name2 = methodName(sig)
+        val exported = exportAll || sig in hIndex.exportedMethods
         val results = ArrayList<String>(2)
         if (resultType != 'V') results.add(jvm2wasm1(resultType))
         if (canThrowError) results.add(ptrType)
-        headPrinter1 = FunctionImpl(
-            name2, (if(isStatic) emptyList() else listOf(ptrType)) + args.map { jvm2wasm(it) },
+        return FunctionImpl(
+            name2, (if (isStatic) emptyList() else listOf(ptrType)) + args.map { jvm2wasm(it) },
             results, localVariables1, emptyList(), exported
         )
     }
@@ -933,31 +911,26 @@ class MethodTranslator(
         v = findOrDefineLocalVar(i, wasmType)
         // initialize it once at the start... "synthetic local variable" in JDGui
         nodes.first().printer
-            .prepend(listOf(Const(ConstType.find(wasmType), "0"), LocalSet(v.wasmName)))
+            .prepend(listOf(Const.zero[wasmType]!!, LocalSet(v.wasmName)))
         return v
     }
 
     private fun findOrDefineLocalVar(i: Int, wasmType: String): LocalVar {
         var v = activeLocalVars.firstOrNull { it.index == i && it.wasmType == wasmType }
         if (v == null) {
-            val wasmName = defineLocalVar(i.toString(), wasmType)
-            val label = Label()
-            v = LocalVar("", wasmType, wasmName, label, label, i)
+            val wasmName = defineLocalVar(i, wasmType)
+            v = LocalVar("", wasmType, wasmName, i)
             activeLocalVars.add(v)
         }
         return v
     }
 
     // name,type -> newName, because types can change in JVM, but they can't in WASM
-    private val localVars = HashMap<Pair<String?, String>, String>()
+    private val localVars = HashMap<Pair<Int, String>, String>()
 
     override fun visitLocalVariable(
-        name: String?,
-        descriptor: String,
-        signature: String?,
-        start: Label,
-        end: Label,
-        index: Int
+        name: String?, descriptor: String, signature: String?,
+        start: Label, end: Label, index: Int
     ) {
         // we don't care yet
         /*val wasmType = jvm2wasm1(descriptor)
@@ -967,7 +940,7 @@ class MethodTranslator(
         if (printOps) println("  local var $name, $descriptor, $signature, $start .. $end, #$index")*/
     }
 
-    private fun defineLocalVar(name: String?, wasmType: String): String {
+    private fun defineLocalVar(name: Int, wasmType: String): String {
         return localVars.getOrPut(Pair(name, wasmType)) {
             // register local variable
             val name2 = "l${localVars.size}"
@@ -1515,15 +1488,8 @@ class MethodTranslator(
                 printer.append(Return)
             } else {
                 val retType = jvm2wasm1(resultType)
-                printer.append(
-                    when (retType) {
-                        "i32" -> i32Const(0)
-                        "i64" -> i64Const(0)
-                        "f32" -> f32Const(0f)
-                        "f64" -> f64Const(0.0)
-                        else -> throw NotImplementedError()
-                    }
-                ).append(Call("swapi32$retType"))
+                printer.append(Const.zero[retType]!!)
+                    .append(Call("swapi32$retType"))
                     .append(Return)
             }
             if (!printer.endsWith(Return) && !printer.endsWith(Unreachable)) {
@@ -1542,13 +1508,7 @@ class MethodTranslator(
                     )
                 )
             } else {
-                val constExpr = when (jvm2wasm1(resultType)) {
-                    "i32" -> i32Const(0)
-                    "i64" -> i64Const(0)
-                    "f32" -> f32Const(0f)
-                    "f64" -> f64Const(0.0)
-                    else -> throw NotImplementedError()
-                }
+                val constExpr = Const.zero[jvm2wasm1(resultType)]!!
                 printer.append(
                     IfBranch(
                         listOf(constExpr, LocalGet(tmp), Return), emptyList(),
@@ -1750,12 +1710,6 @@ class MethodTranslator(
 
         if (printOps) println(" [label] $label")
         if (comments) printer.comment(label.toString())
-        for (v in localVariables) {
-            when (label) {
-                v.start -> activeLocalVars.add(v)
-                v.end -> activeLocalVars.remove(v)
-            }
-        }
     }
 
     private fun getLoadInstr(descriptor: String): Instruction = when (single(descriptor)) {
@@ -1891,15 +1845,7 @@ class MethodTranslator(
                     printer.append(getLoadInstr(descriptor))
                     if (comments) printer.comment("get static '$owner.$name'")
                 } else {
-                    printer.push(wasmType).append(
-                        when (wasmType) {
-                            "i32" -> i32Const(0)
-                            "i64" -> i64Const(0)
-                            "f32" -> f32Const(0f)
-                            "f64" -> f64Const(0.0)
-                            else -> throw NotImplementedError()
-                        }
-                    )
+                    printer.push(wasmType).append(Const.zero[wasmType]!!)
                 }
             }
             0xb3 -> {
@@ -1957,20 +1903,10 @@ class MethodTranslator(
                     if (comments) {
                         if (owner == clazz) printer.comment("get field '$name'")
                         else printer.comment("get field '$owner.$name'")
-                    } else printer
-                } else {
-                    printer.append(Drop).append(
-                        when (wasmType) {
-                            "i32" -> i32Const(0)
-                            "i64" -> i64Const(0)
-                            "f32" -> f32Const(0f)
-                            "f64" -> f64Const(0.0)
-                            else -> throw NotImplementedError()
-                        }
-                    )
-                    if (comments) {
-                        printer.comment("dropped getting $name")
                     }
+                } else {
+                    printer.append(Drop).append(Const.zero[wasmType]!!)
+                    if (comments) printer.comment("dropped getting $name")
                 }
             }
             0xb5 -> {
@@ -2033,10 +1969,11 @@ class MethodTranslator(
                 }
             }
 
-            val jointBuilder = joinNodes(sig, nodes)
+            val jointBuilder = StructuralAnalysis(this).joinNodes(nodes)
+            val headPrinter1 = createFuncHead()
             gIndex.translatedMethods[sig] = FunctionImpl(
                 headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
-                headPrinter1.locals + jointBuilder.localVariables, headPrinter1.body + jointBuilder.instr,
+                headPrinter1.locals, headPrinter1.body + jointBuilder.instr,
                 headPrinter1.isExported
             )
         }

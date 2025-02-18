@@ -12,5 +12,12 @@ class Const(val type: ConstType, val value: String) : Instruction {
         fun i64Const(value: Long): Const = Const(ConstType.I64, value.toString())
         fun f32Const(value: Float): Const = Const(ConstType.F32, value.toString())
         fun f64Const(value: Double): Const = Const(ConstType.F64, value.toString())
+
+        val zero = mapOf(
+            "i32" to i32Const(0),
+            "i64" to i64Const(0),
+            "f32" to f32Const(0f),
+            "f64" to f64Const(0.0)
+        )
     }
 }

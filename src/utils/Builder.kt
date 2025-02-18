@@ -2,12 +2,9 @@ package utils
 
 import wasm.instr.Comment
 import wasm.instr.Instruction
-import wasm.parser.LocalVariable
 
 // typealias Builder = StringBuilder2
 class Builder(capacity: Int = 16) {
-
-    val localVariables = ArrayList<LocalVariable>()
 
     val instr = ArrayList<Instruction>(capacity)
     val length get() = instr.size
