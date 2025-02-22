@@ -176,7 +176,7 @@ class MethodTranslator(
             val wasm = hIndex.wasmNative[sig]
             if (wasm != null) {
                 printHeader()
-                printer.instrs.addAll(wasm)
+                printer.append(wasm)
                 currentNode.isReturn = true
             } else {
                 // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
@@ -197,7 +197,8 @@ class MethodTranslator(
                     .append(
                         IfBranch(
                             if (canThrowError) listOf(i32Const0, Return)
-                            else listOf(Return), emptyList(), emptyList(), emptyList()
+                            else listOf(Return), emptyList(),
+                            emptyList(), emptyList()
                         )
                     )
             }
@@ -1073,7 +1074,7 @@ class MethodTranslator(
 
                     stackPush()
 
-                    printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
+                    printer.append(CallIndirect(gIndex.getType(false, descriptor, calledCanThrow)))
                     ActuallyUsedIndex.add(this.sig, sig)
                     if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
@@ -1084,31 +1085,17 @@ class MethodTranslator(
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
 
                     stackPush()
-
                     getCaller(printer)
 
-                    // todo store this index in a table instead?
-                    printer.append(i32Const(-gIndex.getString(methodName(sig))))
+                    printer.append(i32Const(gIndex.getString(methodName(sig))))
                         // instance, function index -> function-ptr
-                        .append(Call("resolveIndirect"))
-                        .comment("not constructable class, $sig")
-                        .push(i32)
-                    handleThrowable()
-                    printer.pop(i32)
+                        .comment("not constructable class, $sig, $owner, $name, $descriptor")
+                        .append(Call.resolveIndirectFail)
+                        .append(Unreachable)
+
                     pop(splitArgs, false, ret)
-
-                    printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
-                    if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
-
                     stackPop()
 
-                    /*if (canThrowError) {
-                        pop(splitArgs, false, "V")
-                        visitLdcInsn("Class not constructable!: $owner")
-                        printer.append("  call \$createNullptr\n")
-                        visitInsn(0x101) // return error
-                        // handleThrowable(true)
-                    } else throw IllegalStateException()*/
                 } else if (sig0 in hIndex.finalMethods) {
 
                     val sigs = getMethodVariants(sig0)
@@ -1146,7 +1133,7 @@ class MethodTranslator(
                             // can be directly called
                             val inline = hIndex.inlined[sig]
                             if (inline != null) {
-                                printer.instrs.addAll(inline)
+                                printer.append(inline)
                                 printer.comment("virtual-inlined $sig")
                             } else {
                                 stackPush()
@@ -1179,14 +1166,14 @@ class MethodTranslator(
                         val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
                         printer.append(i32Const(funcPtr))
                             // instance, function index -> function-ptr
-                            .append(Call("resolveIndirect"))
+                            .append(Call.resolveIndirect)
                             .comment("$sig0, #${options.size}")
                             .push(i32)
                         stackPop()
                         handleThrowable()
                         printer.pop(i32)
                         pop(splitArgs, false, ret)
-                        printer.append(CallIndirect(gIndex.getType(descriptor, calledCanThrow)))
+                        printer.append(CallIndirect(gIndex.getType(false, descriptor, calledCanThrow)))
                         if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
                         ActuallyUsedIndex.add(this.sig, sig)
                     }
@@ -1200,7 +1187,7 @@ class MethodTranslator(
                 pop(splitArgs, false, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
-                    printer.instrs.addAll(inline)
+                    printer.append(inline)
                     printer.comment("special-inlined $sig")
                 } else {
                     stackPush()
@@ -1216,7 +1203,7 @@ class MethodTranslator(
                 pop(splitArgs, true, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
-                    printer.instrs.addAll(inline)
+                    printer.append(inline)
                     printer.comment("static-inlined $sig")
                 } else {
                     stackPush()
@@ -1497,11 +1484,10 @@ class MethodTranslator(
 
         } else {
             if (comments) {
-                if (mustThrow) {
-                    printer.comment("no catcher was found, returning")
-                } else {
-                    printer.comment("no catcher was found, returning maybe")
-                }
+                printer.comment(
+                    if (mustThrow) "no catcher was found, returning"
+                    else "no catcher was found, returning maybe"
+                )
             }
             // easy, inline, without graph :)
             returnIfThrowable(mustThrow)
@@ -1530,11 +1516,13 @@ class MethodTranslator(
             val tmp = tmpI32
             printer.append(LocalSet(tmp))
             printer.append(LocalGet(tmp))
+            val stack1 = ArrayList(stack)
+            if (comments) printer.comment("stack: $stack")
             if (resultType == 'V') {
                 printer.append(
                     IfBranch(
                         listOf(LocalGet(tmp), Return), emptyList(),
-                        emptyList(), emptyList()
+                        stack1, stack1
                     )
                 )
             } else {
@@ -1542,7 +1530,7 @@ class MethodTranslator(
                 printer.append(
                     IfBranch(
                         listOf(constExpr, LocalGet(tmp), Return), emptyList(),
-                        emptyList(), emptyList()
+                        stack1, stack1
                     )
                 )
             }

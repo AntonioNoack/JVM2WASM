@@ -51,5 +51,8 @@ class Call(val name: String) : Instruction {
         val al = Call("al")
         val alU = Call("alU")
 
+        val resolveIndirect = Call("resolveIndirect")
+        val resolveIndirectFail = Call("resolveIndirectFail")
+
     }
 }

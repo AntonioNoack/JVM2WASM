@@ -237,6 +237,11 @@ public class JVM32 {
         return resolveIndirectByClass(readClass(instance), methodPtr);
     }
 
+    @Alias(names = "resolveIndirectFail")
+    public static void resolveIndirectFail(int instance, String methodName) {
+        throwJs("Resolving non constructable method", instance, methodName);
+    }
+
     // todo mark some static fields as not needing <clinit>
     // private static int riLastClass, riLastMethod, riLastImpl;
 
@@ -289,6 +294,12 @@ public class JVM32 {
 
     @NoThrow
     public static void throwJs(String s, int a, int b) {
+        log(s, a, b);
+        crash();
+    }
+
+    @NoThrow
+    public static void throwJs(String s, int a, String b) {
         log(s, a, b);
         crash();
     }

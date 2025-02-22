@@ -1,9 +1,6 @@
 package wasm2cpp
 
-import me.anno.utils.assertions.assertEquals
-import me.anno.utils.assertions.assertFail
-import me.anno.utils.assertions.assertNotEquals
-import me.anno.utils.assertions.assertTrue
+import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import utils.*
@@ -30,7 +27,11 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-data class StackElement(val type: String, val name: String)
+data class StackElement(val type: String, val name: String) {
+    override fun toString(): String {
+        return "$type $name"
+    }
+}
 
 fun defineFunctionHead(function: FunctionImpl, parameterNames: Boolean) {
     defineFunctionHead(function.funcName, function.params, function.results, parameterNames)
@@ -111,11 +112,25 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     val stack = ArrayList<StackElement>()
     private var genI = 0
     private fun nextTemporaryVariable(): String = "tmp${genI++}"
+
+    private fun popInReverse(funcName: String, types: List<String>): List<String> {
+        assertTrue(stack.size >= types.size) { "Expected $types for $funcName, got $stack" }
+        val hasMismatch = types.indices.any { i -> types[i] != stack[i + stack.size - types.size].type }
+        assertFalse(hasMismatch) { "Expected $types for $funcName, got $stack" }
+        val result = ArrayList<String>(types.size)
+        for (ti in types.lastIndex downTo 0) {
+            val name = pop(types[ti])
+            result.add(name)
+        }
+        result.reverse()
+        return result
+    }
+
     private fun pop(type: String): String {
         val i0 = stack.removeLastOrNull()
             ?: assertFail("Tried popping $type, but stack was empty")
         // println("pop -> $i0 + $stack")
-        assertEquals(type, i0.type) { "pop -> $i0 + $stack" }
+        assertEquals(type, i0.type) { "pop($type) vs $stack + $i0" }
         return i0.name
     }
 
@@ -178,18 +193,17 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
         begin()
         if (results.isNotEmpty()) {
-            for (ri in results.indices) {
-                writer.append(results[ri])
+            for (i in results.indices) {
+                writer.append(results[i])
             }
             writer.append(" ").append(tmp).append(" = ")
         }
 
         writer.append(funcName).append('(')
-        assertTrue(stack.size >= params.size) { "Expected $params for $funcName, got $stack" }
-        val popped = params.reversed().map { pop(it) }
-        for (pi in popped.reversed()) {
+        val popped = popInReverse(funcName, params)
+        for (i in popped.indices) {
             if (!writer.endsWith("(")) writer.append(", ")
-            writer.append(pi)
+            writer.append(popped[i])
         }
         writer.append(')').end()
 
@@ -355,9 +369,9 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 // get running parameters...
                 val condition = pop(i32)
                 val baseSize = stack.size - i.params.size
-                val paramPopped = i.params.reversed().map { pop(it) }
+                val paramPopped = popInReverse(function.funcName, i.params)
                 for (j in i.params.indices) {
-                    beginNew(i.params[j]).append(paramPopped[i.params.lastIndex - j]).end()
+                    beginNew(i.params[j]).append(paramPopped[j]).end()
                 }
 
                 if (i.ifFalse.isEmpty()) {
@@ -383,7 +397,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     }
                     // pack results into our stack somehow...
                     // resultVars[i] = stack[i].name
-                    for (j in i.results.indices.reversed()) {
+                    for (j in i.results.lastIndex downTo 0) {
                         val srcVar = pop(i.results[j])
                         val dstVar = resultVars[j]
                         begin().append(dstVar).append(" = ").append(srcVar).end()
@@ -393,7 +407,9 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 fun writeBranchContents(instructions: List<Instruction>) {
                     depth++
                     for (j in instructions.indices) {
-                        writeInstruction(instructions[j])
+                        val instr = instructions[j]
+                        writeInstruction(instr)
+                        if (instr == Return || instr == Unreachable) break
                     }
                     packResultsIntoOurStack(instructions)
                     depth--
@@ -477,7 +493,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 }
                 if (!lastIsContinue) {
                     // save results
-                    for (j in i.results.indices.reversed()) {
+                    for (j in i.results.lastIndex downTo 0) {
                         begin().append(resultNames[j]).append(" = ")
                             .append(pop(i.results[j])).end()
                     }
@@ -515,9 +531,17 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             depth--
             begin().append("case").append(j).append(": {\n")
             depth++
+
             val instructions = cases[j]
+            val realLast = instructions.lastOrNull()
+            if (realLast == Unreachable || realLast == Return) {
+                for (element in instructions) {
+                    writeInstruction(element)
+                }
+                continue
+            }
+
             assertTrue(instructions.size >= 2)
-            val realLast = instructions.last()
             val isLast = j == cases.lastIndex
             assertTrue(isLast || realLast is Jump) // for while(true)-branch
             var skipped = if (isLast) 1 else 2

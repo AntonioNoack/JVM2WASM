@@ -164,7 +164,7 @@ object ResolveIndirect {
                     nextBranch.add(IfBranch(createBody(toBeCalled), lastBranch, getArgs(), getResult()))
                     lastBranch = nextBranch
                 }
-                printer.instrs.addAll(lastBranch)
+                printer.append(lastBranch)
             }
 
             stackPush()

@@ -21,7 +21,7 @@ class Node(val label: Label) {
     var inputStack: List<String>? = null
     var outputStack: List<String>? = null
 
-    var printer = Builder(32)
+    var printer = Builder()
 
     var hasNoCode = false
     fun calcHasNoCode(): Boolean = printer.instrs.all { it is Comment }

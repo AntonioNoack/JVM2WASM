@@ -1,20 +1,10 @@
 package jvm;
 
 public class Boxing {
+    // box = valueOf
+    // unbox = intValue()
 
-    public static Integer box(int x) {
-        return x;
-    }
-
-    public static Long box(long x) {
-        return x;
-    }
-
-    public static Float box(float x) {
-        return x;
-    }
-
-    public static Double box(double x) {
+    public static char unbox(Character x) {
         return x;
     }
 
@@ -31,6 +21,10 @@ public class Boxing {
     }
 
     public static double unbox(Double x) {
+        return x;
+    }
+
+    public static boolean unbox(Boolean x) {
         return x;
     }
 

@@ -119,7 +119,7 @@ fun genericsTypes(d: String, static: Boolean = true): String {
     return result.toString()
 }
 
-fun splitToType(descriptor: String, canThrow: Boolean): FuncType {
+fun splitToType(static: Boolean, descriptor: String, canThrow: Boolean): FuncType {
     assertTrue(descriptor.startsWith('('))
     var i = 1 // skip '('
 
@@ -146,6 +146,7 @@ fun splitToType(descriptor: String, canThrow: Boolean): FuncType {
     assertTrue(closeIdx > 0, descriptor)
 
     val params = ArrayList<String>()
+    if (!static) params.add(ptrType)
     while (i < closeIdx) {
         params.add(readType())
     }

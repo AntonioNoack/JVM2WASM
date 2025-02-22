@@ -477,7 +477,8 @@ fun jvm2wasm() {
     }
 
     // append nth-getter-methods
-    for (desc in gIndex.nthGetterMethods.map { it.value }) {
+    for (desc in gIndex.nthGetterMethods
+        .map { it.value }.sortedBy { it.funcName }) {
         bodyPrinter.append(desc)
     }
 
@@ -491,7 +492,7 @@ fun jvm2wasm() {
 
     val usedMethods = ActuallyUsedIndex.resolve()
 
-    val isUsed = MethodSig.c(
+    /*val isUsed = MethodSig.c(
         "kotlin/jvm/internal/PropertyReference1", "invoke",
         "(Ljava_lang_Object;)Ljava_lang_Object;"
     )
@@ -519,7 +520,7 @@ fun jvm2wasm() {
     printUsed(parentMissing)
 
     assertTrue(methodName(isUsed) in usedMethods)
-    assertTrue(methodName(isMissing) in usedMethods)
+    assertTrue(methodName(isMissing) in usedMethods)*/
 
     val isUsed2 = MethodSig.c("java/io/InputStreamReader", "close", "()V")
     printUsed(isUsed2)

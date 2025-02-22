@@ -11,7 +11,6 @@ import utils.FieldSig
 import utils.MethodSig
 import utils.methodName2
 import utils.split1
-import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
 
@@ -34,34 +33,39 @@ class DelayedLambdaUpdate(
 
     private fun box(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
         assertTrue(isNative(arg))
+        val invokeStatic = 0xb8
         when (arg) {
+            "B" -> printer.visitMethodInsn2(
+                invokeStatic, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
+                false, checkThrowable
+            )
+            "S" -> printer.visitMethodInsn2(
+                invokeStatic, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
+                false, checkThrowable
+            )
+            "C" -> printer.visitMethodInsn2(
+                invokeStatic, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
+                false, checkThrowable
+            )
             "I" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "box",
-                "(I)Ljava/lang/Integer;",
-                false,
-                checkThrowable
+                invokeStatic, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
+                false, checkThrowable
             )
             "J" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "box",
-                "(J)Ljava/lang/Long;",
-                false,
-                checkThrowable
+                invokeStatic, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
+                false, checkThrowable
             )
             "F" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "box",
-                "(F)Ljava/lang/Float;",
-                false,
-                checkThrowable
+                invokeStatic, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
+                false, checkThrowable
             )
             "D" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "box",
-                "(D)Ljava/lang/Double;",
-                false,
-                checkThrowable
+                invokeStatic, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
+                false, checkThrowable
+            )
+            "Z" -> printer.visitMethodInsn2(
+                invokeStatic, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
+                false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
         }
@@ -69,34 +73,39 @@ class DelayedLambdaUpdate(
 
     private fun unbox(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
         assertFalse(isNative(arg))
+        val invokeVirtual = 0xb6
         when (arg2) {
+            "B" -> printer.visitMethodInsn2(
+                invokeVirtual, "java/lang/Byte", "byteValue", "()B",
+                false, checkThrowable
+            )
+            "S" -> printer.visitMethodInsn2(
+                invokeVirtual, "java/lang/Short", "shortValue", "()S",
+                false, checkThrowable
+            )
+            "C" -> printer.visitMethodInsn2(
+                invokeVirtual, "java/lang/Character", "charValue", "()C",
+                false, checkThrowable
+            )
             "I" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "unbox",
-                "(Ljava/lang/Integer;)I",
-                false,
-                checkThrowable
+                invokeVirtual, "java/lang/Integer", "intValue", "()I",
+                false, checkThrowable
             )
             "J" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "unbox",
-                "(Ljava/lang/Long;)J",
-                false,
-                checkThrowable
+                invokeVirtual, "java/lang/Long", "longValue", "()J",
+                false, checkThrowable
             )
             "F" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "unbox",
-                "(Ljava/lang/Float;)F",
-                false,
-                checkThrowable
+                invokeVirtual, "java/lang/Float", "floatValue", "()F",
+                false, checkThrowable
             )
             "D" -> printer.visitMethodInsn2(
-                0xb8,
-                "jvm/Boxing", "unbox",
-                "(Ljava/lang/Double;)D",
-                false,
-                checkThrowable
+                invokeVirtual, "java/lang/Double", "doubleValue", "()D",
+                false, checkThrowable
+            )
+            "Z" -> printer.visitMethodInsn2(
+                invokeVirtual, "java/lang/Boolean", "booleanValue", "()Z",
+                false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
         }

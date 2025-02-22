@@ -2,6 +2,8 @@ package utils
 
 import wasm.instr.Comment
 import wasm.instr.Instruction
+import wasm.instr.Instructions.Return
+import wasm.instr.Instructions.Unreachable
 
 // typealias Builder = StringBuilder2
 class Builder(capacity: Int = 16) {
@@ -10,18 +12,26 @@ class Builder(capacity: Int = 16) {
     val length get() = instrs.size
 
     fun append(instr: Instruction): Builder {
-        instrs.add(instr)
+        val prevInstr = instrs.lastOrNull()
+        if (prevInstr != Unreachable && prevInstr != Return) {
+            instrs.add(instr)
+        }
+        return this
+    }
+
+    fun append(builder: List<Instruction>): Builder {
+        instrs.ensureCapacity(instrs.size + builder.size)
+        for (instr in builder) append(instr)
         return this
     }
 
     fun append(builder: Builder): Builder {
-        instrs.ensureCapacity(instrs.size + builder.instrs.size)
-        for (instr in builder.instrs) append(instr)
-        return this
+        return append(builder.instrs)
     }
 
     fun prepend(builder: Builder): Builder {
         instrs.addAll(0, builder.instrs)
+        // todo ensure nothing comes after Unreachable/Return
         return this
     }
 

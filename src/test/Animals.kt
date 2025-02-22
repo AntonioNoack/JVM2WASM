@@ -12,7 +12,6 @@ import me.anno.engine.ECSRegistry
 import me.anno.engine.ScenePrefab
 import me.anno.gpu.texture.Clamping
 import me.anno.io.saveable.SaveableArray
-import me.anno.io.base.BaseReader.Companion.getNewClassInstance
 import me.anno.io.utils.StringMap
 import org.jbox2d.collision.shapes.ShapeType
 import org.jbox2d.common.Vec2

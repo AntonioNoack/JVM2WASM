@@ -8,6 +8,7 @@ import isRootType
 import jvm.JVM32.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass1
@@ -95,8 +96,8 @@ object GeneratorIndex {
 
     // register type in index list
     // return name of that type
-    fun getType(descriptor: String, canThrow: Boolean): FuncType {
-        val wasmType = splitToType(descriptor, canThrow)
+    fun getType(static: Boolean, descriptor: String, canThrow: Boolean): FuncType {
+        val wasmType = splitToType(static, descriptor, canThrow)
         types.add(wasmType)
         return wasmType
     }
@@ -106,7 +107,16 @@ object GeneratorIndex {
     val nthGetterMethods = HashMap<List<String>, FunctionImpl>()
     fun getNth(typeStack: List<String>): String {
         return nthGetterMethods.getOrPut(typeStack) {
-            val name = "getNth_${nthGetterMethods.size}"
+            val name0 = typeStack.joinToString("") {
+                when (it) {
+                    i32 -> "i"
+                    i64 -> "l"
+                    f32 -> "f"
+                    f64 -> "d"
+                    else -> assertFail(it)
+                }
+            }
+            val name = "getNth_$name0"
             FunctionImpl(
                 name, typeStack, typeStack + typeStack.first(),
                 emptyList(), typeStack.indices.map { ParamGet(it) } + ParamGet(0),

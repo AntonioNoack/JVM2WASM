@@ -307,14 +307,13 @@ class StructuralAnalysis(
 
     private fun makeNodeLoop(name: String, node: Node) {
         val label = "$name${loopIndex++}"
-        node.printer.instrs.add(Jump(label))
-        val newPrinter = LoopInstr(
-            label, ArrayList(node.printer.instrs),
+        node.printer.append(Jump(label))
+        val newPrinter = Builder()
+        newPrinter.append(LoopInstr(
+            label, node.printer.instrs,
             blockParamsGetResult(node, null)
-        )
-        node.printer.clear()
-        node.printer.append(newPrinter)
-        node.printer.append(Unreachable)
+        )).append(Unreachable)
+        node.printer = newPrinter
         node.isAlwaysTrue = false
         node.ifTrue = null
         node.ifFalse = null
@@ -988,7 +987,7 @@ class StructuralAnalysis(
         val invInstr = equalPairs[lastInstr]
         if (invInstr != null) {
             printer.instrs.removeLast()
-            printer.instrs.add(invInstr)
+            printer.append(invInstr)
         } else {
             printer.append(I32EQZ)
         }
@@ -1152,18 +1151,11 @@ class StructuralAnalysis(
             val inputs = node.inputStack
             if (!inputs.isNullOrEmpty()) {
                 val pre = Builder()
-                var dropCtr = 0
-                while (true) {
-                    if (!node.printer.startsWith(Drop, dropCtr)) break
-                    dropCtr++
-                }
                 if (comments) pre.comment("load stack")
-                for (idx in 0 until inputs.size - dropCtr) {
+                for (idx in inputs.indices) {
                     val type = inputs[idx]
                     pre.append(LocalGet(getStackVarName(idx, type)))
                 }
-                val dropped = min(inputs.size, dropCtr)
-                for (i in 0 until dropped) pre.append(Drop)
                 node.printer.prepend(pre)
             }
             if (node != exitNode) {

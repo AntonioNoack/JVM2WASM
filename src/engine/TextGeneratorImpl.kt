@@ -20,21 +20,28 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         return TextGen.getSize(font.name, text, font.size, widthLimit, heightLimit)
     }
 
+    override fun getBaselineY(): Float {
+        return font.size * 0.8f // good like that?
+    }
+
+    override fun getLineHeight(): Float {
+        return font.size
+    }
+
     override fun generateASCIITexture(
         portableImages: Boolean,
         callback: Callback<Texture2DArray>,
         textColor: Int,
-        backgroundColor: Int,
-        extraPadding: Int
+        backgroundColor: Int
     ) {
         val widthLimit: Int = maxTextureSize
         val heightLimit: Int = maxTextureSize
 
         val offsetCache = getOffsetCache(font)
         val size = offsetCache.getOffset('w'.code, 'w'.code)
-        val width = min(widthLimit, size.roundToInt() + 1 + 2 * extraPadding)
+        val width = min(widthLimit, size.roundToInt() + 1)
         // leading + ascent + descent
-        val height = min(heightLimit, font.sampleHeight + 2 * extraPadding)
+        val height = min(heightLimit, font.sampleHeight)
 
         val simpleChars = simpleChars
         val tex = Texture2DArray("awtAtlas", width, height, simpleChars.size)
@@ -48,7 +55,7 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
             width, height, simpleChars.size,
             textColor and mask,
             backgroundColor and mask,
-            1f + height / 1.3f + extraPadding
+            1f + height / 1.3f
         )
         tex.afterUpload(GL11C.GL_RGBA8, 4, false)
         DebugGPUStorage.tex2da.add(tex)
@@ -62,8 +69,7 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         portableImages: Boolean,
         callback: Callback<ITexture2D>,
         textColor: Int,
-        backgroundColor: Int,
-        extraPadding: Int
+        backgroundColor: Int
     ) {
         callback.ok(TextGen.generateTexture(font.name, text, font.size, widthLimit))
     }

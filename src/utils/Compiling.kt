@@ -46,7 +46,7 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
 fun registerDefaultOffsets() {
 
     eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
-    eq(gIndex.getType("()V", true), FuncType(listOf(), listOf(ptrType)))
+    eq(gIndex.getType(true, "()V", true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(replaceClass1("java/lang/String"))
