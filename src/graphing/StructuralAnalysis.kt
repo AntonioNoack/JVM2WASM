@@ -78,15 +78,15 @@ class StructuralAnalysis(
                 else HashSet()
             }
         }
+
+        private var loopIndex = 0
     }
 
-    val labelToNode = HashMap(nodes.associateBy { it.label })
+    private val labelToNode = HashMap(nodes.associateBy { it.label })
 
     val sig get() = methodTranslator.sig
 
-    private var loopIndex = 0
-
-    fun printState(printLine: (String) -> Unit) {
+    private fun printState(printLine: (String) -> Unit) {
 
         for (node in nodes) {
             val name = node.toString { label ->
@@ -120,7 +120,7 @@ class StructuralAnalysis(
         }
     }
 
-    fun checkState() {
+    private fun checkState() {
         for (node in nodes) {
             val tr = labelToNode[node.ifTrue]
             if (tr != null && tr !in nodes) {

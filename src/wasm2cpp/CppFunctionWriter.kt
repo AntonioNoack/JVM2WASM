@@ -27,64 +27,14 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
-data class StackElement(val type: String, val name: String) {
-    override fun toString(): String {
-        return "$type $name"
-    }
-}
-
-fun defineFunctionHead(function: FunctionImpl, parameterNames: Boolean) {
-    defineFunctionHead(function.funcName, function.params, function.results, parameterNames)
-}
-
-fun defineFunctionHead(funcName: String, params: List<String>, results: List<String>, parameterNames: Boolean) {
-    if (results.isEmpty()) {
-        writer.append("void")
-    } else {
-        for (ri in results) {
-            writer.append(ri)
-        }
-    }
-    writer.append(' ').append(funcName).append('(')
-    for (i in params.indices) {
-        val pi = params[i]
-        if (i > 0) writer.append(", ")
-        writer.append(pi)
-        if (parameterNames) {
-            writer.append(" p").append(i)
-        }
-    }
-    writer.append(")")
-}
-
-fun defineFunctionImplementations(parser: WATParser) {
-    writer.append("// implementations\n")
-    writer.append("#include <cmath> // trunc, ...\n")
-    val functions = parser.functions
-    // functions.sortBy { it.funcName != "java_io_FilterInputStream_skip_JJ" }
-    for (fi in functions.indices) {
-        val function = functions[fi]
-        // if (function.funcName == "stackPush" || function.funcName == "stackPop") continue
-        val pos0 = writer.size
-        try {
-            FunctionWriter(function, parser)
-        } catch (e: Throwable) {
-            println(writer.toString(pos0, writer.size))
-            throw RuntimeException("Failed writing ${function.funcName}", e)
-        }
-    }
-    writer.append('\n')
-}
-
-val ignoredFuncNames = ("r8,r16,r32," +
-        "s8ArrayLoad,u16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
-        "s8ArrayStore,i16ArrayStore,i32ArrayStore,i64ArrayStore," +
-        "f32ArrayStore,f64ArrayStore,f32ArrayLoad,f64ArrayLoad," +
-        "s8ArrayLoadU,u16ArrayLoadU,i32ArrayLoadU,i64ArrayLoadU," +
-        "s8ArrayStoreU,i16ArrayStoreU,i32ArrayStoreU,i64ArrayStoreU," +
-        "f32ArrayStoreU,f64ArrayStoreU,f32ArrayLoadU,f64ArrayLoadU,").split(',')
-
 class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
+
+    private var depth = 1
+    private val localsByName = function.locals
+        .associateBy { it.name }
+
+    private val stack = ArrayList<StackElement>()
+    private var genI = 0
 
     init {
         defineFunctionHead(function, true)
@@ -92,25 +42,65 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         if (logCppFunctionCalls && function.funcName !in ignoredFuncNames) {
             writer.append("std::cout << \"").append(function.funcName).append("\" << std::endl;\n")
         }
+
+        if (function.funcName.startsWith("static_")) {
+            writer.append("static bool wasCalled = false;\n")
+            writer.append(
+                if (function.results.isEmpty()) "if(wasCalled) return;\n"
+                else "if(wasCalled) return 0;\n"
+            )
+            writer.append("wasCalled = true;\n")
+        }
+        for (local in function.locals) {
+            if (local.name == "lbl") continue
+            begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
+        }
+        for (instr in function.body) {
+            // println("instr $instr, stack: ${stack.map { it.type }}")
+            writeInstruction(instr)
+        }
+        when (function.body.lastOrNull()) {
+            Return, Unreachable -> {}
+            else -> writeInstruction(Return)
+        }
+        writer.append("}\n")
     }
 
-    private var depth = 1
-    private val localsByName = function.locals
-        .associateBy { it.name }
+    private fun ensureUniqueLabels() {
+        val uniqueLabels = HashSet<String>()
+        fun process(instr: Instruction) {
+            when (instr) {
+                is LoopInstr -> {
+                    assertTrue(uniqueLabels.add(instr.label))
+
+                }
+                is IfBranch -> {
+                    for (it in instr.ifTrue) process(it)
+                    for (it in instr.ifFalse) process(it)
+                }
+                is SwitchCase -> {
+                    for (case1 in instr.cases) {
+                        for (it in case1) {
+                            process(it)
+                        }
+                    }
+                }
+            }
+        }
+        for (it in function.body) {
+            process(it)
+        }
+    }
 
     private fun begin(): StringBuilder2 {
-        for (i in 0 until depth) {
-            writer.append("  ")
-        }
+        for (i in 0 until depth) writer.append("  ")
         return writer
     }
 
-    fun StringBuilder2.end() {
+    private fun StringBuilder2.end() {
         append(";\n")
     }
 
-    val stack = ArrayList<StackElement>()
-    private var genI = 0
     private fun nextTemporaryVariable(): String = "tmp${genI++}"
 
     private fun popInReverse(funcName: String, types: List<String>): List<String> {
@@ -148,7 +138,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         begin().append(name).append(" = ").append(pop(type)).end()
     }
 
-    fun load(type: String, memoryType: String = type) {
+    private fun load(type: String, memoryType: String = type) {
         val ptr = pop(i32)
         beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
             .append("))[0]").end()
@@ -481,16 +471,17 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
                 val i1 = i.body.size - lastIsContinue.toInt()
                 val isSwitchCase = if (i1 > 0) i.body[0] as? SwitchCase else null
-                val startIdx = if (isSwitchCase != null) 1 else 0
                 if (isSwitchCase != null) {
                     assertEquals(0, isSwitchCase.cases[0].size)
                     val cases = isSwitchCase.cases.subList(1, isSwitchCase.cases.size) +
                             listOf(i.body.subList(1, i1))
                     writeSwitchCase(cases)
+                } else {
+                    for (ii in 0 until i1) {
+                        writeInstruction(i.body[ii])
+                    }
                 }
-                for (ii in startIdx until i1) {
-                    writeInstruction(i.body[ii])
-                }
+
                 if (!lastIsContinue) {
                     // save results
                     for (j in i.results.lastIndex downTo 0) {
@@ -499,6 +490,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     }
                     begin().append("break;\n")
                 } else assertTrue(i.results.isEmpty())
+
                 depth--
                 stack.clear()
                 stack.addAll(stackSave)
@@ -538,6 +530,9 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 for (element in instructions) {
                     writeInstruction(element)
                 }
+                depth--
+                begin().append("}\n")
+                depth++
                 continue
             }
 
@@ -603,29 +598,4 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         }
         depth--
     }
-
-    init {
-        if (function.funcName.startsWith("static_")) {
-            writer.append("static bool wasCalled = false;\n")
-            writer.append(
-                if (function.results.isEmpty()) "if(wasCalled) return;\n"
-                else "if(wasCalled) return 0;\n"
-            )
-            writer.append("wasCalled = true;\n")
-        }
-        for (local in function.locals) {
-            if (local.name == "lbl") continue
-            begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
-        }
-        for (instr in function.body) {
-            // println("instr $instr, stack: ${stack.map { it.type }}")
-            writeInstruction(instr)
-        }
-        when (function.body.lastOrNull()) {
-            Return, Unreachable -> {}
-            else -> writeInstruction(Return)
-        }
-        writer.append("}\n")
-    }
-
 }

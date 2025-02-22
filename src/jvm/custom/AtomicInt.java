@@ -59,6 +59,18 @@ public class AtomicInt extends Number {
         return value;
     }
 
+    @NoThrow
+    public void set(int newValue) {
+        value = newValue;
+    }
+
+    @NoThrow
+    public boolean compareAndSet(int test, int newValue) {
+        boolean result = test == value;
+        if (result) value = newValue;
+        return result;
+    }
+
     @Override
     public int intValue() {
         return value;

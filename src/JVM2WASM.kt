@@ -146,7 +146,8 @@ fun cannotUseClass(clazz: String): Boolean {
             clazz.startsWith("java/awt/Component") || // not available anyway
             clazz.startsWith("javax/imageio/") || // not available anyway
             clazz.startsWith("java/util/regex/") || // let's see how much space it takes -> 2.2 MB wasm text out of 70
-            clazz.startsWith("java/io/ObjectStream") ||
+            // todo this is used by BigDecimal... surely it's not really needed... right?
+            // clazz.startsWith("java/io/ObjectStream") ||
             sin(0f) < 0f // false
 }
 
@@ -187,9 +188,6 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
         method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
         method(MethodSig.c("java/lang/Thread", "<init>", "()V"))
     }
-
-    clazz("jvm/Boxing")
-
 }
 
 fun listLibrary(clazz: (String) -> Unit) {

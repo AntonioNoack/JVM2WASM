@@ -53,18 +53,15 @@ public class AtomicLong extends Number {
     }
 
     @NoThrow
-    public void set(long v) {
-        value = v;
+    public void set(long newValue) {
+        value = newValue;
     }
 
     @NoThrow
     public boolean compareAndSet(long test, long newValue) {
-        if (test == value) {
-            value = newValue;
-            return true;
-        } else {
-            return false;
-        }
+        boolean result = test == value;
+        if (result) value = newValue;
+        return result;
     }
 
     @Override

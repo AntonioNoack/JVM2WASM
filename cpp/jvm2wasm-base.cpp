@@ -307,6 +307,11 @@ void org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV(i32 a, i32 b, i32 c, i
     glFramebufferTexture2D(a,b,c,d,e);
     // std::cout << "glFramebufferTexture2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ")" << std::endl;
 }
+void jvm_LWJGLxOpenGL_glGetTextureSubImageAny_IIIIIIIIIIIIV(
+    i32 ptr, i32 level, i32 x, i32 y, i32 z, i32 w, i32 h, i32 d,
+    i32 format, i32 type, i32 dataPtr, i32 dataLength) {
+    glGetTextureSubImage(ptr, level, x, y, z, w, h, d, format, type, (GLsizei) dataLength, (char*) memory + (u32)dataPtr);
+}
 void org_lwjgl_opengl_GL46C_glGenerateMipmap_IV(i32 x) { glGenerateMipmap(x); }
 void org_lwjgl_opengl_GL46C_glLinkProgram_IV(i32 x) { glLinkProgram(x); }
 void org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV(i32 x, i32 y, i32 z, i32 w) { glRenderbufferStorage(x,y,z,w); }
@@ -331,6 +336,8 @@ void org_lwjgl_opengl_GL15C_glBeginQuery_IIV(i32 a, i32 b) { glBeginQuery(a,b); 
 void org_lwjgl_opengl_GL15C_glEndQuery_IV(i32 a) { glEndQuery(a); }
 void org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV(i32 a, i32 b, i32 c) { glBindBufferBase(a,b,c); }
 void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(i32 x) { GLuint xi = x; glDrawBuffers(1, &xi); }
+void org_lwjgl_opengl_GL40C_glDrawArraysIndirect_IJV(i32 x, i64 y) { glDrawArraysIndirect(x, (void*)y); }
+void org_lwjgl_opengl_GL40C_glDrawElementsIndirect_IIJV(i32 x, i32 y, i64 z) { glDrawElementsIndirect(x, y, (void*)z); }
 void jvm_LWJGLxOpenGL_bufferData8_IIIIV(i32 buffer, i32 data, i32 length, i32 usage) {
     glBufferData(buffer, (u32) length, (char*) memory + (u32)data, usage);
 }
@@ -725,12 +732,16 @@ void org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV(i64 window0) {
     glfwRequestWindowAttention(window);
 }
 
+bool exiting = false;
 void unreachable(std::string msg) {
     std::cout << "!! Unreachable(" << msg << ") !!" << std::endl;
     // create new throwable, and return error
-    i32 err = cr(14).v0;
-    new_java_lang_Throwable_V(err);
-    java_lang_Throwable_printStackTrace_V(err);
+    if (!exiting) {
+        exiting = true;
+        i32 err = cr(14).v0;
+        new_java_lang_Throwable_V(err);
+        java_lang_Throwable_printStackTrace_V(err);
+    }
     exit(-1);
 }
 

@@ -13,6 +13,7 @@ import org.lwjgl.system.SharedLibrary;
 import sun.misc.Unsafe;
 
 import java.io.PrintStream;
+import java.math.BigInteger;
 import java.nio.*;
 import java.util.function.Consumer;
 
@@ -448,7 +449,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIIAFV")
-    private static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIAFV(
+    private static void glTexImage2D_IIIIIIIIAFV(
             int target, int level, int format, int w,
             int h, int border, int dataFormat, int dataType, float[] data) {
         texImage2DAny(target, level, format, w, h, border, dataFormat, dataType, getAddr(data) + arrayOverhead, data.length << 2);
@@ -456,7 +457,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_IntBufferV")
-    private static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_IntBufferV(
+    private static void glTexImage2D_IIIIIIIILjava_nio_IntBufferV(
             int target, int level, int format, int w,
             int h, int border, int dataFormat, int dataType, IntBuffer data) throws NoSuchFieldException, IllegalAccessException {
         texImage2DAny(target, level, format, w, h, border, dataFormat, dataType, getBufferAddr(data), data.remaining() << 2);
@@ -464,7 +465,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIASV")
-    private static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIASV(
+    private static void glTexImage2D_IIIIIIIIASV(
             int a, int b, int c, int d, int e, int f, int g, int h, short[] data) {
         texImage2DAny(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length);
     }
@@ -495,7 +496,7 @@ public class LWJGLxOpenGL {
     private static native void texSubImage2D(int target, int level, int x, int y, int w, int h, int dataFormat, int dataType, int ptr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIIAIV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIAIV(
+    public static void glTexSubImage2D_IIIIIIIIAIV(
             int target, int level, int x, int y,
             int w, int h, int dataFormat, int dataType, int[] data) {
         boolean swizzle = dataFormat == GL_BGRA;
@@ -525,7 +526,7 @@ public class LWJGLxOpenGL {
     public static native void readPixelsU8(int x, int y, int w, int h, int format, int type, int data, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV")
-    public static void org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int[] data) {
+    public static void glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int[] data) {
         readPixelsU8(x, y, w, h, format, type, getAddr(data) + arrayOverhead, data.length << 2);
     }
 
@@ -534,12 +535,49 @@ public class LWJGLxOpenGL {
     public static native void readPixelsF32(int x, int y, int w, int h, int format, int type, int dataPtr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV")
-    public static void GL11C_glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, float[] data) {
+    public static void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, float[] data) {
         readPixelsF32(x, y, w, h, format, type, getAddr(data) + arrayOverhead, data.length);
     }
 
+    @NoThrow // todo for JavaScript, bind texture to framebuffer, like we did it previously, and then use glReadPixels
+    @JavaScript(code = "/* not yet implemented */")
+    public static native void glGetTextureSubImageAny(
+            int ptr, int level, int x, int y, int z,
+            int w, int h, int d, int format, int type, int dataPtr, int length
+    );
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIIAFV")
+    public static void glGetTextureSubImage_IIIIIIIIIIAFV(
+            int ptr, int level, int x, int y, int z,
+            int w, int h, int d, int format, int type, float[] dst
+    ) {
+        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
+                getAddr(dst) + arrayOverhead, dst.length << 2);
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIIAIV")
+    public static void glGetTextureSubImage_IIIIIIIIIIAIV(
+            int ptr, int level, int x, int y, int z,
+            int w, int h, int d, int format, int type, int[] dst
+    ) {
+        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
+                getAddr(dst) + arrayOverhead, dst.length << 2);
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIILjava_nio_ByteBufferV")
+    public static void glGetTextureSubImage_IIIIIIIIIILjava_nio_ByteBufferV(
+            int ptr, int level, int x, int y, int z,
+            int w, int h, int d, int format, int type, ByteBuffer dst
+    ) throws NoSuchFieldException, IllegalAccessException {
+        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
+                getBufferAddr(dst), dst.remaining());
+    }
+
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIILjava_nio_ByteBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_ByteBufferV(
+    public static void glTexImage2D_IIIIIIIILjava_nio_ByteBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ByteBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -838,7 +876,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glDebugMessageCallback_Lorg_lwjgl_opengl_GLDebugMessageCallbackIJV")
-    public static void org_lwjgl_opengl_GL43C_glDebugMessageCallback_Lorg_lwjgl_opengl_GLDebugMessageCallbackIJV(Object callback, long j) {
+    public static void glDebugMessageCallback_Lorg_lwjgl_opengl_GLDebugMessageCallbackIJV(Object callback, long j) {
         log("Setting debugCallback isn't supported");
     }
 
@@ -858,7 +896,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_DoubleBufferV")
-    public static void GL11C_glTexSubImage2D_IIIIIIIILjava_nio_DoubleBufferV(
+    public static void glTexSubImage2D_IIIIIIIILjava_nio_DoubleBufferV(
             int a, int b, int c, int d, int e, int f, int g, int h, DoubleBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
         texSubImage2D(a, b, c, d, e, f, g, h, getBufferAddr(data), data.remaining() << 3);
@@ -867,22 +905,32 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetFloat_IF")
     @JavaScript(code = "throw 'org_lwjgl_opengl_GL11C_glGetFloat_IF'")
-    public static native float org_lwjgl_opengl_GL11C_glGetFloat_IF(int type);
+    public static native float glGetFloat_IF(int type);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV")
     @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV'")
-    public static native void org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV(int a, int b, int c, int d, long e);
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glDrawElements_IIIJV")
-    @JavaScript(code = "gl.drawElements(arg0,arg1,arg2,Number(arg3))")
-    public static native void org_lwjgl_opengl_GL11C_glDrawElements_IIIJV(int mode, int count, int type, long nullPtr);
+    public static native void glVertexAttribIPointer_IIIIJV(int a, int b, int c, int d, long e);
 
     @NoThrow
     @JavaScript(code = "gl.drawArrays(arg0,arg1,arg2)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawArrays_IIIV")
     public static native void glDrawArrays_IIIV(int mode, int first, int count);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glDrawElements_IIIJV")
+    @JavaScript(code = "gl.drawElements(arg0,arg1,arg2,Number(arg3))")
+    public static native void glDrawElements_IIIJV(int mode, int count, int type, long nullPtr);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL40C_glDrawArraysIndirect_IJV")
+    @JavaScript(code = "/* not supported */")
+    public static native void glDrawArraysIndirect_IJV(int mode, long offset);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL40C_glDrawElementsIndirect_IIJV")
+    @JavaScript(code = "/* not supported */")
+    public static native void glDrawElementsIndirect_IIJV(int mode, int indexType, long offset);
 
     @NoThrow
     @JavaScript(code = "gl.drawArraysInstanced(arg0,arg1,arg2,arg3)")

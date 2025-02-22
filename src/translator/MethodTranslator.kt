@@ -1364,6 +1364,9 @@ class MethodTranslator(
 
         if (!canThrowError) {
             printer.append(Call("panic"))
+            if (mustThrow) {
+                printer.append(Unreachable)
+            }
             return
         }
 
@@ -1494,10 +1497,7 @@ class MethodTranslator(
         }
     }
 
-    private fun returnIfThrowable(
-        mustThrow: Boolean,
-        currentNode: Node = this.currentNode
-    ) {
+    private fun returnIfThrowable(mustThrow: Boolean, currentNode: Node = this.currentNode) {
         val printer = currentNode.printer
         if (mustThrow) {
             if (resultType == 'V') {
@@ -1516,24 +1516,13 @@ class MethodTranslator(
             val tmp = tmpI32
             printer.append(LocalSet(tmp))
             printer.append(LocalGet(tmp))
-            val stack1 = ArrayList(stack)
-            if (comments) printer.comment("stack: $stack")
-            if (resultType == 'V') {
-                printer.append(
-                    IfBranch(
-                        listOf(LocalGet(tmp), Return), emptyList(),
-                        stack1, stack1
-                    )
-                )
+            val ifTrue = if (resultType == 'V') {
+                listOf(LocalGet(tmp), Return)
             } else {
-                val constExpr = Const.zero[jvm2wasm1(resultType)]!!
-                printer.append(
-                    IfBranch(
-                        listOf(constExpr, LocalGet(tmp), Return), emptyList(),
-                        stack1, stack1
-                    )
-                )
+                val zeroResult = Const.zero[jvm2wasm1(resultType)]!!
+                listOf(zeroResult, LocalGet(tmp), Return)
             }
+            printer.append(IfBranch(ifTrue, emptyList(), emptyList(), emptyList()))
         }
     }
 
