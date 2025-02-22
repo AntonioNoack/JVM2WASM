@@ -11,6 +11,7 @@ import org.apache.logging.log4j.LogManager
 import utils.*
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32Or
 import wasm.instr.Instructions.Return
@@ -44,7 +45,7 @@ object ResolveIndirect {
     private fun Builder.fixThrowable(calledCanThrow: Boolean, sigJ: MethodSig) {
         if (calledCanThrow != canThrowError(sigJ)) {
             if (calledCanThrow) {
-                append(i32Const(0))
+                append(i32Const0)
             } else {
                 append(Call("panic"))
             }
@@ -138,7 +139,7 @@ object ResolveIndirect {
                 val printer = Builder()
                 printer.append(Call(methodName(sigJ)))
                 printer.fixThrowable(calledCanThrow, sigJ)
-                return printer.instr
+                return printer.instrs
             }
 
             fun printCallPyramid(printer: Builder) {
@@ -163,7 +164,7 @@ object ResolveIndirect {
                     nextBranch.add(IfBranch(createBody(toBeCalled), lastBranch, getArgs(), getResult()))
                     lastBranch = nextBranch
                 }
-                printer.instr.addAll(lastBranch)
+                printer.instrs.addAll(lastBranch)
             }
 
             stackPush()
@@ -190,7 +191,7 @@ object ResolveIndirect {
                     FunctionImpl(
                         helperName, listOf(ptrType) + splitArgs,
                         results, listOf(LocalVariable(tmpI32, ptrType)),
-                        printer.instr, false,
+                        printer.instrs, false,
                     )
                 }
                 printer.append(Call(helperName))

@@ -24,7 +24,7 @@ class Node(val label: Label) {
     var printer = Builder(32)
 
     var hasNoCode = false
-    fun calcHasNoCode(): Boolean = printer.instr.all { it is Comment }
+    fun calcHasNoCode(): Boolean = printer.instrs.all { it is Comment }
 
     fun toString(mapper: (Label?) -> String): String {
         val name = mapper(label)

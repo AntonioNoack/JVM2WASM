@@ -3,6 +3,7 @@ package jvm;
 import annotations.*;
 import jvm.lang.JavaLangAccessImpl;
 import sun.misc.SharedSecrets;
+import utils.DescriptorKt;
 
 import java.io.PrintStream;
 import java.lang.reflect.Field;
@@ -19,7 +20,7 @@ public class JVM32 {
 
     public static int objectOverhead = 4;// 3x class, 1x GC
     public static int arrayOverhead = objectOverhead + 4;// length
-    public static final int ptrSize = 4;
+    public static final int ptrSize = DescriptorKt.is32Bits() ? 4 : 8;
     public static boolean trackAllocations = true;
 
     // public static int fieldTableOffset = getFieldTableOffset(); // for GC
@@ -168,45 +169,49 @@ public class JVM32 {
             if (fields != null) for (Field f : fields) {
                 if (f == null) continue;
                 if (staticToo || !Modifier.isStatic(f.getModifiers())) {
-                    String name = f.getName();
-                    String type = f.getType().getName();
-                    switch (type) {
-                        case "byte":
-                            log(type, name, f.getByte(instance));
-                            break;
-                        case "short":
-                            log(type, name, f.getShort(instance));
-                            break;
-                        case "char":
-                            log(type, name, f.getChar(instance));
-                            break;
-                        case "int":
-                            log(type, name, f.getInt(instance));
-                            break;
-                        case "long":
-                            log(type, name, f.getLong(instance));
-                            break;
-                        case "float":
-                            log(type, name, f.getFloat(instance));
-                            break;
-                        case "double":
-                            log(type, name, f.getDouble(instance));
-                            break;
-                        case "boolean":
-                            log(type, name, f.getBoolean(instance));
-                            break;
-                        default:
-                            Object value = f.get(instance);
-                            if (value == null) log(type, name, 0);
-                            else if (value instanceof String) log(type, name, getAddr(value), value.toString());
-                            else log(type, name, getAddr(value), value.getClass().getName());
-                            break;
-                    }
+                    debugField(instance, staticToo, f);
                 }
             }
             if (instance instanceof Object[]) {
                 debugArray(instance);
             }
+        }
+    }
+
+    public static void debugField(Object instance, boolean staticToo, Field f) throws IllegalAccessException {
+        String name = f.getName();
+        String type = f.getType().getName();
+        switch (type) {
+            case "byte":
+                log(type, name, f.getByte(instance));
+                break;
+            case "short":
+                log(type, name, f.getShort(instance));
+                break;
+            case "char":
+                log(type, name, f.getChar(instance));
+                break;
+            case "int":
+                log(type, name, f.getInt(instance));
+                break;
+            case "long":
+                log(type, name, f.getLong(instance));
+                break;
+            case "float":
+                log(type, name, f.getFloat(instance));
+                break;
+            case "double":
+                log(type, name, f.getDouble(instance));
+                break;
+            case "boolean":
+                log(type, name, f.getBoolean(instance));
+                break;
+            default:
+                Object value = f.get(instance);
+                if (value == null) log(type, name, 0);
+                else if (value instanceof String) log(type, name, getAddr(value), value.toString());
+                else log(type, name, getAddr(value), value.getClass().getName());
+                break;
         }
     }
 

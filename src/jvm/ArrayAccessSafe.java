@@ -1,7 +1,6 @@
 package jvm;
 
 import annotations.Alias;
-import annotations.NoThrow;
 
 import static jvm.JVM32.*;
 
@@ -87,7 +86,7 @@ public class ArrayAccessSafe {
         return read16s(instance + arrayOverhead + (index << 1));
     }
 
-    @Alias(names = "i8ArrayLoad")
+    @Alias(names = "s8ArrayLoad")
     public static byte arrayLoad8(int instance, int index) {
         checkOutOfBounds(instance, index);
         int clazz = readClass(instance);

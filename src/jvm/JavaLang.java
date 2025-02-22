@@ -253,7 +253,6 @@ public class JavaLang {
     public static native int getAddr(Object obj);
 
     @NoThrow
-    @Alias(names = "copy")
     public static void copyForwards(int src, int dst, int length) {
         int endPtr = dst + length;
         int end8 = endPtr - 7;
@@ -276,7 +275,6 @@ public class JavaLang {
     }
 
     @NoThrow
-    @Alias(names = "copyBW")
     public static void copyBackwards(int src, int dst, int length) {
         int endPtr = dst - 1;
         // we start at the end

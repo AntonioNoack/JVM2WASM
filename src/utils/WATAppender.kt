@@ -12,7 +12,8 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.toInt
-import org.objectweb.asm.Opcodes.*
+import org.objectweb.asm.Opcodes.ACC_NATIVE
+import org.objectweb.asm.Opcodes.ACC_STATIC
 import resources
 import translator.GeneratorIndex
 import translator.GeneratorIndex.stringStart
@@ -155,20 +156,22 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                 }
             }
 
-            if (clazz < 10) println("  fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
-                    fields2.joinToString { "${gIndex.getString(it.first)}" })
+            if (clazz < 10) println(
+                "  fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
+                        fields2.joinToString { "${gIndex.getString(it.first)}" })
             else if (clazz == 10 && numClasses > 11) println("  ...")
 
             if (clazz > 0 && gIndex
                     .getFieldOffsets(hIndex.superClass[className]!!, false)
                     .fields.any { it.key !in fields2.map { f2 -> f2.first } }
-            ) throw IllegalStateException("Fields from super class are missing in $className, " +
-                    "super: ${hIndex.superClass[className]!!}, " +
-                    "${
-                        gIndex
-                            .getFieldOffsets(hIndex.superClass[className]!!, false)
-                            .fields.filter { it.key !in fields2.map { f2 -> f2.first } }
-                    }"
+            ) throw IllegalStateException(
+                "Fields from super class are missing in $className, " +
+                        "super: ${hIndex.superClass[className]!!}, " +
+                        "${
+                            gIndex
+                                .getFieldOffsets(hIndex.superClass[className]!!, false)
+                                .fields.filter { it.key !in fields2.map { f2 -> f2.first } }
+                        }"
             )
 
             // create new fields array
@@ -251,21 +254,16 @@ fun appendResourceTable(printer: StringBuilder2, ptr0: Int): Int {
 fun appendFunctionTypes(printer: StringBuilder2) {
     // append all wasm types
     // (type $ft (func (param i32)))
-    for (type in gIndex.types.toSortedSet()) {
-        printer.append("(type \$").append(type).append(" (func (param")
-        // define all params and result types
-        if (type.startsWith("f")) printer.append(' ').append(ptrType) // instance
-        else if (!type.startsWith("s")) throw IllegalStateException()
-        loop@ for (j in 2 until type.length) {// parameters
-            when (type[j]) {
-                'A', 'V' -> {}
-                '0' -> printer.append(' ').append(i32)
-                '1' -> printer.append(' ').append(i64)
-                '2' -> printer.append(' ').append(f32)
-                '3' -> printer.append(' ').append(f64)
-                'R' -> printer.append(") (result")
-                else -> throw NotImplementedError("$type -> ${type[j]}")
-            }
+    for (type in gIndex.types) {
+        printer.append("(type \$")
+        type.toString(printer)
+        printer.append(" (func (param")
+        for (param in type.params) {
+            printer.append(' ').append(param)
+        }
+        printer.append(") (result")
+        for (result in type.results) {
+            printer.append(' ').append(result)
         }
         printer.append(")))\n")
     }
@@ -430,7 +428,8 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
 
             if (clazz in dIndex.constructableClasses &&
                 !hIndex.isAbstractClass(clazz) &&
-                !hIndex.isInterfaceClass(clazz)) {
+                !hIndex.isInterfaceClass(clazz)
+            ) {
 
                 if (printDebug) {
                     debugInfo.append("  constructable & !abstract & !interface\n")

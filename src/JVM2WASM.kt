@@ -60,14 +60,16 @@ var useWASMExceptions = false
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
 var ignoreNonCriticalNullPointers = true
-var checkArrayAccess = false // todo this can no longer be set to true???
+var checkArrayAccess = false
 var checkNullPointers = false
 var checkClassCasts = false
 var checkIntDivisions = false
 
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings
+
 var crashOnAllExceptions = false // todo not yet supported
+
 var crashInStatic = false // crashes at runtime :/
 val byteStrings = useUTF8Strings || replaceStringInternals
 
@@ -144,6 +146,7 @@ fun cannotUseClass(clazz: String): Boolean {
             clazz.startsWith("java/awt/Component") || // not available anyway
             clazz.startsWith("javax/imageio/") || // not available anyway
             clazz.startsWith("java/util/regex/") || // let's see how much space it takes -> 2.2 MB wasm text out of 70
+            clazz.startsWith("java/io/ObjectStream") ||
             sin(0f) < 0f // false
 }
 

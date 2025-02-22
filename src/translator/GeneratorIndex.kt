@@ -1,6 +1,7 @@
 package translator
 
 import byteStrings
+import crashOnAllExceptions
 import dependency.ActuallyUsedIndex
 import hIndex
 import isRootType
@@ -10,10 +11,11 @@ import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass1
+import useWASMExceptions
 import utils.*
+import wasm.instr.FuncType
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
-import wasm.writer.Func
 
 object GeneratorIndex {
 
@@ -83,16 +85,17 @@ object GeneratorIndex {
         }
     }
 
-    val types = HashSet<String>()
+    val types = HashSet<FuncType>()
 
     init {
         // static call with no arguments, which can throw an exception
-        types.add("sRV0")
+        val staticInitResult = if (useWASMExceptions || crashOnAllExceptions) emptyList() else listOf(ptrType)
+        types.add(FuncType(emptyList(), staticInitResult))
     }
 
     // register type in index list
     // return name of that type
-    fun getType(descriptor: String, canThrow: Boolean): String {
+    fun getType(descriptor: String, canThrow: Boolean): FuncType {
         val wasmType = splitToType(descriptor, canThrow)
         types.add(wasmType)
         return wasmType
@@ -105,10 +108,10 @@ object GeneratorIndex {
         return nthGetterMethods.getOrPut(typeStack) {
             val name = "getNth_${nthGetterMethods.size}"
             FunctionImpl(
-                    name, typeStack, typeStack + typeStack.first(),
-                    emptyList(), typeStack.indices.map { ParamGet(it) } + ParamGet(0),
-                    false
-                )
+                name, typeStack, typeStack + typeStack.first(),
+                emptyList(), typeStack.indices.map { ParamGet(it) } + ParamGet(0),
+                false
+            )
         }.funcName
     }
 

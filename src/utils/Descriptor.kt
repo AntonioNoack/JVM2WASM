@@ -1,10 +1,12 @@
 package utils
 
 import hIndex
+import me.anno.utils.assertions.assertFail
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
 import replaceClass1
-import wasm.instr.ConstType
+import wasm.instr.FuncType
 
 val f32 = "f32"
 val f64 = "f64"
@@ -12,7 +14,7 @@ val i32 = "i32"
 val i64 = "i64"
 
 // could be changed to i64 in the future, if more browsers support 64 bit wasm
-// quite a few bits expect i32 though...
+// quite a few bits expect i32 though... hard to change now
 val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
 
@@ -117,39 +119,48 @@ fun genericsTypes(d: String, static: Boolean = true): String {
     return result.toString()
 }
 
-fun splitToType(d: String, canThrow: Boolean): String {
-    val result = StringBuilder2(d.length)
-    var i = 0
-    while (i < d.length) {
-        fun readType(): Char {
-            return when (d[i++]) {
-                'Z', 'C', 'B', 'S', 'I' -> '0'
-                'J' -> '1'
-                'F' -> '2'
-                'D' -> '3'
-                'L' -> {
-                    // read until ;
-                    i = d.indexOf(';', i + 1) + 1
-                    if (is32Bits) '0' else '1'
-                }
+fun splitToType(descriptor: String, canThrow: Boolean): FuncType {
+    assertTrue(descriptor.startsWith('('))
+    var i = 1 // skip '('
 
-                in "[A" -> {
-                    readType()
-                    if (is32Bits) '0' else '1'
-                }
-
-                '(' -> 'f'
-                ')' -> 'R'
-                'V' -> 'V'
-                else -> throw IllegalArgumentException(d)
+    fun readType(): String {
+        return when (descriptor[i++]) {
+            'Z', 'C', 'B', 'S', 'I' -> i32
+            'J' -> i64
+            'F' -> f32
+            'D' -> f64
+            'L' -> {
+                // read until ;
+                i = descriptor.indexOf(';', i + 1) + 1
+                ptrType
             }
+            '[', 'A' -> {
+                readType()
+                ptrType
+            }
+            else -> assertFail(descriptor)
         }
-
-        val type = readType()
-        if (type != ' ') result.append(type)
     }
-    if (canThrow) result.append(if (is32Bits) '0' else '1')
-    return result.toString()
+
+    val closeIdx = descriptor.indexOf(')')
+    assertTrue(closeIdx > 0, descriptor)
+
+    val params = ArrayList<String>()
+    while (i < closeIdx) {
+        params.add(readType())
+    }
+
+    val results = if (descriptor[closeIdx + 1] != 'V') {
+        i = closeIdx + 1
+        val type = readType()
+        if (canThrow) listOf(type, ptrType)
+        else listOf(type)
+    } else {
+        if (canThrow) listOf(ptrType)
+        else emptyList()
+    }
+
+    return FuncType(params, results)
 }
 
 fun jvm2wasm(d: String): String = when (d) {

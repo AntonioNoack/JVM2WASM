@@ -1,5 +1,6 @@
 package wasm.parser
 
+import utils.StringBuilder2
 import wasm.instr.Instruction
 
 data class FunctionImpl(
@@ -9,7 +10,7 @@ data class FunctionImpl(
     val isExported: Boolean
 ) {
     override fun toString(): String {
-        val builder = StringBuilder()
+        val builder = StringBuilder2()
             .append("(func \$").append(funcName)
         if (isExported) {
             builder.append(" (export \"").append(funcName).append("\")")

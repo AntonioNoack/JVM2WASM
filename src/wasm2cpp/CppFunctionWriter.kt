@@ -1,11 +1,12 @@
 package wasm2cpp
 
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
-import utils.StringBuilder2
+import utils.*
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.F32Load
@@ -75,9 +76,12 @@ fun defineFunctionImplementations(parser: WATParser) {
 }
 
 val ignoredFuncNames = ("r8,r16,r32," +
-        "i8ArrayLoad,u16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
-        "i8ArrayStore,i16ArrayStore,i32ArrayStore,i64ArrayStore," +
-        "f32ArrayStore,f64ArrayStore,f32ArrayLoad,f64ArrayLoad,").split(',')
+        "s8ArrayLoad,u16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
+        "s8ArrayStore,i16ArrayStore,i32ArrayStore,i64ArrayStore," +
+        "f32ArrayStore,f64ArrayStore,f32ArrayLoad,f64ArrayLoad," +
+        "s8ArrayLoadU,u16ArrayLoadU,i32ArrayLoadU,i64ArrayLoadU," +
+        "s8ArrayStoreU,i16ArrayStoreU,i32ArrayStoreU,i64ArrayStoreU," +
+        "f32ArrayStoreU,f64ArrayStoreU,f32ArrayLoadU,f64ArrayLoadU,").split(',')
 
 class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
@@ -108,7 +112,8 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     private var genI = 0
     private fun nextTemporaryVariable(): String = "tmp${genI++}"
     private fun pop(type: String): String {
-        val i0 = stack.removeLast()
+        val i0 = stack.removeLastOrNull()
+            ?: assertFail("Tried popping $type, but stack was empty")
         // println("pop -> $i0 + $stack")
         assertEquals(type, i0.type) { "pop -> $i0 + $stack" }
         return i0.name
@@ -129,14 +134,14 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     }
 
     fun load(type: String, memoryType: String = type) {
-        val ptr = pop("i32")
+        val ptr = pop(i32)
         beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
             .append("))[0]").end()
     }
 
     private fun store(type: String, memoryType: String = type) {
         val value = pop(type)
-        val ptr = pop("i32")
+        val ptr = pop(i32)
         begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
             .append("))[0] = ").append(value).end()
     }
@@ -180,6 +185,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         }
 
         writer.append(funcName).append('(')
+        assertTrue(stack.size >= params.size) { "Expected $params for $funcName, got $stack" }
         val popped = params.reversed().map { pop(it) }
         for (pi in popped.reversed()) {
             if (!writer.endsWith("(")) writer.append(", ")
@@ -233,29 +239,29 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 beginSetEnd(local.name, local.type)
             }
             // loading
-            I32Load8S -> load("i32", "int8_t")
-            I32Load8U -> load("i32", "uint8_t")
-            I32Load16S -> load("i32", "int16_t")
-            I32Load16U -> load("i32", "uint16_t")
-            I32Load -> load("i32")
-            I64Load -> load("i64")
-            F32Load -> load("f32")
-            F64Load -> load("f64")
+            I32Load8S -> load(i32, "int8_t")
+            I32Load8U -> load(i32, "uint8_t")
+            I32Load16S -> load(i32, "int16_t")
+            I32Load16U -> load(i32, "uint16_t")
+            I32Load -> load(i32)
+            I64Load -> load(i64)
+            F32Load -> load(f32)
+            F64Load -> load(f64)
             // storing
-            I32Store8 -> store("i32", "int8_t")
-            I32Store16 -> store("i32", "int16_t")
-            I32Store -> store("i32")
-            I64Store -> store("i64")
-            F32Store -> store("f32")
-            F64Store -> store("f64")
+            I32Store8 -> store(i32, "int8_t")
+            I32Store16 -> store(i32, "int16_t")
+            I32Store -> store(i32)
+            I64Store -> store(i64)
+            F32Store -> store(f32)
+            F64Store -> store(f64)
             // other operations
             I32EQZ -> {
-                val i0 = pop("i32")
-                beginNew("i32").append(i0).append(" == 0 ? 1 : 0").end()
+                val i0 = pop(i32)
+                beginNew(i32).append(i0).append(" == 0 ? 1 : 0").end()
             }
             I64EQZ -> {
-                val i0 = pop("i64")
-                beginNew("i32").append(i0).append(" == 0 ? 1 : 0").end()
+                val i0 = pop(i64)
+                beginNew(i32).append(i0).append(" == 0 ? 1 : 0").end()
             }
             is ShiftInstr -> {
                 val i0 = pop(i.type)
@@ -263,7 +269,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 beginNew(i.type)
                 writer.append(
                     if (i.isRight && i.isU) {
-                        if (i.type == "i32") "(u32) " else "(u64) "
+                        if (i.type == i32) "(u32) " else "(u64) "
                     } else ""
                 )
                 writer.append(i1).append(
@@ -323,7 +329,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 if (i.operator.endsWith("(")) {
                     if (i.operator.startsWith("std::rot")) {
                         beginNew(i.type).append(i.operator).append( // cast to unsigned required
-                            if (i0 == "i32") "(u32) " else "(u64) "
+                            if (i0 == i32) "(u32) " else "(u64) "
                         ).append(i1).append(", ").append(i0).append(')').end()
                     } else {
                         beginNew(i.type).append(i.operator).append(i1).append(", ")
@@ -338,7 +344,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             is CompareInstr -> {
                 val i0 = pop(i.type)
                 val i1 = pop(i.type)
-                beginNew("i32")
+                beginNew(i32)
                 if (i.castType != null) writer.append("(").append(i.castType).append(") ")
                 writer.append(i1).append(' ').append(i.operator).append(' ')
                 if (i.castType != null) writer.append("(").append(i.castType).append(") ")
@@ -347,7 +353,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             is IfBranch -> {
 
                 // get running parameters...
-                val condition = pop("i32")
+                val condition = pop(i32)
                 val baseSize = stack.size - i.params.size
                 val paramPopped = i.params.reversed().map { pop(it) }
                 for (j in i.params.indices) {
@@ -422,7 +428,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 writeCall(func.funcName, func.params, func.results)
             }
             is CallIndirect -> {
-                val type = parser.types[i.type]!!
+                val type = i.type
                 val tmpType = nextTemporaryVariable()
                 val tmpVar = nextTemporaryVariable()
                 // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
@@ -459,15 +465,15 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
                 val i1 = i.body.size - lastIsContinue.toInt()
                 val isSwitchCase = if (i1 > 0) i.body[0] as? SwitchCase else null
+                val startIdx = if (isSwitchCase != null) 1 else 0
                 if (isSwitchCase != null) {
                     assertEquals(0, isSwitchCase.cases[0].size)
                     val cases = isSwitchCase.cases.subList(1, isSwitchCase.cases.size) +
                             listOf(i.body.subList(1, i1))
                     writeSwitchCase(cases)
-                } else {
-                    for (ii in 0 until i1) {
-                        writeInstruction(i.body[ii])
-                    }
+                }
+                for (ii in startIdx until i1) {
+                    writeInstruction(i.body[ii])
                 }
                 if (!lastIsContinue) {
                     // save results
@@ -525,7 +531,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 } else break
             }
             val last = instructions[instructions.size - skipped]
-            if (last != Unreachable) {
+            if (last != Unreachable && last != Return) {
                 assertTrue(last is LocalSet && last.name == "lbl")
                 val preLast = instructions[instructions.size - (skipped + 1)]
                 assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == ConstType.I32))
@@ -544,7 +550,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 }
                 if (preLast is IfBranch) {
                     // save branch
-                    val branch = pop("i32")
+                    val branch = pop(i32)
                     executeStackSaving()
                     assertEquals(1, preLast.ifTrue.size)
                     assertEquals(1, preLast.ifFalse.size)

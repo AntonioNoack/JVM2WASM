@@ -12,6 +12,7 @@ import utils.MethodSig
 import utils.methodName2
 import utils.split1
 import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
 
 class DelayedLambdaUpdate(
@@ -163,7 +164,7 @@ class DelayedLambdaUpdate(
                 printer.visitVarInsn(0x2a, 0) // local.get this
                 printer.visitFieldInsn2(0xb4, synthClassName, "self", "Ljava/lang/Object;", false) // get field
             } else {
-                printer.printer.append(i32Const(0)).comment("self, unused")
+                printer.printer.append(i32Const0).comment("self, unused")
             }
             if (!callingStatic) k--
         }

@@ -1,9 +1,7 @@
 package wasm
 
 import me.anno.utils.structures.arrays.ByteArrayList
-import utils.wasmFolder
-import utils.wasmTextFile
-import wasm.parser.FunctionType
+import utils.*
 import wasm.parser.WATParser
 import wasm.writer.*
 import wasm.writer.Function
@@ -17,17 +15,17 @@ fun main() {
     parser.parse(text)
 
     val typesByFunctions = parser.functions
-        .map { FunctionType(it.params, it.results) }
+        .map { wasm.instr.FuncType(it.params, it.results) }
     val typesByImports = parser.imports
-        .map { FunctionType(it.params, it.results) }
+        .map { wasm.instr.FuncType(it.params, it.results) }
     val functionTypes = (typesByFunctions + typesByImports)
         .toHashSet().toList()
 
     val typeToType = mapOf(
-        "i32" to Type(TypeKind.I32),
-        "i64" to Type(TypeKind.I64),
-        "f32" to Type(TypeKind.F32),
-        "f64" to Type(TypeKind.F64),
+        i32 to Type(TypeKind.I32),
+        i64 to Type(TypeKind.I64),
+        f32 to Type(TypeKind.F32),
+        f64 to Type(TypeKind.F64),
     )
 
     val module = Module(
@@ -56,7 +54,7 @@ fun main() {
         emptyList(), // tags???
         parser.globals.values.map {
             // todo set expression to i32.const <initial-value>
-            Global(listOf(), typeToType["i32"]!!, it.isMutable)
+            Global(listOf(), typeToType[i32]!!, it.isMutable)
         },
         parser.functions.withIndex()
             .filter { it.value.isExported }

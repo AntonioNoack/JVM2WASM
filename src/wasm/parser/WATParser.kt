@@ -20,7 +20,7 @@ class WATParser {
     val dataSections = ArrayList<DataSection>()
     val functionTable = ArrayList<String>()
     val functions = ArrayList<FunctionImpl>()
-    val types = HashMap<String, FunctionType>()
+    val types = HashMap<String, FuncType>()
     val globals = HashMap<String, GlobalVariable>()
 
     private val params = ArrayList<String>()
@@ -191,7 +191,7 @@ class WATParser {
                                 parseBlock(list, i) // params are optional
                             if (list.getType(i) == TokenType.OPEN_BRACKET) i = parseBlock(list, i)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
-                            types[typeName] = FunctionType(ArrayList(params), ArrayList(results))
+                            types[typeName] = FuncType(ArrayList(params), ArrayList(results))
                             params.clear()
                             results.clear()
                         }
@@ -317,7 +317,7 @@ class WATParser {
                             list.consume(TokenType.NAME, "type", i++)
                             val type = list.consume(TokenType.DOLLAR, i++)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
-                            result.add(CallIndirect(type))
+                            result.add(CallIndirect(types[type] ?: FuncType.parse(type)))
                         }
                         "if" -> {
                             // (if (then ...) (else ...))

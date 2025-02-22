@@ -6,27 +6,22 @@ import wasm.instr.Instruction
 // typealias Builder = StringBuilder2
 class Builder(capacity: Int = 16) {
 
-    val instr = ArrayList<Instruction>(capacity)
-    val length get() = instr.size
+    val instrs = ArrayList<Instruction>(capacity)
+    val length get() = instrs.size
 
     fun append(instr: Instruction): Builder {
-        this.instr.add(instr)
-        return this
-    }
-
-    @Deprecated("Please use instruction objects")
-    fun append(instr: String): Builder {
-        TODO()
+        instrs.add(instr)
         return this
     }
 
     fun append(builder: Builder): Builder {
-        instr.addAll(builder.instr)
+        instrs.ensureCapacity(instrs.size + builder.instrs.size)
+        for (instr in builder.instrs) append(instr)
         return this
     }
 
     fun prepend(builder: Builder): Builder {
-        instr.addAll(0, builder.instr)
+        instrs.addAll(0, builder.instrs)
         return this
     }
 
@@ -36,29 +31,44 @@ class Builder(capacity: Int = 16) {
     }
 
     fun prepend(values: List<Instruction>): Builder {
-        instr.addAll(0, values)
+        instrs.addAll(0, values)
+        return this
+    }
+
+    fun prepend(instr: Instruction): Builder {
+        this.instrs.add(0, instr)
         return this
     }
 
     fun endsWith(instr: Instruction): Boolean {
-        return this.instr.lastOrNull() == instr
+        var i = instrs.lastIndex
+        while (i >= 0 && instrs[i] is Comment) i--
+        return this.instrs.getOrNull(i) == instr
     }
 
     fun endsWith(end: List<Instruction>): Boolean {
-        return instr.size >= end.size &&
-                instr.subList(instr.size - end.size, instr.size) == end
+        return instrs.size >= end.size &&
+                instrs.subList(instrs.size - end.size, instrs.size) == end
     }
 
     fun startsWith(instr: Instruction, i: Int): Boolean {
-        return this.instr.getOrNull(i) == instr
+        return this.instrs.getOrNull(i) == instr
     }
 
     fun drop(): Builder {
-        instr.removeLast()
+        instrs.removeLast()
         return this
     }
 
     fun clear() {
-        instr.clear()
+        instrs.clear()
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return instrs == other
+    }
+
+    override fun hashCode(): Int {
+        return instrs.hashCode()
     }
 }

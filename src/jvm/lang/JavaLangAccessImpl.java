@@ -114,7 +114,7 @@ public class JavaLangAccessImpl implements JavaLangAccess {
         }
     }
 
-    @WASM(code = "call_indirect (type $sRV0)")
+    @WASM(code = "call_indirect (type $Xi)")
     public static native void callStaticInit(int methodId);
 
     @Override

@@ -31,7 +31,6 @@ public class JavaThrowable {
     private static boolean insideFIST = false;
 
     @NoThrow
-    @Alias(names = "fIST")
     public static Throwable Throwable_fillInStackTraceI(Throwable th) throws NoSuchFieldException, IllegalAccessException {
 
         // todo this is supposed to store the state, but not yet create the stack elements

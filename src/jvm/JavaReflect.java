@@ -107,30 +107,30 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Field_get_Ljava_lang_ObjectLjava_lang_Object")
-    public static int Field_get(Field field, Object instance) {
+    public static Object Field_get(Field field, Object instance) {
         int addr = getFieldAddr(field, instance);
         // if the field is native, we have to wrap it
         Class<?> clazz = field.getType();
         String clazzName = clazz.getName();
         switch (clazzName) {
             case "boolean":
-                return getAddr(read8(addr) > 0);
+                return read8(addr) > 0;
             case "byte":
-                return getAddr(read8(addr));
+                return read8(addr);
             case "short":
-                return getAddr(read16s(addr));
+                return read16s(addr);
             case "char":
-                return getAddr(read16u(addr));
+                return read16u(addr);
             case "int":
-                return getAddr(read32(addr));
-            case "long":
-                return getAddr(read64(addr));
-            case "float":
-                return getAddr(read32f(addr));
-            case "double":
-                return getAddr(read64f(addr));
-            default:
                 return read32(addr);
+            case "long":
+                return read64(addr);
+            case "float":
+                return read32f(addr);
+            case "double":
+                return read64f(addr);
+            default:
+                return ptrTo(read32(addr));
         }
     }
 
@@ -149,9 +149,7 @@ public class JavaReflect {
         int addr = getFieldAddr(field, instance);
         // log("writing field at", offset);
         // log("wrote obj", getAddr(value));
-        Class<?> clazz = field.getType();
-        String clazzName = clazz.getName();
-        switch (clazzName) {
+        switch (field.getType().getName()) {
             case "boolean":
                 write8(addr, (byte) (((Boolean) value) ? 1 : 0));
                 break;
@@ -542,12 +540,8 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Field_equals_Ljava_lang_ObjectZ")
     public static boolean Field_equals(Field f, Object o) {
-        return Field_equals2(f, o);
+        return f == o;
     }
-
-    @NoThrow
-    @WASM(code = "i32.eq")
-    public static native boolean Field_equals2(Field f, Object o);
 
     @Alias(names = "java_lang_Class_newInstance_Ljava_lang_Object")
     public static <V> Object java_lang_Class_newInstance_Ljava_lang_Object(Class<V> clazz) {
@@ -560,7 +554,7 @@ public class JavaReflect {
         return ptrTo(instance);
     }
 
-    @WASM(code = "call_indirect (type $fRV0)")
+    @WASM(code = "call_indirect (type $iXi)")
     public static native void invoke(int obj, int methodPtr);
 
     @Alias(names = "java_lang_Class_toString_Ljava_lang_String")

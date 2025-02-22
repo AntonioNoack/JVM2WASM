@@ -29,6 +29,7 @@ import org.objectweb.asm.*
 import replaceClass1
 import resolvedMethods
 import translator.ClassTranslator
+import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
@@ -38,10 +39,14 @@ fun <V> eq(a: V, b: V) {
     if (a != b) throw IllegalStateException("$a != $b")
 }
 
+fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
+    eq(gIndex.getFieldOffset(clazz, name, descriptor, false), objectOverhead + offset)
+}
+
 fun registerDefaultOffsets() {
 
     eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
-    eq(gIndex.getType("()V", true), "fRV0")
+    eq(gIndex.getType("()V", true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(replaceClass1("java/lang/String"))
@@ -58,11 +63,8 @@ fun registerDefaultOffsets() {
     gIndex.getFieldOffset("java/lang/System", "in", "Ljava/io/InputStream;", true)
     gIndex.getFieldOffset("java/lang/System", "out", "Ljava/io/PrintStream;", true)
     gIndex.getFieldOffset("java/lang/System", "err", "Ljava/io/PrintStream;", true)
-    eq(gIndex.getFieldOffset("java/lang/Throwable", "detailMessage", "Ljava/lang/String;", false), objectOverhead + 0)
-    eq(
-        gIndex.getFieldOffset("java/lang/Throwable", "stackTrace", "[Ljava/lang/StackTraceElement;", false),
-        objectOverhead + 4
-    )
+    eq("java/lang/Throwable", "detailMessage", "Ljava/lang/String;", 0)
+    eq("java/lang/Throwable", "stackTrace", "[Ljava/lang/StackTraceElement;", ptrSize)
 
     gIndex.getFieldOffset("java/lang/StackTraceElement", "declaringClass", "Ljava/lang/String;", false)
     gIndex.getFieldOffset("java/lang/StackTraceElement", "methodName", "Ljava/lang/String;", false)
@@ -70,19 +72,19 @@ fun registerDefaultOffsets() {
     gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "I", false)
 
     eq(gIndex.getFieldOffset("java/lang/Class", "name", "Ljava/lang/String", false), objectOverhead + 0)
-    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[Ljava/lang/reflect/Field", false), objectOverhead + 4)
-    eq(gIndex.getFieldOffset("java/lang/Class", "methods", "[Ljava/lang/reflect/Method", false), objectOverhead + 8)
-    eq(gIndex.getFieldOffset("java/lang/Class", "index", "I", false), objectOverhead + 12)
+    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[Ljava/lang/reflect/Field", false), objectOverhead + ptrSize)
+    eq("java/lang/Class", "methods", "[Ljava/lang/reflect/Method", ptrSize * 2)
+    eq("java/lang/Class", "index", "I", ptrSize * 3)
 
     gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "securityCheckCache", "Ljava/lang/Object", false) // 0
     gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "Z", false) // 4
     gIndex.getFieldOffset("java/lang/reflect/Field", "securityCheckCache", "Ljava/lang/Object", false) // 0
     gIndex.getFieldOffset("java/lang/reflect/Field", "override", "Z", false) // 4
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "name", "Ljava/lang/String", false), objectOverhead + 5)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "slot", "I", false), objectOverhead + 9)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "type", "Ljava/lang/Class", false), objectOverhead + 13)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "modifiers", "I", false), objectOverhead + 17)
-    eq(gIndex.getFieldOffset("java/lang/reflect/Field", "clazz", "Ljava/lang/Class", false), objectOverhead + 21)
+    eq("java/lang/reflect/Field", "name", "Ljava/lang/String", 1 + ptrSize)
+    eq("java/lang/reflect/Field", "slot", "I", 1 + 2 * ptrSize)
+    eq("java/lang/reflect/Field", "type", "Ljava/lang/Class", 1 + 2 * ptrSize + 4)
+    eq("java/lang/reflect/Field", "modifiers", "I", 1 + 3 * ptrSize + 4)
+    eq("java/lang/reflect/Field", "clazz", "Ljava/lang/Class", 1 + 3 * ptrSize + 2 * 4)
 
     // for sun/misc
     gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSeed", "J", false)
