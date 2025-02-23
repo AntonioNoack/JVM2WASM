@@ -94,7 +94,7 @@ public class ArrayAccessSafe {
         return read8(instance + arrayOverhead + index);
     }
 
-    @Alias(names = "al")
+    @Alias(names = "arrayLength")
     public static int arrayLength(int instance) {
         if (instance == 0) throw new NullPointerException("[].length");
         return read32(instance + objectOverhead);

@@ -1,5 +1,7 @@
 package wasm.instr
 
+import me.anno.utils.structures.lists.Lists.createList
+
 class Call(val name: String) : Instruction {
 
     init {
@@ -48,11 +50,56 @@ class Call(val name: String) : Instruction {
         val f64ArrayStore = Call("f64ArrayStore")
         val f64ArrayStoreU = Call("f64ArrayStoreU")
 
-        val al = Call("al")
-        val alU = Call("alU")
+        val al = Call("arrayLength")
+        val alU = Call("arrayLengthU")
 
         val resolveIndirect = Call("resolveIndirect")
         val resolveIndirectFail = Call("resolveIndirectFail")
 
+        val setFieldI8 = Call("setFieldI8")
+        val setFieldI16 = Call("setFieldI16")
+        val setFieldI32 = Call("setFieldI32")
+        val setFieldI64 = Call("setFieldI64")
+        val setFieldF32 = Call("setFieldF32")
+        val setFieldF64 = Call("setFieldF64")
+
+        val setStaticFieldI8 = Call("setStaticFieldI8")
+        val setStaticFieldI16 = Call("setStaticFieldI16")
+        val setStaticFieldI32 = Call("setStaticFieldI32")
+        val setStaticFieldI64 = Call("setStaticFieldI64")
+        val setStaticFieldF32 = Call("setStaticFieldF32")
+        val setStaticFieldF64 = Call("setStaticFieldF64")
+
+        val getFieldS8 = Call("getFieldS8")
+        val getFieldS16 = Call("getFieldS16")
+        val getFieldU16 = Call("getFieldU16")
+        val getFieldI32 = Call("getFieldI32")
+        val getFieldI64 = Call("getFieldI64")
+        val getFieldF32 = Call("getFieldF32")
+        val getFieldF64 = Call("getFieldF64")
+
+        val getStaticFieldS8 = Call("getStaticFieldS8")
+        val getStaticFieldS16 = Call("getStaticFieldS16")
+        val getStaticFieldU16 = Call("getStaticFieldU16")
+        val getStaticFieldI32 = Call("getStaticFieldI32")
+        val getStaticFieldI64 = Call("getStaticFieldI64")
+        val getStaticFieldF32 = Call("getStaticFieldF32")
+        val getStaticFieldF64 = Call("getStaticFieldF64")
+
+        val panic = Call("panic")
+        val readClass = Call("readClass")
+        val findStatic = Call("findStatic")
+        val instanceOf = Call("instanceOf")
+        val instanceOfNonInterface = Call("instanceOfNonInterface")
+        val instanceOfExact = Call("instanceOfExact")
+
+        val createObjectArray = Call("createObjectArray")
+        val createNativeArray = createList(20) { Call("createNativeArray$it") }
+
+        val createInstance = Call("createInstance")
+        val getClassIndexPtr = Call("getClassIndexPtr")
+
+        val checkCast = Call("checkCast")
+        val checkCastExact = Call("checkCastExact")
     }
 }

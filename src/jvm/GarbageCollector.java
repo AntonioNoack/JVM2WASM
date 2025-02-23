@@ -15,7 +15,7 @@ import static jvm.JVMValues.failedToAllocateMemory;
 import static jvm.JVMValues.reachedMemoryLimit;
 import static jvm.JavaLang.getAddr;
 
-public class GC {
+public class GarbageCollector {
 
     public static int freeMemory = 0;
 
@@ -44,7 +44,7 @@ public class GC {
         traverseAliveInstances();
         long t1 = System.nanoTime();
         findLargestGaps(largestGaps, null);
-        GCX.hasGaps = hasGaps();
+        GarbageCollectorFlags.hasGaps = hasGaps();
         long t2 = System.nanoTime();
         log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
     }
@@ -68,7 +68,7 @@ public class GC {
     public static boolean concurrentGC1() {
         boolean done = GCGapFinder.findLargestGapsStep(largestGaps, null);
         if (done) {
-            GCX.hasGaps = hasGaps();
+            GarbageCollectorFlags.hasGaps = hasGaps();
         }
         return done;
     }
@@ -112,7 +112,7 @@ public class GC {
     public static void parallelGC2() {
         // mergeGaps();
         swapGaps();
-        GCX.hasGaps = hasGaps();
+        GarbageCollectorFlags.hasGaps = hasGaps();
     }
 
     @NoThrow

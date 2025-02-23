@@ -13,12 +13,12 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Objects;
+import java.util.HashMap;
 
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
-import static jvm.JVM32.findClass;
-import static jvm.JavaLang.*;
+import static jvm.JavaLang.getAddr;
+import static jvm.JavaLang.ptrTo;
 
 public class JavaReflect {
 
@@ -147,8 +147,11 @@ public class JavaReflect {
     @Alias(names = "java_lang_reflect_Field_set_Ljava_lang_ObjectLjava_lang_ObjectV")
     public static void Field_set(Field field, Object instance, Object value) {
         int addr = getFieldAddr(field, instance);
-        // log("writing field at", offset);
-        // log("wrote obj", getAddr(value));
+        log("Field.set()", addr, getAddr(value));
+        log("Field.newValue", String.valueOf(value));
+        boolean isInstanceOfType = field.getType().isInstance(value);
+        log("Field.type vs newType", field.getType().getName(), value == null ? null : value.getClass().getName());
+        log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
         switch (field.getType().getName()) {
             case "boolean":
                 write8(addr, (byte) (((Boolean) value) ? 1 : 0));
@@ -292,17 +295,27 @@ public class JavaReflect {
         return read8(getFieldAddr(field, instance)) != 0;
     }
 
+    @SuppressWarnings("rawtypes")
+    private static HashMap<String, Class> classesForName;
+
+    @SuppressWarnings("rawtypes")
+    private static HashMap<String, Class> getClassesForName() {
+        HashMap<String, Class> values = classesForName;
+        if (values == null) {
+            JavaReflect.classesForName = values = new HashMap<>(numClasses());
+            for (int i = 0, l = numClasses(); i < l; i++) {
+                Class<Object> clazz = ptrTo(findClass(i));
+                values.put(clazz.getName(), clazz);
+            }
+        }
+        return values;
+    }
+
     @Alias(names = "java_lang_Class_forName_Ljava_lang_StringLjava_lang_Class")
     public static <V> Class<V> Class_forName(String name) throws ClassNotFoundException {
-        // iterate over all class instances, and get their names
-        // if the name matches, return that class
-        log("looking for class", name);
-        for (int i = 0, l = numClasses(); i < l; i++) {
-            Class<V> clazz = ptrTo(findClass(i));
-            // log("instance of class?", clazz instanceof Class ? 1 : 0);
-            // log("class", i, clazz.getName());
-            if (Objects.equals(name, clazz.getName())) return clazz;
-        }
+        @SuppressWarnings("unchecked")
+        Class<V> clazz = (Class<V>) getClassesForName().get(name);
+        if (clazz != null) return clazz;
         throw new ClassNotFoundException();
     }
 
@@ -548,8 +561,13 @@ public class JavaReflect {
         if (clazz == null) throwJs();
         int classIndex = getClassIndex(clazz);
         if (classIndex < 0) throwJs();
-        int instance = create(classIndex);
-        int constructorPtr = resolveIndirect(instance, 4); // (id+1)<<2, id = 0
+        if (getDynamicTableSize(classIndex) == 0) {
+            log("Cannot instantiate clazz", classIndex, clazz == null ? null : clazz.getName());
+            return null;
+        }
+        int constructorPtr = resolveIndirectByClass(classIndex, 4); // (id+1)<<2, id = 0
+        int instance = createInstance(classIndex);
+        // todo it would be good, if we have a value for stackPush/stackPop here
         invoke(instance, constructorPtr);
         return ptrTo(instance);
     }
@@ -612,6 +630,7 @@ public class JavaReflect {
     @Alias(names = "java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor")
     public static <V> Object[] java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
             throws NoSuchFieldException, IllegalAccessException {
+        if (getDynamicTableSize(getClassIndex(self)) == 0) return empty; // not constructable class
         return new Object[]{getConstructorWithoutArgs(self)}; // to do better implementation?
     }
 
@@ -636,17 +655,19 @@ public class JavaReflect {
         return getConstructorWithoutArgs(self);
     }
 
-    private static <V> Constructor<V> getConstructorWithoutArgs(Class<V> self) throws NoSuchFieldException, IllegalAccessException {
+    private static <V> Constructor<V> getConstructorWithoutArgs(Class<V> clazz) throws NoSuchFieldException, IllegalAccessException {
         if (constructors == null) {
+            //noinspection unchecked
             constructors = new Constructor[numClasses()];
         }
-        int idx = getClassIndex(self);
+        int idx = getClassIndex(clazz);
         Constructor<Object> cs = constructors[idx];
         if (cs == null) {
-            cs = ptrTo(create(getClassIndex(Constructor.class)));
-            Constructor.class.getDeclaredField("clazz").set(cs, self);
+            cs = ptrTo(createInstance(getClassIndex(Constructor.class)));
+            Constructor.class.getDeclaredField("clazz").set(cs, clazz);
             constructors[idx] = cs;
         }
+        //noinspection unchecked
         return (Constructor<V>) cs;
     }
 
@@ -679,7 +700,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_getInterfaces_ALjava_lang_Class")
     public static Object[] java_lang_Class_getInterfaces_ALjava_lang_Class(Object self) {
-        return empty;// todo
+        return empty;// to do -> not really used anyway
     }
 
     @Alias(names = "static_java_lang_ClassLoaderXParallelLoaders_V")

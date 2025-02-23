@@ -7,8 +7,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.GC.GC_OFFSET;
-import static jvm.GC.iteration;
+import static jvm.GarbageCollector.GC_OFFSET;
+import static jvm.GarbageCollector.iteration;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
@@ -85,6 +85,7 @@ public class GCTraversal {
     private static int[] staticFields;
     public static int[] classSizes;
 
+    @NoThrow
     private static void createGCFieldTable() {
         // classes
         int nc = numClasses();
@@ -94,7 +95,7 @@ public class GCTraversal {
         classSizes = classSizes2;
         int staticFieldCtr = 0;
         for (int i = 0; i < nc; i++) {
-            classSizes2[i] = JVM32.getInstanceSizeC(i);
+            classSizes2[i] = JVM32.getInstanceSize(i);
             Class<Object> clazz = ptrTo(findClass(i));
             int fields = getFields(clazz);
             if (fields == 0) continue;

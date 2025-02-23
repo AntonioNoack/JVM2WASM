@@ -5,7 +5,6 @@ import annotations.JavaScript;
 import annotations.NoThrow;
 
 import static jvm.JVM32.*;
-import static jvm.JVM32.read32;
 import static jvm.JavaLang.*;
 
 public class JavaThrowable {
@@ -18,9 +17,32 @@ public class JavaThrowable {
         return (getStackPtr0() - getStackPtr()) >> 2;
     }
 
-    @JavaScript(code = "trace(arg0)")
     @Alias(names = "java_lang_Throwable_printStackTrace_V")
-    public static native void java_lang_Throwable_printStackTrace_V(Throwable th);
+    public static void java_lang_Throwable_printStackTrace_V(Throwable th) {
+        printStackTraceHead(th.getClass().getName(), th.getMessage());
+        StackTraceElement[] trace = ptrTo(read32(getAddr(th) + objectOverhead + 4));
+        for (StackTraceElement element : trace) {
+            String clazz = element.getClassName();
+            String name = element.getMethodName();
+            int line = element.getLineNumber();
+            printStackTraceLine(clazz, name, line);
+        }
+        printStackTraceEnd();
+    }
+
+    // std::cerr << name << ": " << msg << std::endl;
+    @NoThrow
+    @JavaScript(code = "trace(arg0)")
+    public static native void printStackTraceHead(String name, String message);
+
+    // std::cerr << "  " << clazz << "." << name << ":" << line << std::endl;
+    @NoThrow
+    @JavaScript(code = "console.log('  '+arg0+'.'+arg1+':'+arg2)")
+    public static native void printStackTraceLine(String clazzName, String methodName, int lineNumber);
+
+    @NoThrow
+    @JavaScript(code = "")
+    public static native void printStackTraceEnd();
 
     @NoThrow
     @Alias(names = "java_lang_Throwable_fillInStackTrace_Ljava_lang_Throwable")
@@ -64,7 +86,7 @@ public class JavaThrowable {
             reachedLimit = true;
         }
 
-        int lookupBasePtr = getLookupBasePtr();
+        int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) {
             insideFIST = false;
             return th;
@@ -133,7 +155,7 @@ public class JavaThrowable {
         int sp = getStackPtr();
         int stackLength = (getStackPtr0() - sp) >> 2;// each element is 4 bytes in size currently
         if (stackLength >= stackReportLimit) stackLength = stackReportLimit;
-        int lookupBasePtr = getLookupBasePtr();
+        int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return;
         if (stackLength < 1) return;
 
@@ -159,7 +181,7 @@ public class JavaThrowable {
         int stackLength = (getStackPtr0() - sp) >> 2;// each element is 4 bytes in size currently
         if (stackLength < 1) return new StackTraceElement[0];
         if (stackLength >= stackReportLimit) stackLength = stackReportLimit;
-        int lookupBasePtr = getLookupBasePtr();
+        int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return new StackTraceElement[0];
 
         StackTraceElement[] array = new StackTraceElement[stackLength];

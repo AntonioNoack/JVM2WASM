@@ -44,4 +44,10 @@ class IfBranch(
             builder.append("))")
         }
     }
+
+    override fun isReturning(): Boolean {
+        val trueReturns = ifTrue.lastOrNull { it !is Comment }?.isReturning() ?: false
+        val falseReturns = ifFalse.lastOrNull { it !is Comment }?.isReturning() ?: false
+        return trueReturns && falseReturns
+    }
 }

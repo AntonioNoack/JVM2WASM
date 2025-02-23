@@ -4,8 +4,8 @@ import jvm.JVM32;
 
 import java.lang.ref.ReferenceQueue;
 
-import static jvm.GC.lockMallocMutex;
-import static jvm.GC.unlockMallocMutex;
+import static jvm.GarbageCollector.lockMallocMutex;
+import static jvm.GarbageCollector.unlockMallocMutex;
 import static jvm.JVM32.getAllocationStart;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;

@@ -5,7 +5,7 @@ import jvm.custom.WeakRef;
 import me.anno.utils.structures.arrays.IntArrayList;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.GC.*;
+import static jvm.GarbageCollector.*;
 import static jvm.GCTraversal.classSizes;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
@@ -94,7 +94,7 @@ public class GCGapFinder {
         // for that, iterate over all allocated memory
         int instance = currPtr;
         int gapStart = GCGapFinder.gapStart;
-        final int iteration = GC.iteration;
+        final int iteration = GarbageCollector.iteration;
         final int endPtr = GCGapFinder.endPtr;
         boolean wasUsed = GCGapFinder.wasUsed;
 
@@ -131,7 +131,7 @@ public class GCGapFinder {
             if (remainingBudget-- == 0) {
                 // save temporary state
                 GCGapFinder.currPtr = instance;
-                GC.freeMemory += freedMemory;
+                GarbageCollector.freeMemory += freedMemory;
                 GCGapFinder.gapStart = gapStart;
                 GCGapFinder.wasUsed = wasUsed;
                 return false; // not yet done
@@ -142,7 +142,7 @@ public class GCGapFinder {
         if (!wasUsed) {
             finishFindingGaps(endPtr, gapStart);
         }
-        GC.freeMemory += freedMemory;
+        GarbageCollector.freeMemory += freedMemory;
 
         // log("Done Scanning :), instances:", numInstances);
         // log("Gaps:", gapCounter);

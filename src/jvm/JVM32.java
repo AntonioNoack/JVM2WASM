@@ -3,24 +3,22 @@ package jvm;
 import annotations.*;
 import jvm.lang.JavaLangAccessImpl;
 import sun.misc.SharedSecrets;
-import utils.DescriptorKt;
 
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 import static jvm.ArrayAccessSafe.arrayStore;
-import static jvm.GC.largestGaps;
+import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMValues.emptyArray;
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JavaLang.*;
 
 @SuppressWarnings("unused")
 public class JVM32 {
 
-    public static int objectOverhead = 4;// 3x class, 1x GC
-    public static int arrayOverhead = objectOverhead + 4;// length
-    public static final int ptrSize = DescriptorKt.is32Bits() ? 4 : 8;
+    public static final int objectOverhead = 4;// 3x class, 1x GC
+    public static final int arrayOverhead = objectOverhead + 4;// length
+    public static final int ptrSize = 4; // this is JVM32, so this is correct
     public static boolean trackAllocations = true;
 
     // public static int fieldTableOffset = getFieldTableOffset(); // for GC
@@ -43,8 +41,8 @@ public class JVM32 {
 
     @NoThrow
     @Alias(names = "findClass")
-    public static int findClass(int idx) {
-        return findClass2(idx);
+    public static int findClass(int classIdx) {
+        return findClass2(classIdx);
     }
 
     @NoThrow
@@ -132,7 +130,7 @@ public class JVM32 {
     public static native void log(String msg, String param);
 
     // instance, class -> instance, error
-    @Alias(names = "cc")
+    @Alias(names = "checkCast")
     public static int checkCast(int instance, int clazz) {
         if (instance == 0) return 0;
         if (!instanceOf(instance, clazz)) {
@@ -141,7 +139,7 @@ public class JVM32 {
         return instance;
     }
 
-    @Alias(names = "ccx")
+    @Alias(names = "checkCastExact")
     public static int checkCastExact(int instance, int clazz) {
         if (instance == 0) return 0;
         if (!instanceOfExact(instance, clazz)) {
@@ -246,28 +244,28 @@ public class JVM32 {
     // private static int riLastClass, riLastMethod, riLastImpl;
 
     @NoThrow
-    @WASM(code = "global.get $M\n" +
-            "  local.get 0\n" + // clazz
-            "  i32.const 2\n" +
-            "  i32.shl\n" + // clazz << 2
-            "  i32.add\n" + // M + clazz << 2
-            "  i32.load\n" + // memory[M + clazz << 2]
-            "  local.get 1\n" +
-            "  i32.add\n" +
-            "  i32.load") // memory[methodPtr + memory[M + clazz << 2]]
+    @WASM(code = "" +
+            "  local.get 0 i32.const 2 i32.shl\n" + // clazz << 2
+            "  global.get $M i32.add i32.load\n" + // memory[M + clazz << 2]
+            "  local.get 1 i32.add i32.load") // memory[methodPtr + memory[M + clazz << 2]]
     private static native int resolveIndirectByClassUnsafe(int clazz, int methodPtr);
 
     @NoThrow
-    private static int resolveIndirectByClass(int clazz, int methodPtr) {
+    public static int resolveIndirectByClass(int clazzIdx, int methodPtr) {
         // unsafe memory -> from ~8ms/frame to ~6.2ms/frame
         // log("resolveIndirect", clazz, methodPtr);
-        int x = resolveIndirectByClassUnsafe(clazz, methodPtr);
+        int x = resolveIndirectByClassUnsafe(clazzIdx, methodPtr);
         if (x < 0) {
-            Class<Object> class1 = ptrTo(findClass(clazz));
+            Class<Object> class1 = ptrTo(findClass(clazzIdx));
             log("resolveIndirectByClass", class1.getName());
-            throwJs("classIndex, methodPtr, resolved:", clazz, methodPtr, x);
+            throwJs("classIndex, methodPtr, resolved:", clazzIdx, methodPtr, x);
         }
         return x;
+    }
+
+    @NoThrow
+    public static int getDynamicTableSize(int classIdx) {
+        return resolveIndirectByClass(classIdx, 0);
     }
 
     @NoThrow
@@ -415,22 +413,31 @@ public class JVM32 {
 
     @Export
     @NoThrow
-    @Alias(names = "io")
+    @Alias(names = "instanceOf")
     public static boolean instanceOf(int instance, int clazz) {
-        // log("io", instance, clazz);
+        // log("instanceOf", instance, clazz);
         if (instance == 0) return false;
         if (clazz == 0) return true;
         // checkAddress(instance);
         int testedClass = readClass(instance);
-        if (ge_ub(testedClass, numClasses())) {
-            log("class index out of bounds", testedClass, numClasses());
-            throwJs();
-        }
-        return instanceOfByClass(testedClass, clazz);
+        return isChildOrSameClass(testedClass, clazz);
+    }
+
+
+    @Export
+    @NoThrow
+    @Alias(names = "instanceOfNonInterface")
+    public static boolean instanceOfNonInterface(int instance, int clazz) {
+        // log("instanceOf", instance, clazz);
+        if (instance == 0) return false;
+        if (clazz == 0) return true;
+        // checkAddress(instance);
+        int testedClass = readClass(instance);
+        return isChildOrSameClassNonInterface(testedClass, clazz);
     }
 
     @NoThrow
-    @Alias(names = "iox")
+    @Alias(names = "instanceOfExact")
     public static boolean instanceOfExact(int instance, int clazz) {
         return (instance != 0) & (readClass(instance) == clazz);
     }
@@ -443,25 +450,45 @@ public class JVM32 {
     }
 
     @NoThrow
-    @Alias(names = "instanceOfByClass")
-    public static boolean instanceOfByClass(int instanceClass, int clazz) {
-        if (instanceClass == clazz) return true;
-        // find super classes in table
-        // log("instanceOf", instanceClass, clazz);
-        if (ge_ub(instanceClass, numClasses())) {
-            log("class index out of bounds", instanceClass, numClasses());
+    public static boolean isChildOrSameClass(int childClassIdx, int parentClassIdx) {
+        while (true) {
+            if (childClassIdx == parentClassIdx) return true;
+            // find super classes in table
+            validateClassIdx(childClassIdx);
+            int tableAddress = read32(inheritanceTable() + (childClassIdx << 2));
+            if (tableAddress == 0) return false;
+            // check for interfaces
+            if (isInInterfaceTable(tableAddress, parentClassIdx)) return true;
+            childClassIdx = read32(tableAddress); // switch to parent class
+        }
+    }
+
+    @NoThrow
+    public static boolean isChildOrSameClassNonInterface(int childClassIdx, int parentClassIdx) {
+        while (true) {
+            if (childClassIdx == parentClassIdx) return true;
+            validateClassIdx(childClassIdx);
+            int tableAddress = read32(inheritanceTable() + (childClassIdx << 2));
+            if (tableAddress == 0) return false;
+            childClassIdx = read32(tableAddress); // switch to parent class
+        }
+    }
+
+    @NoThrow
+    private static void validateClassIdx(int childClassIdx) {
+        if (ge_ub(childClassIdx, numClasses())) {
+            log("class index out of bounds", childClassIdx, numClasses());
             throwJs();
         }
-        int tableAddress = read32(inheritanceTable() + (instanceClass << 2));
-        // log("testing class, ptr", testedClass, tableAddress);
-        if (tableAddress == 0) return false;
-        int instanceSuperClass = read32(tableAddress);
-        if (instanceOfByClass(instanceSuperClass, clazz)) return true;
+    }
+
+    @NoThrow
+    public static boolean isInInterfaceTable(int tableAddress, int interfaceClassIdx) {
         // handle interfaces
         int length = read32(tableAddress + 8);
         tableAddress += 12;
         for (int i = 0; i < length; i++) {
-            if (read32(tableAddress) == clazz)
+            if (read32(tableAddress) == interfaceClassIdx)
                 return true;
             tableAddress += 4;
         }
@@ -475,16 +502,16 @@ public class JVM32 {
         return read32(tableAddress);
     }
 
-    @Alias(names = "gis")
-    public static int getInstanceSizeC(int classIndex) {
+    @NoThrow
+    public static int getInstanceSize(int classIndex) {
         // look up class table for size
         if (classIndex == 0 || (classIndex >= 17 && classIndex < 25)) return arrayOverhead;
         int tableAddress = read32(inheritanceTable() + (classIndex << 2));
         return read32(tableAddress + 4);
     }
 
-    @Alias(names = "cr")
-    public static int create(int clazz) {
+    @Alias(names = "createInstance")
+    public static int createInstance(int clazz) {
         if (ge_ub(clazz, numClasses())) {
             log("class index out of bounds", clazz, numClasses());
             throwJs();
@@ -498,7 +525,7 @@ public class JVM32 {
             throwJs("Class cannot be created");
         }*/
         if (trackAllocations) trackCalloc(clazz);
-        int instanceSize = getInstanceSizeC(clazz);
+        int instanceSize = getInstanceSize(clazz);
         if (instanceSize <= 0)
             throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
         int newInstance = calloc(instanceSize);
@@ -517,8 +544,8 @@ public class JVM32 {
     @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
     private static native void trackCalloc(int clazz);
 
-    @Alias(names = "ca")
-    public static int createArray(int length) {
+    @Alias(names = "createObjectArray")
+    public static int createObjectArray(int length) {
         // probably a bit illegal; should be fine for us, saving allocations :)
         if (length == 0) {
             Object sth = emptyArray;
@@ -526,7 +553,7 @@ public class JVM32 {
             // else awkward, probably recursive trap
         }
         // log("creating array", length);
-        return createNativeArray(length, 1);
+        return createNativeArray1(length, 1);
     }
 
     @NoThrow
@@ -559,8 +586,8 @@ public class JVM32 {
     @WASM(code = "") // automatically done
     public static native int b2i(boolean flag);
 
-    @Alias(names = "cna")
-    public static int createNativeArray(int length, int clazz) {
+    @Alias(names = "createNativeArray1")
+    public static int createNativeArray1(int length, int clazz) {
         // log("creating native array", length, clazz);
         if (length < 0) throw new IllegalArgumentException();
         int typeShift = getTypeShiftNoThrow(clazz);
@@ -583,52 +610,52 @@ public class JVM32 {
         return newInstance;
     }
 
-    @Alias(names = "cma2")
-    public static int createMultiArray(int l0, int l1, int clazz) {
+    @Alias(names = "createNativeArray2")
+    public static int createNativeArray2(int l0, int l1, int clazz) {
         if (l0 == 0) return 0;
-        int array = createNativeArray(l0, 1);
+        int array = createNativeArray1(l0, 1);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray(l1, clazz));
+            arrayStore(array, i, createNativeArray1(l1, clazz));
         }
         return array;
     }
 
-    @Alias(names = "cma3")
-    public static int createMultiArray(int l0, int l1, int l2, int clazz) {
+    @Alias(names = "createNativeArray3")
+    public static int createNativeArray3(int l0, int l1, int l2, int clazz) {
         if (l0 == 0) return 0;
-        int array = createNativeArray(l0, 1);
+        int array = createNativeArray1(l0, 1);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createMultiArray(l1, l2, clazz));
+            arrayStore(array, i, createNativeArray2(l1, l2, clazz));
         }
         return array;
     }
 
-    @Alias(names = "cma4")
-    public static int createMultiArray(int l0, int l1, int l2, int l3, int clazz) {
+    @Alias(names = "createNativeArray4")
+    public static int createNativeArray4(int l0, int l1, int l2, int l3, int clazz) {
         if (l0 == 0) return 0;
-        int array = createNativeArray(l0, 1);
+        int array = createNativeArray1(l0, 1);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createMultiArray(l1, l2, l3, clazz));
+            arrayStore(array, i, createNativeArray3(l1, l2, l3, clazz));
         }
         return array;
     }
 
-    @Alias(names = "cma5")
-    public static int createMultiArray(int l0, int l1, int l2, int l3, int l4, int clazz) {
+    @Alias(names = "createNativeArray5")
+    public static int createNativeArray5(int l0, int l1, int l2, int l3, int l4, int clazz) {
         if (l0 == 0) return 0;
-        int array = createNativeArray(l0, 1);
+        int array = createNativeArray1(l0, 1);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createMultiArray(l1, l2, l3, l4, clazz));
+            arrayStore(array, i, createNativeArray4(l1, l2, l3, l4, clazz));
         }
         return array;
     }
 
-    @Alias(names = "cma6")
-    public static int createMultiArray(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
+    @Alias(names = "createNativeArray6")
+    public static int createNativeArray6(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
         if (l0 == 0) return 0;
-        int array = createNativeArray(l0, 1);
+        int array = createNativeArray1(l0, 1);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createMultiArray(l1, l2, l3, l4, l5, clazz));
+            arrayStore(array, i, createNativeArray5(l1, l2, l3, l4, l5, clazz));
         }
         return array;
     }
@@ -642,13 +669,6 @@ public class JVM32 {
     public static native int getNextPtr();
 
     @NoThrow
-    @Alias(names = "qa")
-    public static int queryAllocated() {
-        return getNextPtr();
-    }
-
-    @NoThrow
-    @Alias(names = "qg")
     public static int queryGCed() {
         int sum = 0;
         int[] data = largestGaps;
@@ -682,24 +702,23 @@ public class JVM32 {
 
     @NoThrow
     public static void writeClass(int ptr, int clazz) {
-        write32(ptr, clazz | (GC.iteration << 24));
+        write32(ptr, clazz | (GarbageCollector.iteration << 24));
     }
 
-    @Alias(names = "_c")
     public static int calloc(int size) {
 
         size = adjustCallocSize(size);
 
         int ptr;
         // enough space for the first allocations
-        if (GCX.hasGaps) {
+        if (GarbageCollectorFlags.hasGaps) {
             // try to find a freed place in gaps first
-            ptr = GC.findGap(size);
+            ptr = GarbageCollector.findGap(size);
             if (ptr == 0) {
-                ptr = GC.allocateNewSpace(size);
+                ptr = GarbageCollector.allocateNewSpace(size);
             }
         } else {
-            ptr = GC.allocateNewSpace(size);
+            ptr = GarbageCollector.allocateNewSpace(size);
         }
 
         int endPtr = ptr + size;
@@ -707,16 +726,22 @@ public class JVM32 {
         return ptr;
     }
 
+    @NoThrow
     public static void fill8(int start, int end, byte value) {
-        fill16(start, end, (short) ((((int) value) << 8) | value));
+        int value1 = ((int) value) & 255;
+        fill16(start, end, (short) ((value1 << 8) | value1));
     }
 
+    @NoThrow
     public static void fill16(int start, int end, short value) {
-        fill32(start, end, (((int) value) << 16) | value);
+        int value1 = ((int) value) & 0xffff;
+        fill32(start, end, (value1 << 16) | value1);
     }
 
+    @NoThrow
     public static void fill32(int start, int end, int value) {
-        fill64(start, end, (((long) value) << 32) | value);
+        long value1 = ((long) value) & 0xffffffffL;
+        fill64(start, end, (value1 << 32) | value1);
     }
 
     @NoThrow
@@ -890,12 +915,12 @@ public class JVM32 {
         if (v < -2147483648f) return Integer.MIN_VALUE;
         if (v > 2147483647f) return Integer.MAX_VALUE;
         if (Float.isNaN(v)) return 0;
-        return _f2i(v);
+        return f2iNative(v);
     }
 
     @NoThrow
     @WASM(code = "i32.trunc_f32_s")
-    public static native int _f2i(float v);
+    public static native int f2iNative(float v);
 
     @NoThrow
     @Alias(names = "f2l")
@@ -903,12 +928,12 @@ public class JVM32 {
         if (v < -9223372036854775808f) return Long.MIN_VALUE;
         if (v > 9223372036854775807f) return Long.MAX_VALUE;
         if (Float.isNaN(v)) return 0L;
-        return _f2l(v);
+        return f2lNative(v);
     }
 
     @NoThrow
     @WASM(code = "i64.trunc_f32_s")
-    public static native long _f2l(float v);
+    public static native long f2lNative(float v);
 
     @NoThrow
     @Alias(names = "d2i")
@@ -916,12 +941,12 @@ public class JVM32 {
         if (v < -2147483648.0) return Integer.MIN_VALUE;
         if (v > 2147483647.0) return Integer.MAX_VALUE;
         if (Double.isNaN(v)) return 0;
-        return _d2i(v);
+        return d2iNative(v);
     }
 
     @NoThrow
     @WASM(code = "i32.trunc_f64_s")
-    public static native int _d2i(double v);
+    public static native int d2iNative(double v);
 
     @NoThrow
     @Alias(names = "d2l")
@@ -1026,44 +1051,44 @@ public class JVM32 {
 
     @Alias(names = "safeDiv32")
     public static int safeDiv32(int a, int b) {
-        if (b == 0) throw new ArithmeticException();
+        if (b == 0) throw new ArithmeticException("Division by zero");
         if ((a == Integer.MIN_VALUE) & (b == -1)) return Integer.MIN_VALUE;
         return div(a, b);
     }
 
     @Alias(names = "safeDiv64")
     public static long safeDiv64(long a, long b) {
-        if (b == 0) throw new ArithmeticException();
+        if (b == 0) throw new ArithmeticException("Division by zero");
         if ((a == Long.MIN_VALUE) & (b == -1)) return Long.MIN_VALUE;
         return div(a, b);
     }
 
     @Alias(names = "checkNonZero32")
     public static int checkNonZero32(int b) {
-        if (b == 0) throw new ArithmeticException();
+        if (b == 0) throw new ArithmeticException("Division by zero");
         return b;
     }
 
     @Alias(names = "checkNonZero64")
     public static long checkNonZero64(long b) {
-        if (b == 0) throw new ArithmeticException();
+        if (b == 0) throw new ArithmeticException("Division by zero");
         return b;
     }
 
     private static boolean canWarnStackOverflow = true;
 
     @NoThrow
-
     @Alias(names = "stackPush")
-    public static void pushCall(int idx) {
+    public static void stackPush(int idx) {
+        printStackTraceLine(idx);
         int stackPointer = getStackPtr() - 4;
-        // else stack overflow
-        // we can do different things here -> let's just keep running;
-        // just the stack is no longer tracked :)
         int limit = getStackLimit();
         if (unsignedGreaterThanEqual(stackPointer, limit)) {
             write32(stackPointer, idx);
         } else if (stackPointer == limit - 4) {
+            // stack overflow
+            // we can do different things here -> let's just keep running;
+            // just the stack is no longer tracked :)
             if (canWarnStackOverflow) {
                 canWarnStackOverflow = false;
                 log("Warning: Exited stack space, meaning",
@@ -1072,6 +1097,37 @@ public class JVM32 {
         }
         setStackPtr(stackPointer);
     }
+
+    @NoThrow
+    private static void printStackTraceLine(int idx) {
+        int lookupBasePtr = getStackTraceTablePtr();
+        if (lookupBasePtr <= 0) return;
+        int throwableLookup = lookupBasePtr + idx * 12;
+        String className = ptrTo(read32(throwableLookup));
+        String methodName = ptrTo(read32(throwableLookup + 4));
+        int line = read32(throwableLookup + 8);
+        printStackTraceLine(getStackDepth(), className, methodName, line);
+    }
+
+    @NoThrow
+    @JavaScript(code = "console.log('  '.repeat(arg0)+arg1+'.'+arg2+':'+arg3)")
+    private static native void printStackTraceLine(int depth, String clazz, String method, int line);
+
+    @NoThrow
+    @Alias(names = "stackPop")
+    public static void stackPop() {
+        stackPopImpl();
+    }
+
+    @NoThrow
+    @Alias(names = "getStackDepth")
+    public static int getStackDepth() {
+        return (getStackPtr0() - getStackPtr()) >> 2;
+    }
+
+    @NoThrow
+    @WASM(code = "global.get $Q i32.const 4 i32.add global.set $Q")
+    public static native void stackPopImpl();
 
     @NoThrow
     @WASM(code = "global.get $Q")
@@ -1090,18 +1146,6 @@ public class JVM32 {
     public static native void setStackPtr(int addr);
 
     @NoThrow
-
-    @Alias(names = "stackPop")
-    public static void popCall() {
-        popCall0();
-    }
-
-    @NoThrow
-    @Alias(names = "stackPop0")
-    @WASM(code = "global.get $Q i32.const 4 i32.add global.set $Q")
-    public static native void popCall0();
-
-    @NoThrow
     @Alias(names = "createNullptr")
     public static Throwable createNullptr(String name) {
         return new NullPointerException(name);
@@ -1115,9 +1159,14 @@ public class JVM32 {
         }
     }
 
+    /**
+     * Pseudo-Instance, which can be used to avoid allocations,
+     * when no fields of a type are used; only used for lambdas, because
+     * identity checks might cause trouble otherwise
+     */
     @NoThrow
-    @Alias(names = "cip")
-    public static <V> int getClassIndexPtr(int classIndex) {// pseudo instance, avoiding allocations
+    @Alias(names = "getClassIndexPtr")
+    public static <V> int getClassIndexPtr(int classIndex) {
         return findClass(classIndex) + objectOverhead + 12;
     }
 

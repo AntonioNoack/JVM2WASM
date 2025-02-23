@@ -45,9 +45,18 @@ fun defineFunctionImplementations(parser: WATParser) {
 }
 
 val ignoredFuncNames = ("r8,r16,r32," +
-        "s8ArrayLoad,u16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
+        "s8ArrayLoad,u16ArrayLoad,s16ArrayLoad,i32ArrayLoad,i64ArrayLoad," +
         "s8ArrayStore,i16ArrayStore,i32ArrayStore,i64ArrayStore," +
         "f32ArrayStore,f64ArrayStore,f32ArrayLoad,f64ArrayLoad," +
-        "s8ArrayLoadU,u16ArrayLoadU,i32ArrayLoadU,i64ArrayLoadU," +
-        "s8ArrayStoreU,i16ArrayStoreU,i32ArrayStoreU,i64ArrayStoreU," +
-        "f32ArrayStoreU,f64ArrayStoreU,f32ArrayLoadU,f64ArrayLoadU,").split(',')
+        "s8ArrayLoadU,u16ArrayLoadU,s16ArrayLoadU,i32ArrayLoadU,i64ArrayLoadU," +
+        "i8ArrayStoreU,i16ArrayStoreU,i32ArrayStoreU,i64ArrayStoreU," +
+        "f32ArrayStoreU,f64ArrayStoreU,f32ArrayLoadU,f64ArrayLoadU," +
+        "getStackDepth,stackPush,stackPop," +
+        "getStaticFieldS8,getFieldS8,setStaticFieldI8,setFieldI8," +
+        "getStaticFieldS16,getFieldS16,setStaticFieldI16,setFieldI16," +
+        "getStaticFieldU16,getFieldU16," +
+        "getStaticFieldI32,getFieldI32,setStaticFieldI32,setFieldI32," +
+        "getStaticFieldI64,getFieldI64,setStaticFieldI64,setFieldI64," +
+        "getStaticFieldF32,getFieldF32,setStaticFieldF32,setFieldF32," +
+        "getStaticFieldF64,getFieldF64,setStaticFieldF64,setFieldF64," +
+        "resolveIndirect,panic,dup_x1i32i32,arrayLengthU,").split(',').toHashSet()

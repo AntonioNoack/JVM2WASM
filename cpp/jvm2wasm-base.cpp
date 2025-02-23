@@ -38,11 +38,10 @@ i32 engine_Engine_update_IIFV(i32, i32, f32) {
     return 0;
 }
 
-void gc() {
-
-}
+void gc() {}
 
 #else
+void logCall(const char* funcName);
 #include "jvm2wasm.cpp"
 #endif
 
@@ -111,7 +110,7 @@ void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void java_lang_System_gc_V() { gcCtr = 1000000; }
-void jvm_GC_markJSReferences_V() { }
+void jvm_GarbageCollector_markJSReferences_V() { }
 void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
 
 i32 jvm_JVM32_log_III(i32 code, i32 r) { std::cout << code << ", " << r << std::endl; return r; }
@@ -444,29 +443,34 @@ i32 arrayLength(i32 instance) {
 }
 
 i32 java_lang_Thread_setNativeName_Ljava_lang_StringV(i32, i32) { return 0; }
-i32 java_lang_Throwable_printStackTrace_V(i32 err) { 
-    if(!io(err, 14)) {
-        std::cerr << err << " is not a throwable" << std::endl;
-        return 0;
-    }
-    std::string msg = strToCpp(r32(err + objectOverhead));
-    std::string name = strToCpp(java_lang_Class_getName_Ljava_lang_String(findClass(rCl(err))).v0);
-    std::cerr << name << ": " << msg << std::endl;
-    i32 trace = r32(err + objectOverhead + 4);
-    if(trace && io(trace, 1)) {
-        i32 traceLength = arrayLength(trace);
-        for(i32 i=0;i<traceLength;i++) {
-            i32 element = r32(trace + arrayOverhead + 4 * i);
-            if(element && io(element, 15)) {
-                std::string clazz = strToCpp(r32(element + objectOverhead));
-                std::string name = strToCpp(r32(element + objectOverhead + 4));
-                i32 line = r32(element + objectOverhead + 12);
-                std::cerr << "  " << clazz << "." << name << ":" << line << std::endl;
-            }
-        }
-    }
-    return 0;
+
+void jvm_JavaThrowable_printStackTraceEnd_V() {}
+void jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV(i32 name, i32 message) {
+    std::string msg = strToCpp(message);
+    std::string name1 = strToCpp(name);
+    std::cerr << name1 << ": " << msg << std::endl;
 }
+
+void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isError) {
+    std::string clazz1 = strToCpp(clazz);
+    std::string name = strToCpp(method);
+    if (isError) {
+        for(int i=0;i<depth;i++) std::cerr << "  ";
+        std::cerr << clazz1 << "." << name << ":" << line << std::endl;
+    } else {
+        for(int i=0;i<depth;i++) std::cout << "  ";
+        std::cout << clazz1 << "." << name << ":" << line << std::endl;
+    }
+}
+
+void jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
+    printStackTraceLine(depth, clazz, method, line, false);
+}
+
+void jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV(i32 clazz, i32 method, i32 line) {
+    printStackTraceLine(1, clazz, method, line, true);
+}
+
 i32 java_text_SimpleDateFormat_subFormat_IILjava_text_FormatXFieldDelegateLjava_lang_StringBufferZV(i32, i32, i32, i32, i32, i32) { return 0; }
 i32 java_util_zip_Deflater_end_JV(i64) { return 0; }
 i32 java_util_zip_Deflater_initIDs_V() { return 0; }
@@ -738,11 +742,18 @@ void unreachable(std::string msg) {
     // create new throwable, and return error
     if (!exiting) {
         exiting = true;
-        i32 err = cr(14).v0;
-        new_java_lang_Throwable_V(err);
-        java_lang_Throwable_printStackTrace_V(err);
+        // ~ new Throwable().printStackTrace()
+        i32 tmpErrorInstance = createInstance(14).v0;
+        new_java_lang_Throwable_V(tmpErrorInstance);
+        java_lang_Throwable_printStackTrace_V(tmpErrorInstance);
     }
     exit(-1);
+}
+
+void logCall(const char* funcName) {
+    int depth = getStackDepth();
+    for(int i=0;i<depth;i++) std::cout << "  ";
+    std::cout << funcName << std::endl;
 }
 
 void initMemory() {
@@ -759,13 +770,15 @@ void initMemory() {
         return;
     }
 
+    std::cout << "Allocated " << allocatedSize << " bytes, address " << (u64) memory << std::endl;
+
     // load memory block
     std::string path = "runtime-data.bin";
     std::ifstream file(path, std::ios::binary);
     size_t size = std::min(std::filesystem::file_size(path), allocatedSize);
     file.read((char*) memory, size);
     if(!file) std::cerr << "Failed reading file " << path << std::endl;
-    std::cout << "Loaded " << size << " bytes into memory" << std::endl;
+    std::cout << "Loaded " << file.gcount() << "/" << size << " bytes into memory" << std::endl;
 
 }
 

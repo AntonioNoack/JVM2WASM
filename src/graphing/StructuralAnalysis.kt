@@ -33,7 +33,6 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.LocalVariable
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.min
 
 class StructuralAnalysis(
     val methodTranslator: MethodTranslator,
@@ -78,13 +77,13 @@ class StructuralAnalysis(
                 else HashSet()
             }
         }
-
-        private var loopIndex = 0
     }
+
+    private var loopIndex = 0
 
     private val labelToNode = HashMap(nodes.associateBy { it.label })
 
-    val sig get() = methodTranslator.sig
+    private val sig get() = methodTranslator.sig
 
     private fun printState(printLine: (String) -> Unit) {
 
@@ -137,12 +136,29 @@ class StructuralAnalysis(
 
     private fun removeNegations(node: Node) {
         if (!node.isBranch) return
-        while (node.printer.endsWith(I32EQZ)) {// remove unnecessary null check before branch
-            node.printer.instrs.removeLast()
+        // remove unnecessary null checks before branch
+        while (node.printer.endsWith(I32EQZ)) {
+            node.printer.removeLast()
             val t = node.ifTrue!!
             val f = node.ifFalse!!
             node.ifTrue = f.label
             node.ifFalse = labelToNode[t]!!
+        }
+    }
+
+    private fun removeUselessBranches(node: Node) {
+        if (!node.isBranch) return
+        val lastNode = node.printer.lastOrNull()
+        if (lastNode is Const && lastNode.type == ConstType.I32) {
+            node.printer.removeLast()
+            if (lastNode.value == 0) {
+                // always take false path
+                node.ifTrue = null
+            } else {
+                // always take true path
+                node.ifFalse = null
+                node.isAlwaysTrue = true
+            }
         }
     }
 
@@ -309,10 +325,12 @@ class StructuralAnalysis(
         val label = "$name${loopIndex++}"
         node.printer.append(Jump(label))
         val newPrinter = Builder()
-        newPrinter.append(LoopInstr(
-            label, node.printer.instrs,
-            blockParamsGetResult(node, null)
-        )).append(Unreachable)
+        newPrinter.append(
+            LoopInstr(
+                label, node.printer.instrs,
+                blockParamsGetResult(node, null)
+            )
+        ).append(Unreachable)
         node.printer = newPrinter
         node.isAlwaysTrue = false
         node.ifTrue = null
@@ -367,7 +385,7 @@ class StructuralAnalysis(
         for (node in nodes) {
             if (node.ifTrue == node.ifFalse?.label && node.ifTrue != null) {
                 node.ifTrue = null
-                node.printer.append(Drop).comment("ifTrue == ifFalse")
+                node.printer.drop().comment("ifTrue == ifFalse")
                 val ifFalse = node.ifFalse!!.inputs
                 ifFalse.remove(node)
                 ifFalse.remove(node)
@@ -882,6 +900,7 @@ class StructuralAnalysis(
         for (node in nodes) {
             node.hasNoCode = node.calcHasNoCode()
             removeNegations(node)
+            removeUselessBranches(node)
         }
 
         for (index in nodes.indices) {

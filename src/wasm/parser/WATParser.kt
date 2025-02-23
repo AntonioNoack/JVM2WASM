@@ -292,24 +292,24 @@ class WATParser {
                     when (val instrName = list.getString(i++)) {
                         "local.get" -> {
                             when (list.getType(i)) {
-                                TokenType.NUMBER -> result.add(ParamGet(list.consume(TokenType.NUMBER, i++).toInt()))
+                                TokenType.NUMBER -> result.add(ParamGet[list.consume(TokenType.NUMBER, i++).toInt()])
                                 TokenType.DOLLAR -> result.add(LocalGet(list.getString(i++)))
                                 else -> throw NotImplementedError()
                             }
                         }
                         "local.set" -> {
                             when (list.getType(i)) {
-                                TokenType.NUMBER -> result.add(ParamSet(list.consume(TokenType.NUMBER, i++).toInt()))
+                                TokenType.NUMBER -> result.add(ParamSet[list.consume(TokenType.NUMBER, i++).toInt()])
                                 TokenType.DOLLAR -> result.add(LocalSet(list.getString(i++)))
                                 else -> throw NotImplementedError()
                             }
                         }
                         "global.get" -> result.add(GlobalGet(list.consume(TokenType.DOLLAR, i++)))
                         "global.set" -> result.add(GlobalSet(list.consume(TokenType.DOLLAR, i++)))
-                        "i32.const" -> result.add(i32Const(list.consume(TokenType.NUMBER, i++)))
-                        "i64.const" -> result.add(i64Const(list.consume(TokenType.NUMBER, i++)))
-                        "f32.const" -> result.add(f32Const(list.consume(TokenType.NUMBER, i++)))
-                        "f64.const" -> result.add(f64Const(list.consume(TokenType.NUMBER, i++)))
+                        "i32.const" -> result.add(i32Const(list.consume(TokenType.NUMBER, i++).toInt()))
+                        "i64.const" -> result.add(i64Const(list.consume(TokenType.NUMBER, i++).toLong()))
+                        "f32.const" -> result.add(f32Const(list.consume(TokenType.NUMBER, i++).toFloat()))
+                        "f64.const" -> result.add(f64Const(list.consume(TokenType.NUMBER, i++).toDouble()))
                         "call" -> result.add(Call(list.consume(TokenType.DOLLAR, i++)))
                         "call_indirect" -> {
                             // call_indirect (type $fR00)

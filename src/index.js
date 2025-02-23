@@ -72,10 +72,10 @@ try {
 
     window.trace = function(th){
         if(th == 0) return null
-        if(lib.io(th, 14)){// 14 = Throwable
+        if(lib.instanceOf(th, 14)){// 14 = Throwable
             var clazz = ptr2err(th)
             var trace = lib.r32(th + objectOverhead + 4) // first is message
-            if(trace && lib.io(trace, 1)){
+            if(trace && lib.instanceOf(trace, 1)){
                 var traceLength = lib.r32(trace + objectOverhead)
                 var trace1 = []
                 for(var i=0;i<traceLength;i++){
@@ -96,7 +96,7 @@ try {
     }
 
     window.trace1 = function(trace){
-        if(trace && lib.io(trace, 1)){
+        if(trace && lib.instanceOf(trace, 1)){
             var traceLength = lib.r32(trace + objectOverhead)
             var trace1 = []
             for(var i=0;i<traceLength;i++){

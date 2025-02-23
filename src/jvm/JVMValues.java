@@ -1,6 +1,6 @@
 package jvm;
 
-import static jvm.JVM32.createNativeArray;
+import static jvm.JVM32.createNativeArray1;
 import static jvm.JavaLang.ptrTo;
 
 public class JVMValues {
@@ -9,5 +9,5 @@ public class JVMValues {
             reachedMemoryLimit = new OutOfMemoryError("Reached memory limit"),
             failedToAllocateMemory = new OutOfMemoryError("Failed to allocate more memory");
 
-    public static final Object emptyArray = ptrTo(createNativeArray(0, 1));
+    public static final Object emptyArray = ptrTo(createNativeArray1(0, 1));
 }

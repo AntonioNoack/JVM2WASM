@@ -6,7 +6,6 @@ import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
-import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.lists.Lists.any2
 import org.objectweb.asm.Opcodes.ASM9
@@ -15,6 +14,7 @@ import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
 import wasm.instr.Instructions.F64_SQRT
+import wasm.parser.GlobalVariable
 import java.io.FileNotFoundException
 import kotlin.math.sin
 
@@ -80,6 +80,8 @@ var addDebugMethods = false
 // todo doesn't work yet, missing functions :/
 // if this flag is true, fields that aren't read won't be written
 var fieldsRWRequired = false
+
+var alwaysUseFieldCalls = true
 
 val stackSize = if (enableTracing) 1024 * 32 else 0
 
@@ -173,7 +175,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
     clazz("engine/Engine")
 
     clazz("jvm/JVM32")
-    clazz("jvm/GC")
+    clazz("jvm/GarbageCollector")
     clazz("jvm/MemDebug")
 
     if (checkArrayAccess) {
@@ -460,7 +462,7 @@ fun jvm2wasm() {
     // must come after invoke dynamic
     appendDynamicFunctionTable(dataPrinter, implementedMethods) // idx -> function
     appendFunctionTypes(dataPrinter)
-    appendNativeHelperFunctions(dataPrinter)
+    appendNativeHelperFunctions()
 
     val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
 
@@ -489,41 +491,6 @@ fun jvm2wasm() {
     })
 
     val usedMethods = ActuallyUsedIndex.resolve()
-
-    /*val isUsed = MethodSig.c(
-        "kotlin/jvm/internal/PropertyReference1", "invoke",
-        "(Ljava_lang_Object;)Ljava_lang_Object;"
-    )
-
-    val isMaybeUsed = MethodSig.c(
-        "kotlin/jvm/internal/PropertyReference1", "get",
-        "(Ljava_lang_Object;)Ljava_lang_Object;"
-    )
-
-    val parentClazz = "kotlin/jvm/internal/PropertyReference1Impl"
-    val clazzMissing = "me/anno/ecs/systems/Systems\$registerSystem\$1\$1"
-    println("  SuperClass: ${hIndex.superClass[clazzMissing]}, Interfaces: ${hIndex.interfaces[clazzMissing]}")
-    val parentMissing = MethodSig.c(
-        parentClazz, "get",
-        "(Ljava_lang_Object;)Ljava_lang_Object;"
-    )
-    val isMissing = MethodSig.c(
-        clazzMissing, "get",
-        "(Ljava_lang_Object;)Ljava_lang_Object;"
-    )
-
-    printUsed(isUsed)
-    printUsed(isMaybeUsed)
-    printUsed(isMissing)
-    printUsed(parentMissing)
-
-    assertTrue(methodName(isUsed) in usedMethods)
-    assertTrue(methodName(isMissing) in usedMethods)*/
-
-    val isUsed2 = MethodSig.c("java/io/InputStreamReader", "close", "()V")
-    printUsed(isUsed2)
-    assertTrue(methodName(isUsed2) in usedMethods)
-
     usedButNotImplemented.retainAll(usedMethods)
 
     val nameToMethod = nameToMethod
@@ -548,42 +515,42 @@ fun jvm2wasm() {
     }
 
     printMethodImplementations(bodyPrinter, usedMethods)
-
     printInterfaceIndex()
 
-    fun global(name: String, type: String, type2: String, value: Int) {
+    fun printGlobal(name: String, type: String, type2: String, value: Int) {
         // can be mutable...
         dataPrinter.append("(global $").append(name).append(" ").append(type).append(" (").append(type2)
             .append(".const ").append(value).append("))\n")
     }
 
-    fun global(name: String, type: String, value: Int) {
-        global(name, type, type, value)
+    fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
+        printGlobal(name, if(isMutable) "(mut $type)" else type, type, value)
+        globals.add(GlobalVariable(name, type, value, isMutable))
     }
 
     dataPrinter.append(";; globals:\n")
-    global("S", ptrType, stringStart) // string table
-    global("c", ptrType, classTableStart) // class table
-    global("s", ptrType, staticTablePtr) // static table
-    global("M", ptrType, methodTablePtr)
-    global("X", ptrType, numClasses)
-    global("Y", ptrType, classInstanceTablePtr)
-    global("YS", ptrType, gIndex.getFieldOffsets("java/lang/Class", false).offset)
-    global("Z", ptrType, clInitFlagTable)
-    global("L", ptrType, throwableLookupPtr)
-    global("R", ptrType, resourceTablePtr)
+    defineGlobal("S", ptrType, stringStart) // string table
+    defineGlobal("c", ptrType, classTableStart) // class table
+    defineGlobal("s", ptrType, staticTablePtr) // static table
+    defineGlobal("M", ptrType, methodTablePtr)
+    defineGlobal("X", ptrType, numClasses)
+    defineGlobal("Y", ptrType, classInstanceTablePtr)
+    defineGlobal("YS", ptrType, gIndex.getFieldOffsets("java/lang/Class", false).offset)
+    defineGlobal("Z", ptrType, clInitFlagTable)
+    defineGlobal("L", ptrType, throwableLookupPtr)
+    defineGlobal("R", ptrType, resourceTablePtr)
 
     // todo if we run out of stack space, throw exception
 
-    global("q", ptrType, ptr) // stack end ptr
+    defineGlobal("q", ptrType, ptr) // stack end ptr
     ptr += stackSize
-    global("Q", "(mut i32)", ptrType, ptr) // stack ptr
-    global("Q0", ptrType, ptr) // stack ptr start address
+    defineGlobal("Q", ptrType, ptr, true) // stack ptr
+    defineGlobal("Q0", ptrType, ptr) // stack ptr start address
 
     ptr = align(ptr + 4, 16)
     // allocation start address
-    global("G", "(mut i32)", ptrType, ptr)
-    global("G0", ptrType, ptr) // original allocation start address
+    defineGlobal("G", ptrType, ptr, true)
+    defineGlobal("G0", ptrType, ptr) // original allocation start address
 
     val sizeInPages = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
     headerPrinter.append("(memory (import \"js\" \"mem\") ").append(sizeInPages).append(")\n")
@@ -598,29 +565,14 @@ fun jvm2wasm() {
     headerPrinter.append(") ;; end of module\n")
 
     println("  Total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
-
-    /*for (it in gIndex.interfaceIndex.entries.sortedBy { it.value }) {
-        println("${it.value}: ${it.key}")
-    }*/
-
     println("  Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
 
     compileToWASM(headerPrinter)
 
     println("  ${dIndex.constructableClasses.size}/${gIndex.classNames.size} classes are constructable")
-
-    /*for ((name, size) in gIndex.classNames
-        .map { it to gIndex.getFieldOffsets(it, false).offset }
-        .sortedByDescending { it.second }
-        .subList(0, min(gIndex.classNames.size, 100))) {
-        println(
-            "$name: $size, ${
-                gIndex.getFieldOffsets(name, false).fields.entries.sortedBy { it.value.offset }.map { it.key }
-            }"
-        )
-    }*/
-
 }
+
+val globals = ArrayList<GlobalVariable>()
 
 fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
     println("\nMissing functions:")

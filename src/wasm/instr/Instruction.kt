@@ -7,4 +7,7 @@ interface Instruction {
         for (i in 0 until depth) builder.append("  ")
         builder.append(toString())
     }
+
+    // todo when this is true, break instr-block-printing
+    fun isReturning(): Boolean = false
 }

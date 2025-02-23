@@ -18,8 +18,6 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
 
     private var writer: ClassWriter? = null
 
-    class FoundBetterReader(val reader: ClassReader) : Throwable()
-
     override fun visit(
         version: Int,
         access: Int,

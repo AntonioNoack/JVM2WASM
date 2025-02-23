@@ -29,6 +29,7 @@ import org.objectweb.asm.*
 import replaceClass1
 import resolvedMethods
 import translator.ClassTranslator
+import translator.FoundBetterReader
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
@@ -471,7 +472,7 @@ fun translateMethods(classesToLoad: List<String>, filterClass: (String) -> Boole
                 ClassTranslator(clazz),
                 ClassReader.EXPAND_FRAMES
             )
-        } catch (e: ClassTranslator.FoundBetterReader) {
+        } catch (e: FoundBetterReader) {
             try {
                 e.reader.accept(
                     ClassTranslator(clazz),

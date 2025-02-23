@@ -8,7 +8,7 @@ import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
 
 var enableCppTracing = true
-var logCppFunctionCalls = true
+var logCppFunctionCalls = false
 
 // todo try using this on Android XD
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
@@ -17,10 +17,6 @@ val functionsByName = HashMap<String, FunctionImpl>()
 
 fun main() {
     wasm2cpp()
-}
-
-fun makeFloat(str: String): String {
-    return if ('.' !in str) "$str.0" else str
 }
 
 val writer = StringBuilder2(1024)

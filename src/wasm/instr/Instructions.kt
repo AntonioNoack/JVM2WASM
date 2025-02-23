@@ -103,8 +103,8 @@ object Instructions {
     val I32_REM_S = BinaryInstruction("i32.rem_s", "%")
     val I64_REM_S = BinaryInstruction("i64.rem_s", "%")
 
-    val Return = SimpleInstr("return")
-    val Unreachable = SimpleInstr("unreachable")
+    val Return = ReturnInstr("return")
+    val Unreachable = ReturnInstr("unreachable")
 
     val I32Shl = ShiftInstr("i32.shl")
     val I32ShrU = ShiftInstr("i32.shr_u")

@@ -317,7 +317,7 @@ public class JavaLang {
 
     @NoThrow
     @WASM(code = "global.get $L")
-    public static native int getLookupBasePtr();
+    public static native int getStackTraceTablePtr();
 
     @NoThrow
     @Alias(names = "resetSP")
@@ -447,7 +447,7 @@ public class JavaLang {
 
     @Alias(names = "java_lang_Runtime_freeMemory_J")
     public static long java_lang_Runtime_freeMemory_J(Runtime runtime) {
-        return Integer.toUnsignedLong(GC.freeMemory + getAllocatedSize() - getNextPtr());
+        return Integer.toUnsignedLong(GarbageCollector.freeMemory + getAllocatedSize() - getNextPtr());
     }
 
     @Alias(names = "java_lang_Object_clone_Ljava_lang_Object")

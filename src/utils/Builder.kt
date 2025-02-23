@@ -1,7 +1,10 @@
 package utils
 
+import wasm.instr.BinaryInstruction
 import wasm.instr.Comment
+import wasm.instr.Const
 import wasm.instr.Instruction
+import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 
@@ -50,10 +53,20 @@ class Builder(capacity: Int = 16) {
         return this
     }
 
-    fun endsWith(instr: Instruction): Boolean {
+    fun lastOrNull(): Instruction? {
         var i = instrs.lastIndex
         while (i >= 0 && instrs[i] is Comment) i--
-        return this.instrs.getOrNull(i) == instr
+        return instrs.getOrNull(i)
+    }
+
+    fun endsWith(instr: Instruction): Boolean {
+        return lastOrNull() == instr
+    }
+
+    fun removeLast() {
+        var i = instrs.lastIndex
+        while (i >= 0 && instrs[i] is Comment) i--
+        instrs.subList(i, instrs.size).clear()
     }
 
     fun endsWith(end: List<Instruction>): Boolean {
@@ -66,7 +79,20 @@ class Builder(capacity: Int = 16) {
     }
 
     fun drop(): Builder {
-        instrs.removeLast()
+        val last = lastOrNull()
+        val numDrop = when (last) {
+            is Const -> 1
+            is BinaryInstruction -> 2
+            Return, Unreachable -> return this
+            else -> -1
+        }
+        if (numDrop >= 0) {
+            for (i in 0 until numDrop) {
+                removeLast()
+            }
+        } else {
+            append(Drop)
+        }
         return this
     }
 

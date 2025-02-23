@@ -47,7 +47,7 @@ object ResolveIndirect {
             if (calledCanThrow) {
                 append(i32Const0)
             } else {
-                append(Call("panic"))
+                append(Call.panic)
             }
         }
     }
@@ -114,7 +114,7 @@ object ResolveIndirect {
             fun createPyramidCondition(classes2: List<String>): ArrayList<Instruction> {
                 val result = ArrayList<Instruction>(classes2.size * 5)
                 for (k in classes2.indices) {
-                    result.add(LocalGet(tmpI32))
+                    result.add(tmpI32.localGet)
                     result.add(i32Const(gIndex.getClassIndex(classes2[k])))
                     result.add(I32EQ)
                     if (k > 0) result.add(I32Or)
@@ -149,8 +149,8 @@ object ResolveIndirect {
                 printer.comment("tree for $sig0 -> $options")
                 if (groupedByClass.size > 1 || checkForInvalidClasses) {
                     getCaller(printer)
-                    printer.append(Call("readClass"))
-                        .append(LocalSet(tmpI32))
+                    printer.append(Call.readClass)
+                        .append(tmpI32.localSet)
                 }
 
                 var lastBranch: List<Instruction> =
@@ -183,14 +183,14 @@ object ResolveIndirect {
                     val printer = Builder()
                     // load all parameters onto the stack
                     for (k in 0 until splitArgs.size + 1) {
-                        printer.append(ParamGet(k))
+                        printer.append(ParamGet[k])
                     }
                     printCallPyramid(printer)
                     printer.append(Return)
 
                     FunctionImpl(
                         helperName, listOf(ptrType) + splitArgs,
-                        results, listOf(LocalVariable(tmpI32, ptrType)),
+                        results, listOf(LocalVariable(tmpI32.wasmName, ptrType)),
                         printer.instrs, false,
                     )
                 }

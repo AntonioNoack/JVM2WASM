@@ -1,5 +1,5 @@
 package jvm;
 
-public class GCX {
+public class GarbageCollectorFlags {
     public static boolean hasGaps = false;
 }

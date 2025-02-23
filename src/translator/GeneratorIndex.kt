@@ -119,7 +119,7 @@ object GeneratorIndex {
             val name = "getNth_$name0"
             FunctionImpl(
                 name, typeStack, typeStack + typeStack.first(),
-                emptyList(), typeStack.indices.map { ParamGet(it) } + ParamGet(0),
+                emptyList(), typeStack.indices.map { ParamGet[it] } + ParamGet[0],
                 false
             )
         }.funcName

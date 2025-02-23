@@ -13,7 +13,6 @@ import org.lwjgl.system.SharedLibrary;
 import sun.misc.Unsafe;
 
 import java.io.PrintStream;
-import java.math.BigInteger;
 import java.nio.*;
 import java.util.function.Consumer;
 

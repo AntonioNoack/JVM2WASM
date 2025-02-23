@@ -615,7 +615,6 @@ public class Engine {
      * for debugging, prints all strings that were generated at runtime
      */
     @NoThrow // todo what are idx0 and len???
-    @Alias(names = "pds")
     private static void printDynamicStrings(int idx0, int len) {
         int instance = getAllocationStart();
         final int endPtr = getNextPtr();

@@ -283,7 +283,8 @@ public class StringsUTF8 {
 	}
 
 	private static String newString(byte[] bytes) {
-		String value = ptrTo(create(getClassIndex(String.class))); // string class
+		int classIndex = getClassIndex(String.class); // will be 10
+		String value = ptrTo(createInstance(classIndex)); // string class
 		setValue(value, bytes);
 		return value;
 	}
@@ -291,43 +292,43 @@ public class StringsUTF8 {
 	@Alias(names = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
 	public static String String_toLowerCase(String s, Locale lx) {
 		if (s == null) return null;
-		byte[] lc = null;
-		byte[] uc = getValue(s);
-		for (int i = 0, l = uc.length; i < l; i++) {
-			byte c = uc[i];
+		byte[] output = null;
+		byte[] input = getValue(s);
+		for (int i = 0, l = input.length; i < l; i++) {
+			byte c = input[i];
 			int d = c - 'A';
 			if (unsignedLessThan(d, 26)) {
-				if (lc == null) {
-					lc = new byte[s.length()];
-					System.arraycopy(uc, 0, lc, 0, i);
+				if (output == null) {
+					output = new byte[s.length()];
+					System.arraycopy(input, 0, output, 0, i);
 				}
 				c = (byte) (d + 'a');
 			}
-			if (lc != null) lc[i] = c;
+			if (output != null) output[i] = c;
 		}
-		if (lc == null) return s;
-		return newString(lc);
+		if (output == null) return s;
+		return newString(output);
 	}
 
 	@Alias(names = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
 	public static String String_toUpperCase(String s, Locale lx) {
 		if (s == null) return null;
-		byte[] lc = null;
-		byte[] uc = getValue(s);
-		for (int i = 0, l = uc.length; i < l; i++) {
-			byte c = uc[i];
+		byte[] output = null;
+		byte[] input = getValue(s);
+		for (int i = 0, l = input.length; i < l; i++) {
+			byte c = input[i];
 			int d = c - 'a';
 			if (unsignedLessThan(d, 26)) {
-				if (lc == null) {
-					lc = new byte[s.length()];
-					System.arraycopy(uc, 0, lc, 0, i);
+				if (output == null) {
+					output = new byte[s.length()];
+					System.arraycopy(input, 0, output, 0, i);
 				}
 				c = (byte) (d + 'A');
 			}
-			if (lc != null) lc[i] = c;
+			if (output != null) output[i] = c;
 		}
-		if (lc == null) return s;
-		return newString(lc);
+		if (output == null) return s;
+		return newString(output);
 	}
 
 	@Alias(names = "java_lang_CharSequence_codePoints_Ljava_util_stream_IntStream")
@@ -337,7 +338,7 @@ public class StringsUTF8 {
 
 	// java.lang.Integer would need to replaced;
 	// potential gain:
-	// - less allocations, because skipping char[]
+	// - fewer allocations, because skipping char[]
 	// - much smaller static {} function, because we can use String instead of char[]
     /*static final String digits = "0123456789abcdefghijklmnopqrstuvwxyz";
     static final String DigitTens = "0000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999";

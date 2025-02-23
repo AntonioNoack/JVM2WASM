@@ -40,7 +40,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         defineFunctionHead(function, true)
         writer.append(" {\n")
         if (logCppFunctionCalls && function.funcName !in ignoredFuncNames) {
-            writer.append("std::cout << \"").append(function.funcName).append("\" << std::endl;\n")
+            writer.append("logCall(\"").append(function.funcName).append("\");\n")
         }
 
         if (function.funcName.startsWith("static_")) {
@@ -55,41 +55,17 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             if (local.name == "lbl") continue
             begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
         }
+        var hasReturn = false
         for (instr in function.body) {
             // println("instr $instr, stack: ${stack.map { it.type }}")
             writeInstruction(instr)
+            hasReturn = instr.isReturning()
+            if (hasReturn) break
         }
-        when (function.body.lastOrNull()) {
-            Return, Unreachable -> {}
-            else -> writeInstruction(Return)
+        if (!hasReturn) {
+            writeInstruction(Return)
         }
         writer.append("}\n")
-    }
-
-    private fun ensureUniqueLabels() {
-        val uniqueLabels = HashSet<String>()
-        fun process(instr: Instruction) {
-            when (instr) {
-                is LoopInstr -> {
-                    assertTrue(uniqueLabels.add(instr.label))
-
-                }
-                is IfBranch -> {
-                    for (it in instr.ifTrue) process(it)
-                    for (it in instr.ifFalse) process(it)
-                }
-                is SwitchCase -> {
-                    for (case1 in instr.cases) {
-                        for (it in case1) {
-                            process(it)
-                        }
-                    }
-                }
-            }
-        }
-        for (it in function.body) {
-            process(it)
-        }
     }
 
     private fun begin(): StringBuilder2 {
@@ -305,16 +281,18 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             }
             is Const -> {
                 when (i.type) {
-                    ConstType.F32 -> push(i.type.name1, makeFloat(i.value) + "f")
-                    ConstType.F64 -> push(i.type.name1, makeFloat(i.value))
+                    ConstType.F32 -> push(i.type.name1, i.value.toString() + "f")
+                    ConstType.F64 -> push(i.type.name1, i.value.toString())
                     ConstType.I32 -> {
-                        val v = if (i.value == "-2147483648") "(i32)(1u << 31)"
-                        else i.value
+                        val v =
+                            if (i.value == Int.MIN_VALUE) "(i32)(1u << 31)"
+                            else i.value.toString()
                         push(i.type.name1, v)
                     }
                     ConstType.I64 -> {
-                        val v = if (i.value == "-9223372036854775808") "(i64)(1llu << 63)"
-                        else i.value + "ll"
+                        val v =
+                            if (i.value == Long.MIN_VALUE) "(i64)(1llu << 63)"
+                            else i.value.toString() + "ll"
                         push(i.type.name1, v)
                     }
                 }
@@ -399,7 +377,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     for (j in instructions.indices) {
                         val instr = instructions[j]
                         writeInstruction(instr)
-                        if (instr == Return || instr == Unreachable) break
+                        if (instr.isReturning()) break
                     }
                     packResultsIntoOurStack(instructions)
                     depth--
@@ -478,7 +456,9 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     writeSwitchCase(cases)
                 } else {
                     for (ii in 0 until i1) {
-                        writeInstruction(i.body[ii])
+                        val instr = i.body[ii]
+                        writeInstruction(instr)
+                        if (instr.isReturning()) break
                     }
                 }
 
@@ -558,13 +538,17 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 //   - i32.const 2 local.set $lbl
                 //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
                 for (k in 0 until instructions.size - (skipped + 1)) {
-                    writeInstruction(instructions[k])
+                    val instr = instructions[k]
+                    writeInstruction(instr)
+                    if (instr.isReturning()) break
                 }
                 fun executeStackSaving() {
                     // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
                     for (k in instructions.size - (skipped - 1) until instructions.size - 1) {
                         // println("  stack saving[$k]: ${instructions[k]}")
-                        writeInstruction(instructions[k])
+                        val instr = instructions[k]
+                        writeInstruction(instr)
+                        if (instr.isReturning()) break
                     }
                 }
                 if (preLast is IfBranch) {
@@ -589,7 +573,9 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 }
             } else {
                 for (k in 0 until instructions.size - skipped) {
-                    writeInstruction(instructions[k])
+                    val instr = instructions[k]
+                    writeInstruction(instr)
+                    if (instr.isReturning()) break
                 }
             }
             depth--

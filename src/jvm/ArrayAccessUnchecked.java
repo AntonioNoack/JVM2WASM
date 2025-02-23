@@ -86,7 +86,7 @@ public class ArrayAccessUnchecked {
     }
 
     @NoThrow
-    @Alias(names = "alU")
+    @Alias(names = "arrayLengthU")
     public static int arrayLength(int instance) {
         return read32(instance + objectOverhead);
     }
