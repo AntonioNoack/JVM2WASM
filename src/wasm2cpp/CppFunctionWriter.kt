@@ -25,9 +25,13 @@ import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
-import wasm.parser.WATParser
+import wasm.parser.GlobalVariable
+import kotlin.math.min
 
-class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
+class FunctionWriter(
+    val function: FunctionImpl, val globals: Map<String, GlobalVariable>,
+    private val functionsByName: Map<String, FunctionImpl>
+) {
 
     private var depth = 1
     private val localsByName = function.locals
@@ -39,9 +43,6 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
     init {
         defineFunctionHead(function, true)
         writer.append(" {\n")
-        if (logCppFunctionCalls && function.funcName !in ignoredFuncNames) {
-            writer.append("logCall(\"").append(function.funcName).append("\");\n")
-        }
 
         if (function.funcName.startsWith("static_")) {
             writer.append("static bool wasCalled = false;\n")
@@ -184,6 +185,18 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
         }
     }
 
+    private fun writeInstructions(instructions: List<Instruction>) {
+        writeInstructions(instructions, 0, instructions.size)
+    }
+
+    private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int) {
+        for (i in i0 until i1) {
+            val instr = instructions[i]
+            writeInstruction(instr)
+            if (instr.isReturning()) break
+        }
+    }
+
     private fun writeInstruction(i: Instruction) {
         when (i) {
             is ParamGet -> {
@@ -197,12 +210,12 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 beginSetEnd(i.name, type)
             }
             is GlobalGet -> {
-                val global = parser.globals[i.name]
+                val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
                 beginNew(global.type).append(global.name).end()
             }
             is GlobalSet -> {
-                val global = parser.globals[i.name]
+                val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
                 beginSetEnd(global.name, global.type)
             }
@@ -259,7 +272,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             }
             Return -> {
                 val offset = stack.size - function.results.size
-                assertTrue(offset >= 0)
+                assertTrue(offset >= 0) { "Missing ${-offset} return values" }
                 begin().append("return")
                 when (function.results.size) {
                     0 -> {}
@@ -374,11 +387,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
 
                 fun writeBranchContents(instructions: List<Instruction>) {
                     depth++
-                    for (j in instructions.indices) {
-                        val instr = instructions[j]
-                        writeInstruction(instr)
-                        if (instr.isReturning()) break
-                    }
+                    writeInstructions(instructions)
                     packResultsIntoOurStack(instructions)
                     depth--
                 }
@@ -439,7 +448,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 val resultNames = i.results.map { nextTemporaryVariable() }
                 for (j in i.results.indices) {
                     begin().append(i.results[j]).append(' ')
-                        .append(resultNames[j]).append(" = 0;\n")
+                        .append(resultNames[j]).append(" = 0").end()
                 }
                 // to do check if the label is used
                 begin().append(i.label).append(": while (true) {\n")
@@ -448,19 +457,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 depth++
                 val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
                 val i1 = i.body.size - lastIsContinue.toInt()
-                val isSwitchCase = if (i1 > 0) i.body[0] as? SwitchCase else null
-                if (isSwitchCase != null) {
-                    assertEquals(0, isSwitchCase.cases[0].size)
-                    val cases = isSwitchCase.cases.subList(1, isSwitchCase.cases.size) +
-                            listOf(i.body.subList(1, i1))
-                    writeSwitchCase(cases)
-                } else {
-                    for (ii in 0 until i1) {
-                        val instr = i.body[ii]
-                        writeInstruction(instr)
-                        if (instr.isReturning()) break
-                    }
-                }
+                writeInstructions(i.body, 0, i1)
 
                 if (!lastIsContinue) {
                     // save results
@@ -468,7 +465,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                         begin().append(resultNames[j]).append(" = ")
                             .append(pop(i.results[j])).end()
                     }
-                    begin().append("break;\n")
+                    begin().append("break").end()
                 } else assertTrue(i.results.isEmpty())
 
                 depth--
@@ -480,21 +477,27 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 begin().append("}\n")
             }
             is Jump -> {
-                begin().append("goto ").append(i.label).append(";\n")
+                begin().append("goto ").append(i.label).end()
             }
             is JumpIf -> {
                 val condition = pop("i32")
                 begin().append("if (").append(condition).append(" != 0) { goto ")
                     .append(i.label).append("; }\n")
             }
+            is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
-            else -> throw NotImplementedError(i.toString())
+            is Comment -> {
+                begin().append("// ").append(i.name).append('\n')
+            }
+            else -> assertFail(i.toString())
         }
     }
 
-    private fun writeSwitchCase(cases: List<List<Instruction>>) {
+    private fun writeSwitchCase(switchCase: SwitchCase) {
         // big monster, only 1 per function allowed, afaik
         // assertEquals(1, depth)
+        val cases = switchCase.cases
+        val lblName = switchCase.lblName
         assertEquals(0, stack.size)
         depth++
         for (j in cases.indices) {
@@ -504,7 +507,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
             begin().append("case").append(j).append(": {\n")
             depth++
 
-            val instructions = cases[j]
+            val instructions = cases[j].filter { it !is Comment }
             val realLast = instructions.lastOrNull()
             if (realLast == Unreachable || realLast == Return) {
                 for (element in instructions) {
@@ -516,40 +519,35 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                 continue
             }
 
-            assertTrue(instructions.size >= 2)
             val isLast = j == cases.lastIndex
+            assertTrue(isLast || instructions.size >= 2)
             assertTrue(isLast || realLast is Jump) // for while(true)-branch
-            var skipped = if (isLast) 1 else 2
-            while (!isLast) {
-                val tmp = instructions[instructions.size - skipped]
-                if (tmp is LocalSet && tmp.name.startsWith("s") &&
-                    (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
-                ) {
-                    // println("skipping ${tmp.name}")
-                    skipped++
-                } else break
+            var skipped = if (isLast) min(1, instructions.size) else 2
+            if (!isLast) {
+                while (true) {
+                    val tmp = instructions[instructions.size - skipped]
+                    if (tmp is LocalSet && tmp.name.startsWith("s") && // stack variable
+                        (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
+                    ) {
+                        // println("skipping ${tmp.name}")
+                        skipped++
+                    } else break
+                }
             }
-            val last = instructions[instructions.size - skipped]
-            if (last != Unreachable && last != Return) {
-                assertTrue(last is LocalSet && last.name == "lbl")
+            val last = instructions.getOrNull(instructions.size - skipped)
+            if (last is Jump) {
+                begin().append("goto ").append(last.label).end() // ok?
+            } else if (last != Unreachable && last != Return && last != null) {
+                assertTrue(last is LocalSet && last.name == lblName)
                 val preLast = instructions[instructions.size - (skipped + 1)]
                 assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == ConstType.I32))
                 // find end:
                 //   - i32.const 2 local.set $lbl
                 //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
-                for (k in 0 until instructions.size - (skipped + 1)) {
-                    val instr = instructions[k]
-                    writeInstruction(instr)
-                    if (instr.isReturning()) break
-                }
+                writeInstructions(instructions, 0, instructions.size - (skipped + 1))
                 fun executeStackSaving() {
                     // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
-                    for (k in instructions.size - (skipped - 1) until instructions.size - 1) {
-                        // println("  stack saving[$k]: ${instructions[k]}")
-                        val instr = instructions[k]
-                        writeInstruction(instr)
-                        if (instr.isReturning()) break
-                    }
+                    writeInstructions(instructions, instructions.size - (skipped - 1), instructions.size - 1)
                 }
                 if (preLast is IfBranch) {
                     // save branch
@@ -572,11 +570,7 @@ class FunctionWriter(val function: FunctionImpl, val parser: WATParser) {
                     begin().append("goto case").append(preLast.value).end()
                 }
             } else {
-                for (k in 0 until instructions.size - skipped) {
-                    val instr = instructions[k]
-                    writeInstruction(instr)
-                    if (instr.isReturning()) break
-                }
+                writeInstructions(instructions, 0, instructions.size - skipped)
             }
             depth--
             begin().append("}\n")

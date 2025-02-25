@@ -108,6 +108,21 @@ fun appendNativeHelperFunctions() {
         )
     }
 
+    // set(Value,Instance,Offset)Field-functions
+    for ((call, type, storeInstr) in listOf(
+        Triple(Call.setVIOFieldI8, i32, I32Store8),
+        Triple(Call.setVIOFieldI16, i32, I32Store16),
+        Triple(Call.setVIOFieldI32, i32, I32Store),
+        Triple(Call.setVIOFieldI64, i64, I64Store),
+        Triple(Call.setVIOFieldF32, f32, F32Store),
+        Triple(Call.setVIOFieldF64, f64, F64Store),
+    )) {
+        register(
+            call.name, listOf(type, i32, i32), emptyList(),
+            listOf(ParamGet[1], ParamGet[2], I32Add, ParamGet[0], storeInstr)
+        )
+    }
+
     // setStaticField-functions
     for ((call, type, storeInstr) in listOf(
         Triple(Call.setStaticFieldI8, i32, I32Store8),
@@ -182,7 +197,7 @@ fun appendNativeHelperFunctions() {
     register("i32neg", listOf(i32), listOf(i32), listOf(i32Const0, ParamGet[0], I32Sub))
     register("i64neg", listOf(i64), listOf(i64), listOf(i64Const0, ParamGet[0], I64Sub))
     register(
-        "lcmp", listOf(i64, i64), listOf(i32), listOf(
+        Call.lcmp.name, listOf(i64, i64), listOf(i32), listOf(
             ParamGet[0], ParamGet[1], I64GTS,
             ParamGet[0], ParamGet[1], I64LTS, I32Sub
         )
@@ -191,13 +206,17 @@ fun appendNativeHelperFunctions() {
     // to do implement this, when we have multi-threading
     register("monitorEnter", listOf(ptrType), emptyList(), emptyList())
     register("monitorExit", listOf(ptrType), emptyList(), emptyList())
-    register(FunctionImpl("wasStaticInited", listOf(i32), listOf(i32),
-        listOf(LocalVariable("addr", i32)),
-        listOf(
-            GlobalGet("Z"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address
-            LocalGet("addr"), I32Load8S, // load result (unused by next line)
-            LocalGet("addr"), i32Const1, I32Store8 // set flag
-            // return result
-        ),
-        exportHelpers))
+    register(
+        FunctionImpl(
+            "wasStaticInited", listOf(i32), listOf(i32),
+            listOf(LocalVariable("addr", i32)),
+            listOf(
+                GlobalGet("Z"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address
+                LocalGet("addr"), I32Load8S, // load result (unused by next line)
+                LocalGet("addr"), i32Const1, I32Store8 // set flag
+                // return result
+            ),
+            exportHelpers
+        )
+    )
 }

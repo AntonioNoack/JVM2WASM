@@ -1,6 +1,6 @@
 package wasm.instr
 
-class LocalGet(val name: String) : Instruction {
+data class LocalGet(val name: String) : Instruction {
 
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)

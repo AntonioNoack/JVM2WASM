@@ -2,8 +2,8 @@ package wasm.instr
 
 import utils.StringBuilder2
 
-class IfBranch(
-    val ifTrue: List<Instruction>, val ifFalse: List<Instruction>,
+data class IfBranch(
+    var ifTrue: List<Instruction>, var ifFalse: List<Instruction>,
     val params: List<String>, val results: List<String>
 ) : Instruction {
 

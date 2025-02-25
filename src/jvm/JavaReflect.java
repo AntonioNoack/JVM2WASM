@@ -543,6 +543,7 @@ public class JavaReflect {
         return Collections.emptyList();
     }
 
+    @NoThrow
     @Alias(names = "java_lang_Class_getSimpleName_Ljava_lang_String")
     public static <V> String Class_getSimpleName(Class<V> c) {
         String name = c.getName();

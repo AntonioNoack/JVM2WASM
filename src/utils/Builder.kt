@@ -70,8 +70,12 @@ class Builder(capacity: Int = 16) {
     }
 
     fun endsWith(end: List<Instruction>): Boolean {
-        return instrs.size >= end.size &&
-                instrs.subList(instrs.size - end.size, instrs.size) == end
+        val offset = instrs.size - end.size
+        if (offset < 0) return false
+        for (i in end.indices) {
+            if (end[i] != instrs[i + offset]) return false
+        }
+        return true
     }
 
     fun startsWith(instr: Instruction, i: Int): Boolean {

@@ -9,12 +9,10 @@ import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
 import translator.MethodTranslator
 import utils.Builder
-import utils.MethodSig
 import utils.i32
 import utils.methodName
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
-import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32GES
@@ -109,11 +107,7 @@ class StructuralAnalysis(
                 )
                 printLine("")
                 for (line in node.printer.instrs) {
-                    var ln = line
-                    //for (node1 in nodes) {
-                    //    ln = ln.replace(node1.label.toString(), "[${node1.index}]")
-                    //}
-                    printLine("             $ln")
+                    printLine("             $line")
                 }
             }
         }
@@ -445,7 +439,7 @@ class StructuralAnalysis(
             val unreachable = nodes.filter { it !in reachable }
             println("warning: found unreachable nodes:")
             for (node in unreachable) {
-                println("  $node, ${node.index}, ${node.printer}")
+                println("  $node, ${node.index}, ${node.printer.instrs}")
             }
             //printState()
             val toRemove = unreachable.toSet()
@@ -892,9 +886,9 @@ class StructuralAnalysis(
 
         lastSize = nodes.size
 
-        if (nodes.isEmpty()) throw IllegalArgumentException()
-        if (nodes.size == 1 && nodes[0].inputs.isEmpty()) {
-            return nodes[0].printer
+        assertFalse(nodes.isEmpty())
+        if (canReturnFirstNode()) {
+            return firstNode()
         }
 
         for (node in nodes) {
@@ -963,7 +957,8 @@ class StructuralAnalysis(
             if (!changed2) {
                 if (printOps) printState()
                 assertFalse(isLookingAtSpecial, "Looking at something")
-                return createLargeSwitchStatement()
+                methodTranslator.localVariables1.add(LocalVariable("lbl", i32))
+                return createLargeSwitchStatement2(nodes)
             }
         }
 
@@ -1046,15 +1041,14 @@ class StructuralAnalysis(
         return builder.toString()
     }
 
-    private fun renumber(nodes: List<Node>, exitNode: Node? = null) {
+    private fun renumber(nodes: List<Node>) {
         if (printOps) println("renumbering:")
-        var j = 0
-        for (node in nodes) {
+        for (j in nodes.indices) {
+            val node = nodes[j]
             // if (node.hasNoCode()) throw IllegalStateException()
             if (printOps) println("${node.index} -> $j")
-            node.index = j++
+            node.index = j
         }
-        if (exitNode != null) exitNode.index = j
     }
 
     private val stackVariables = HashSet<String>()
@@ -1064,16 +1058,6 @@ class StructuralAnalysis(
             methodTranslator.localVariables1.add(LocalVariable(name, type))
         }
         return name
-    }
-
-    private fun createLargeSwitchStatement(): Builder {
-        methodTranslator.localVariables1.add(LocalVariable("lbl", i32))
-        val code = createLargeSwitchStatement1(sig, nodes)
-        val varPrinter = Builder(code.size)
-        for (i in code.lastIndex downTo 0) {
-            varPrinter.append(code[i])
-        }
-        return varPrinter
     }
 
     private fun saveGraph(graphId: String) {
@@ -1097,21 +1081,22 @@ class StructuralAnalysis(
         }
     }
 
-    private fun createLargeSwitchStatement2(
-        nodes0: List<Node>,
-        exitNode: Node?, // not included, next
-    ): Builder {
+    private fun createLargeSwitchStatement2(nodes0: List<Node>): Builder {
 
         val firstNode = nodes0.first()
         val firstIsLinear = !firstNode.isBranch && firstNode.inputs.isEmpty()
         val nodes = if (firstIsLinear) nodes0.subList(1, nodes0.size) else nodes0
 
-        renumber(nodes, exitNode)
+        renumber(nodes)
 
         // create graph id
         // to do store image of graph based on id
         val graphId = graphId()
         if (true) saveGraph(graphId)
+
+        val lblName = "lbl"
+        val lblSet = LocalSet(lblName)
+        val lblGet = LocalGet(lblName)
 
         // create large switch-case-statement
         // https://musteresel.github.io/posts/2020/01/webassembly-text-br_table-example.html
@@ -1132,11 +1117,11 @@ class StructuralAnalysis(
                             listOf(i32Const(falseIndex)),
                             emptyList(), listOf(i32)
                         )
-                    ).append(LocalSet("lbl"))
+                    ).append(lblSet)
                 } else {
                     // set end label
                     val next = labelToNode[node.next]!!.index
-                    printer1.append(i32Const(next)).append(LocalSet("lbl"))
+                    printer1.append(i32Const(next)).append(lblSet)
                 }
                 // store stack
                 val outputs = node.outputStack
@@ -1160,7 +1145,7 @@ class StructuralAnalysis(
         } else {
             printer
                 .append(i32Const(nodes.first().index))
-                .append(LocalSet("lbl"))
+                .append(lblSet)
         }
 
         printer.comment("#$graphId")
@@ -1177,99 +1162,25 @@ class StructuralAnalysis(
                 }
                 node.printer.prepend(pre)
             }
-            if (node != exitNode) {
-                // execute
-                if (comments) node.printer.prepend(Comment("execute ${node.index}"))
-                finishBlock(node)
-                // close block
-                node.printer.append(Jump(loopName))
-            }
+            // execute
+            if (comments) node.printer.prepend(Comment("execute ${node.index}"))
+            finishBlock(node)
+            // close block
+            node.printer.append(Jump(loopName))
         }
 
         for (node in nodes) {
             appendBlock(node)
         }
-        if (exitNode != null) {
-            appendBlock(exitNode)
-        }
 
         // good like that???
-        printer.append(LoopInstr(loopName, listOf(SwitchCase(nodes.map { it.printer.instrs })), emptyList()))
+        val switch = SwitchCase(lblName, nodes.map { it.printer.instrs })
+        printer.append(LoopInstr(loopName, listOf(switch), emptyList()))
 
-        if (exitNode == null) {
-            // close loop
-            printer.comment("no exit-node")
-            printer.append(Unreachable)
-        }
+        // close loop
+        printer.append(Unreachable)
 
         return printer
-    }
-
-    /// todo there is a small set of near-exit nodes, that we are allowed to replicate: return true/false
-
-    private fun createLargeSwitchStatement1(
-        sig: MethodSig,
-        nodes0: List<Node>
-    ): ArrayList<Builder> {
-        // find all nodes, that separate the graph
-        for (separator in nodes0) {
-            if (separator !== nodes0.first() && !separator.isReturn) {
-
-                val reached = HashSet<Node>()
-                fun add(node: Node, force: Boolean) {
-                    if ((reached.add(node) && node != separator) || force) {
-                        val t = labelToNode[node.ifTrue]
-                        val f = node.ifFalse
-                        if (t != null) add(t, false)
-                        if (f != null) add(f, false)
-                    }
-                }
-
-                add(separator, true)
-
-                if (separator !in reached) {
-                    // all other nodes must reach this node
-                    val revReached = HashSet(reached)
-                    reached.clear()
-                    // track backwards
-                    fun addReverse(node: Node) {
-                        if (reached.add(node)) {
-                            for (src in node.inputs) {
-                                addReverse(src)
-                            }
-                        }
-                    }
-                    addReverse(separator)
-                    val size0 = reached.size
-                    val size1 = revReached.size
-                    if (size0 + size1 == nodes0.size) {
-                        reached.addAll(revReached)
-                        if (reached.size == nodes0.size) {
-                            renumber(nodes0)
-                            // println("\nGraph for separation (on ${separator.index}):")
-                            // printState(nodes0, labelToNode, ::println)
-                            reached.removeAll(revReached)
-
-                            val code0 = createLargeSwitchStatement2(
-                                nodes0.filter { it in reached },
-                                separator
-                            )
-
-                            val code1i = createLargeSwitchStatement1(
-                                // split second part :)
-                                sig, // first separator (enter node), then all else
-                                listOf(separator) + nodes0.filter { it in revReached && it != separator },
-                            )
-
-                            code1i.add(code0)
-                            return code1i
-                        }
-                    }
-                }
-            }
-        }
-
-        return arrayListOf(createLargeSwitchStatement2(nodes0, null))
     }
 }
 

@@ -15,6 +15,7 @@ import enableTracing
 import exportAll
 import gIndex
 import graphing.Node
+import utils.ReplaceOptimizer.optimizeUsingReplacements
 import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
@@ -753,11 +754,11 @@ class MethodTranslator(
                 .append(i32Const(16)).append(I32Shl)
                 .append(i32Const(16)).append(I32ShrS)
 
-            0x94 -> printer.pop(i64).pop(i64).push(i32).append(Call("lcmp"))
-            0x95 -> printer.pop(f32).pop(f32).push(i32).append(Call("fcmpl")) // -1 if NaN
-            0x96 -> printer.pop(f32).pop(f32).push(i32).append(Call("fcmpg")) // +1 if NaN
-            0x97 -> printer.pop(f64).pop(f64).push(i32).append(Call("dcmpl")) // -1 if NaN
-            0x98 -> printer.pop(f64).pop(f64).push(i32).append(Call("dcmpg")) // +1 if NaN
+            0x94 -> printer.pop(i64).pop(i64).push(i32).append(Call.lcmp)
+            0x95 -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpl) // -1 if NaN
+            0x96 -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpg) // +1 if NaN
+            0x97 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpl) // -1 if NaN
+            0x98 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpg) // +1 if NaN
 
             0xbe -> {
                 // array length
@@ -836,12 +837,18 @@ class MethodTranslator(
                     println("constructor-dependency? ${synthClassName in dIndex.constructorDependencies[sig]!!}")
                     throw NullPointerException("Missing $synthClassName.f$i ($arg), constructable? ${synthClassName in dIndex.constructableClasses}")
                 }
-                printer.append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
-                printer.append(if (is32Bits) I32Add else I64Add)
                 if (comments) printer.comment("set field #$i")
-                // swap ptr and value
-                printer.append(Call("swap${jvm2wasm(arg)}$ptrType"))
-                printer.append(getStoreInstr2(arg))
+                if (alwaysUseFieldCalls) {
+                    printer
+                        .append(i32Const(offset))
+                        .append(getVIOStoreCall(arg))
+                } else {
+                    printer
+                        .append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
+                        .append(if (is32Bits) I32Add else I64Add)
+                        .append(Call("swap${jvm2wasm(arg)}$ptrType")) // swap ptr and value
+                        .append(getStoreInstr2(arg))
+                }
                 printer.pop(jvm2wasm(arg))
             }
 
@@ -1799,6 +1806,16 @@ class MethodTranslator(
         else -> if (is32Bits) Call.setFieldI32 else Call.setFieldI64
     }
 
+    private fun getVIOStoreCall(descriptor: String): Instruction = when (descriptor) {
+        "Z", "B" -> Call.setVIOFieldI8
+        "S", "C" -> Call.setVIOFieldI16
+        "I" -> Call.setVIOFieldI32
+        "J" -> Call.setVIOFieldI64
+        "F" -> Call.setVIOFieldF32
+        "D" -> Call.setVIOFieldF64
+        else -> if (is32Bits) Call.setVIOFieldI32 else Call.setVIOFieldI64
+    }
+
     private fun callClinit(clazz: String) {
         if (name == "<clinit>" && clazz == this.clazz) {
             if (comments) printer.comment("skipped <clinit>, we're inside of it")
@@ -2042,10 +2059,11 @@ class MethodTranslator(
             }
 
             val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
+            optimizeUsingReplacements(jointBuilder)
             val headPrinter1 = createFuncHead()
             gIndex.translatedMethods[sig] = FunctionImpl(
                 headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
-                headPrinter1.locals, headPrinter1.body + jointBuilder.instrs,
+                headPrinter1.locals, jointBuilder.instrs,
                 headPrinter1.isExported
             )
         }

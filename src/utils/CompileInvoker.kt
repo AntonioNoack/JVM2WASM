@@ -4,6 +4,7 @@ import dIndex
 import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
+import me.anno.utils.OS
 import me.anno.utils.OS.documents
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.lists.Lists.any2
@@ -93,9 +94,7 @@ val debugFolder = wasmFolder.getChild("debug").apply {
 
 fun compileToWASM(printer: StringBuilder2) {
 
-    wasmTextFile.outputStream().use {
-        it.write(printer.values, 0, printer.size)
-    }
+    wasmTextFile.writeBytes(printer.values, 0, printer.size)
 
     println(
         "  Number of constant Strings: ${gIndex.stringSet.size}, " +
@@ -105,14 +104,23 @@ fun compileToWASM(printer: StringBuilder2) {
     val t1 = System.nanoTime()
     println("  Total Kotlin time: ${((t1 - t0) * 1e-9).f3()}s")
 
-    val process = Runtime.getRuntime().exec("wsl")
-    printAsync(process.inputStream, false)
-    printAsync(process.errorStream, true)
-    val stream = process.outputStream
-    stream.write("cd ~\n".toByteArray())
-    stream.write("./comp.sh\n".toByteArray())
-    stream.close()
-    process.waitFor()
+    when {
+        OS.isWindows -> {
+            if (false) {
+                val process = Runtime.getRuntime().exec("wsl")
+                printAsync(process.inputStream, false)
+                printAsync(process.errorStream, true)
+                val stream = process.outputStream
+                stream.write("cd ~\n".toByteArray())
+                stream.write("./comp.sh\n".toByteArray())
+                stream.close()
+                process.waitFor()
+            } else System.err.println("Compiling via WSL is broken :/")
+        }
+        else -> {
+            System.err.println("Automatic compilation hasn't been implemented yet for this platform")
+        }
+    }
 
     val t2 = System.nanoTime()
     println("  Total time: ${((t2 - t0) * 1e-9).f3()}s")

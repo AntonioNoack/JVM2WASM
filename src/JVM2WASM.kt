@@ -15,6 +15,7 @@ import translator.GeneratorIndex.stringStart
 import utils.*
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
+import wasm2cpp.FunctionOrder
 import java.io.FileNotFoundException
 import kotlin.math.sin
 
@@ -477,8 +478,7 @@ fun jvm2wasm() {
     }
 
     // append nth-getter-methods
-    for (desc in gIndex.nthGetterMethods
-        .map { it.value }.sortedBy { it.funcName }) {
+    for (desc in gIndex.nthGetterMethods.values.sortedWith(FunctionOrder)) {
         bodyPrinter.append(desc)
     }
 
@@ -524,8 +524,8 @@ fun jvm2wasm() {
     }
 
     fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
-        printGlobal(name, if(isMutable) "(mut $type)" else type, type, value)
-        globals.add(GlobalVariable(name, type, value, isMutable))
+        printGlobal(name, if (isMutable) "(mut $type)" else type, type, value)
+        globals.add(GlobalVariable("global_$name", type, value, isMutable))
     }
 
     dataPrinter.append(";; globals:\n")

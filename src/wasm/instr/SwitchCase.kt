@@ -1,8 +1,10 @@
 package wasm.instr
 
+import me.anno.utils.structures.lists.Lists.all2
+import me.anno.utils.structures.lists.Lists.any2
 import utils.StringBuilder2
 
-class SwitchCase(val cases: List<List<Instruction>>) : Instruction {
+data class SwitchCase(val lblName: String, var cases: List<List<Instruction>>) : Instruction {
 
     override fun toString(): String {
         val builder = StringBuilder2()
@@ -15,7 +17,7 @@ class SwitchCase(val cases: List<List<Instruction>>) : Instruction {
         //  (block local.get $lbl (br_table 0 1 2 3 4 5 6 7 8))
         for (i in 0 until depth) builder.append("  ")
         for (i in 0..cases.size) builder.append("(block ")
-        builder.append("local.get \$lbl (br_table")
+        builder.append("local.get \$").append(lblName).append(" (br_table")
         for (i in cases.indices) builder.append(" ").append(i)
         builder.append("))\n")
         for (i in cases.indices) {
@@ -28,5 +30,11 @@ class SwitchCase(val cases: List<List<Instruction>>) : Instruction {
             builder.append(")\n")
         }
         builder.size-- // remove last line-break
+    }
+
+    override fun isReturning(): Boolean {
+        return cases.all2 { instructions ->
+            instructions.any2 { instr -> instr.isReturning() }
+        }
     }
 }

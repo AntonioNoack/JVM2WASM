@@ -119,7 +119,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
         index.interfaces[name] = interfaces
         for (interfaceI in interfaces) {
-            index.childClasses.getOrPut(interfaceI) { HashSet() }.add(name)
+            index.childClasses.getOrPut(interfaceI, ::HashSet).add(name)
             dep(interfaceI)
         }
 

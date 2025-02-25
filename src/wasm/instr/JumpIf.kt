@@ -1,6 +1,6 @@
 package wasm.instr
 
-class JumpIf(val label: String) : Instruction {
+data class JumpIf(val label: String) : Instruction {
 
     init {
         if (label.startsWith('$')) throw IllegalArgumentException(label)

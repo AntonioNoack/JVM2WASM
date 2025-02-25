@@ -33,6 +33,7 @@ import translator.FoundBetterReader
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
+import wasm.parser.Import
 import wasm.parser.WATParser
 import java.io.IOException
 
@@ -597,6 +598,8 @@ fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<Me
         bodyPrinter.append(")\n")
     }
 }
+
+val imports = ArrayList<Import>()
 
 fun printForbiddenMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     println("[printForbiddenMethods]")

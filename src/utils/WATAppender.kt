@@ -9,6 +9,7 @@ import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.toInt
@@ -18,6 +19,7 @@ import resources
 import translator.GeneratorIndex
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
+import wasm.parser.DataSection
 import java.io.OutputStream
 import kotlin.math.abs
 
@@ -275,6 +277,9 @@ val nameToMethod
 
 val dynIndex = HashMap<String, Pair<MethodSig, Int>>()
 val dynIndexSig = MethodSig.c("", "dynIndex", "()V")
+
+val functionTable = ArrayList<String>()
+
 fun appendDynamicFunctionTable(
     printer: StringBuilder2,
     implementedMethods: Map<String, MethodSig>
@@ -302,6 +307,7 @@ fun appendDynamicFunctionTable(
     }
     printer.append("(table ${dynIndex.size} funcref)\n")
     printer.append("(elem (i32.const 0)\n")
+    functionTable.ensureCapacity(dynIndex.size)
     var i = 0
     for ((name, idx) in dynIndex
         .entries.sortedBy { it.value.second }) {
@@ -312,21 +318,23 @@ fun appendDynamicFunctionTable(
             val sig = hIndex.getAlias(name2) ?: break
             val name3 = methodName(sig)
             if (name2 == name3) {
-                if (name2 !in implementedMethods) {
+                assertTrue(name2 in implementedMethods) {
                     printUsed(sig)
-                    throw NotImplementedError("Missing impl of $name2/$sig")
+                    "Missing impl of $name2/$sig"
                 }
                 break
             }
             name2 = name3
         }
 
-        if (nameToMethod[name2] in hIndex.abstractMethods)
-            throw IllegalStateException("$name is abstract, but also listed")
+        assertFalse(nameToMethod[name2] in hIndex.abstractMethods) {
+            "$name is abstract, but also listed"
+        }
 
         val sig = nameToMethod[name2] ?: idx.first
-        if (sig in hIndex.abstractMethods) throw IllegalStateException("$name2 is abstract, but also listed")
+        assertFalse(sig in hIndex.abstractMethods) { "$name2 is abstract, but also listed" }
         printer.append("  $").append(name2).append('\n')
+        functionTable.add(name2)
         ActuallyUsedIndex.add(dynIndexSig, sig)
     }
     printer.append(")\n")
@@ -744,30 +752,36 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
     return ptr
 }
 
-fun appendData(printer: StringBuilder2, startIndex: Int, vararg data: ByteArrayOutputStream2) =
-    appendData(printer, startIndex, *data.map { it.toByteArray() }.toTypedArray())
+val segments = ArrayList<DataSection>()
 
-val segments = ArrayList<IntRange>()
+fun appendData(printer: StringBuilder2, startIndex: Int, vararg data: ByteArrayOutputStream2): Int {
+    val totalSize = data.sumOf { it.size() }
+    val joined = ByteArray(totalSize)
+    var offset = 0
+    for (dataI in data) {
+        dataI.data.values.copyInto(joined, offset, 0, dataI.size())
+        offset += dataI.size()
+    }
+    return appendData(printer, startIndex, joined)
+}
 
-fun appendData(printer: StringBuilder2, startIndex: Int, vararg data: ByteArray): Int {
-    val segment = startIndex until (startIndex + data.sumOf { it.size })
+fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
+    val segment = startIndex until (startIndex + data.size)
     val mid1 = segment.first + segment.last
     val length1 = segment.last - segment.first
     for (seg in segments) {
-        val mid2 = seg.first + seg.last
-        val length2 = seg.last - seg.first
+        val first = seg.startIndex
+        val last = seg.startIndex + seg.content.size
+        val mid2 = first + last
+        val length2 = last - first
         if (abs(mid1 - mid2) < length1 + length2)
             throw IllegalStateException("Overlapping segments $segment, $seg")
     }
-    segments.add(segment)
+    segments.add(DataSection(startIndex, data))
     printer.append("(data ($ptrType.const ${startIndex}) \"")
-    var index = startIndex
-    for (dataI in data) {
-        writeData(printer, dataI)
-        index += dataI.size
-    }
+    writeData(printer, data)
     printer.append("\")\n")
-    return index
+    return startIndex + data.size
 }
 
 fun appendStringData(printer: StringBuilder2, gIndex: GeneratorIndex): Int {

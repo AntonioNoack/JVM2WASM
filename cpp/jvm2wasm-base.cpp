@@ -16,34 +16,47 @@
 
 size_t allocatedSize = 0;
 
-// #define STANDALONE
-#ifdef STANDALONE
-
+#define MAIN_CPP
 #include "jvm2wasm-types.h"
+#include "jvm2wasm-base.h"
 
-void* memory = nullptr;
+// list imported functions:
+i32 r8(i32);
+i32 r16(i32);
+i32 r32(i32);
+i64 r64(i32);
+void w16(i32,i32);
+void w32(i32,i32);
+i32 findClass(i32);
+i32 runRunnable(i32);
+void parallelGC0();
+void parallelGC1();
+void parallelGC2();
+void concurrentGC0();
+i32 concurrentGC1();
+void initFunctionTable();
+void gc();
+// todo it would be nice to make this NoThrow, so in the future, we can abort on all exceptions
+i32i32 java_lang_Class_getName_Ljava_lang_String(i32);
+i32 engine_Engine_keyModState_IV(i32);
+i32 engine_Engine_keyUp_IV(i32);
+i32 engine_Engine_keyDown_IV(i32);
+i32 engine_Engine_keyTyped_IV(i32);
+i32 engine_Engine_mouseUp_IV(i32);
+i32 engine_Engine_mouseDown_IV(i32);
+i32 engine_Engine_mouseMove_FFV(f32,f32);
+i32 engine_Engine_mouseWheel_FFV(f32,f32);
+i32 engine_Engine_charTyped_IIV(i32,i32);
+i32 java_lang_Throwable_printStackTrace_V(i32);
+i32 engine_Engine_update_IIFV(i32, i32, f32);
+i32 new_java_lang_Throwable_V(i32);
+i32 finishTexture(i32, i32, i32, i32);
+i32i32 createInstance(i32);
+i32 prepareTexture(i32);
+i32 engine_Engine_main_Ljava_lang_StringV(i32);
+i32 init();
 
-void initFunctionTable() {}
-i32 global_G0 = 2798416;
-
-i32i32 java_lang_String_length_I(i32 p0) {
-    return { 0, 0 };
-}
-
-i32 engine_Engine_main_Ljava_lang_StringZZV(i32, i32, i32) {
-    return 0;
-}
-
-i32 engine_Engine_update_IIFV(i32, i32, f32) {
-    return 0;
-}
-
-void gc() {}
-
-#else
-void logCall(const char* funcName);
-#include "jvm2wasm.cpp"
-#endif
+// todo implement that variable and parameter names are kept as far as possible in C++ code
 
 // memory stuff
 i32 gcCtr = 0;
@@ -750,12 +763,6 @@ void unreachable(std::string msg) {
     exit(-1);
 }
 
-void logCall(const char* funcName) {
-    int depth = getStackDepth();
-    for(int i=0;i<depth;i++) std::cout << "  ";
-    std::cout << funcName << std::endl;
-}
-
 void initMemory() {
 
     // 10 as some buffer for the first allocations
@@ -883,21 +890,6 @@ void attachGLFWListeners() {
         std::cerr << "[GL] Warning: A non-debug context may not produce any debug output." << std::endl;
         glEnable(GL_DEBUG_OUTPUT);
     }
-}
-
-i64 lastTime = 0L;
-void notifySampler(std::string funcName) {
-    // std::cerr << funcName << std::endl;
-    // i64 thisTime = java_lang_System_nanoTime_J();
-    // if(std::abs(thisTime - lastTime) > 1000000000) {
-    /*if(lastTime++ > 1000000) {
-        // lastTime = thisTime;
-        lastTime = 0;
-        i32 err = cr(14).v0;
-        std::cerr << "Waiting... " << funcName << std::endl;
-        new_java_lang_Throwable_Ljava_lang_StringV(err, 0);
-        java_lang_Throwable_printStackTrace_V(err);
-    }*/
 }
 
 void runGCThread() {

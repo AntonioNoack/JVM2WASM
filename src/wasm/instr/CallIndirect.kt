@@ -2,7 +2,7 @@ package wasm.instr
 
 import utils.StringBuilder2
 
-class CallIndirect(val type: FuncType) : Instruction {
+data class CallIndirect(val type: FuncType) : Instruction {
     override fun toString(): String {
         val builder = StringBuilder2()
         toString(0, builder)

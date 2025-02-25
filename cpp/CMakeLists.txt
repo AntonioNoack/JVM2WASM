@@ -27,12 +27,23 @@ add_library(stbi STATIC ${PROJECT_SOURCE_DIR}/stbi/stbi.c)
 target_include_directories(stbi PUBLIC ${PROJECT_SOURCE_DIR}/stbi/include)
 
 # Required, why ever
-if(MSVC)
+if (MSVC)
     add_compile_options(/bigobj)
 endif()
 
+# Instruct MSCV to print timing stats
+if (MSVC)
+	add_compile_options(/MP /Bt)
+	add_link_options(/time)
+endif()
+
 # Create the executable
-add_executable(JVM2CPP jvm2wasm-base.cpp)
+add_executable(JVM2CPP jvm2wasm-base.cpp jvm2wasm-funcTable.cpp
+    jvm2wasm-part0.cpp jvm2wasm-part1.cpp jvm2wasm-part2.cpp jvm2wasm-part3.cpp jvm2wasm-part4.cpp
+    jvm2wasm-part5.cpp jvm2wasm-part6.cpp jvm2wasm-part7.cpp jvm2wasm-part8.cpp jvm2wasm-part9.cpp
+    jvm2wasm-part10.cpp jvm2wasm-part11.cpp jvm2wasm-part12.cpp jvm2wasm-part13.cpp jvm2wasm-part14.cpp
+    jvm2wasm-part15.cpp jvm2wasm-part16.cpp jvm2wasm-part17.cpp jvm2wasm-part18.cpp jvm2wasm-part19.cpp
+)
 
 # Link GLFW and glad with the project
 target_link_libraries(JVM2CPP PRIVATE glfw glad stbi)

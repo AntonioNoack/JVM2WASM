@@ -1,8 +1,9 @@
 package wasm.instr
 
+import me.anno.utils.structures.lists.Lists.any2
 import utils.StringBuilder2
 
-class LoopInstr(val label: String, val body: List<Instruction>, val results: List<String>) : Instruction {
+data class LoopInstr(val label: String, var body: List<Instruction>, val results: List<String>) : Instruction {
 
     init {
         if (label.startsWith('$')) throw IllegalArgumentException(label)
@@ -29,5 +30,11 @@ class LoopInstr(val label: String, val body: List<Instruction>, val results: Lis
         }
         for (i in 0 until depth) builder.append("  ")
         builder.append(")")
+    }
+
+    override fun isReturning(): Boolean {
+        val lastInstr = body.lastOrNull { it !is Comment }
+        if (lastInstr is Jump && lastInstr.label == label) return true // while(true)-loop
+        return body.any2 { it.isReturning() }
     }
 }

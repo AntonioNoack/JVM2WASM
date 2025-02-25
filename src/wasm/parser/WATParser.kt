@@ -2,8 +2,10 @@ package wasm.parser
 
 import me.anno.io.json.generic.JsonReader.Companion.toHex
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
+import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
@@ -30,11 +32,13 @@ class WATParser {
         val tokens = parseTokens(text)
         // parse it
         val endI = parseBlock(tokens, 0)
-        assertEquals(tokens.size, endI)
+        assertEquals(tokens.size, endI, 1)
     }
 
     fun parseExpression(text: String): List<Instruction> {
         val tokens = parseTokens(text)
+        // append additional closing bracket, so we can read it as a block
+        tokens.push(TokenType.CLOSE_BRACKET, tokens.size, tokens.size + 1)
         return parseFunctionBlock(tokens, 0).instructions
     }
 
@@ -91,8 +95,10 @@ class WATParser {
                 }
                 ';' -> {
                     // comment
-                    assertEquals(text[i].code, ';'.code)
+                    assertEquals(text[i++].code, ';'.code)
+                    val i0 = i
                     i = text.indexOf2('\n', i) + 1
+                    list.push(TokenType.COMMENT, i0 + (text[i0] == ' ').toInt(), i - 1)
                     lineNumber++
                 }
                 else -> throw NotImplementedError(
@@ -112,6 +118,9 @@ class WATParser {
                 TokenType.CLOSE_BRACKET -> {
                     // println("returning from parseBlock @${getStackDepth()}")
                     return i + 1
+                }
+                TokenType.COMMENT -> {
+                    i++ // comments have nothing to be placed on here...
                 }
                 TokenType.NAME -> {
                     when (val name = list.getString(i++)) {
@@ -250,7 +259,7 @@ class WATParser {
                             val globalName = list.consume(TokenType.DOLLAR, i++)
                             val isMutable = list.getType(i) == TokenType.OPEN_BRACKET
                             if (isMutable) {
-                                i++ // (
+                                i++ // skip '('
                                 list.consume(TokenType.NAME, "mut", i++)
                             }
                             list.consume(TokenType.NAME, "i32", i++)
@@ -261,12 +270,10 @@ class WATParser {
                             globals[globalName] = GlobalVariable("global_$globalName", "i32", initialValue, isMutable)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                         }
-                        else -> throw NotImplementedError(
-                            "Unknown name: $name at " + list.subList(i, min(i + 20, list.size))
-                        )
+                        else -> assertFail("Unknown name: $name at " + list.subList(i, min(i + 20, list.size)))
                     }
                 }
-                else -> throw NotImplementedError("Unknown type: $type at " + list.subList(i, min(i + 20, list.size)))
+                else -> assertFail("Unknown type: $type at " + list.subList(i, min(i + 20, list.size)))
             }
         }
     }
@@ -294,14 +301,14 @@ class WATParser {
                             when (list.getType(i)) {
                                 TokenType.NUMBER -> result.add(ParamGet[list.consume(TokenType.NUMBER, i++).toInt()])
                                 TokenType.DOLLAR -> result.add(LocalGet(list.getString(i++)))
-                                else -> throw NotImplementedError()
+                                else -> assertFail()
                             }
                         }
                         "local.set" -> {
                             when (list.getType(i)) {
                                 TokenType.NUMBER -> result.add(ParamSet[list.consume(TokenType.NUMBER, i++).toInt()])
                                 TokenType.DOLLAR -> result.add(LocalSet(list.getString(i++)))
-                                else -> throw NotImplementedError()
+                                else -> assertFail()
                             }
                         }
                         "global.get" -> result.add(GlobalGet(list.consume(TokenType.DOLLAR, i++)))
@@ -368,7 +375,7 @@ class WATParser {
                             }
                             val (j, body) = parseFunctionBlock(list, i)
                             result.add(LoopInstr(label, body, results))
-                            i = j - 1
+                            return FunctionBlock(j, result)
                         }
                         "br" -> {
                             val label = list.consume(TokenType.DOLLAR, i++)
@@ -388,12 +395,13 @@ class WATParser {
                                 depth++
                             }
                             list.consume(TokenType.NAME, "local.get", i++)
-                            list.consume(TokenType.DOLLAR, "lbl", i++)
+                            val lblName = list.consume(TokenType.DOLLAR, i++)
                             list.consume(TokenType.OPEN_BRACKET, i++)
                             list.consume(TokenType.NAME, "br_table", i++)
                             for (j in 0 until depth) {
                                 list.consume(TokenType.NUMBER, j.toString(), i++)
                             }
+                            list.consume(TokenType.CLOSE_BRACKET, i++)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                             val cases = ArrayList<List<Instruction>>()
                             for (j in 0 until depth) {
@@ -401,16 +409,18 @@ class WATParser {
                                 cases.add(instructions)
                                 i = k
                             }
-                            result.add(SwitchCase(cases))
+                            result.add(SwitchCase(lblName, cases))
+                            return FunctionBlock(i, result)
                         }
                         else -> {
                             val simple = simpleInstructions[instrName]
                             if (simple != null) {
                                 result.add(simple)
-                            } else throw NotImplementedError(instrName)
+                            } else assertFail(instrName)
                         }
                     }
                 }
+                TokenType.COMMENT -> result.add(Comment(list.getString(i++)))
                 TokenType.OPEN_BRACKET -> {
                     val (j, instructions) = parseFunctionBlock(list, i + 1)
                     result.addAll(instructions)
@@ -420,10 +430,10 @@ class WATParser {
                     // println("returning from ${getStackDepth()}: $result")
                     return FunctionBlock(i + 1, result)
                 }
-                else -> throw IllegalStateException("Unexpected ${list.getType(i)} in function block")
+                else -> throw IllegalStateException("Unexpected ${list.getType(i)}/${list.getString(i)}/$i in function block")
             }
         }
-        return FunctionBlock(list.size, result)
+        assertFail("Exiting block without )")
     }
 
 }

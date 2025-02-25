@@ -8,6 +8,5 @@ interface Instruction {
         builder.append(toString())
     }
 
-    // todo when this is true, break instr-block-printing
     fun isReturning(): Boolean = false
 }

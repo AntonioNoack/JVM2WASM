@@ -3,21 +3,21 @@ package utils
 import canThrowError
 import hIndex
 import useWASMExceptions
+import wasm.parser.Import
 
-fun StringBuilder2.import1(name: String, inputs: List<String>, outputs: List<String>) {
-    if (name == "kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List") TODO()
-    if (contains("kotlin_reflect_full_KClasses_getSuperclasses_Lkotlin_reflect_KClassLjava_util_List")) TODO()
-    append("(import \"jvm\" \"").append(name).append("\" (func $").append(name)
-    if (inputs.isNotEmpty()) {
+fun StringBuilder2.import1(funcName: String, params: List<String>, results: List<String>) {
+    imports.add(Import(funcName, params, results))
+    append("(import \"jvm\" \"").append(funcName).append("\" (func $").append(funcName)
+    if (params.isNotEmpty()) {
         append(" (param")
-        for (input in inputs) {
+        for (input in params) {
             append(' ')
             append(input)
         }
         append(')')
     }
     append(" (result")
-    for (output in outputs) {
+    for (output in results) {
         append(' ')
         append(output)
     }

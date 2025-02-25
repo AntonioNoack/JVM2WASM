@@ -102,7 +102,7 @@ object ResolveIndirect {
 
         if (groupedByClass.isEmpty()) {
             // printUsed(sig0)
-            LOGGER.warn("$sig0 has no implementations? By $sig")
+            LOGGER.warn("$sig0 has no implementations? By $sig, children: $allChildren")
             return false
         }
 

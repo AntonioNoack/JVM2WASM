@@ -1,3 +1,3 @@
 package wasm.parser
 
-class LocalVariable(val name: String, val type: String)
+data class LocalVariable(val name: String, val type: String)

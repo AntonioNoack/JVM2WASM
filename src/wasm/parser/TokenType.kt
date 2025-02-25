@@ -6,5 +6,6 @@ enum class TokenType(val prefix: Int) {
     NAME(0),
     STRING(1),
     DOLLAR(1),
-    NUMBER(0)
+    NUMBER(0),
+    COMMENT(3)
 }

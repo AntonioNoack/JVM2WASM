@@ -1,31 +1,6 @@
 package utils
 
-/*  txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then i32.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then i64.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then f32.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
-            txt = txt.replace(
-                "local.set \$l0 local.get \$l0 (if (then f64.const 0 local.get \$l0 return))\n" +
-                        "  i32.const 0\n" +
-                        "  return", "return"
-            )
+/*
             txt = txt.replace(
                 "(if (then\n" +
                         "  i32.const 0\n" +
@@ -106,8 +81,6 @@ txt = txt.replace(
    txt = txt.replace("call \$lcmp\n  i32.const 0 i32.le_s", "i64.le_s")
    txt = txt.replace("call \$lcmp\n  i32.const 0 i32.eq", "i64.eq")
 
-   txt = txt.replace("local.get 0\n  drop", "")
-   txt = txt.replace("local.get 1\n  drop", "")
    txt = txt.replace(
        "i32.ne\n" +
                "  (if (result i32) (then\n" +
@@ -142,22 +115,10 @@ txt = txt.replace(
                "))", "f32.eq"
    )
 
-   txt = txt.replace("i32.load\n  drop", "drop")
-   txt = txt.replace("i64.load\n  drop", "drop")
-   txt = txt.replace("f32.load\n  drop", "drop")
-   txt = txt.replace("f64.load\n  drop", "drop")
-   // these two don't exist!
-   // txt = txt.replace("i32.const 0 i32.eq", "i32.eqz")
-   // txt = txt.replace("i32.const 0 i32.ne", "i32.nez")
    txt = txt.replace(
        "call \$dupi32 (if (param i32) (then i32.const 0 call \$swapi32i32 return) (else drop))\n" +
                "  i32.const 0\n" +
                "  return", "return"
-   )
-   txt = txt.replace(
-       "f64.promote_f32\n" +
-               "  f64.sqrt\n" +
-               "  f32.demote_f64", "f32.sqrt"
    )
    // why ever these constructs exist...
    txt = txt.replace(
@@ -210,6 +171,3 @@ txt = txt.replace(
                "  i32.eqz", "f64.eq"
    )
 */
-// then add the result to the actual printer
-// headPrinter.append(txt)
-// headPrinter.append(")\n")

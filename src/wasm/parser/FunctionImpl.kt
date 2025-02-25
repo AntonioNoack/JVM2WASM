@@ -3,7 +3,7 @@ package wasm.parser
 import utils.StringBuilder2
 import wasm.instr.Instruction
 
-data class FunctionImpl(
+open class FunctionImpl(
     val funcName: String, val params: List<String>, val results: List<String>,
     val locals: List<LocalVariable>,
     var body: List<Instruction>,

@@ -2,7 +2,7 @@ package wasm.instr
 
 import me.anno.utils.structures.lists.Lists.createList
 
-class Call(val name: String) : Instruction {
+data class Call(val name: String) : Instruction {
 
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)
@@ -63,6 +63,14 @@ class Call(val name: String) : Instruction {
         val setFieldF32 = Call("setFieldF32")
         val setFieldF64 = Call("setFieldF64")
 
+        // value-instance-offset setters
+        val setVIOFieldI8 = Call("setVIOFieldI8")
+        val setVIOFieldI16 = Call("setVIOFieldI16")
+        val setVIOFieldI32 = Call("setVIOFieldI32")
+        val setVIOFieldI64 = Call("setVIOFieldI64")
+        val setVIOFieldF32 = Call("setVIOFieldF32")
+        val setVIOFieldF64 = Call("setVIOFieldF64")
+
         val setStaticFieldI8 = Call("setStaticFieldI8")
         val setStaticFieldI16 = Call("setStaticFieldI16")
         val setStaticFieldI32 = Call("setStaticFieldI32")
@@ -101,5 +109,11 @@ class Call(val name: String) : Instruction {
 
         val checkCast = Call("checkCast")
         val checkCastExact = Call("checkCastExact")
+
+        val lcmp = Call("lcmp")
+        val fcmpl = Call("fcmpl") // -1 if NaN
+        val fcmpg = Call("fcmpg") // +1 if NaN
+        val dcmpl = Call("dcmpl") // -1 if NaN
+        val dcmpg = Call("dcmpg") // +1 if NaN
     }
 }
