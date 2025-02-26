@@ -33,8 +33,8 @@ import java.io.File
 import java.io.FileOutputStream
 
 class StructuralAnalysis(
-    val methodTranslator: MethodTranslator,
-    val nodes: MutableList<Node>
+    private val methodTranslator: MethodTranslator,
+    private val nodes: MutableList<Node>
 ) {
 
     companion object {
@@ -125,18 +125,6 @@ class StructuralAnalysis(
                 printState(::println)
                 throw IllegalStateException("${node.index} -> ${fs.index}")
             }
-        }
-    }
-
-    private fun removeNegations(node: Node) {
-        if (!node.isBranch) return
-        // remove unnecessary null checks before branch
-        while (node.printer.endsWith(I32EQZ)) {
-            node.printer.removeLast()
-            val t = node.ifTrue!!
-            val f = node.ifFalse!!
-            node.ifTrue = f.label
-            node.ifFalse = labelToNode[t]!!
         }
     }
 
@@ -873,6 +861,18 @@ class StructuralAnalysis(
         return changed2
     }
 
+    private fun unlinkReturnNodes() {
+        for (node in nodes) {
+            if (node.isReturn) {
+                node.ifTrue = null
+                node.ifFalse = null
+            }
+            if (node.isAlwaysTrue) {
+                node.ifFalse = null
+            }
+        }
+    }
+
     /**
      * transform all nodes into some nice if-else-tree
      * */
@@ -893,28 +893,18 @@ class StructuralAnalysis(
 
         for (node in nodes) {
             node.hasNoCode = node.calcHasNoCode()
-            removeNegations(node)
             removeUselessBranches(node)
         }
 
-        for (index in nodes.indices) {
-            nodes[index].index = index
-        }
+        renumber(nodes) // just for debug printing
 
-        for (node in nodes) {
-            if (node.isReturn) {
-                node.ifTrue = null
-                node.ifFalse = null
-            }
-            if (node.isAlwaysTrue) {
-                node.ifFalse = null
-            }
-        }
+        unlinkReturnNodes()
 
         recalculateInputs()
         removeNodesWithoutInputs()
         removeNodesWithoutCode()
         removeDuplicateNodes()
+        renumber(nodes)
 
         validateInputOutputStacks()
 

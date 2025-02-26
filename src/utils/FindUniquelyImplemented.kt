@@ -4,6 +4,9 @@ import dIndex
 import gIndex
 import hIndex
 import me.anno.utils.structures.maps.CountMap
+import org.apache.logging.log4j.LogManager
+
+private val LOGGER = LogManager.getLogger("FindUniquelyImplemented")
 
 val methodVariants = HashMap<MethodSig, HashSet<MethodSig>>()
 
@@ -69,7 +72,7 @@ fun findMethodsWithoutChildClasses(): Int {
  * find functions with a single implementation only, and make it final
  * */
 fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMethods: Collection<MethodSig>) {
-    println("[findUniquelyImplemented]")
+    LOGGER.info("[findUniquelyImplemented]")
 
     // we only need this for classes, where multiple classes are constructable
     // otherwise, we can directly resolve the call :)
@@ -113,11 +116,5 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         }
     }
 
-    println("  found $finalMethods uniquely implemented methods and made them final :)")
-
-    // HashSet and LinkedHashSet share the same implementation
-    // printUsed(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z"))
-    // printUsed(MethodSig.c("java/util/LinkedHashSet", "add", "(Ljava/lang/Object;)Z"))
-    // assertTrue(MethodSig.c("java/util/HashSet", "add", "(Ljava/lang/Object;)Z") in hIndex.finalMethods)
-
+    LOGGER.info("Found $finalMethods uniquely implemented methods and made them final")
 }

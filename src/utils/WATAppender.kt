@@ -13,6 +13,7 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.toInt
+import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ACC_NATIVE
 import org.objectweb.asm.Opcodes.ACC_STATIC
 import resources
@@ -23,6 +24,8 @@ import wasm.parser.DataSection
 import java.io.OutputStream
 import kotlin.math.abs
 
+private val LOGGER = LogManager.getLogger("WATAppender")
+
 fun OutputStream.writeClass(clazz: Int) {
     if (clazz < 0 || clazz > 0xffffff) throw IllegalArgumentException()
     writeLE32(clazz) // class
@@ -31,7 +34,7 @@ fun OutputStream.writeClass(clazz: Int) {
 
 var classInstanceTablePtr = 0
 fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
-    println("[appendClassInstanceTable]")
+    LOGGER.info("[appendClassInstanceTable]")
 
     classInstanceTablePtr = indexStartPtr
 
@@ -39,7 +42,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
     val clazzIndex = gIndex.getClassIndex("java/lang/Class")
     val classSize = fields.offset
 
-    println("  class fields: ${fields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
+    LOGGER.info("java/lang/Class.fields: ${fields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
 
     val classData = ByteArrayOutputStream2(classSize * numClasses)
     for (i in 0 until numClasses) {
@@ -158,10 +161,11 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                 }
             }
 
-            if (clazz < 10) println(
-                "  fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
-                        fields2.joinToString { "${gIndex.getString(it.first)}" })
-            else if (clazz == 10 && numClasses > 11) println("  ...")
+            if (clazz < 10) {
+                LOGGER.info(
+                    "Fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $fields2, " +
+                            fields2.joinToString { "${gIndex.getString(it.first)}" })
+            } else if (clazz == 10 && numClasses > 11) LOGGER.info("...")
 
             if (clazz > 0 && gIndex
                     .getFieldOffsets(hIndex.superClass[className]!!, false)
@@ -217,14 +221,14 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
 var throwableLookupPtr = 0
 fun appendThrowableLookup(printer: StringBuilder2, ptr0: Int): Int {
-    println("[appendThrowableLookup]")
+    LOGGER.info("[appendThrowableLookup]")
     throwableLookupPtr = ptr0
     return appendData(printer, ptr0, MethodTranslator.callTable)
 }
 
 var resourceTablePtr = 0
 fun appendResourceTable(printer: StringBuilder2, ptr0: Int): Int {
-    println("[appendResourceTable]")
+    LOGGER.info("[appendResourceTable]")
     resourceTablePtr = ptr0
     val resources = resources
     val table = ByteArrayOutputStream2(
@@ -338,7 +342,7 @@ fun appendDynamicFunctionTable(
         ActuallyUsedIndex.add(dynIndexSig, sig)
     }
     printer.append(")\n")
-    println("  filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
+    LOGGER.info("Filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
 }
 
 var printDebug = true
@@ -353,7 +357,7 @@ var printDebug = true
 // ...
  * */
 fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
-    println("[appendInheritanceTable]")
+    LOGGER.info("[appendInheritanceTable]")
     val debugInfo = StringBuilder2(1024)
     // done append custom functions
     // append class instanceOf-table
@@ -387,7 +391,7 @@ fun appendInheritanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int):
 
             interfaces.removeIf {
                 if (gIndex.getClassIndex(it) >= numClasses) {
-                    println("warn: $it got index too late (interface)")
+                    LOGGER.warn("$it got index too late (interface)")
                     true
                 } else false
             }
@@ -545,7 +549,7 @@ var staticTablePtr = -1
 var clInitFlagTable = 0
 val staticLookup = HashMap<String, Int>()
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
-    println("[appendStaticInstanceTable]")
+    LOGGER.info("[appendStaticInstanceTable]")
     val debugInfo = StringBuilder2()
     staticTablePtr = ptr0
     clInitFlagTable = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
@@ -584,7 +588,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
 var methodTablePtr = 0
 var aidtCtr = 50 // disabled
 fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
-    println("[appendInvokeDynamicTable]")
+    LOGGER.info("[appendInvokeDynamicTable]")
     val debugInfo = StringBuilder2()
 
     methodTablePtr = ptr0
@@ -706,9 +710,9 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
                         }
                         if (true) {
 
-                            println("  [WARN] $sig ($i/$idx) is missing from dynIndex")
+                            LOGGER.warn("$sig ($i/$idx) is missing from dynIndex")
                             printUsed(sig)
-                            println("    $idx -> -1*")
+                            LOGGER.warn("    $idx -> -1*")
 
                             if (false) {
                                 // to do check if any super class or interface is being used...
@@ -742,7 +746,7 @@ fun appendInvokeDynamicTable(printer: StringBuilder2, ptr0: Int, numClasses: Int
             // if (print) throw IllegalStateException("debug")
         }
     }
-    println("  dynamic table, ok: $numOk, abstract: $numAbstract, broken: $numBroken, fixed: $numFixed, index-size: ${dynIndex.size}")
+    LOGGER.info("  dynamic table, ok: $numOk, abstract: $numAbstract, broken: $numBroken, fixed: $numFixed, index-size: ${dynIndex.size}")
     appendData(printer, ptr0, methodTable)
     appendData(printer, ptr0 + numClasses * 4, table2)
     if (printDebug) {
@@ -785,7 +789,7 @@ fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
 }
 
 fun appendStringData(printer: StringBuilder2, gIndex: GeneratorIndex): Int {
-    println("[appendStringData]")
+    LOGGER.info("[appendStringData]")
     return appendData(printer, stringStart, gIndex.stringOutput)
 }
 

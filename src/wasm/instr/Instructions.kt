@@ -1,5 +1,10 @@
 package wasm.instr
 
+import utils.f32
+import utils.f64
+import utils.i32
+import utils.i64
+
 object Instructions {
 
     val I32Add = BinaryInstruction("i32.add", "+")
@@ -55,26 +60,26 @@ object Instructions {
     val F64NE = CompareInstr("f64.ne", "!=")
     val F64EQ = CompareInstr("f64.eq", "==")
 
-    val I32_TRUNC_F32S = UnaryInstruction2("i32.trunc_f32_s", "static_cast<i32>(std::trunc(", "))", "f32")
-    val I32_TRUNC_F64S = UnaryInstruction2("i32.trunc_f64_s", "static_cast<i32>(std::trunc(", "))", "f64")
-    val I64_TRUNC_F32S = UnaryInstruction2("i64.trunc_f32_s", "static_cast<i64>(std::trunc(", "))", "f32")
-    val I64_TRUNC_F64S = UnaryInstruction2("i64.trunc_f64_s", "static_cast<i64>(std::trunc(", "))", "f64")
-    val F64_PROMOTE_F32 = UnaryInstruction2("f64.promote_f32", "static_cast<f64>(", ")", "f32")
-    val F32_DEMOTE_F64 = UnaryInstruction2("f32.demote_f64", "static_cast<f32>(", ")", "f64")
-    val I64_EXTEND_I32S = UnaryInstruction2("i64.extend_i32_s", "static_cast<i64>(", ")", "i32")
-    val I32_WRAP_I64 = UnaryInstruction2("i32.wrap_i64", "static_cast<i32>(", ")", "i64")
-    val F32_CONVERT_I32S = UnaryInstruction2("f32.convert_i32_s", "static_cast<f32>(", ")", "i32")
-    val F32_CONVERT_I64S = UnaryInstruction2("f32.convert_i64_s", "static_cast<f32>(", ")", "i64")
-    val F64_CONVERT_I32S = UnaryInstruction2("f64.convert_i32_s", "static_cast<f64>(", ")", "i32")
-    val F64_CONVERT_I64S = UnaryInstruction2("f64.convert_i64_s", "static_cast<f64>(", ")", "i64")
+    val I32_TRUNC_F32S = UnaryInstruction2("i32.trunc_f32_s", "static_cast<i32>(std::trunc(", "))", f32)
+    val I32_TRUNC_F64S = UnaryInstruction2("i32.trunc_f64_s", "static_cast<i32>(std::trunc(", "))", f64)
+    val I64_TRUNC_F32S = UnaryInstruction2("i64.trunc_f32_s", "static_cast<i64>(std::trunc(", "))", f32)
+    val I64_TRUNC_F64S = UnaryInstruction2("i64.trunc_f64_s", "static_cast<i64>(std::trunc(", "))", f64)
+    val F64_PROMOTE_F32 = UnaryInstruction2("f64.promote_f32", "static_cast<f64>(", ")", f32)
+    val F32_DEMOTE_F64 = UnaryInstruction2("f32.demote_f64", "static_cast<f32>(", ")", f64)
+    val I64_EXTEND_I32S = UnaryInstruction2("i64.extend_i32_s", "static_cast<i64>(", ")", i32)
+    val I32_WRAP_I64 = UnaryInstruction2("i32.wrap_i64", "static_cast<i32>(", ")", i64)
+    val F32_CONVERT_I32S = UnaryInstruction2("f32.convert_i32_s", "static_cast<f32>(", ")", i32)
+    val F32_CONVERT_I64S = UnaryInstruction2("f32.convert_i64_s", "static_cast<f32>(", ")", i64)
+    val F64_CONVERT_I32S = UnaryInstruction2("f64.convert_i32_s", "static_cast<f64>(", ")", i32)
+    val F64_CONVERT_I64S = UnaryInstruction2("f64.convert_i64_s", "static_cast<f64>(", ")", i64)
 
-    val F64_CONVERT_I32U = UnaryInstruction2("f64.convert_i32_u", "static_cast<f64>(", ")", "i32")
-    val F64_CONVERT_I64U = UnaryInstruction2("f64.convert_i64_u", "static_cast<f64>(", ")", "i64")
+    val F64_CONVERT_I32U = UnaryInstruction2("f64.convert_i32_u", "static_cast<f64>(", ")", i32)
+    val F64_CONVERT_I64U = UnaryInstruction2("f64.convert_i64_u", "static_cast<f64>(", ")", i64)
 
-    val I32_REINTERPRET_F32 = UnaryInstruction2("i32.reinterpret_f32", "std::bit_cast<i32>(", ")", "f32")
-    val F32_REINTERPRET_I32 = UnaryInstruction2("f32.reinterpret_i32", "std::bit_cast<f32>(", ")", "i32")
-    val I64_REINTERPRET_F64 = UnaryInstruction2("i64.reinterpret_f64", "std::bit_cast<i64>(", ")", "f64")
-    val F64_REINTERPRET_I64 = UnaryInstruction2("f64.reinterpret_i64", "std::bit_cast<f64>(", ")", "i64")
+    val I32_REINTERPRET_F32 = UnaryInstruction2("i32.reinterpret_f32", "std::bit_cast<i32>(", ")", f32)
+    val F32_REINTERPRET_I32 = UnaryInstruction2("f32.reinterpret_i32", "std::bit_cast<f32>(", ")", i32)
+    val I64_REINTERPRET_F64 = UnaryInstruction2("i64.reinterpret_f64", "std::bit_cast<i64>(", ")", f64)
+    val F64_REINTERPRET_I64 = UnaryInstruction2("f64.reinterpret_i64", "std::bit_cast<f64>(", ")", i64)
 
     val I32GES = CompareInstr("i32.ge_s", ">=")
     val I32GTS = CompareInstr("i32.gt_s", ">")

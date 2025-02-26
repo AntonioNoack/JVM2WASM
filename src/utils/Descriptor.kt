@@ -47,29 +47,28 @@ fun split1(d: String, generics: Boolean = false): List<String> {
     val result = ArrayList<String>()
     var i = 0
     val pad = generics.toInt()
-    while (i < d.length) {
-        fun readType(): String {
-            return when (d[i++]) {
-                'Z' -> "Z"
-                'C' -> "C"
-                'B' -> "B"
-                'S' -> "S"
-                'I' -> "I"
-                'J' -> "J"
-                'F' -> "F"
-                'D' -> "D"
-                'L', 'T' -> {
-                    // read until ;
-                    val j = d.indexOf(';', i + 1)
-                    val str = d.substring(i - pad, j + pad)
-                    i = j + 1
-                    str
-                }
-
-                in "[A" -> "[${readType()}"
-                else -> throw IllegalArgumentException(d)
+    fun readType(): String {
+        return when (d[i++]) {
+            'Z' -> "Z"
+            'C' -> "C"
+            'B' -> "B"
+            'S' -> "S"
+            'I' -> "I"
+            'J' -> "J"
+            'F' -> "F"
+            'D' -> "D"
+            'L', 'T' -> {
+                // read until ;
+                val j = d.indexOf(';', i + 1)
+                val str = d.substring(i - pad, j + pad)
+                i = j + 1
+                str
             }
+            '[', 'A' -> "[${readType()}"
+            else -> assertFail(d)
         }
+    }
+    while (i < d.length) {
         result.add(readType())
     }
     return result
@@ -110,7 +109,6 @@ fun genericsTypes(d: String, static: Boolean = true): String {
                     i = d.indexOf(';', i + 1) + 1
                     '?'
                 }
-
                 'V' -> 'V'
                 else -> throw IllegalArgumentException(d)
             }
