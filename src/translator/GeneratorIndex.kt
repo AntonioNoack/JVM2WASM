@@ -125,11 +125,6 @@ object GeneratorIndex {
         }.funcName
     }
 
-    val usedDup_x1 = BooleanArray(16)
-    val usedDup_x2 = BooleanArray(64)
-
-    val usedDup2_x1 = BooleanArray(64)
-
     val classNames = ArrayList<String>()
     val classIndex = HashMap<String, Int>()
 

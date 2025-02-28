@@ -7,4 +7,5 @@ class Throw(val tag: String) : Instruction {
     }
 
     override fun toString(): String = "throw \$$tag"
+    override fun isReturning(): Boolean = true
 }

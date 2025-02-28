@@ -294,19 +294,19 @@ class FunctionWriter(
             }
             is Const -> {
                 when (i.type) {
-                    ConstType.F32 -> push(i.type.name1, i.value.toString() + "f")
-                    ConstType.F64 -> push(i.type.name1, i.value.toString())
+                    ConstType.F32 -> push(i.type.wasmType, i.value.toString() + "f")
+                    ConstType.F64 -> push(i.type.wasmType, i.value.toString())
                     ConstType.I32 -> {
                         val v =
                             if (i.value == Int.MIN_VALUE) "(i32)(1u << 31)"
                             else i.value.toString()
-                        push(i.type.name1, v)
+                        push(i.type.wasmType, v)
                     }
                     ConstType.I64 -> {
                         val v =
                             if (i.value == Long.MIN_VALUE) "(i64)(1llu << 63)"
                             else i.value.toString() + "ll"
-                        push(i.type.name1, v)
+                        push(i.type.wasmType, v)
                     }
                 }
             }
@@ -314,7 +314,7 @@ class FunctionWriter(
                 val i0 = pop(i.type)
                 beginNew(i.type).append(i.call).append('(').append(i0).append(')').end()
             }
-            is UnaryInstruction2 -> {
+            is NumberCastInstruction -> {
                 val i0 = pop(i.popType)
                 beginNew(i.pushType).append(i.prefix).append(i0).append(i.suffix).end()
             }
@@ -356,7 +356,9 @@ class FunctionWriter(
                 }
 
                 if (i.ifFalse.isEmpty()) {
-                    assertEquals(i.params.size, i.results.size)
+                    assertEquals(i.params.size, i.results.size) {
+                        "Invalid Branch: $i"
+                    }
                 }
 
                 val resultVars = i.results.map { nextTemporaryVariable() }

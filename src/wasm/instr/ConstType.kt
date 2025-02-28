@@ -1,6 +1,6 @@
 package wasm.instr
 
-enum class ConstType(val name1: String) {
+enum class ConstType(val wasmType: String) {
     I32("i32"), I64("i64"),
     F32("f32"), F64("f64");
 

@@ -256,7 +256,10 @@ class DelayedLambdaUpdate(
             couldThrow = true
         }
 
-        if (!couldThrow) printer.visitLdcInsn(0) // calling this is easier than figuring our the return type for the correct return function
+        if (!couldThrow) {
+            // calling this is easier than figuring our the return type for the correct return function
+            printer.visitLdcInsn(0)
+        }
 
         printer.printer.append(Return)
         printer.visitEnd()

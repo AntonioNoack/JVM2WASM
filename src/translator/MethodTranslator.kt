@@ -3,6 +3,7 @@ package translator
 import alwaysUseFieldCalls
 import annotations.Boring
 import annotations.NotCalled
+import anyMethodThrows
 import api
 import canThrowError
 import checkArrayAccess
@@ -15,7 +16,7 @@ import enableTracing
 import exportAll
 import gIndex
 import graphing.Node
-import utils.ReplaceOptimizer.optimizeUsingReplacements
+import graphing.StackValidator
 import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
@@ -37,6 +38,7 @@ import translator.GeneratorIndex.tri
 import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
+import utils.ReplaceOptimizer.optimizeUsingReplacements
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f32Const0
@@ -142,18 +144,7 @@ class MethodTranslator(
     private val argsMapping = HashMap<Int, Int>()
 
     val localVariables1 = ArrayList<LocalVariable>()
-    private val activeLocalVars = ArrayList<LocalVar>()
-
-    class LocalVar(
-        val descriptor: String,
-        val wasmType: String,
-        val wasmName: String,
-        val index: Int,
-        isParam: Boolean
-    ) {
-        val localGet = if (isParam) ParamGet[index] else LocalGet(wasmName)
-        val localSet = if (isParam) ParamSet[index] else LocalSet(wasmName)
-    }
+    val localVarsWithParams = ArrayList<LocalVar>()
 
     private var resultType = 'V'
 
@@ -167,20 +158,20 @@ class MethodTranslator(
     private val canPush = enableTracing && canThrowError
     private val isStatic = access.hasFlag(ACC_STATIC)
 
-    val print = false // clazz == "kotlin/jvm/internal/PropertyReference1" && name == "invoke"
 
     init {
-        if (print) println("Method-Translating $clazz.$name.$descriptor")
+        printOps = false // clazz == "kotlin/collections/CollectionsKt__ReversedViewsKt"
+        if (printOps) println("Method-Translating $clazz.$name.$descriptor")
+
         nodes.add(currentNode)
         currentNode.inputStack = emptyList()
 
-        if (access.hasFlag(ACC_NATIVE) || access.hasFlag(ACC_ABSTRACT) /*|| access.hasFlag(ACC_INTERFACE)*/) {
-            // if has @WASM annotation, use that code
+        if (access.hasFlag(ACC_NATIVE) || access.hasFlag(ACC_ABSTRACT)) {
+            // if it has @WASM annotation, use that code
             val wasm = hIndex.wasmNative[sig]
             if (wasm != null) {
                 printHeader()
-                printer.append(wasm)
-                currentNode.isReturn = true
+                printer.append(wasm).append(Return)
             } else {
                 // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
                 isAbstract = true
@@ -224,12 +215,12 @@ class MethodTranslator(
         var numArgs = 0
         var idx = 0
         if (!isStatic) {
-            activeLocalVars.add(LocalVar("", ptrType, "self", 0, true))
+            localVarsWithParams.add(LocalVar("", ptrType, "self", 0, true))
             argsMapping[numArgs++] = idx++
         }
         for (arg in args) {
             val type = jvm2wasm(arg)
-            activeLocalVars.add(LocalVar("", type, "param$idx", idx, true))
+            localVarsWithParams.add(LocalVar("", type, "param$idx", idx, true))
             argsMapping[numArgs] = idx++
             numArgs += when (arg) {
                 "D", "J" -> 2
@@ -415,28 +406,28 @@ class MethodTranslator(
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.i32ArrayLoad else Call.i32ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x2f -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(i64)
                     .append(if (checkArrayAccess) Call.i64ArrayLoad else Call.i64ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x30 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f32)
                     .append(if (checkArrayAccess) Call.f32ArrayLoad else Call.f32ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x31 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f64)
                     .append(if (checkArrayAccess) Call.f64ArrayLoad else Call.f64ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x32 -> {
                 stackPush()
@@ -446,28 +437,28 @@ class MethodTranslator(
                         else if (is32Bits) Call.i32ArrayLoadU else Call.i64ArrayLoadU
                     )
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x33 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x34 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x35 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             // store instructions
             0x4f -> {
@@ -475,28 +466,28 @@ class MethodTranslator(
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i32ArrayStore else Call.i32ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x50 -> {
                 stackPush()
                 printer.pop(i64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i64ArrayStore else Call.i64ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x51 -> {
                 stackPush()
                 printer.pop(f32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f32ArrayStore else Call.f32ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x52 -> {
                 stackPush()
                 printer.pop(f64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f64ArrayStore else Call.f64ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x53 -> {
                 stackPush()
@@ -506,21 +497,21 @@ class MethodTranslator(
                         else if (is32Bits) Call.i32ArrayStoreU else Call.i64ArrayStoreU
                     )
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x54 -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i8ArrayStore else Call.i8ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
             0x55, 0x56 -> { // char/short-array store
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i16ArrayStore else Call.i16ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && anyMethodThrows) handleThrowable()
             }
 
             // returnx is important: it shows to cancel the flow = jump to end
@@ -536,7 +527,6 @@ class MethodTranslator(
                 // we actually need the list of what was returned, I think
                 // pop these things from the stack? :)
 
-                currentNode.isReturn = true
                 if (opcode != 0xb1) {
                     val type = stack.last()
                     printer.pop(type)
@@ -557,12 +547,9 @@ class MethodTranslator(
                 // nextNode(Label())
             }
             0x101 -> {
-                if (canThrowError) {
-                    printer.append(Return)
-                    currentNode.isReturn = true
-                } else throw IllegalStateException()
+                assertTrue(canThrowError)
+                printer.append(Return)
             }
-
             0x57 -> {
                 val type1 = stack.last()
                 printer.pop(type1).drop()
@@ -590,7 +577,6 @@ class MethodTranslator(
                 stack.add(v1)
                 stack.add(v0)
                 printer.append(Call("dup_x1$v0$v1"))
-                gIndex.usedDup_x1[pair(v0, v1)] = true
                 // value2, value1 →
                 // value1, value2, value1
             }
@@ -603,7 +589,6 @@ class MethodTranslator(
                 stack.add(v1)
                 stack.add(v0)
                 printer.append(Call("dup_x2$v0$v1$v2"))
-                gIndex.usedDup_x2[tri(v0, v1, v2)] = true
             }
             0x5c -> {
                 val v1 = stack[stack.size - 1]
@@ -637,7 +622,6 @@ class MethodTranslator(
                     stack.add(v2)
                     stack.add(v1)
                     printer.append(Call("dup2_x1$v1$v2$v3"))
-                    gIndex.usedDup2_x1[tri(v1, v2, v3)] = true
                 } else {
                     // value2, value1 ->
                     // value1, value2, value1
@@ -676,7 +660,7 @@ class MethodTranslator(
                     printer.poppush(i32).append(Call("safeDiv32"))
                     printer.pop(i32).poppush(i32)
                     stackPop()
-                    handleThrowable()
+                    if (anyMethodThrows) handleThrowable()
                 } else {
                     printer.pop(i32).poppush(i32).append(I32_DIVS)
                 }
@@ -687,7 +671,7 @@ class MethodTranslator(
                     printer.poppush(i64).append(Call("safeDiv64"))
                     printer.pop(i64).poppush(i64)
                     stackPop()
-                    handleThrowable()
+                    if (anyMethodThrows) handleThrowable()
                 } else {
                     printer.pop(i64).poppush(i64).append(I64_DIVS)
                 }
@@ -699,7 +683,7 @@ class MethodTranslator(
                     stackPush()
                     printer.poppush(i32).append(Call("checkNonZero32"))
                     stackPop()
-                    handleThrowable()
+                    if (anyMethodThrows) handleThrowable()
                 }
                 printer.pop(i32).poppush(i32).append(I32_REM_S)
             }
@@ -708,7 +692,7 @@ class MethodTranslator(
                     stackPush()
                     printer.poppush(i64).append(Call("checkNonZero64"))
                     stackPop()
-                    handleThrowable()
+                    if (anyMethodThrows) handleThrowable()
                 }
                 printer.pop(i64).poppush(i64)
                 printer.append(I64_REM_S)
@@ -770,7 +754,7 @@ class MethodTranslator(
             }
             0xbf -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
-                printer.dupI32()
+                printer.dupI32() // todo why are we duplicating the error???
                 handleThrowable(true)
                 printer.pop(ptrType)
             }
@@ -816,7 +800,7 @@ class MethodTranslator(
             printer.push(ptrType).append(Call.createInstance)
             if (comments) printer.comment(synthClassName)
             stackPop()
-            handleThrowable()
+            if (anyMethodThrows) handleThrowable()
         }
 
         if (fields.isNotEmpty()) {
@@ -962,7 +946,7 @@ class MethodTranslator(
     }
 
     private fun findLocalVar(i: Int, wasmType: String): LocalVar {
-        var v = activeLocalVars.firstOrNull { it.index == i && it.wasmType == wasmType }
+        var v = localVarsWithParams.firstOrNull { it.index == i && it.wasmType == wasmType }
         if (v != null) return v
         v = findOrDefineLocalVar(i, wasmType)
         // initialize it once at the start... "synthetic local variable" in JDGui
@@ -972,11 +956,11 @@ class MethodTranslator(
     }
 
     private fun findOrDefineLocalVar(i: Int, wasmType: String): LocalVar {
-        var v = activeLocalVars.firstOrNull { it.index == i && it.wasmType == wasmType }
+        var v = localVarsWithParams.firstOrNull { it.index == i && it.wasmType == wasmType }
         if (v == null) {
             val wasmName = defineLocalVar(i, wasmType)
             v = LocalVar("", wasmType, wasmName, i, false)
-            activeLocalVars.add(v)
+            localVarsWithParams.add(v)
         }
         return v
     }
@@ -1027,7 +1011,7 @@ class MethodTranslator(
             printer.append(i32Const(gIndex.getString(clazz)))
             printer.append(i32Const(gIndex.getString(name)))
             printer.append(Call("checkNotNull"))
-            handleThrowable()
+            if (anyMethodThrows) handleThrowable()
         }
     }
 
@@ -1093,7 +1077,7 @@ class MethodTranslator(
                     stackPush()
                     printer.push(i32).append(Call("resolveInterface"))
                     stackPop() // so we can track the call better
-                    handleThrowable() // if it's not found or nullptr
+                    if (anyMethodThrows) handleThrowable() // if it's not found or nullptr
                     printer.pop(i32) // pop instance
                     pop(splitArgs, false, ret)
 
@@ -1125,10 +1109,10 @@ class MethodTranslator(
 
                     val sigs = getMethodVariants(sig0)
                     assertTrue(sigs.size < 2) { "Unclear $sig0 -> $sig?" }
-                    val sig = sigs.firstOrNull() ?: sig
+                    val sig1 = sigs.firstOrNull() ?: sig
 
-                    val setter = hIndex.setterMethods[sig]
-                    val getter = hIndex.getterMethods[sig]
+                    val setter = hIndex.setterMethods[sig1]
+                    val getter = hIndex.getterMethods[sig1]
 
                     fun isStatic(field: FieldSig): Boolean {
                         return field.name in gIndex.getFieldOffsets(field.clazz, true).fields
@@ -1156,20 +1140,20 @@ class MethodTranslator(
                             pop(splitArgs, false, ret)
                             // final, so not actually virtual;
                             // can be directly called
-                            val inline = hIndex.inlined[sig]
+                            val inline = hIndex.inlined[sig1]
                             if (inline != null) {
                                 printer.append(inline)
-                                printer.comment("virtual-inlined $sig")
+                                printer.comment("virtual-inlined $sig1")
                             } else {
                                 stackPush()
-                                val name2 = methodName(sig)
+                                val name2 = methodName(sig1)
                                 val name3 = methodName(sig0)
                                 if (name3 == "java_lang_Object_hashCode_I" ||
                                     name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
                                     name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
-                                ) throw IllegalStateException("$sig0 -> $sig must not be final!!!")
-                                if (sig in hIndex.abstractMethods) throw IllegalStateException()
-                                ActuallyUsedIndex.add(this.sig, sig)
+                                ) throw IllegalStateException("$sig0 -> $sig1 must not be final!!!")
+                                if (sig1 in hIndex.abstractMethods) throw IllegalStateException()
+                                ActuallyUsedIndex.add(this.sig, sig1)
                                 printer.append(Call(name2))
                                 stackPop()
                             }
@@ -1195,7 +1179,7 @@ class MethodTranslator(
                             .comment("$sig0, #${options.size}")
                             .push(i32)
                         stackPop()
-                        handleThrowable()
+                        if (anyMethodThrows) handleThrowable()
                         printer.pop(i32)
                         pop(splitArgs, false, ret)
                         printer.append(CallIndirect(gIndex.getType(false, descriptor, calledCanThrow)))
@@ -1304,7 +1288,7 @@ class MethodTranslator(
             .append(Call.createNativeArray[numDimensions])
 
         stackPop()
-        handleThrowable()
+        if (anyMethodThrows) handleThrowable()
 
         if (numDimensions > 6)
             throw NotImplementedError("Multidimensional arrays with more than 5 dimensions haven't been implemented yet.")
@@ -1376,7 +1360,6 @@ class MethodTranslator(
                 // throw :)
                 printer.append(Throw("exTag"))
                 printer.append(Unreachable)
-                currentNode.isReturn = true // kind of
             } else {
                 // nothing will be here :)
             }
@@ -1521,18 +1504,12 @@ class MethodTranslator(
     private fun returnIfThrowable(mustThrow: Boolean, currentNode: Node = this.currentNode) {
         val printer = currentNode.printer
         if (mustThrow) {
-            if (resultType == 'V') {
-                printer.append(Return)
-            } else {
+            if (resultType != 'V') {
                 val retType = jvm2wasm1(resultType)
                 printer.append(Const.zero[retType]!!)
                     .append(Call("swapi32$retType"))
-                    .append(Return)
             }
-            if (!printer.endsWith(Return) && !printer.endsWith(Unreachable)) {
-                printer.append(Unreachable)
-            }
-            currentNode.isReturn = true
+            printer.append(Return)
         } else {
             val tmp = tmpI32
             printer.append(tmp.localSet)
@@ -1571,7 +1548,7 @@ class MethodTranslator(
                     .append(Call.createInstance)
                 if (comments) printer.comment(type)
                 stackPop()
-                handleThrowable()
+                if (anyMethodThrows) handleThrowable()
             }
             0xbd -> {
                 // a-new array, type doesn't matter
@@ -1580,7 +1557,7 @@ class MethodTranslator(
                 printer.append(Call.createObjectArray)
                 if (comments) printer.comment(type)
                 stackPop()
-                handleThrowable()
+                if (anyMethodThrows) handleThrowable()
             }
             0xc0 -> {
                 // check cast
@@ -1590,7 +1567,7 @@ class MethodTranslator(
                     printer.printCastClass(type)
                     if (comments) printer.comment(type)
                     stackPop()
-                    handleThrowable()
+                    if (anyMethodThrows) handleThrowable()
                 }
             }
             0xc1 -> {
@@ -1693,7 +1670,7 @@ class MethodTranslator(
                     .append(i32Const(gIndex.getClassIndex(type)))
                     .append(Call.createNativeArray[1]).comment(type)
                 stackPop()
-                handleThrowable()
+                if (anyMethodThrows) handleThrowable()
             }
             else -> throw NotImplementedError()
         }
@@ -1718,7 +1695,7 @@ class MethodTranslator(
                     nextNode.inputStack = node.outputStack
                     // println("found $label :), $stack -> ${node.outputStack}")
                     stack.clear()
-                    stack.addAll(node.outputStack!!)
+                    stack.addAll(node.outputStack)
                     found = true
                     break
                 }
@@ -1830,7 +1807,7 @@ class MethodTranslator(
         printer.append(Call(methodName(sig)))
         ActuallyUsedIndex.add(this.sig, sig)
         stackPop()
-        if (canThrowError(sig)) {
+        if (anyMethodThrows && canThrowError(sig)) {
             handleThrowable()
         }
     }
@@ -1841,16 +1818,7 @@ class MethodTranslator(
     }
 
     private fun Builder.dupI32(): Builder {
-        val lastInstr = instrs.lastOrNull()
-        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is Const) {
-            append(lastInstr)
-        } else {
-            val tmp = tmpI32
-            append(tmp.localSet)
-            append(tmp.localGet)
-            append(tmp.localGet)
-        }
-        return this
+        return dupI32(tmpI32)
     }
 
     fun visitFieldInsn2(opcode: Int, owner: String, name: String, descriptor: String, checkNull: Boolean) {
@@ -2041,23 +2009,10 @@ class MethodTranslator(
 
     override fun visitEnd() {
         if (!isAbstract) {
-
-            val lastNode = nodes.last()
-            if (StructuralAnalysis.printOps) {
-                println("\n$clazz $name $descriptor: ${nodes.size}")
+            if (true) {
+                for (node in nodes) node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
+                StackValidator.validateStack(nodes, this)
             }
-
-            // jnt.scimark2.FFT.log2(0);
-
-            if (nodes.size > 1 && lastNode.next == null && !lastNode.isReturn) {
-                nodes.removeAt(nodes.lastIndex)
-                for (it in nodes) {
-                    if (it.ifFalse == lastNode) {
-                        it.ifFalse = null
-                    }
-                }
-            }
-
             val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
             optimizeUsingReplacements(jointBuilder)
             val headPrinter1 = createFuncHead()

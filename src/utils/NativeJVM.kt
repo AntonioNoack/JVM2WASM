@@ -1,7 +1,6 @@
 package utils
 
 import exportHelpers
-import gIndex
 import me.anno.utils.assertions.assertNull
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
@@ -57,8 +56,8 @@ fun appendNativeHelperFunctions() {
 
     fun forAll2(flags: BooleanArray, callback: (String, String) -> Unit) {
         var i = 0
-        for (type2 in types) {
-            for (type1 in types) {
+        for (type1 in types) {
+            for (type2 in types) {
                 if (flags[i++]) callback(type1, type2)
             }
         }
@@ -70,9 +69,9 @@ fun appendNativeHelperFunctions() {
 
     fun forAll3(flags: BooleanArray, callback: (String, String, String) -> Unit) {
         var i = 0
-        for (type3 in types) {
+        for (type1 in types) {
             for (type2 in types) {
-                for (type1 in types) {
+                for (type3 in types) {
                     if (flags[i++]) callback(type1, type2, type3)
                 }
             }
@@ -170,14 +169,14 @@ fun appendNativeHelperFunctions() {
         )
     }
 
-    forAll2(gIndex.usedDup_x1) { v1, v2 ->
+    forAll2 { v1, v2 ->
         register(
             "dup_x1$v1$v2", listOf(v2, v1), listOf(v1, v2, v1),
             listOf(ParamGet[1], ParamGet[0], ParamGet[1])
         )
     }
 
-    forAll3(gIndex.usedDup_x2) { v1, v2, v3 ->
+    forAll3(t) { v1, v2, v3 ->
         register(
             "dup_x2$v1$v2$v3", listOf(v3, v2, v1), listOf(v1, v3, v2, v1),
             listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2])

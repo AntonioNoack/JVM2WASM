@@ -1,18 +1,17 @@
 package graphing
 
-import me.anno.io.Streams.writeString
+import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
 import me.anno.utils.structures.tuples.IntPair
 import org.objectweb.asm.Label
+import translator.LocalVar
 import translator.MethodTranslator
 import utils.Builder
 import utils.i32
-import utils.methodName
 import wasm.instr.*
-import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32GES
@@ -30,11 +29,10 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.LocalVariable
 import java.io.File
-import java.io.FileOutputStream
 
 class StructuralAnalysis(
-    private val methodTranslator: MethodTranslator,
-    private val nodes: MutableList<Node>
+    val methodTranslator: MethodTranslator,
+    val nodes: MutableList<Node>
 ) {
 
     companion object {
@@ -67,23 +65,26 @@ class StructuralAnalysis(
         val equalPairs = equalPairs0.associate { it } +
                 equalPairs0.associate { it.second to it.first }
 
-        private val textCache = HashMap<String, HashSet<String>>()
-        private fun getFileLines(graphId: String): HashSet<String> {
-            return textCache.getOrPut(graphId) {
-                val file = File(folder, graphId)
-                if (file.exists()) file.readText().split('\n').toHashSet()
-                else HashSet()
+        fun renumber(nodes: List<Node>) {
+            if (printOps) println("renumbering:")
+            for (j in nodes.indices) {
+                val node = nodes[j]
+                // if (node.hasNoCode()) throw IllegalStateException()
+                if (printOps && node.index >= 0) {
+                    println("${node.index} -> $j")
+                }
+                node.index = j
             }
         }
     }
 
-    private var loopIndex = 0
+    var loopIndex = 0
 
-    private val labelToNode = HashMap(nodes.associateBy { it.label })
+    val labelToNode = HashMap(nodes.associateBy { it.label })
 
-    private val sig get() = methodTranslator.sig
+    val sig get() = methodTranslator.sig
 
-    private fun printState(printLine: (String) -> Unit) {
+    fun printState(printLine: (String) -> Unit) {
 
         for (node in nodes) {
             val name = node.toString { label ->
@@ -159,7 +160,8 @@ class StructuralAnalysis(
     }
 
     private fun removeNodesWithoutInputs() {
-        while (nodes.removeIf { it != nodes.first() && it.inputs.isEmpty() }) {
+        val firstNode = nodes.first()
+        while (nodes.removeIf { it != firstNode && it.inputs.isEmpty() }) {
             recalculateInputs()
         }
     }
@@ -180,47 +182,6 @@ class StructuralAnalysis(
                         nextNode.inputs.addAll(node.inputs)
                     }
                     nodes.removeAt(i)
-                }
-            }
-        }
-    }
-
-    private fun findDuplicateNodes(nodes: List<Node>, labelToNode: Map<Label, Node>): Map<Node, Node> {
-        val uniqueNodes = HashMap<Triple<List<Instruction>, IntPair, List<String>?>, Node>()
-        val getPrimaryNodeMap = HashMap<Node, Node>()
-        for (node in nodes) {
-            val key = Triple(
-                ArrayList(node.printer.instrs),
-                IntPair(
-                    labelToNode[node.ifTrue]?.index ?: -1,
-                    node.ifFalse?.index ?: -1
-                ),
-                node.inputStack
-            )
-            val other = uniqueNodes[key]
-            if (other != null) {
-                getPrimaryNodeMap[node] = other
-                other.inputs.addAll(node.inputs)
-            } else {
-                uniqueNodes[key] = node
-            }
-        }
-        return getPrimaryNodeMap
-    }
-
-    private fun removeDuplicateNodes() {
-        val nodeMap = findDuplicateNodes(nodes, labelToNode)
-        if (nodeMap.isNotEmpty()) {
-            nodes.removeIf { it in nodeMap.keys }
-            for (node in nodes) {
-                node.inputs.addAll(node.inputs.map { nodeMap[it] ?: it })
-                node.inputs.removeIf { it in nodeMap.keys }
-                if (node.ifTrue != null) {
-                    val ifTrue = labelToNode[node.ifTrue]
-                    node.ifTrue = nodeMap[ifTrue]?.label ?: node.ifTrue
-                }
-                if (node.ifFalse in nodeMap) {
-                    node.ifFalse = nodeMap[node.ifFalse]!!
                 }
             }
         }
@@ -286,18 +247,18 @@ class StructuralAnalysis(
 
 
     private fun blockParamsGetParams(from: Node): List<String> {
-        return from.inputStack!!
+        return from.inputStack
     }
 
     private fun blockParamsGetResult(from: Node, to: Node?): List<String> {
         if (to == null) {
             // output must be equal to input
-            if (from.inputStack?.isNotEmpty() == true) {
-                return from.inputStack!!
+            if (from.inputStack.isNotEmpty()) {
+                return from.inputStack
             }
-        } else if (from.outputStack?.isNotEmpty() == true) {
+        } else if (from.outputStack.isNotEmpty()) {
             if (!from.isReturn) {
-                return from.outputStack!!
+                return from.outputStack
             }
         }// else if(printOps) append(";; no return values found in ${node.index}\n")
         return emptyList()
@@ -627,12 +588,12 @@ class StructuralAnalysis(
     }
 
     private fun canReturnFirstNode(): Boolean {
-        return nodes.size == 1 && nodes[0].inputs.isEmpty()
+        return nodes.size == 1 && nodes.first().inputs.isEmpty()
     }
 
-    private fun firstNode(): Builder {
+    private fun firstNodeForReturn(): Builder {
         assertTrue(canReturnFirstNode())
-        return nodes[0].printer
+        return nodes.first().printer
     }
 
     /**
@@ -873,10 +834,32 @@ class StructuralAnalysis(
         }
     }
 
+    private fun calculateReturnNodes() {
+        for (node in nodes) {
+            val isReturn = node.printer.lastOrNull()?.isReturning() ?: false
+            node.isReturn = isReturn
+            if (isReturn) {
+                node.ifTrue = null
+                node.ifFalse = null
+                node.isAlwaysTrue = false
+            }
+        }
+    }
+
+    private fun trySolveLinearTree(): Boolean {
+        // todo don't skip getType
+        if (sig.name == "getType") return false // let's find an easier graph
+        return SolveLinearTree.solve(nodes, this)
+    }
+
     /**
      * transform all nodes into some nice if-else-tree
      * */
     fun joinNodes(): Builder {
+
+        if (printOps) {
+            println("\n${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
+        }
 
         val isLookingAtSpecial = false
         if (isLookingAtSpecial) {
@@ -888,8 +871,10 @@ class StructuralAnalysis(
 
         assertFalse(nodes.isEmpty())
         if (canReturnFirstNode()) {
-            return firstNode()
+            return firstNodeForReturn()
         }
+
+        calculateReturnNodes()
 
         for (node in nodes) {
             node.hasNoCode = node.calcHasNoCode()
@@ -902,8 +887,9 @@ class StructuralAnalysis(
 
         recalculateInputs()
         removeNodesWithoutInputs()
+
         removeNodesWithoutCode()
-        removeDuplicateNodes()
+        // removeDuplicateNodes()
         renumber(nodes)
 
         validateInputOutputStacks()
@@ -915,8 +901,10 @@ class StructuralAnalysis(
         checkState()
 
         if (canReturnFirstNode()) {
-            return firstNode()
+            return firstNodeForReturn()
         }
+
+        StackValidator.validateStack(nodes, methodTranslator)
 
         while (true) {
             var changed2 = false
@@ -938,17 +926,22 @@ class StructuralAnalysis(
                 if (changed2i) {
                     checkState()
                     if (canReturnFirstNode()) {
-                        return firstNode()
+                        return firstNodeForReturn()
                     }
                     changed2 = true
                 }
+            }
+
+            if (!changed2 && trySolveLinearTree()) {
+                assertTrue(canReturnFirstNode())
+                return firstNodeForReturn()
             }
 
             if (!changed2) {
                 if (printOps) printState()
                 assertFalse(isLookingAtSpecial, "Looking at something")
                 methodTranslator.localVariables1.add(LocalVariable("lbl", i32))
-                return createLargeSwitchStatement2(nodes)
+                return createLargeSwitchStatement2(nodes, this)
             }
         }
 
@@ -965,212 +958,14 @@ class StructuralAnalysis(
         // and there isn't any easy ends
     }
 
-    private fun normalizeGraph() {
-        var changed = false
-        // printState(, ::println)
-        for (node in nodes) {
-            if (node.isBranch) {
-                val ifTrue = labelToNode[node.ifTrue]!!
-                val ifFalse = node.ifFalse!!
-                if (ifTrue.index > ifFalse.index) {
-                    swapBranches(node, ifTrue, ifFalse)
-                    changed = true
-                }
-            }
-        }
-        // if (changed) printState(, ::println)
-    }
-
-    private fun swapBranches(node: Node, ifTrue: Node, ifFalse: Node) {
-        val printer = node.printer
-        // swap branches :)
-        node.ifTrue = ifFalse.label
-        node.ifFalse = ifTrue
-        // swap conditional
-        val lastInstr = printer.instrs.lastOrNull()
-        val invInstr = equalPairs[lastInstr]
-        if (invInstr != null) {
-            printer.instrs.removeLast()
-            printer.append(invInstr)
-        } else {
-            printer.append(I32EQZ)
-        }
-    }
-
-    private fun graphId(): String {
-        // return methodName(sig).shorten(50).toString() + ".txt"
-        if (false) normalizeGraph()
-        val builder = StringBuilder(nodes.size * 5)
-        for (node in nodes) {
-            builder.append(
-                when {
-                    node.isAlwaysTrue -> 'T'
-                    node.isReturn -> 'R'
-                    node.isBranch -> 'B'
-                    else -> 'N'
-                }
-            )
-            val a = labelToNode[node.ifTrue]?.index
-            val b = node.ifFalse?.index
-            if (a != null) builder.append(a)
-            if (b != null) {
-                if (a != null) builder.append('-')
-                builder.append(b)
-            }
-        }
-        val maxLength = 80
-        if (builder.length > maxLength) {
-            val hash = builder.toString().hashCode()
-            val extra = builder.substring(0, maxLength - 8)
-            builder.clear()
-            builder.append(extra)
-            builder.append('-')
-            builder.append(hash.toUInt().toString(16))
-        }
-        builder.append(".txt")
-        return builder.toString()
-    }
-
-    private fun renumber(nodes: List<Node>) {
-        if (printOps) println("renumbering:")
-        for (j in nodes.indices) {
-            val node = nodes[j]
-            // if (node.hasNoCode()) throw IllegalStateException()
-            if (printOps) println("${node.index} -> $j")
-            node.index = j
-        }
-    }
-
     private val stackVariables = HashSet<String>()
     fun getStackVarName(i: Int, type: String): String {
         val name = "s$i$type"
         if (stackVariables.add(name)) {
             methodTranslator.localVariables1.add(LocalVariable(name, type))
+            methodTranslator.localVarsWithParams.add(LocalVar("?", type, name, -1, false))
         }
         return name
-    }
-
-    private fun saveGraph(graphId: String) {
-        val fileLines = getFileLines(graphId)
-        if (fileLines.isEmpty()) {
-            val builder = StringBuilder()
-            builder.append(sig).append('\n')
-            builder.append(methodName(sig)).append('\n')
-            printState { builder.append(it).append('\n') }
-            File(folder, graphId).writeText(builder.toString())
-        } else {
-            val sigStr = sig.toString()
-            if (sigStr !in fileLines) {
-                FileOutputStream(File(folder, graphId), true).use {
-                    it.writeString(sigStr)
-                    it.write('\n'.code)
-                    it.writeString(methodName(sig))
-                    it.write('\n'.code)
-                }
-            }
-        }
-    }
-
-    private fun createLargeSwitchStatement2(nodes0: List<Node>): Builder {
-
-        val firstNode = nodes0.first()
-        val firstIsLinear = !firstNode.isBranch && firstNode.inputs.isEmpty()
-        val nodes = if (firstIsLinear) nodes0.subList(1, nodes0.size) else nodes0
-
-        renumber(nodes)
-
-        // create graph id
-        // to do store image of graph based on id
-        val graphId = graphId()
-        if (true) saveGraph(graphId)
-
-        val lblName = "lbl"
-        val lblSet = LocalSet(lblName)
-        val lblGet = LocalGet(lblName)
-
-        // create large switch-case-statement
-        // https://musteresel.github.io/posts/2020/01/webassembly-text-br_table-example.html
-
-        fun finishBlock(node: Node) {
-            val printer1 = node.printer
-            if (node.isReturn) {
-                printer1.append(Unreachable)
-            } else {
-                // todo if either one is exitNode, jump to end of switch() block
-                if (node.isBranch) {
-                    // set end label
-                    val trueIndex = labelToNode[node.ifTrue]!!.index
-                    val falseIndex = node.ifFalse!!.index
-                    printer1.append(
-                        IfBranch(
-                            listOf(i32Const(trueIndex)),
-                            listOf(i32Const(falseIndex)),
-                            emptyList(), listOf(i32)
-                        )
-                    ).append(lblSet)
-                } else {
-                    // set end label
-                    val next = labelToNode[node.next]!!.index
-                    printer1.append(i32Const(next)).append(lblSet)
-                }
-                // store stack
-                val outputs = node.outputStack
-                if (!outputs.isNullOrEmpty()) {
-                    if (comments) printer1.comment("store stack")
-                    for ((idx, type) in outputs.withIndex().reversed()) {
-                        printer1.append(LocalSet(getStackVarName(idx, type)))
-                    }
-                }
-            }
-        }
-
-        val loopIdx = loopIndex++
-        val loopName = "b$loopIdx"
-
-        val printer = Builder()
-        if (firstIsLinear) {
-            if (comments) printer.comment("execute -1")
-            finishBlock(firstNode)
-            printer.append(firstNode.printer)
-        } else {
-            printer
-                .append(i32Const(nodes.first().index))
-                .append(lblSet)
-        }
-
-        printer.comment("#$graphId")
-
-        fun appendBlock(node: Node) {
-            // load stack
-            val inputs = node.inputStack
-            if (!inputs.isNullOrEmpty()) {
-                val pre = Builder()
-                if (comments) pre.comment("load stack")
-                for (idx in inputs.indices) {
-                    val type = inputs[idx]
-                    pre.append(LocalGet(getStackVarName(idx, type)))
-                }
-                node.printer.prepend(pre)
-            }
-            // execute
-            if (comments) node.printer.prepend(Comment("execute ${node.index}"))
-            finishBlock(node)
-            // close block
-            node.printer.append(Jump(loopName))
-        }
-
-        for (node in nodes) {
-            appendBlock(node)
-        }
-
-        // good like that???
-        val switch = SwitchCase(lblName, nodes.map { it.printer.instrs })
-        printer.append(LoopInstr(loopName, listOf(switch), emptyList()))
-
-        // close loop
-        printer.append(Unreachable)
-
-        return printer
     }
 }
 

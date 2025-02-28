@@ -1,9 +1,7 @@
 package utils
 
-import wasm.instr.BinaryInstruction
-import wasm.instr.Comment
-import wasm.instr.Const
-import wasm.instr.Instruction
+import translator.LocalVar
+import wasm.instr.*
 import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
@@ -102,6 +100,18 @@ class Builder(capacity: Int = 16) {
 
     fun clear() {
         instrs.clear()
+    }
+
+    fun dupI32(tmp: LocalVar): Builder {
+        val lastInstr = instrs.lastOrNull()
+        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is Const) {
+            append(lastInstr)
+        } else {
+            append(tmp.localSet)
+            append(tmp.localGet)
+            append(tmp.localGet)
+        }
+        return this
     }
 
     override fun equals(other: Any?): Boolean {

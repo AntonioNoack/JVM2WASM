@@ -18,8 +18,8 @@ class Node(val label: Label) {
     val next get() = if (isAlwaysTrue) ifTrue else ifFalse?.label
     val isBranch get() = ifTrue != null && ifFalse != null && !isAlwaysTrue
 
-    var inputStack: List<String>? = null
-    var outputStack: List<String>? = null
+    var inputStack: List<String> = emptyList()
+    var outputStack: List<String> = emptyList()
 
     var printer = Builder()
 

@@ -21,6 +21,9 @@ import kotlin.math.sin
 
 const val api = ASM9
 
+// todo calculate dependency-tree from static initialization,
+//  and call that once at the start, and then never again
+
 // optimizations:
 // done when there is no child implementations for a non-final, non-static function, call it directly
 // todo also track, which methods theoretically can throw errors: mark them, and all their callers; -> optimization
@@ -57,6 +60,8 @@ var exportHelpers = exportAll
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
+var crashOnAllExceptions = true // todo supported this
+val anyMethodThrows = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
@@ -68,8 +73,6 @@ var checkIntDivisions = false
 
 var useUTF8Strings = false // doesn't work with the compiler yet
 var replaceStringInternals = true // another way for UTF-8 strings
-
-var crashOnAllExceptions = false // todo not yet supported
 
 var crashInStatic = false // crashes at runtime :/
 val byteStrings = useUTF8Strings || replaceStringInternals
@@ -442,6 +445,7 @@ fun jvm2wasm() {
     ptr = appendStaticInstanceTable(dataPrinter, ptr, numClasses)
     stringStart = ptr
 
+    appendNativeHelperFunctions()
     translateMethods(classesToLoad, ::filterClass)
     buildSyntheticMethods()
 
@@ -463,7 +467,6 @@ fun jvm2wasm() {
     // must come after invoke dynamic
     appendDynamicFunctionTable(dataPrinter, implementedMethods) // idx -> function
     appendFunctionTypes(dataPrinter)
-    appendNativeHelperFunctions()
 
     val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
 

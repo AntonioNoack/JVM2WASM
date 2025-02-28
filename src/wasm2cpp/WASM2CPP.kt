@@ -267,11 +267,7 @@ fun writeCluster(
 ) {
     writer.append("#include \"jvm2wasm-base.h\"\n\n")
     defineFunctionHeads(clustering.imports)
-    try {
-        defineFunctionImplementations(clustering.functions, globals, functionsByName)
-    } catch (e: Throwable) {
-        e.printStackTrace()
-    }
+    defineFunctionImplementations(clustering.functions, globals, functionsByName)
     getClusterFile(i).writeBytes(writer.values, 0, writer.size)
     writer.clear()
 }

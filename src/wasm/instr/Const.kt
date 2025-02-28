@@ -2,7 +2,7 @@ package wasm.instr
 
 data class Const(val type: ConstType, val value: Number) : Instruction {
 
-    override fun toString(): String = "${type.name1}.const $value"
+    override fun toString(): String = "${type.wasmType}.const $value"
 
     companion object {
 

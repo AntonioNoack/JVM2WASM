@@ -7,6 +7,8 @@ data class IfBranch(
     val params: List<String>, val results: List<String>
 ) : Instruction {
 
+    constructor(ifTrue: List<Instruction>) : this(ifTrue, emptyList(), emptyList(), emptyList())
+
     override fun toString(): String {
         val builder = StringBuilder2()
         toString(0, builder)

@@ -81,6 +81,11 @@ fun split2(d: String, generics: Boolean = false): List<String> {
     return base
 }
 
+fun split3(d: String, generics: Boolean = false): List<String> {
+    val ix = d.lastIndexOf(')')
+    return split1(d.substring(1, ix), generics) as ArrayList
+}
+
 fun genericsTypes(sig: MethodSig): String {
     return genericsTypes(sig.descriptor, sig in hIndex.staticMethods)
 }
