@@ -14,11 +14,25 @@ import wasm.instr.Instructions.Unreachable
 
 object LargeSwitchStatement {
 
+    private fun filterFirstIsLinear(nodes: List<GraphingNode>): List<GraphingNode> {
+        val firstNode = nodes.first() as SequenceNode
+        // make sure that the node that follows the first one is the first node of the "tree"
+        //  otherwise, our C++ logic "skips" the first goto, which is terrible
+        val nextNode = firstNode.next
+        val dst = ArrayList<GraphingNode>(nodes.size - 1)
+        dst.add(nextNode)
+        for (i in 1 until nodes.size) {
+            val node = nodes[i]
+            if (node != nextNode) dst.add(node)
+        }
+        return dst
+    }
+
     fun createLargeSwitchStatement2(sa: StructuralAnalysis): Builder {
         val nodes0 = sa.nodes
         val firstNode = nodes0.first()
         val firstIsLinear = !firstNode.isBranch && firstNode.inputs.isEmpty()
-        val nodes = if (firstIsLinear) nodes0.subList(1, nodes0.size) else nodes0
+        val nodes = if (firstIsLinear) filterFirstIsLinear(nodes0) else nodes0
 
         renumber(nodes)
         if (firstIsLinear) firstNode.index = nodes.size
