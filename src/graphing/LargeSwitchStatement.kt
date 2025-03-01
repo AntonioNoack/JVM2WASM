@@ -3,7 +3,9 @@ package graphing
 import graphing.SaveGraph.graphId
 import graphing.SaveGraph.saveGraph
 import graphing.StructuralAnalysis.Companion.comments
+import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
+import me.anno.utils.assertions.assertFail
 import utils.Builder
 import utils.i32
 import wasm.instr.*
@@ -12,18 +14,27 @@ import wasm.instr.Instructions.Unreachable
 
 object LargeSwitchStatement {
 
-    fun createLargeSwitchStatement2(nodes0: List<Node>, sa: StructuralAnalysis): Builder {
-
+    fun createLargeSwitchStatement2(sa: StructuralAnalysis): Builder {
+        val nodes0 = sa.nodes
         val firstNode = nodes0.first()
         val firstIsLinear = !firstNode.isBranch && firstNode.inputs.isEmpty()
         val nodes = if (firstIsLinear) nodes0.subList(1, nodes0.size) else nodes0
 
         renumber(nodes)
+        if (firstIsLinear) firstNode.index = nodes.size
+
+        if (sa.isLookingAtSpecial) {
+            printState(nodes0, "Before GraphID")
+        }
 
         // create graph id
         // to do store image of graph based on id
         val graphId = graphId(sa)
         if (true) saveGraph(graphId, sa)
+
+        if (sa.isLookingAtSpecial) {
+            println(graphId)
+        }
 
         val lblName = "lbl"
         val lblSet = LocalSet(lblName)
@@ -31,16 +42,14 @@ object LargeSwitchStatement {
         // create large switch-case-statement
         // https://musteresel.github.io/posts/2020/01/webassembly-text-br_table-example.html
 
-        fun finishBlock(node: Node) {
+        fun finishBlock(node: GraphingNode) {
             val printer1 = node.printer
-            if (node.isReturn) {
-                printer1.append(Unreachable)
-            } else {
-                // todo if either one is exitNode, jump to end of switch() block
-                if (node.isBranch) {
+            when (node) {
+                is ReturnNode -> printer1.append(Unreachable)
+                is BranchNode -> {
                     // set end label
-                    val trueIndex = sa.labelToNode[node.ifTrue]!!.index
-                    val falseIndex = node.ifFalse!!.index
+                    val trueIndex = node.ifTrue.index
+                    val falseIndex = node.ifFalse.index
                     printer1.append(
                         IfBranch(
                             listOf(i32Const(trueIndex)),
@@ -48,13 +57,17 @@ object LargeSwitchStatement {
                             emptyList(), listOf(i32)
                         )
                     ).append(lblSet)
-                } else {
-                    // set end label
-                    val next = sa.labelToNode[node.next]!!.index
-                    printer1.append(i32Const(next)).append(lblSet)
+                    // store stack
+                    storeStack(node, sa)
                 }
-                // store stack
-                storeStack(node, sa)
+                is SequenceNode -> {
+                    // set end label
+                    val next = node.next.index
+                    printer1.append(i32Const(next)).append(lblSet)
+                    // store stack
+                    storeStack(node, sa)
+                }
+                else -> assertFail()
             }
         }
 
@@ -74,7 +87,7 @@ object LargeSwitchStatement {
 
         printer.comment("#$graphId")
 
-        fun appendBlock(node: Node) {
+        fun appendBlock(node: GraphingNode) {
             // load stack
             loadStack(node, sa)
             // execute
@@ -98,27 +111,25 @@ object LargeSwitchStatement {
         return printer
     }
 
-    fun loadStack(node: Node, sa: StructuralAnalysis) {
+    fun loadStack(node: GraphingNode, sa: StructuralAnalysis) {
         val inputs = node.inputStack
-        if (true || inputs.isNotEmpty()) {
-            val pre = Builder()
-            if (comments) pre.comment("load stack $inputs")
-            for (idx in inputs.indices) {
-                val type = inputs[idx]
-                pre.append(LocalGet(sa.getStackVarName(idx, type)))
-            }
-            node.printer.prepend(pre)
+        if (inputs.isEmpty()) return
+        val pre = Builder()
+        if (comments) pre.comment("load stack $inputs")
+        for (idx in inputs.indices) {
+            val type = inputs[idx]
+            pre.append(LocalGet(sa.getStackVarName(idx, type)))
         }
+        node.printer.prepend(pre)
     }
 
-    fun storeStack(node: Node, sa: StructuralAnalysis) {
+    fun storeStack(node: GraphingNode, sa: StructuralAnalysis) {
         val outputs = node.outputStack
-        if (true || outputs.isNotEmpty()) {
-            val printer = node.printer
-            if (comments) printer.comment("store stack $outputs")
-            for ((idx, type) in outputs.withIndex().reversed()) {
-                printer.append(LocalSet(sa.getStackVarName(idx, type)))
-            }
+        if (outputs.isEmpty()) return
+        val printer = node.printer
+        if (comments) printer.comment("store stack $outputs")
+        for ((idx, type) in outputs.withIndex().reversed()) {
+            printer.append(LocalSet(sa.getStackVarName(idx, type)))
         }
     }
 }

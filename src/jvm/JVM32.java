@@ -1171,6 +1171,7 @@ public class JVM32 {
     }
 
     @Export
+    @NoThrow
     @UsedIfIndexed
     @Alias(names = "init")
     public static void init() {

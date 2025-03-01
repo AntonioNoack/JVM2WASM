@@ -88,6 +88,7 @@ public class Engine {
     }
 
     @Export
+    @NoThrow
     @SuppressWarnings("ConfusingMainMethod")
     public static void main(String clazzName) {
 
@@ -146,6 +147,7 @@ public class Engine {
     }
 
     @Export
+    @NoThrow
     public static void update(int width, int height, float dt) {
         window.setWidth(width);
         window.setHeight(height);

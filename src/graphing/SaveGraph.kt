@@ -2,8 +2,9 @@ package graphing
 
 import graphing.StructuralAnalysis.Companion.equalPairs
 import graphing.StructuralAnalysis.Companion.folder
+import graphing.StructuralAnalysis.Companion.printState
 import me.anno.io.Streams.writeString
-import org.objectweb.asm.Label
+import me.anno.utils.assertions.assertFalse
 import utils.methodName
 import wasm.instr.Instructions.I32EQZ
 import java.io.File
@@ -20,11 +21,12 @@ object SaveGraph {
         }
     }
 
-    private fun normalizeGraph(nodes: MutableList<Node>, labelToNode: Map<Label, Node>) {
-        for (node in nodes) {
-            if (node.isBranch) {
-                val ifTrue = labelToNode[node.ifTrue]!!
-                val ifFalse = node.ifFalse!!
+    private fun normalizeGraph(nodes: MutableList<GraphingNode>) {
+        for (i in nodes.indices) {
+            val node = nodes[i]
+            if (node is BranchNode) {
+                val ifTrue = node.ifTrue
+                val ifFalse = node.ifFalse
                 if (ifTrue.index > ifFalse.index) {
                     swapBranches(node, ifTrue, ifFalse)
                 }
@@ -32,10 +34,10 @@ object SaveGraph {
         }
     }
 
-    private fun swapBranches(node: Node, ifTrue: Node, ifFalse: Node) {
+    private fun swapBranches(node: BranchNode, ifTrue: GraphingNode, ifFalse: GraphingNode) {
         val printer = node.printer
         // swap branches :)
-        node.ifTrue = ifFalse.label
+        node.ifTrue = ifFalse
         node.ifFalse = ifTrue
         // swap conditional
         val lastInstr = printer.instrs.lastOrNull()
@@ -50,26 +52,27 @@ object SaveGraph {
 
     fun graphId(sa: StructuralAnalysis): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
-        if (false) normalizeGraph(sa.nodes, sa.labelToNode)
+        if (false) normalizeGraph(sa.nodes)
         val nodes = sa.nodes
         val builder = StringBuilder(nodes.size * 5)
         for (node in nodes) {
             builder.append(
-                when {
-                    node.isAlwaysTrue -> 'T'
-                    node.isReturn -> 'R'
-                    node.isBranch -> 'B'
+                when (node) {
+                    is ReturnNode -> 'R'
+                    is BranchNode -> 'B'
                     else -> 'N'
                 }
             )
-            val a = sa.labelToNode[node.ifTrue]?.index
-            val b = node.ifFalse?.index
-            if (a != null) builder.append(a)
-            if (b != null) {
-                if (a != null) builder.append('-')
-                builder.append(b)
+            val nextNodes = node.outputs
+            for (i in nextNodes.indices) {
+                if (i > 0) builder.append('-')
+                builder.append(nextNodes[i].index)
             }
         }
+        assertFalse(
+            builder.startsWith("R"),
+            "First node shouldn't be return in LargeSwitchStatement, because that would be trivial"
+        )
         val maxLength = 80
         if (builder.length > maxLength) {
             val hash = builder.toString().hashCode()
@@ -89,7 +92,7 @@ object SaveGraph {
             val builder = StringBuilder()
             builder.append(sa.sig).append('\n')
             builder.append(methodName(sa.sig)).append('\n')
-            sa.printState { builder.append(it).append('\n') }
+            printState(sa.nodes) { builder.append(it).append('\n') }
             File(folder, graphId).writeText(builder.toString())
         } else {
             val sigStr = sa.sig.toString()

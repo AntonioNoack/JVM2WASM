@@ -9,6 +9,10 @@ import wasm.instr.Instructions.Unreachable
 // typealias Builder = StringBuilder2
 class Builder(capacity: Int = 16) {
 
+    constructor(instr: Instruction) : this(1) {
+        append(instr)
+    }
+
     val instrs = ArrayList<Instruction>(capacity)
     val length get() = instrs.size
 
@@ -120,5 +124,9 @@ class Builder(capacity: Int = 16) {
 
     override fun hashCode(): Int {
         return instrs.hashCode()
+    }
+
+    override fun toString(): String {
+        return instrs.joinToString("\n")
     }
 }

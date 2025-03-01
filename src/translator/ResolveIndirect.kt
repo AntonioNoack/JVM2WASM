@@ -171,6 +171,7 @@ object ResolveIndirect {
             checkNotNull0(owner, name, getCaller)
 
             if (numTests < 3) {
+                printer.comment("small pyramid")
                 printCallPyramid(printer)
             } else {
                 val helperName = "tree_${sig0.toString().escapeChars()}"

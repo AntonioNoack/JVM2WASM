@@ -25,19 +25,6 @@ object GeneratorIndex {
     val dataStart = 64
     var stringStart = -1
 
-    private fun code(type: String) = when (type) {
-        i32 -> 0
-        i64 -> 1
-        f32 -> 2
-        f64 -> 3
-        else -> throw IllegalArgumentException(type)
-    }
-
-    fun tri(a: String, b: String, c: String) = tri(code(a), code(b), code(c))
-    fun tri(a: Int, b: Int, c: Int) = a + b * 4 + c * 16
-    fun pair(a: String, b: String) = pair(code(a), code(b))
-    fun pair(a: Int, b: Int) = a + b * 4
-
     // string -> index
     val stringSet = HashMap<String, Int>()
     var totalStringSize = 0

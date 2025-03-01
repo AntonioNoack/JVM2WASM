@@ -15,8 +15,8 @@ import dependency.ActuallyUsedIndex
 import enableTracing
 import exportAll
 import gIndex
-import graphing.Node
 import graphing.StackValidator
+import graphing.StackValidator.validateInputOutputStacks
 import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
@@ -33,8 +33,6 @@ import me.anno.utils.types.Strings.shorten
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass1
-import translator.GeneratorIndex.pair
-import translator.GeneratorIndex.tri
 import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
@@ -149,8 +147,8 @@ class MethodTranslator(
     private var resultType = 'V'
 
     private val startLabel = Label()
-    private val nodes = ArrayList<Node>()
-    private var currentNode = Node(startLabel)
+    private val nodes = ArrayList<TranslatorNode>()
+    private var currentNode = TranslatorNode(startLabel)
     var printer = currentNode.printer
 
     val sig = MethodSig.c(clazz, name, descriptor)
@@ -920,7 +918,7 @@ class MethodTranslator(
                 if (comments) {
                     printer.comment(
                         "\"" + value.shorten(100)
-                            .filter { it in '0'..'9' || it in 'a'..'z' || it in 'A'..'Z' || it in ".,-!%/()={[]}" }
+                            .filter { it in '0'..'9' || it in 'a'..'z' || it in 'A'..'Z' || it in " .,-!%/()={[]}" }
                             .toString() + "\""
                     )
                 }
@@ -1389,7 +1387,7 @@ class MethodTranslator(
                 val throwable = findOrDefineLocalVar(thIndex--, ptrType)
                 printer.append(throwable.localSet).comment("multiple/complex catchers")
 
-                var handler = Node(Label())
+                var handler = TranslatorNode(Label())
                 nodes.add(handler)
 
                 if (mustThrow) {
@@ -1425,7 +1423,7 @@ class MethodTranslator(
                         if (comments) handler.printer.comment("handler #$i/${catchers.size}/$throwable")
 
                         // actual branch
-                        val nextHandler = Node(Label())
+                        val nextHandler = TranslatorNode(Label())
                         nodes.add(nextHandler)
                         handler.ifFalse = nextHandler
                         handler.ifTrue = catcher.handler
@@ -1434,7 +1432,6 @@ class MethodTranslator(
                         nextHandler.inputStack = listOf(ptrType)
                         nextHandler.outputStack = listOf(ptrType)
                     }
-
                 }
 
                 // handle if all failed: throw error
@@ -1466,7 +1463,7 @@ class MethodTranslator(
 
                     printer.comment("maybe throwing single generic catcher")
 
-                    val mainHandler = Node(Label())
+                    val mainHandler = TranslatorNode(Label())
                     val throwable = findOrDefineLocalVar(thIndex--, ptrType)
 
                     if (printOps) println("--- handler: ${mainHandler.label}")
@@ -1501,7 +1498,7 @@ class MethodTranslator(
         }
     }
 
-    private fun returnIfThrowable(mustThrow: Boolean, currentNode: Node = this.currentNode) {
+    private fun returnIfThrowable(mustThrow: Boolean, currentNode: TranslatorNode = this.currentNode) {
         val printer = currentNode.printer
         if (mustThrow) {
             if (resultType != 'V') {
@@ -1613,13 +1610,13 @@ class MethodTranslator(
         when (opcode) {
             0x15, in 0x1a..0x1d -> printer.push(i32) // iload
             0x16, in 0x1e..0x21 -> printer.push(i64) // lload
-            0x17, in 0x22..0x25 -> printer.push(f32)
-            0x18, in 0x26..0x29 -> printer.push(f64)
+            0x17, in 0x22..0x25 -> printer.push(f32) // fload
+            0x18, in 0x26..0x29 -> printer.push(f64) // dload
             0x19, in 0x2a..0x2d -> printer.push(ptrType) // aload
-            0x36, in 0x3b..0x3e -> printer.pop(i32)
-            0x37, in 0x3f..0x42 -> printer.pop(i64)
-            0x38, in 0x43..0x46 -> printer.pop(f32)
-            0x39, in 0x47..0x4a -> printer.pop(f64)
+            0x36, in 0x3b..0x3e -> printer.pop(i32) // istore
+            0x37, in 0x3f..0x42 -> printer.pop(i64) // lstore
+            0x38, in 0x43..0x46 -> printer.pop(f32) // fstore
+            0x39, in 0x47..0x4a -> printer.pop(f64) // dstore
             0x3a, in 0x4b..0x4e -> printer.pop(ptrType) // astore
             else -> assertFail()
         }
@@ -1672,7 +1669,7 @@ class MethodTranslator(
                 stackPop()
                 if (anyMethodThrows) handleThrowable()
             }
-            else -> throw NotImplementedError()
+            else -> assertFail()
         }
     }
 
@@ -1680,16 +1677,16 @@ class MethodTranslator(
         visitLabel(label, false)
     }
 
-    private fun visitLabel(label: Label, alwaysTrue: Boolean) {
+    private fun visitLabel(label: Label, findStackManually: Boolean) {
 
         val currNode = currentNode
-        val nextNode = Node(label)
+        val nextNode = TranslatorNode(label)
 
         currNode.outputStack = ArrayList(stack)
 
-        if (alwaysTrue/* || (currNode.hasNoCode())*/) {
+        var found = false
+        if (findStackManually/* || (currNode.hasNoCode())*/) {
             // find whether we had a good candidate in the past
-            var found = false
             for (node in nodes) { // O(n²) -> potentially very slow :/
                 if (node.ifTrue == label || node.ifFalse?.label == label) {
                     nextNode.inputStack = node.outputStack
@@ -1700,11 +1697,10 @@ class MethodTranslator(
                     break
                 }
             }
-            if (!found) {
-                // println("didn't find $label :/")
-                nextNode.inputStack = ArrayList(stack)
-            }
-        } else {
+            // if (!found) println("didn't find $label :/")
+        }
+
+        if (!found) {
             nextNode.inputStack = ArrayList(stack)
         }
 
@@ -2009,8 +2005,12 @@ class MethodTranslator(
 
     override fun visitEnd() {
         if (!isAbstract) {
+            for (node in nodes) {
+                node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
+            }
+            val nodes = TranslatorNode.convertNodes(nodes)
+            validateInputOutputStacks(nodes, sig)
             if (true) {
-                for (node in nodes) node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
                 StackValidator.validateStack(nodes, this)
             }
             val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()

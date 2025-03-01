@@ -1,10 +1,12 @@
 package graphing
 
 import canThrowError
+import graphing.StructuralAnalysis.Companion.printState
 import hierarchy.HierarchyIndex
 import hierarchy.HierarchyIndex.methodAliases
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
@@ -77,18 +79,21 @@ object StackValidator {
         return this
     }
 
-    fun validateStack(nodes: List<Node>, sa: MethodTranslator) {
-        val returnTypes = getReturnTypes(sa.sig)
+    /**
+     * relatively expensive validation function to check whether all stack-operations add up
+     * */
+    fun validateStack(nodes: List<GraphingNode>, mt: MethodTranslator) {
+        val returnTypes = getReturnTypes(mt.sig)
         // println("Validating stack ${sa.sig} -> $returnTypes")
         for (node in nodes) {
             validateStack2(
-                sa.sig, node.printer, node.inputStack,
+                mt.sig, node.printer, node.inputStack,
                 when {
                     node.isReturn -> returnTypes
                     node.isBranch -> node.outputStack + listOf(i32)
                     else -> node.outputStack
                 }, returnTypes,
-                sa.localVarsWithParams
+                mt.localVarsWithParams
             )
         }
     }
@@ -108,10 +113,13 @@ object StackValidator {
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        // println("Validating stack ${sig.name}/$params -> $normalResults/$returnResults")
+        val print = false
+        if (print) println("Validating stack ${sig.name}/$params -> $normalResults/$returnResults")
         val stack = ArrayList(params)
         for (i in instructions) {
-            // println("  $stack, $i")
+            if (print && i !is IfBranch && i !is LoopInstr && i !is SwitchCase) {
+                println("  $stack, $i")
+            }
             when (i) {
                 is LocalGet -> stack.push(
                     localVarTypes[i.name]
@@ -237,7 +245,7 @@ object StackValidator {
                     listOf(jvm2wasm1(descriptor[ix + 1]))
                 } else emptyList()
             }
-            else -> throw NotImplementedError()
+            else -> assertFail()
         }
     }
 
@@ -245,7 +253,7 @@ object StackValidator {
         return when (func) {
             is FunctionImpl -> false // helper function
             is MethodSig -> func !in HierarchyIndex.staticMethods
-            else -> throw NotImplementedError()
+            else -> assertFail()
         }
     }
 
@@ -253,7 +261,7 @@ object StackValidator {
         return when (func) {
             is FunctionImpl -> false // helper function
             is MethodSig -> canThrowError(func)
-            else -> throw NotImplementedError()
+            else -> assertFail()
         }
     }
 
@@ -264,5 +272,25 @@ object StackValidator {
             if (end[i] != this[i + offset]) return false
         }
         return true
+    }
+
+    fun validateInputOutputStacks(nodes: List<GraphingNode>, sig: MethodSig) {
+        // check input- and output stacks
+        val illegals = ArrayList<String>()
+        for (node in nodes) {
+            for (next in node.outputs) {
+                val outputStack = node.outputStack
+                if (next.inputStack != outputStack) {
+                    illegals += ("$outputStack != ${next.inputStack}, ${node.index} -> ${next.index}")
+                }
+            }
+        }
+        if (illegals.isNotEmpty()) {
+            printState(nodes, "Illegal")
+            for (ill in illegals) {
+                System.err.println(ill)
+            }
+            throw IllegalStateException("Illegal node in $sig")
+        }
     }
 }

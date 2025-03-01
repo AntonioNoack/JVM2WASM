@@ -28,7 +28,7 @@ i64 r64(i32);
 void w16(i32,i32);
 void w32(i32,i32);
 i32 findClass(i32);
-i32 runRunnable(i32);
+roid runRunnable(i32);
 void parallelGC0();
 void parallelGC1();
 void parallelGC2();
@@ -36,25 +36,39 @@ void concurrentGC0();
 i32 concurrentGC1();
 void initFunctionTable();
 void gc();
-// todo it would be nice to make this NoThrow, so in the future, we can abort on all exceptions
-i32i32 java_lang_Class_getName_Ljava_lang_String(i32);
-i32 engine_Engine_keyModState_IV(i32);
-i32 engine_Engine_keyUp_IV(i32);
-i32 engine_Engine_keyDown_IV(i32);
-i32 engine_Engine_keyTyped_IV(i32);
-i32 engine_Engine_mouseUp_IV(i32);
-i32 engine_Engine_mouseDown_IV(i32);
-i32 engine_Engine_mouseMove_FFV(f32,f32);
-i32 engine_Engine_mouseWheel_FFV(f32,f32);
-i32 engine_Engine_charTyped_IIV(i32,i32);
-i32 java_lang_Throwable_printStackTrace_V(i32);
-i32 engine_Engine_update_IIFV(i32, i32, f32);
-i32 new_java_lang_Throwable_V(i32);
-i32 finishTexture(i32, i32, i32, i32);
-i32i32 createInstance(i32);
-i32 prepareTexture(i32);
-i32 engine_Engine_main_Ljava_lang_StringV(i32);
-i32 init();
+
+#ifdef NO_ERRORS
+#define r32 i32
+#define r64 i64
+#define roid void
+#define RET_VOID
+#define RET_NULL 0
+#else
+#define r32 i32i32
+#define r64 i64i32
+#define roid i32
+#define RET_VOID 0
+#define RET_NO_ERR {}
+#endif
+
+r32 java_lang_Class_getName_Ljava_lang_String(i32);
+r32 createInstance(i32);
+roid engine_Engine_keyModState_IV(i32);
+roid engine_Engine_keyUp_IV(i32);
+roid engine_Engine_keyDown_IV(i32);
+roid engine_Engine_keyTyped_IV(i32);
+roid engine_Engine_mouseUp_IV(i32);
+roid engine_Engine_mouseDown_IV(i32);
+roid engine_Engine_mouseMove_FFV(f32,f32);
+roid engine_Engine_mouseWheel_FFV(f32,f32);
+roid engine_Engine_charTyped_IIV(i32,i32);
+roid java_lang_Throwable_printStackTrace_V(i32);
+roid engine_Engine_update_IIFV(i32, i32, f32);
+roid new_java_lang_Throwable_V(i32);
+roid finishTexture(i32, i32, i32, i32);
+roid prepareTexture(i32);
+roid engine_Engine_main_Ljava_lang_StringV(i32);
+roid init();
 
 // todo implement that variable and parameter names are kept as far as possible in C++ code
 
@@ -188,7 +202,11 @@ void printClassStatistics() {
         auto [count, classIndex] = indexed_values[i];
         if (count == 0) break;
         i32 clazz = findClass(classIndex);
+        #ifdef NO_ERRORS
+        i32 clazzName = java_lang_Class_getName_Ljava_lang_String(clazz);
+        #else
         i32 clazzName = java_lang_Class_getName_Ljava_lang_String(clazz).v0;
+        #endif
         std::cout << count << "x " << strToCpp(clazzName) << std::endl;
     }
     std::cout << std::endl;
@@ -389,7 +407,7 @@ i32 fcmpl(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 
 i32 engine_Engine_fillURL_ACI(i32) { return 0; }
 
-i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(
+roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(
     i32 pathPtr, i32 texturePtr, i32 callback
 ) {
     std::string path = strToCpp(pathPtr);
@@ -406,7 +424,7 @@ i32 engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2
         std::cout << "Image Size: undefined" << std::endl;
         finishTexture(0, -1, -1, callback);
     }
-    return 0;
+    return RET_VOID;
 }
 void engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFV(
     i32 fontName, f32 fontSize, i32 text0, i32 width, i32 height, i32 depth, i32 textColor, i32 backgroundColor, f32 y0
@@ -418,11 +436,6 @@ i32 engine_TextGen_measureText1_Ljava_lang_StringFLjava_lang_StringI(
     i32 fontName, f32 fontSize, i32 text
 ) { return 0; }
 
-i32 java_io_BufferedInputStream_fill_V(i32) { return 0; }
-i32 java_io_RandomAccessFile_close0_V(i32) { return 0; }
-i32 java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return 0; }
-i32 java_io_RandomAccessFile_seek0_JV(i32, i64) { return 0; }
-i32 java_io_RandomAccessFile_writeBytes_ABIIV(i32, i32, i32, i32) { return 0; }
 i32 java_lang_Math_round_FI(f32 x) { return (i32) std::round(x); }
 f64 java_lang_StrictMath_acos_DD(f64 x) { return std::acos(x); }
 f64 java_lang_StrictMath_asin_DD(f64 x) { return std::asin(x); }
@@ -455,7 +468,7 @@ i32 arrayLength(i32 instance) {
     return r32(instance + objectOverhead);
 }
 
-i32 java_lang_Thread_setNativeName_Ljava_lang_StringV(i32, i32) { return 0; }
+roid java_lang_Thread_setNativeName_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
 
 void jvm_JavaThrowable_printStackTraceEnd_V() {}
 void jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV(i32 name, i32 message) {
@@ -484,11 +497,11 @@ void jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV(
     printStackTraceLine(1, clazz, method, line, true);
 }
 
-i32 java_text_SimpleDateFormat_subFormat_IILjava_text_FormatXFieldDelegateLjava_lang_StringBufferZV(i32, i32, i32, i32, i32, i32) { return 0; }
-i32 java_util_zip_Deflater_end_JV(i64) { return 0; }
-i32 java_util_zip_Deflater_initIDs_V() { return 0; }
-i32 java_util_zip_Inflater_end_JV(i64) { return 0; }
-i32 java_util_zip_Inflater_initIDs_V() { return 0; }
+roid java_text_SimpleDateFormat_subFormat_IILjava_text_FormatXFieldDelegateLjava_lang_StringBufferZV(i32, i32, i32, i32, i32, i32) { return RET_VOID; }
+roid java_util_zip_Deflater_end_JV(i64) { return RET_VOID; }
+roid java_util_zip_Deflater_initIDs_V() { return RET_VOID; }
+roid java_util_zip_Inflater_end_JV(i64) { return RET_VOID; }
+roid java_util_zip_Inflater_initIDs_V() { return RET_VOID; }
 
 std::vector<void*> garbageWhileGC;
 i32 jvm_JVM32_getAllocatedSize_I() { return allocatedSize; }
@@ -649,76 +662,73 @@ void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstAr
     w32(dstArray + arrayOverhead, dst);
 }
 
-
-i32 kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return 0; }
 i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
-i32 me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return 0; }
-i32 new_java_text_SimpleDateFormat_V(i32) { return 0; }
-i32 new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return 0; }
-#if 0
-void static_java_io_BufferedInputStream_V() { }
-void static_java_lang_reflect_AccessibleObject_V() { }
-void static_java_util_Date_V() { }
-void static_java_util_Formatter_V() { }
-void static_me_anno_audio_AudioFXCache_V() { }
-void static_me_anno_video_formats_gpu_GPUFrame_V() { }
-#else
-i32 static_java_io_BufferedInputStream_V() { return 0; }
-i32 static_java_lang_reflect_AccessibleObject_V() { return 0; }
-i32 static_java_util_Date_V() { return 0; }
-i32 static_java_util_Formatter_V() { return 0; }
-i32 static_me_anno_audio_AudioFXCache_V() { return 0; }
-i32 static_me_anno_video_formats_gpu_GPUFrame_V() { return 0; }
-#endif
-i32i32 java_lang_Class_copyConstructors_ALjava_lang_reflect_ConstructorALjava_lang_reflect_Constructor(i32) { return {}; }
-i32i32 java_lang_Class_getDeclaredConstructors0_ZALjava_lang_reflect_Constructor(i32, i32) { return { }; }
-i32i32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { return { }; }
-i32i32 java_lang_Class_getModifiers_I(i32) { return { }; }
-i32i32 java_lang_Class_getName0_Ljava_lang_String(i32) { return { }; }
-i32i32 java_lang_Class_isInterface_Z(i32) { return { }; }
-i32i32 java_lang_Thread_holdsLock_Ljava_lang_ObjectZ(i32) { return { }; }
-i32i32 java_lang_Thread_isAlive_Z(i32) { return { }; }
-i32i32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return { }; }
-i32i32 java_lang_reflect_Field_acquireFieldAccessor_ZLsun_reflect_FieldAccessor(i32, i32) { return { }; }
-i32i32 java_text_DateFormatSymbols_getProviderInstance_Ljava_util_LocaleLjava_text_DateFormatSymbols(i32) { return { }; }
-i32i32 java_text_DecimalFormatSymbols_getInstance_Ljava_util_LocaleLjava_text_DecimalFormatSymbols(i32) { return { }; }
-i32i32 java_text_NumberFormat_getInstance_Ljava_util_LocaleILjava_text_NumberFormat(i32, i32) { return { }; }
-i32i32 java_util_Date_clone_Ljava_lang_Object(i32) { return { }; }
-i64i32 java_util_Date_getMillisOf_Ljava_util_DateJ(i32) { return { }; }
-i64i32 java_util_Date_getTimeImpl_J(i32) { return { }; }
-i32i32 java_util_Date_toString_Ljava_lang_String(i32) { return { }; }
-i32i32 java_util_Formatter_parse_Ljava_lang_StringALjava_util_FormatterXFormatString(i32, i32) { return { }; }
-i32i32 java_util_Properties_isEmpty_Z(i32) { return { }; }
-i32i32 java_util_zip_Deflater_deflateBytes_JABIIII(i32, i64, i32, i32, i32, i32) { return { }; }
-i64i32 java_util_zip_Deflater_init_IIZJ(i32, i32, i32) { return { }; }
-i32i32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { return { }; }
-i64i32 java_util_zip_Inflater_init_ZJ(i32) { return { }; }
-i32i32 jvm_custom_File_isAbsolute_Z(i32) { return { }; }
-// i32i32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return { }; }
-i32i32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return { }; }
-i32i32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return { }; }
-i32i32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return { }; }
-i32i32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return { }; }
-i32i32 me_anno_ecs_prefab_change_PathXCompanion_generateRandomId_Ljava_lang_String(i32) { return { }; }
-i64i32 org_lwjgl_system_JNI_invokePP_JIIJJ(i64, i32, i32, i64) { return { }; }
-i32i32 sun_reflect_Reflection_getClassAccessFlags_Ljava_lang_ClassI(i32) { return { }; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX1_Lme_anno_gpu_OSWindowJIJVxd26ac3d_address_J(i32) { return {}; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX2_Lme_anno_gpu_OSWindowJIIVxd26ac3d_address_J(i32) { return {}; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX3_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return {}; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX4_Lme_anno_gpu_OSWindowJIIIVxd26ac3d_address_J(i32) { return {}; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX5_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return {}; }
-i64i32 me_anno_input_Input_initForGLFWXlambdaX6_Lme_anno_gpu_OSWindowJIIIIVxd26ac3d_address_J(i32) { return {}; }
-i32i32 me_anno_ui_editor_stacked_StackPanel_getValue_Ljava_lang_Object(i32) { return {}; }
-i32i32 me_anno_ui_editor_stacked_StackPanel_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return {}; }
-i32i32 me_anno_ui_input_NumberInput_getValue_Ljava_lang_Object(i32) { return {}; }
-i32i32 me_anno_ui_input_NumberInput_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return {}; }
-i64i32 me_anno_gpu_WindowManagement_runRenderLoop0XlambdaX5_IIIIIJJVxv1311c2a2_address_J(i32) { return {}; }
-i32i32 java_util_TreeMapXPrivateEntryIterator_next_Ljava_lang_Object(i32) { return {}; }
-i32i32 java_util_WeakHashMapXHashIterator_next_Ljava_lang_Object(i32) { return {}; }
-i32i32 kotlin_collections_CharIterator_hasNext_Z(i32) { return {}; }
-i32 me_anno_io_base_BaseReader_readAllInList_V(i32) { return 0; }
-i32i32 kotlin_jvm_internal_MutablePropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return {}; }
-i32i32 kotlin_jvm_internal_PropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return {}; }
+roid kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return RET_VOID; }
+roid me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return RET_VOID; }
+roid new_java_text_SimpleDateFormat_V(i32) { return RET_VOID; }
+roid new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
+
+roid static_java_io_BufferedInputStream_V() { }
+roid static_java_lang_reflect_AccessibleObject_V() { }
+roid static_java_util_Date_V() { }
+roid static_java_util_Formatter_V() { }
+roid static_me_anno_audio_AudioFXCache_V() { }
+roid static_me_anno_video_formats_gpu_GPUFrame_V() { }
+
+roid java_io_BufferedInputStream_fill_V(i32) { return RET_VOID; }
+roid java_io_RandomAccessFile_close0_V(i32) { return RET_VOID; }
+roid java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return RET_VOID; }
+roid java_io_RandomAccessFile_seek0_JV(i32, i64) { return RET_VOID; }
+roid java_io_RandomAccessFile_writeBytes_ABIIV(i32, i32, i32, i32) { return RET_VOID; }
+r32 java_lang_Class_copyConstructors_ALjava_lang_reflect_ConstructorALjava_lang_reflect_Constructor(i32) { return RET_NULL; }
+r32 java_lang_Class_getDeclaredConstructors0_ZALjava_lang_reflect_Constructor(i32, i32) { return RET_NULL; }
+r32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { return RET_NULL; }
+r32 java_lang_Class_getModifiers_I(i32) { return RET_NULL; }
+r32 java_lang_Class_getName0_Ljava_lang_String(i32) { return RET_NULL; }
+r32 java_lang_Class_isInterface_Z(i32) { return RET_NULL; }
+r32 java_lang_Thread_holdsLock_Ljava_lang_ObjectZ(i32) { return RET_NULL; }
+r32 java_lang_Thread_isAlive_Z(i32) { return RET_NULL; }
+r32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return RET_NULL; }
+r32 java_lang_reflect_Field_acquireFieldAccessor_ZLsun_reflect_FieldAccessor(i32, i32) { return RET_NULL; }
+r32 java_text_DateFormatSymbols_getProviderInstance_Ljava_util_LocaleLjava_text_DateFormatSymbols(i32) { return RET_NULL; }
+r32 java_text_DecimalFormatSymbols_getInstance_Ljava_util_LocaleLjava_text_DecimalFormatSymbols(i32) { return RET_NULL; }
+r32 java_text_NumberFormat_getInstance_Ljava_util_LocaleILjava_text_NumberFormat(i32, i32) { return RET_NULL; }
+r32 java_util_Date_clone_Ljava_lang_Object(i32) { return RET_NULL; }
+r64 java_util_Date_getMillisOf_Ljava_util_DateJ(i32) { return RET_NULL; }
+r64 java_util_Date_getTimeImpl_J(i32) { return RET_NULL; }
+r32 java_util_Date_toString_Ljava_lang_String(i32) { return RET_NULL; }
+r32 java_util_Formatter_parse_Ljava_lang_StringALjava_util_FormatterXFormatString(i32, i32) { return RET_NULL; }
+r32 java_util_Properties_isEmpty_Z(i32) { return RET_NULL; }
+r32 java_util_zip_Deflater_deflateBytes_JABIIII(i32, i64, i32, i32, i32, i32) { return RET_NULL; }
+r64 java_util_zip_Deflater_init_IIZJ(i32, i32, i32) { return RET_NULL; }
+r32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { return RET_NULL; }
+r64 java_util_zip_Inflater_init_ZJ(i32) { return RET_NULL; }
+r32 jvm_custom_File_isAbsolute_Z(i32) { return RET_NULL; }
+// i32i32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
+r32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
+r32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return RET_NULL; }
+r32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return RET_NULL; }
+r32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return RET_NULL; }
+r32 me_anno_ecs_prefab_change_PathXCompanion_generateRandomId_Ljava_lang_String(i32) { return RET_NULL; }
+r64 org_lwjgl_system_JNI_invokePP_JIIJJ(i64, i32, i32, i64) { return RET_NULL; }
+i32 sun_reflect_Reflection_getClassAccessFlags_Ljava_lang_ClassI(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX1_Lme_anno_gpu_OSWindowJIJVxd26ac3d_address_J(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX2_Lme_anno_gpu_OSWindowJIIVxd26ac3d_address_J(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX3_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX4_Lme_anno_gpu_OSWindowJIIIVxd26ac3d_address_J(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX5_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return RET_NULL; }
+r64 me_anno_input_Input_initForGLFWXlambdaX6_Lme_anno_gpu_OSWindowJIIIIVxd26ac3d_address_J(i32) { return RET_NULL; }
+r32 me_anno_ui_editor_stacked_StackPanel_getValue_Ljava_lang_Object(i32) { return RET_NULL; }
+r32 me_anno_ui_editor_stacked_StackPanel_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return RET_NULL; }
+r32 me_anno_ui_input_NumberInput_getValue_Ljava_lang_Object(i32) { return RET_NULL; }
+r32 me_anno_ui_input_NumberInput_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return RET_NULL; }
+r64 me_anno_gpu_WindowManagement_runRenderLoop0XlambdaX5_IIIIIJJVxv1311c2a2_address_J(i32) { return RET_NULL; }
+r32 java_util_TreeMapXPrivateEntryIterator_next_Ljava_lang_Object(i32) { return RET_NULL; }
+r32 java_util_WeakHashMapXHashIterator_next_Ljava_lang_Object(i32) { return RET_NULL; }
+r32 kotlin_collections_CharIterator_hasNext_Z(i32) { return RET_NULL; }
+roid me_anno_io_base_BaseReader_readAllInList_V(i32) { return RET_VOID; }
+r32 kotlin_jvm_internal_MutablePropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return RET_NULL; }
+r32 kotlin_jvm_internal_PropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return RET_NULL; }
 f64 jvm_JavaUtil_seedUniquifier_D() {
     return java_lang_System_currentTimeMillis_J();
 }
@@ -756,7 +766,11 @@ void unreachable(std::string msg) {
     if (!exiting) {
         exiting = true;
         // ~ new Throwable().printStackTrace()
+        #ifdef NO_ERRORS
+        i32 tmpErrorInstance = createInstance(14);
+        #else
         i32 tmpErrorInstance = createInstance(14).v0;
+        #endif
         new_java_lang_Throwable_V(tmpErrorInstance);
         java_lang_Throwable_printStackTrace_V(tmpErrorInstance);
     }
@@ -806,11 +820,15 @@ void createWindow() {
     glfwSwapInterval(0);
 }
 
+#ifdef NO_ERRORS
+#define handleError(x) x
+#else
 void handleError(i32 error) {
     if (error != 0) {
         java_lang_Throwable_printStackTrace_V(error);
     }
 }
+#endif
 
 void handleResize(GLFWwindow* window, int sx, int sy) {
     width = sx;
@@ -923,17 +941,8 @@ int main() {
         return -2;
     }
 
-    i32 err = 0;
-    err = init();
-    if(err != 0) {
-        java_lang_Throwable_printStackTrace_V(err);
-        return -3;
-    }
-    err = engine_Engine_main_Ljava_lang_StringV(0);
-    if(err != 0) {
-        java_lang_Throwable_printStackTrace_V(err);
-        return -4;
-    }
+    init();
+    engine_Engine_main_Ljava_lang_StringV(0);
 
     attachGLFWListeners();
     startGCThread();
@@ -958,11 +967,7 @@ int main() {
         x *= 0.99;
         if(x < 0.05) x = 1.0;
 
-        err = engine_Engine_update_IIFV(width, height, dt);
-        if(err != 0) {
-            java_lang_Throwable_printStackTrace_V(err);
-            break;
-        }
+        engine_Engine_update_IIFV(width, height, dt);
 
         // can be used to see how many instances of what type were created
         if(countAllocations && ++csCtr >= 2000) {

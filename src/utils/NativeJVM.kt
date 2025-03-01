@@ -37,8 +37,6 @@ import wasm.parser.LocalVariable
 
 fun appendNativeHelperFunctions() {
 
-    val t = BooleanArray(64) { true }
-
     fun register(functionImpl: FunctionImpl) {
         assertNull(helperFunctions.put(functionImpl.funcName, functionImpl))
     }
@@ -54,25 +52,19 @@ fun appendNativeHelperFunctions() {
         }
     }
 
-    fun forAll2(flags: BooleanArray, callback: (String, String) -> Unit) {
-        var i = 0
+    fun forAll2(callback: (String, String) -> Unit) {
         for (type1 in types) {
             for (type2 in types) {
-                if (flags[i++]) callback(type1, type2)
+                callback(type1, type2)
             }
         }
     }
 
-    fun forAll2(callback: (String, String) -> Unit) {
-        forAll2(t, callback)
-    }
-
-    fun forAll3(flags: BooleanArray, callback: (String, String, String) -> Unit) {
-        var i = 0
+    fun forAll3(callback: (String, String, String) -> Unit) {
         for (type1 in types) {
             for (type2 in types) {
                 for (type3 in types) {
-                    if (flags[i++]) callback(type1, type2, type3)
+                    callback(type1, type2, type3)
                 }
             }
         }
@@ -176,7 +168,7 @@ fun appendNativeHelperFunctions() {
         )
     }
 
-    forAll3(t) { v1, v2, v3 ->
+    forAll3 { v1, v2, v3 ->
         register(
             "dup_x2$v1$v2$v3", listOf(v3, v2, v1), listOf(v1, v3, v2, v1),
             listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2])

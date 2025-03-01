@@ -2,9 +2,11 @@ package graphing
 
 import graphing.LargeSwitchStatement.loadStack
 import graphing.LargeSwitchStatement.storeStack
+import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.sortByTopology
+import me.anno.utils.structures.lists.Lists.swap
 import me.anno.utils.types.Booleans.toInt
 import translator.LocalVar
 import utils.i32
@@ -12,28 +14,35 @@ import wasm.instr.Const
 import wasm.instr.IfBranch
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32Or
+import wasm.instr.Instructions.Unreachable
 import wasm.parser.LocalVariable
 
 object SolveLinearTree {
 
-    val unusedLabel = LocalVar("I", i32, "lUnused", -1, false)
+    private val unusedLabel = LocalVar("I", i32, "lUnused", -1, false)
 
-    fun solve(nodes: MutableList<Node>, sa: StructuralAnalysis): Boolean {
+    fun solve(nodes: MutableList<GraphingNode>, sa: StructuralAnalysis): Boolean {
 
         val retTypes = StackValidator.getReturnTypes(sa.sig)
         val firstNode = nodes.first()
-        nodes.sortByTopology { node -> node.inputs } ?: return false
+        val isSorted = nodes.sortByTopology { node -> node.inputs } != null
+        if (!isSorted) {
+            // ensure first node is first again
+            nodes.swap(0, nodes.indexOf(firstNode))
+            return false
+        }
+
+        val print = false
+        if (print) println("SolveLinearTree[${sa.sig}]")
 
         assertSame(nodes.first(), firstNode)
-
         renumber(nodes)
 
         val validate = true
-        val print = false
         if (validate) {
             if (print) {
                 println(sa.sig)
-                sa.printState()
+                printState(sa.nodes, "Validating")
             }
             StackValidator.validateStack(nodes, sa.methodTranslator)
         }
@@ -108,7 +117,7 @@ object SolveLinearTree {
         val depth = IntArray(nodes.size)
         depth.fill(-1, 1)
 
-        fun getPredecessorsAtDepth(node: Node, targetDepth: Int, dst: HashSet<Node>) {
+        fun getPredecessorsAtDepth(node: GraphingNode, targetDepth: Int, dst: HashSet<GraphingNode>) {
             val depthI = depth[node.index]
             assertNotEquals(-1, depthI)
             if (depthI > targetDepth) {
@@ -120,66 +129,82 @@ object SolveLinearTree {
             }
         }
 
-        fun findCommonNode(nodes: List<Node>): Node {
-            val minDepth = nodes.minOf { depth[it.index] }
-            var nodes1 = nodes.toHashSet()
-            var predecessors = HashSet<Node>()
+        fun findCommonNode(nodes1: List<GraphingNode>): GraphingNode {
+            assertTrue(nodes1.all { it.index in nodes.indices }) { "${nodes.map { it.index }}|${nodes1.map { it.index }} vs ${nodes.size}" }
+            val minDepth = nodes1.minOf { depth[it.index] }
+            var nodes2 = nodes1.toHashSet()
+            var predecessors = HashSet<GraphingNode>()
             for (depthI in minDepth downTo 0) {
-                for (node in nodes1) {
+                for (node in nodes2) {
                     getPredecessorsAtDepth(node, depthI, predecessors)
                 }
                 assertTrue(predecessors.isNotEmpty())
                 if (predecessors.size == 1) {
                     return predecessors.first()
                 }
-                nodes1.clear()
-                val tmp = nodes1
-                nodes1 = predecessors
+                nodes2.clear()
+                val tmp = nodes2
+                nodes2 = predecessors
                 predecessors = tmp
             }
             assertFail("no valid node was found")
         }
 
+        val skipLastCondition = false
         for (i in 1 until nodes.size) {
             val node = nodes[i]
             assertEquals(i, node.index)
-            val nodeInputs = node.inputs.toList()
-            assertTrue(nodeInputs.isNotEmpty())
-            val common = findCommonNode(nodeInputs)
-            depth[node.index] = depth[common.index] + 1 // we're one deeper
+            if (skipLastCondition && i == nodes.lastIndex) {
+                // last node has no other choice, and shouldn't be in any sub-branch
+                firstNode.printer.append(node.printer)
+            } else {
+                val nodeInputs = node.inputs.toList()
+                assertTrue(nodeInputs.isNotEmpty())
+                val common = findCommonNode(nodeInputs)
+                depth[node.index] = depth[common.index] + 1 // we're one deeper
 
-            // add the code to common node
-            // add the condition here
-            for (j in nodeInputs.indices) {
-                val nodeI = nodeInputs[j]
-                val isTrue = when {
-                    node.label == nodeI.ifTrue -> 1
-                    node == nodeI.ifFalse -> 0
-                    else -> assertFail()
+                // add the code to common node
+                // add the condition here
+                for (j in nodeInputs.indices) {
+                    val nodeI = nodeInputs[j]
+                    val isTrue = when {
+                        nodeI is BranchNode && node == nodeI.ifTrue -> 1
+                        nodeI is BranchNode && node == nodeI.ifFalse -> 0
+                        nodeI is SequenceNode && node == nodeI.next -> 0
+                        else -> assertFail("Unknown case")
+                    }
+                    val condition = labels[nodeI.index * 2 + isTrue]
+                    common.printer.append(condition.localGet)
+                    if (j > 0) common.printer.append(I32Or)
                 }
-                val condition = labels[nodeI.index * 2 + isTrue]
-                if (j > 0) common.printer.append(I32Or)
-                common.printer.append(condition.localGet)
-            }
 
-            common.printer.append(IfBranch(node.printer.instrs))
-            if (validate) StackValidator.validateStack2(
-                sa.sig, node.printer, emptyList(), emptyList(), retTypes,
-                sa.methodTranslator.localVarsWithParams
-            )
-        }
-
-        if (false) {
-            for (instr in firstNode.printer.instrs) {
-                println(instr)
+                common.printer.append(IfBranch(node.printer.instrs))
+                if (validate) StackValidator.validateStack2(
+                    sa.sig, node.printer, emptyList(), emptyList(), retTypes,
+                    sa.methodTranslator.localVarsWithParams
+                )
             }
         }
 
-        firstNode.ifTrue = null
-        firstNode.ifFalse = null
-        firstNode.isReturn = true
+        if (!skipLastCondition) {
+            // end cannot be reached; in theory, we can skip the branch of the last node
+            firstNode.printer.append(Unreachable)
+        }
+
         nodes.clear()
-        nodes.add(firstNode)
+        val retNode = ReturnNode(firstNode.printer)
+        retNode.inputStack = emptyList()
+        retNode.outputStack = emptyList()
+        nodes.add(retNode)
+
+        if (sa.sig.name == "getType" && sa.sig.descriptor == "(Ljava_lang_String;)Lme_anno_input_KeyCombinationXType;") {
+            println()
+            println("-------------------------------------------------------------")
+            println(sa.sig)
+            println()
+            println(retNode.printer)
+        }
+        StackValidator.validateStack(nodes, sa.methodTranslator)
 
         return true
     }

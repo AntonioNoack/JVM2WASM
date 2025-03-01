@@ -222,10 +222,15 @@ public class Kotlin {
 		// whatever this is...
 	}
 
-	@NoThrow
+	@NoThrow // safe by using Kotlin language
 	@Alias(names = "kotlin_jvm_internal_Intrinsics_checkNotNullParameter_Ljava_lang_ObjectLjava_lang_StringV")
 	@WASM(code = "drop drop")
-	public static native void kotlin_jvm_internal_Intrinsics_checkNotNullParameter_Ljava_lang_ObjectLjava_lang_StringV(Object o, String s);
+	public static native void Intrinsics_checkNotNullParameter(Object o, String s);
+
+	/*@NoThrow // unsafe
+	@Alias(names = "kotlin_jvm_internal_Intrinsics_checkNotNullExpressionValue_Ljava_lang_ObjectLjava_lang_StringV")
+	@WASM(code = "drop drop")
+	public static native void Intrinsics_checkNotNullExpressionValue(Object o, String s);*/
 
 	@Alias(names = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toFloatOrNull_Ljava_lang_StringLjava_lang_Float")
 	public static Float toFloatOrNull(String s) {

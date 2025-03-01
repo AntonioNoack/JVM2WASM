@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import crashOnAllExceptions
 import globals
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
@@ -238,6 +239,7 @@ fun writeHeader(
     writer.append("// imports\n")
     writer.append("#include <string>\n") // for debugging
     writer.append("#include \"jvm2wasm-types.h\"\n") // for debugging
+    if (crashOnAllExceptions) writer.append("#define NO_ERRORS\n")
     writer.append('\n')
 
     writer.append("// header\n")
