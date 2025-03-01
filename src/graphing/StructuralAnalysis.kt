@@ -857,21 +857,27 @@ class StructuralAnalysis(
      * A -> B; B -> A; only entry: A
      * */
     private fun mergeSmallCircles(): Boolean {
+        val print = printOps && nodes.size == 2
         var changed2 = false
         do {
             var changed = false
+            val firstNode = nodes.first()
             for (i in nodes.indices) {
                 val node1 = nodes.getOrNull(i) ?: break
+                if (print) println("node1: $node1")
                 if (node1 is SequenceNode) {
                     val node2 = node1.next
+                    if (print) println("node2: $node2")
                     if (node1 != node2 && node2 is SequenceNode && node2.next == node1) {
                         // we found such a circle
                         val entry1 = node1.inputs.size > 1
                         val entry2 = node2.inputs.size > 1
+                        if (print) println("e1/e2: $entry1/$entry2")
                         if (entry1 && entry2) {
                             // TO DO("duplicate functionality")
                             // code duplication -> ignore this case
-                        } else if (entry1) {
+                            continue
+                        } else if (entry1 && node2 != firstNode) {
                             // append entry2 to entry1
                             node1.printer.append(node2.printer)
                             node1.inputs.remove(node2)
@@ -879,9 +885,7 @@ class StructuralAnalysis(
                             nodes.remove(node2)
                             if (printOps) println("-${node2.index} by 7")
                             makeNodeLoop("mergeSmallCircleA", node1, i)
-                            changed = true
-                            changed2 = true
-                        } else if (entry2) {
+                        } else if (node1 != firstNode) {
                             // append entry1 to entry2
                             node2.printer.append(node1.printer)
                             node2.inputs.remove(node1)
@@ -890,9 +894,10 @@ class StructuralAnalysis(
                             if (printOps) println("-${node1.index} by 8")
                             val node2i = nodes.indexOf(node2)
                             makeNodeLoop("mergeSmallCircleB", node2, node2i)
-                            changed = true
-                            changed2 = true
                         }
+                        checkState()
+                        changed = true
+                        changed2 = true
                     }
                 }
             }
@@ -911,9 +916,8 @@ class StructuralAnalysis(
      * */
     fun joinNodes(): Builder {
 
-        isLookingAtSpecial = false &&
-                sig.clazz == "me/anno/ecs/prefab/PrefabInspector" &&
-                sig.name == "inspect\$lambda\$11"
+        isLookingAtSpecial =
+            sig.name == "findDiscrepancy"
 
         if (isLookingAtSpecial) {
             printOps = true

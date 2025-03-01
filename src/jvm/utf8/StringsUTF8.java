@@ -256,7 +256,6 @@ public class StringsUTF8 {
 
 	@NoThrow
 	private static byte[] getValue(String s) {
-		log("StringsUTF8.getValue()", getAddr(s));
 		return ptrTo(read32(getAddr(s) + objectOverhead));
 	}
 

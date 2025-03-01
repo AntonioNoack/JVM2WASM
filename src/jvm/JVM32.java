@@ -380,13 +380,13 @@ public class JVM32 {
     }
 
     private static int searchInterfaceLinear(int min, int max, int methodId, int tablePtr, int tableLength) {
+        max = (max << 3) + tablePtr;
+        min = (min << 3) + tablePtr;
         while (max >= min) {
-            int addr = tablePtr + (min << 3);
-            int cmp = read32(addr) - methodId;
-            if (cmp == 0) {
-                return read32(addr + 4);
+            if (read32(min) == methodId) {
+                return read32(min + 4);
             }
-            min++;
+            min += 8;
         }
         return -1;
     }
