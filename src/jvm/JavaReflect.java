@@ -211,14 +211,14 @@ public class JavaReflect {
         return read32f(getFieldAddr(field, instance));
     }
 
-    @Alias(names = "java_lang_reflect_Field_setLong_Ljava_lang_ObjectLV")
+    @Alias(names = "java_lang_reflect_Field_setLong_Ljava_lang_ObjectJV")
     public static void Field_setLong(Field field, Object instance, long value) {
         Class<?> clazz = field.getType();
         if (!"int".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");
         write32(getFieldAddr(field, instance), value);
     }
 
-    @Alias(names = "java_lang_reflect_Field_getLong_Ljava_lang_ObjectL")
+    @Alias(names = "java_lang_reflect_Field_getLong_Ljava_lang_ObjectJ")
     public static long Field_getLong(Field field, Object instance) {
         Class<?> clazz = field.getType();
         if (!"long".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");

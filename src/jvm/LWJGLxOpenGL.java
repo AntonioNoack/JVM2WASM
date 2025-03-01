@@ -524,7 +524,7 @@ public class LWJGLxOpenGL {
     @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
     public static native void readPixelsU8(int x, int y, int w, int h, int format, int type, int data, int length);
 
-    @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV")
+    @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV"})
     public static void glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int[] data) {
         readPixelsU8(x, y, w, h, format, type, getAddr(data) + arrayOverhead, data.length << 2);
     }
@@ -533,7 +533,7 @@ public class LWJGLxOpenGL {
     @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
     public static native void readPixelsF32(int x, int y, int w, int h, int format, int type, int dataPtr, int length);
 
-    @Alias(names = "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV")
+    @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAFV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV"})
     public static void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, float[] data) {
         readPixelsF32(x, y, w, h, format, type, getAddr(data) + arrayOverhead, data.length);
     }
