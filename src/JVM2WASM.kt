@@ -25,6 +25,12 @@ import kotlin.math.sin
 
 const val api = ASM9
 
+// todo Kotlin reflection is currently broken, because
+//  kotlin.reflect.jvm.internal.ReflectionFactoryImpl is missing,
+//  because its dependency is never declared explicitly, only via Class.forName().
+//  -> automatically replace all Kotlin-reflect stuff with KotlynReflect, or for now,
+//     add this dependency manually
+
 // todo calculate dependency-tree from static initialization,
 //  and call that once at the start, and then never again
 // alternative/improvement:
@@ -65,7 +71,7 @@ var exportHelpers = exportAll
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
-var crashOnAllExceptions = true // todo supported this
+var crashOnAllExceptions = true
 val anyMethodThrows = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory

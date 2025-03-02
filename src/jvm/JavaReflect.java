@@ -23,7 +23,7 @@ import static jvm.NativeLog.log;
 
 public class JavaReflect {
 
-    private static final ClassLoader cl = new ClassLoader() {
+    private static final ClassLoader classLoaderInstance = new ClassLoader() {
     };
 
     @NoThrow
@@ -324,8 +324,11 @@ public class JavaReflect {
     public static <V> Class<V> Class_forName(String name) throws ClassNotFoundException {
         @SuppressWarnings("unchecked")
         Class<V> clazz = (Class<V>) getClassesForName().get(name);
-        if (clazz != null) return clazz;
-        throw new ClassNotFoundException();
+        if (clazz == null) log("Missing class, returning null", name);
+        return clazz;
+        // avoid throwing exceptions, so we can compile without them
+        // if (clazz != null) return clazz;
+        // throw new ClassNotFoundException();
     }
 
     @Alias(names = "java_lang_Class_forName_Ljava_lang_StringZLjava_lang_ClassLoaderLjava_lang_Class")
@@ -396,13 +399,13 @@ public class JavaReflect {
     @NoThrow
     @Alias(names = "java_lang_ClassLoader_getSystemClassLoader_Ljava_lang_ClassLoader")
     public static ClassLoader ClassLoader_getSystemClassLoader() {
-        return cl;
+        return classLoaderInstance;
     }
 
     @NoThrow
     @Alias(names = "java_lang_Class_getClassLoader_Ljava_lang_ClassLoader")
-    public static ClassLoader getClassLoader(Class<Object> clazz) {
-        return cl;
+    public static ClassLoader Class_getClassLoader(Class<Object> clazz) {
+        return classLoaderInstance;
     }
 
     @NoThrow

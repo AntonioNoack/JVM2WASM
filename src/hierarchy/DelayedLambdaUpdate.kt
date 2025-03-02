@@ -1,5 +1,6 @@
 package hierarchy
 
+import anyMethodThrows
 import dIndex
 import gIndex
 import hIndex
@@ -256,7 +257,7 @@ class DelayedLambdaUpdate(
             couldThrow = true
         }
 
-        if (!couldThrow) {
+        if (!couldThrow && anyMethodThrows) {
             // calling this is easier than figuring our the return type for the correct return function
             printer.visitLdcInsn(0)
         }

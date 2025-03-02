@@ -489,8 +489,12 @@ void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isErro
     }
 }
 
+i64 instrCtr = 0;
 void jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
-    printStackTraceLine(depth, clazz, method, line, false);
+    if (instrCtr++ > 3297970 - 200000) {
+        std::cout << instrCtr << ":";
+        printStackTraceLine(depth, clazz, method, line, false);
+    }
 }
 
 void jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV(i32 clazz, i32 method, i32 line) {
