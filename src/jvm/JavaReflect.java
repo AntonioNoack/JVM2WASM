@@ -16,10 +16,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 
-import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
+import static jvm.NativeLog.log;
 
 public class JavaReflect {
 

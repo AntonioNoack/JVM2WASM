@@ -57,6 +57,7 @@ import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
+import static jvm.NativeLog.log;
 
 @SuppressWarnings("unused")
 public class Engine {

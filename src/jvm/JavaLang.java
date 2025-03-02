@@ -15,6 +15,7 @@ import java.util.Random;
 
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
+import static jvm.NativeLog.log;
 
 @SuppressWarnings("unused")
 public class JavaLang {

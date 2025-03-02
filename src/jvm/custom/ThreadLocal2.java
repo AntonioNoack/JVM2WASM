@@ -6,7 +6,9 @@ import java.util.function.Supplier;
 
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
+import static jvm.NativeLog.log;
 
+// in theory, we could replace all instances of this with the immediate result...
 @SuppressWarnings("unused")
 public class ThreadLocal2<V> {
 
@@ -26,8 +28,10 @@ public class ThreadLocal2<V> {
         Supplier<V> supplier = this.supplier;
         if (supplier != null) {
             object = supplier.get();
+            log("Got instance from ThreadLocal", getAddr(object));
             this.supplier = null;
         }
+        log("Returning from ThreadLocal", getAddr(object));
         return object;
     }
 }

@@ -14,6 +14,7 @@ import static jvm.JVM32.*;
 import static jvm.JVMValues.failedToAllocateMemory;
 import static jvm.JVMValues.reachedMemoryLimit;
 import static jvm.JavaLang.getAddr;
+import static jvm.NativeLog.log;
 
 public class GarbageCollector {
 

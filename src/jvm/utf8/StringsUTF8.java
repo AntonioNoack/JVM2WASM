@@ -19,17 +19,17 @@ public class StringsUTF8 {
 
 	@Alias(names = "java_lang_String_getBytes_AB")
 	public static byte[] String_getBytes(String self) {
-		byte[] data = getValue(self);
+		byte[] chars = getValue(self);
 		if (copyGetBytes) {
-			int length = data.length;
+			int length = chars.length;
 			byte[] clone = new byte[length];
-			System.arraycopy(data, 0, clone, 0, length);
+			System.arraycopy(chars, 0, clone, 0, length);
 			return clone;
-		} else return data;
+		} else return chars;
 	}
 
 	@Alias(names = "java_lang_String_getBytes_Ljava_nio_charset_CharsetAB")
-	public static byte[] String_getBytes(String self, Charset cs) {
+	public static byte[] String_getBytes(String self, Charset ignored) {
 		return String_getBytes(self);
 	}
 
@@ -44,34 +44,34 @@ public class StringsUTF8 {
 	}
 
 	@Alias(names = "new_java_lang_String_ABLjava_nio_charset_CharsetV")
-	public static void new_java_lang_String_ABLjava_nio_charset_CharsetV(String self, byte[] bytes, Charset charset) {
+	public static void new_java_lang_String_ABLjava_nio_charset_CharsetV(String self, byte[] bytes, Charset ignored) {
 		new_java_lang_String_ABV(self, bytes);
 	}
 
 	@Alias(names = "new_java_lang_String_ABIILjava_nio_charset_CharsetV")
-	public static void new_java_lang_String_ABIILjava_nio_charset_CharsetV(String self, byte[] bytes, int start, int end, Charset charset) {
+	public static void new_java_lang_String_ABIILjava_nio_charset_CharsetV(String self, byte[] bytes, int start, int end, Charset ignored) {
 		new_java_lang_String_ABIIV(self, bytes, start, end);
 	}
 
 	@Alias(names = "new_java_lang_String_ABV")
-	public static void new_java_lang_String_ABV(String self, byte[] bytes) {
+	public static void new_java_lang_String_ABV(String self, byte[] src) {
 		if (copyToString) {
-			int length = bytes.length;
+			int length = src.length;
 			byte[] clone = new byte[length];
-			System.arraycopy(bytes, 0, clone, 0, length);
+			System.arraycopy(src, 0, clone, 0, length);
 			setValue(self, clone);
-		} else setValue(self, bytes);
+		} else setValue(self, src);
 	}
 
 	@Alias(names = "new_java_lang_String_ABIIV")
-	public static void new_java_lang_String_ABIIV(String self, byte[] bytes, int start, int end) {
-		if (start == 0 && end == bytes.length) {
-			new_java_lang_String_ABV(self, bytes);
+	public static void new_java_lang_String_ABIIV(String self, byte[] src, int start, int end) {
+		if (start == 0 && end == src.length) {
+			new_java_lang_String_ABV(self, src);
 		} else {
 			int length = end - start;
-			byte[] v1 = new byte[length];
-			System.arraycopy(bytes, start, v1, 0, length);
-			setValue(self, v1);
+			byte[] clone = new byte[length];
+			System.arraycopy(src, start, clone, 0, length);
+			setValue(self, clone);
 		}
 	}
 
@@ -119,9 +119,9 @@ public class StringsUTF8 {
 	@Alias(names = "java_lang_String_indexOf_III")
 	public static int String_indexOf(String self, int code, int idx) {
 		if (code < 128) {
-			byte[] v0 = getValue(self);
-			for (int i = idx, l = v0.length; i < l; i++) {
-				if (v0[i] == code) {
+			byte[] chars = getValue(self);
+			for (int i = idx, l = chars.length; i < l; i++) {
+				if (chars[i] == code) {
 					return i;
 				}
 			}
@@ -133,9 +133,9 @@ public class StringsUTF8 {
 	@Alias(names = "java_lang_String_lastIndexOf_III")
 	public static int String_lastIndexOf(String self, int code, int idx) {
 		if (code < 128) {
-			byte[] v0 = getValue(self);
-			for (int i = Math.min(idx, v0.length - 1); i >= 0; --i) {
-				if (v0[i] == code) {
+			byte[] chars = getValue(self);
+			for (int i = Math.min(idx, chars.length - 1); i >= 0; --i) {
+				if (chars[i] == code) {
 					return i;
 				}
 			}
@@ -160,13 +160,13 @@ public class StringsUTF8 {
 
 	@Alias(names = "java_lang_String_substring_IILjava_lang_String")
 	public static String String_substring(String self, int start, int end) {
-		byte[] v0 = getValue(self);
-		if (start == 0 && end == v0.length) return self;
+		byte[] src = getValue(self);
+		if (start == 0 && end == src.length) return self;
 		if (start == end) return ""; // special case :)
 		int length = end - start;
-		byte[] v1 = new byte[length];
-		System.arraycopy(v0, start, v1, 0, length);
-		return newString(v1);
+		byte[] dst = new byte[length];
+		System.arraycopy(src, start, dst, 0, length);
+		return newString(dst);
 	}
 
 	@Alias(names = "java_lang_String_substring_ILjava_lang_String")
@@ -193,10 +193,10 @@ public class StringsUTF8 {
 	public static int String_compareTo(String self, String other) {
 		if (self == other) return 0;
 		if (other == null) throw new NullPointerException("String.compareTo");
-		int v0 = getAddr(getValue(self));
-		int v1 = getAddr(getValue(other));
-		int a0 = v0 + objectOverhead;
-		int b0 = v1 + objectOverhead;
+		int chars0 = getAddr(getValue(self));
+		int chars1 = getAddr(getValue(other));
+		int a0 = chars0 + objectOverhead;
+		int b0 = chars1 + objectOverhead;
 		int l0 = read32(a0);
 		int l1 = read32(b0);
 		// skip length
@@ -236,22 +236,22 @@ public class StringsUTF8 {
 
 	@Alias(names = "java_lang_String_getChars_IIACIV")
 	public static void String_getChars(String str, int start, int end, char[] dst, int dstStart) {
-		byte[] data = str.getBytes();
+		byte[] src = getValue(str);
 		int length = end - start;
 		// todo if search > 127 || replace > 127, this won't work properly
 		for (int i = 0; i < length; i++) {
-			dst[dstStart + i] = (char) data[start + i];
+			dst[dstStart + i] = (char) src[start + i];
 		}
 	}
 
 	@Alias(names = "java_lang_String_toCharArray_AC")
 	public static char[] String_toCharArray(String str) {
-		byte[] data = str.getBytes();
+		byte[] src = getValue(str);
 		// todo if search > 127 || replace > 127, this won't work properly
-		int length = data.length;
-		char[] result = new char[length];
-		str.getChars(0, length, result, 0);
-		return result;
+		int length = src.length;
+		char[] dst = new char[length];
+		str.getChars(0, length, dst, 0);
+		return dst;
 	}
 
 	@NoThrow
@@ -268,9 +268,9 @@ public class StringsUTF8 {
 	public static int String_hashCode_I(String str) {
 		int hashPtr = getAddr(str) + objectOverhead + 4;
 		int hash = read32(hashPtr);
-		byte[] data = getValue(str);
-		int startPtr = getAddr(data) + arrayOverhead;
-		int endPtr = startPtr + data.length;
+		byte[] chars = getValue(str);
+		int startPtr = getAddr(chars) + arrayOverhead;
+		int endPtr = startPtr + chars.length;
 		if (hash == 0) {
 			while (unsignedLessThan(startPtr, endPtr)) {
 				hash = hash * 31 + (read8(startPtr) & 255);

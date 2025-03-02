@@ -3,6 +3,7 @@ package wasm2cpp
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
+import org.apache.logging.log4j.LogManager
 import utils.*
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
@@ -26,12 +27,15 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
-import kotlin.math.min
 
 class FunctionWriter(
     val function: FunctionImpl, val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>
 ) {
+
+    companion object {
+        private val LOGGER = LogManager.getLogger(FunctionWriter::class)
+    }
 
     private var depth = 1
     private val localsByName = function.locals
@@ -40,7 +44,7 @@ class FunctionWriter(
     private val stack = ArrayList<StackElement>()
     private var genI = 0
 
-    init {
+    fun write() {
         defineFunctionHead(function, true)
         writer.append(" {\n")
 
@@ -56,14 +60,8 @@ class FunctionWriter(
             if (local.name == "lbl") continue
             begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
         }
-        var hasReturn = false
-        for (instr in function.body) {
-            // println("instr $instr, stack: ${stack.map { it.type }}")
-            writeInstruction(instr)
-            hasReturn = instr.isReturning()
-            if (hasReturn) break
-        }
-        if (!hasReturn) {
+        if (!writeInstructions(function.body)) {
+            LOGGER.warn("Appended return")
             writeInstruction(Return)
         }
         writer.append("}\n")
@@ -185,16 +183,17 @@ class FunctionWriter(
         }
     }
 
-    private fun writeInstructions(instructions: List<Instruction>) {
-        writeInstructions(instructions, 0, instructions.size)
+    private fun writeInstructions(instructions: List<Instruction>): Boolean {
+        return writeInstructions(instructions, 0, instructions.size)
     }
 
-    private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int) {
+    private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
         for (i in i0 until i1) {
             val instr = instructions[i]
             writeInstruction(instr)
-            if (instr.isReturning()) break
+            if (instr.isReturning()) return true
         }
+        return false
     }
 
     private fun writeInstruction(i: Instruction) {
@@ -495,6 +494,14 @@ class FunctionWriter(
         }
     }
 
+    private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
+        for (j in i + 1 until instructions.size) {
+            val instr = instructions[j]
+            if (instr !is Comment) return j
+        }
+        return -1
+    }
+
     private fun writeSwitchCase(switchCase: SwitchCase) {
         // big monster, only 1 per function allowed, afaik
         // assertEquals(1, depth)
@@ -502,78 +509,79 @@ class FunctionWriter(
         val lblName = switchCase.lblName
         assertEquals(0, stack.size)
         depth++
+
+        fun getBranchIdx(instructions: List<Instruction>): Int {
+            val first = instructions.firstOrNull()
+            return if (instructions.size == 1 &&
+                first is Const && first.type == ConstType.I32
+            ) first.value as Int else assertFail()
+        }
+
         for (j in cases.indices) {
             stack.clear()
-            // assertEquals(0, stack.size)
             depth--
             begin().append("case").append(j).append(": {\n")
             depth++
 
-            val instructions = cases[j].filter { it !is Comment }
-            val realLast = instructions.lastOrNull()
-            if (realLast == Unreachable || realLast == Return) {
-                for (element in instructions) {
-                    writeInstruction(element)
+            var hadReturn = false
+            val instructions = cases[j]
+            for (i in instructions.indices) {
+                val ni = nextInstr(instructions, i)
+                val next = instructions.getOrNull(ni)
+                val instr = instructions[i]
+
+                if (next is LocalSet && next.name == lblName) {
+                    var nni = nextInstr(instructions, ni)
+                    var nextNext = instructions[nni]
+                    while (nextNext !is Jump) {
+                        // confirm it is a stack variable
+                        assertTrue(nextNext is LocalSet && nextNext.name.startsWith("s"))
+                        val lastNNi = nni
+                        nni = nextInstr(instructions, nni)
+                        assertTrue(nni > lastNNi)
+                        nextNext = instructions[nni]
+                    }
+                    fun saveStack() {
+                        // save stack
+                        for (k in ni + 1 until nni) {
+                            writeInstruction(instructions[k])
+                        }
+                    }
+                    when (instr) {
+                        is IfBranch -> {
+                            // implement branch-goto
+                            val trueCase = getBranchIdx(instr.ifTrue)
+                            val falseCase = getBranchIdx(instr.ifFalse)
+                            val branch = pop(i32)
+                            saveStack()
+                            begin().append("if (").append(branch).append(") {\n")
+                            begin().append("  goto case").append(trueCase).end()
+                            begin().append("} else {\n")
+                            begin().append("  goto case").append(falseCase).end()
+                            begin().append("}\n")
+                        }
+                        is Const -> {
+                            // implement simple goto
+                            saveStack()
+                            val targetCase = getBranchIdx(listOf(instr))
+                            begin().append("goto case").append(targetCase).end()
+                        }
+                        else -> throw NotImplementedError()
+                    }
+                    hadReturn = true
+                    break
                 }
-                depth--
-                begin().append("}\n")
-                depth++
-                continue
+
+                writeInstruction(instr)
+
+                if (instr.isReturning()) {
+                    hadReturn = true
+                    break
+                }
             }
 
-            val isLast = j == cases.lastIndex
-            assertTrue(isLast || instructions.size >= 2)
-            assertTrue(isLast || realLast is Jump) // for while(true)-branch
-            var skipped = if (isLast) min(1, instructions.size) else 2
-            if (!isLast) {
-                while (true) {
-                    val tmp = instructions[instructions.size - skipped]
-                    if (tmp is LocalSet && tmp.name.startsWith("s") && // stack variable
-                        (tmp.name.endsWith("32") || tmp.name.endsWith("64"))
-                    ) {
-                        // println("skipping ${tmp.name}")
-                        skipped++
-                    } else break
-                }
-            }
-            val last = instructions.getOrNull(instructions.size - skipped)
-            if (last is Jump) {
-                begin().append("goto ").append(last.label).end() // ok?
-            } else if (last != Unreachable && last != Return && last != null) {
-                assertTrue(last is LocalSet && last.name == lblName)
-                val preLast = instructions[instructions.size - (skipped + 1)]
-                assertTrue(preLast is IfBranch || (preLast is Const && preLast.type == ConstType.I32))
-                // find end:
-                //   - i32.const 2 local.set $lbl
-                //   - (if (result i32) (then i32.const 4) (else i32.const 7)) local.set $lbl
-                writeInstructions(instructions, 0, instructions.size - (skipped + 1))
-                fun executeStackSaving() {
-                    // println("executing stack saving, skipped: $skipped, length: ${instructions.size}")
-                    writeInstructions(instructions, instructions.size - (skipped - 1), instructions.size - 1)
-                }
-                if (preLast is IfBranch) {
-                    // save branch
-                    val branch = pop(i32)
-                    executeStackSaving()
-                    assertEquals(1, preLast.ifTrue.size)
-                    assertEquals(1, preLast.ifFalse.size)
-                    begin().append("if (").append(branch).append(") {\n")
-                    depth++
-                    begin().append("goto case").append((preLast.ifTrue[0] as Const).value).end()
-                    depth--
-                    begin().append("} else {\n")
-                    depth++
-                    begin().append("goto case").append((preLast.ifFalse[0] as Const).value).end()
-                    depth--
-                    begin().append("}\n")
-                } else {
-                    executeStackSaving()
-                    preLast as Const
-                    begin().append("goto case").append(preLast.value).end()
-                }
-            } else {
-                writeInstructions(instructions, 0, instructions.size - skipped)
-            }
+            assertTrue(hadReturn)
+
             depth--
             begin().append("}\n")
             depth++

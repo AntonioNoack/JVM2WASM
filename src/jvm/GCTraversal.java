@@ -14,6 +14,7 @@ import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.JavaReflect.getFields;
+import static jvm.NativeLog.log;
 
 /**
  * "Mark" of mark-and-sweep
@@ -85,6 +86,7 @@ public class GCTraversal {
     private static int[] staticFields;
     public static int[] classSizes;
 
+    @NoThrow
     private static int findFieldsByClass(Class<Object> clazz, int classIdx) {
 
         Field[] fields = getFields(clazz);

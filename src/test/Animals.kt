@@ -3,7 +3,7 @@
 package test
 
 import jvm.JVM32.getNextPtr
-import jvm.JVM32.log
+import jvm.NativeLog.log
 import me.anno.animation.Interpolation
 import me.anno.config.DefaultConfig
 import me.anno.ecs.Entity

@@ -42,7 +42,7 @@ fun testCppWriter(func0: FunctionImpl) {
             "AfterSwitch" to Import("AfterSwitch", emptyList(), emptyList()),
             "AfterLoop" to Import("AfterLoop", emptyList(), emptyList())
         )
-    )
+    ).write()
     println(writer.toString())
     // confirm everything correct
     assertEquals(

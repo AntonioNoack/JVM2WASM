@@ -1,6 +1,6 @@
 package test
 
-import jvm.JVM32.log
+import jvm.NativeLog.log
 
 open class InvokeTest {
 

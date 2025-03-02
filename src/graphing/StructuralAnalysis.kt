@@ -322,56 +322,83 @@ class StructuralAnalysis(
         return it is IfBranch || it is SwitchCase || it is LoopInstr
     }
 
-    private fun joinSequences(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in 1 until nodes.size) {
-                val curr = nodes.getOrNull(i) ?: break
-                if (curr.inputs.size == 1) {
-                    // merge with previous node
-                    val prev = curr.inputs.first()
-                    if (prev !is SequenceNode) continue // cannot merge
-                    if (prev === curr) continue // cannot merge either
-                    if (prev == nodes.first()) continue // should not remove that node
-                    // replace inputs with inputs of previous node
-                    curr.inputs.clear()
-                    curr.inputs.addAll(prev.inputs)
-                    curr.inputStack = prev.inputStack
-                    // prepend the previous node to this one
-                    curr.printer.prepend(prev.printer)
-                    // replace links from prev to curr
-                    replaceInputs(prev, curr)
-                    // then delete the previous node
-                    nodes.remove(prev)
-                    changed = true
-                    changed2 = true
+    private fun joinFirstSequence(): Boolean {
+        val firstNode = nodes.first()
+        if (firstNode !is SequenceNode || firstNode.inputs.isNotEmpty()) {
+            return false
+        }
 
-                    if (printOps) {
-                        printState(nodes, "Removed ${prev.index} via replaceSequences()")
-                    }
-                    checkState()
+        // remove first node, and prepend it onto next node
+        val next = firstNode.next
+        if (next.inputs.size != 1) return false// we cannot simply prepend it
+
+        next.printer.prepend(firstNode.printer)
+        assertTrue(next.inputs.remove(firstNode))
+        assertTrue(next.inputs.isEmpty())
+        next.inputStack = firstNode.inputStack
+
+        val nextIndex = nodes.indexOf(next)
+        nodes[0] = next
+        nodes.removeAt(nextIndex)
+        next.index = firstNode.index
+        firstNode.index = -1
+
+        // print update
+        if (printOps) {
+            printState(nodes, "Removed ${firstNode.index} via replaceSequences/first()")
+        }
+        checkState()
+
+        return true
+    }
+
+    private fun joinSequences(): Boolean {
+        var changed = false
+        val firstNode = nodes.first()
+        for (i in 1 until nodes.size) {
+            val curr = nodes.getOrNull(i) ?: break
+            if (curr.inputs.size == 1) {
+                // merge with previous node
+                val prev = curr.inputs.first()
+                if (prev !is SequenceNode) continue // cannot merge
+                if (prev === curr) continue // cannot merge either
+                if (prev == firstNode) continue // should not remove that node
+                // replace inputs with inputs of previous node
+                curr.inputs.clear()
+                curr.inputs.addAll(prev.inputs)
+                curr.inputStack = prev.inputStack
+                // prepend the previous node to this one
+                curr.printer.prepend(prev.printer)
+                // replace links from prev to curr
+                replaceInputs(prev, curr)
+                // then delete the previous node
+                nodes.remove(prev)
+                changed = true
+
+                if (printOps) {
+                    printState(nodes, "Removed ${prev.index} via replaceSequences()")
                 }
+                checkState()
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     private fun removeEmptyIfStatements(): Boolean {
-        var changed2 = false
+        var changed = false
         for (i in nodes.indices) {
             val node = nodes[i] as? BranchNode ?: continue
             if (node.ifTrue != node.ifFalse) continue
             // both branches are the same -> change the branch to a sequence
             node.printer.drop().comment("ifTrue == ifFalse")
             replaceNode(node, SequenceNode(node.printer, node.ifTrue), i)
-            changed2 = true
+            changed = true
         }
-        return changed2
+        return changed
     }
 
     private fun duplicateSimpleReturnNodes(): Boolean {
-        var changed2 = false
+        var changed = false
         for (i in nodes.lastIndex downTo 0) {
             val retNode = nodes[i]
             if (retNode.inputs.isNotEmpty() && retNode is ReturnNode && isEasyNode(retNode)) {
@@ -382,7 +409,7 @@ class StructuralAnalysis(
                     if (printOps) {
                         printState(nodes, "Append ${retNode.index} onto ${newPrev.index}")
                     }
-                    changed2 = true
+                    changed = true
                 }
                 if (retNode.inputs.isEmpty()) {
                     // node can be deleted
@@ -394,7 +421,7 @@ class StructuralAnalysis(
                 }
             }
         }
-        return changed2
+        return changed
     }
 
     /**
@@ -439,21 +466,17 @@ class StructuralAnalysis(
     }
 
     private fun findWhileTrueLoops(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
-                val node = nodes[i]
-                if (node is SequenceNode && node.next == node) {
-                    // replace loop with wasm loop
-                    makeNodeLoop("whileTrue", node, i)
-                    // node.printer.append("  unreachable\n")
-                    changed = true
-                    changed2 = true
-                }
+        var changed = false
+        for (i in nodes.indices) {
+            val node = nodes[i]
+            if (node is SequenceNode && node.next == node) {
+                // replace loop with wasm loop
+                makeNodeLoop("whileTrue", node, i)
+                // node.printer.append("  unreachable\n")
+                changed = true
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     private fun replaceWhileLoop(node: BranchNode, i: Int, negate: Boolean, nextNode: GraphingNode) {
@@ -477,30 +500,25 @@ class StructuralAnalysis(
     private fun findWhileLoops(): Boolean {
         // find while(x) loops
         // A -> A|B
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
-                val node = nodes[i] as? BranchNode ?: continue
-                if (node.ifTrue == node.ifFalse) continue
-                if (node == node.ifTrue) {
-                    renumber(nodes)
-                    // A ? A : B
-                    // loop(A, if() else break)
-                    replaceWhileLoop(node, i, false, node.ifFalse)
-                    changed2 = true
-                    changed = true
-                } else if (node == node.ifFalse) {
-                    renumber(nodes)
-                    // A ? B : A
-                    // loop(A, if() break)
-                    replaceWhileLoop(node, i, true, node.ifTrue)
-                    changed2 = true
-                    changed = true
-                } // else ignored
-            }
-        } while (changed)
-        return changed2
+        var changed = false
+        for (i in nodes.indices) {
+            val node = nodes[i] as? BranchNode ?: continue
+            if (node.ifTrue == node.ifFalse) continue
+            if (node == node.ifTrue) {
+                renumber(nodes)
+                // A ? A : B
+                // loop(A, if() else break)
+                replaceWhileLoop(node, i, false, node.ifFalse)
+                changed = true
+            } else if (node == node.ifFalse) {
+                renumber(nodes)
+                // A ? B : A
+                // loop(A, if() break)
+                replaceWhileLoop(node, i, true, node.ifTrue)
+                changed = true
+            } // else ignored
+        }
+        return changed
     }
 
     private fun replaceSimpleBranch(
@@ -532,83 +550,74 @@ class StructuralAnalysis(
      * A -> B|C, B -> C
      * */
     private fun replaceSimpleBranch(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
-                val node = nodes.getOrNull(i) ?: break
-                if (node is BranchNode) {
-                    val b0 = node.ifFalse
-                    val b1 = node.ifTrue
-                    if (b0 is SequenceNode && b0.inputs.size == 1 && b0.next == b1) {
-                        replaceSimpleBranch(node, b0, b1, true, i)
-                        changed = true
-                        changed2 = true
-                    } else if (b1 is SequenceNode && b1.inputs.size == 1 && b1.next == b0) {
-                        replaceSimpleBranch(node, b1, b0, false, i)
-                        changed = true
-                        changed2 = true
-                    }
+        var changed = false
+        for (i in nodes.indices) {
+            val node = nodes.getOrNull(i) ?: break
+            if (node is BranchNode) {
+                val b0 = node.ifFalse
+                val b1 = node.ifTrue
+                if (b0 is SequenceNode && b0.inputs.size == 1 && b0.next == b1) {
+                    replaceSimpleBranch(node, b0, b1, true, i)
+                    changed = true
+                } else if (b1 is SequenceNode && b1.inputs.size == 1 && b1.next == b0) {
+                    replaceSimpleBranch(node, b1, b0, false, i)
+                    changed = true
                 }
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     private fun mergeGeneralBranching(): Boolean {
-        var changed2 = false
         // general branching
         // A -> B|C; B -> D; C -> D
         // becomes A -> D
-        do {
-            var changed = false
-            for (i in nodes.indices) {
-                val nodeA = nodes.getOrNull(i) ?: break
-                if (nodeA is BranchNode) {
-                    val nodeB = nodeA.ifTrue
-                    val nodeC = nodeA.ifFalse
-                    if (
-                        nodeB is SequenceNode && nodeC is SequenceNode &&
-                        nodeB.next == nodeC.next &&
-                        (nodeB.inputs.size == 1 && nodeC.inputs.size == 1) &&
-                        nodeB.next != nodeA // extra-condition; we might make it work later
-                    ) {
+        var changed = false
+        for (i in nodes.indices) {
+            val nodeA = nodes.getOrNull(i) ?: break
+            if (nodeA is BranchNode) {
+                val nodeB = nodeA.ifTrue
+                val nodeC = nodeA.ifFalse
+                if (
+                    nodeB is SequenceNode && nodeC is SequenceNode &&
+                    nodeB.next == nodeC.next &&
+                    (nodeB.inputs.size == 1 && nodeC.inputs.size == 1) &&
+                    nodeB.next != nodeA // extra-condition; we might make it work later
+                ) {
 
-                        // merge branch into nodeA
-                        nodeA.printer.append(
-                            IfBranch(
-                                nodeB.printer.instrs, nodeC.printer.instrs,
-                                blockParamsGetParams(nodeB),
-                                blockParamsGetResult(nodeB, nodeC)
-                            )
+                    // merge branch into nodeA
+                    nodeA.printer.append(
+                        IfBranch(
+                            nodeB.printer.instrs, nodeC.printer.instrs,
+                            blockParamsGetParams(nodeB),
+                            blockParamsGetResult(nodeB, nodeC)
                         )
-                        nodeA.outputStack = nodeC.outputStack
+                    )
+                    nodeA.outputStack = nodeC.outputStack
 
-                        val nodeD = nodeB.next
-                        val newNodeA = SequenceNode(nodeA.printer, nodeD)
-                        replaceNode(nodeA, newNodeA, i)
+                    val nodeD = nodeB.next
+                    val newNodeA = SequenceNode(nodeA.printer, nodeD)
+                    replaceNode(nodeA, newNodeA, i)
 
-                        nodeD.inputs.remove(nodeB)
-                        nodeD.inputs.remove(nodeC)
-                        nodeD.inputs.add(newNodeA)
+                    nodeD.inputs.remove(nodeB)
+                    nodeD.inputs.remove(nodeC)
+                    nodeD.inputs.add(newNodeA)
 
-                        nodes.removeAll(listOf(nodeB, nodeC))
+                    nodes.removeAll(listOf(nodeB, nodeC))
 
-                        if (printOps) {
-                            printState(
-                                nodes, "generalBranching " +
-                                        "[${newNodeA.index}, ${nodeB.index}, ${nodeC.index}, ${nodeD.index}]"
-                            )
-                        }
-                        checkState()
-
-                        changed = true
-                        changed2 = true
+                    if (printOps) {
+                        printState(
+                            nodes, "generalBranching " +
+                                    "[${newNodeA.index}, ${nodeB.index}, ${nodeC.index}, ${nodeD.index}]"
+                        )
                     }
+                    checkState()
+
+                    changed = true
                 }
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     private fun canReturnFirstNode(): Boolean {
@@ -625,80 +634,75 @@ class StructuralAnalysis(
      * if a branch terminates, we can just add this branch without complications
      * */
     private fun findWhereBothBranchesTerminate(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
-                val node = nodes.getOrNull(i) ?: return changed2
-                if (node is BranchNode) {
-                    val b0 = node.ifFalse
-                    val b1 = node.ifTrue
+        var changed = false
+        for (i in nodes.indices) {
+            val node = nodes.getOrNull(i) ?: break
+            if (node is BranchNode) {
+                val b0 = node.ifFalse
+                val b1 = node.ifTrue
 
-                    val b0Ends = b0 is ReturnNode && b0.inputs.size == 1
-                    val b1Ends = b1 is ReturnNode && b1.inputs.size == 1
+                val b0Ends = b0 is ReturnNode && b0.inputs.size == 1
+                val b1Ends = b1 is ReturnNode && b1.inputs.size == 1
+                if (!b0Ends && !b1Ends) continue
 
-                    if (!b0Ends && !b1Ends) continue
+                if (b0Ends && b1Ends) {
+                    // join exiting branches into a single exit node
 
-                    if (b0Ends && b1Ends) {
-                        // join exiting branches into a single exit node
-
-                        node.printer.append(
-                            IfBranch(
-                                ArrayList(b1.printer.instrs), ArrayList(b0.printer.instrs),
-                                blockParamsGetParams(b1),
-                                blockParamsGetResult(b1, b0)
-                            )
+                    node.printer.append(
+                        IfBranch(
+                            ArrayList(b1.printer.instrs), ArrayList(b0.printer.instrs),
+                            blockParamsGetParams(b1),
+                            blockParamsGetResult(b1, b0)
                         )
-                        node.printer.append(Unreachable)
+                    )
+                    node.printer.append(Unreachable)
 
-                        replaceNode(node, ReturnNode(node.printer), i)
-                        nodes.removeAll(listOf(b0, b1))
+                    replaceNode(node, ReturnNode(node.printer), i)
+                    nodes.removeAll(listOf(b0, b1))
 
-                        if (printOps) {
-                            printState(nodes, "-${b0.index},${b1.index} by 1/2")
-                        }
-                    } else if (b0Ends) {
-                        // merge exit into this node
-
-                        node.printer.append(I32EQZ)
-                        node.printer.append(
-                            IfBranch(
-                                ArrayList(b0.printer.instrs), emptyList(),
-                                blockParamsGetParams(b0),
-                                blockParamsGetResult(b0, null)
-                            )
-                        )
-
-                        replaceNode(node, SequenceNode(node.printer, b1), i)
-                        nodes.remove(b0)
-
-                        if (printOps) {
-                            printState(nodes, "-${b0.index} by 3")
-                        }
-                    } else {
-                        // merge exit into this node
-                        node.printer.append(
-                            IfBranch(
-                                ArrayList(b1.printer.instrs), emptyList(),
-                                blockParamsGetParams(b1),
-                                blockParamsGetResult(b1, null)
-                            )
-                        )
-
-                        replaceNode(node, SequenceNode(node.printer, b0), i)
-                        nodes.remove(b1)
-
-                        if (printOps) {
-                            printState(nodes, "-${b1.index} by 4")
-                        }
+                    if (printOps) {
+                        printState(nodes, "-${b0.index},${b1.index} by 1/2")
                     }
+                } else if (b0Ends) {
+                    // merge exit into this node
 
-                    changed = true
-                    changed2 = true
+                    node.printer.append(I32EQZ)
+                    node.printer.append(
+                        IfBranch(
+                            ArrayList(b0.printer.instrs), emptyList(),
+                            blockParamsGetParams(b0),
+                            blockParamsGetResult(b0, null)
+                        )
+                    )
+
+                    replaceNode(node, SequenceNode(node.printer, b1), i)
+                    nodes.remove(b0)
+
+                    if (printOps) {
+                        printState(nodes, "-${b0.index} by 3")
+                    }
+                } else {
+                    // merge exit into this node
+                    node.printer.append(
+                        IfBranch(
+                            ArrayList(b1.printer.instrs), emptyList(),
+                            blockParamsGetParams(b1),
+                            blockParamsGetResult(b1, null)
+                        )
+                    )
+
+                    replaceNode(node, SequenceNode(node.printer, b0), i)
+                    nodes.remove(b1)
+
+                    if (printOps) {
+                        printState(nodes, "-${b1.index} by 4")
+                    }
                 }
+
+                changed = true
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     /**
@@ -706,68 +710,64 @@ class StructuralAnalysis(
      * A -> B | C; B -> A
      * */
     private fun findSmallCircleA(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
+        var changed = false
+        for (i in nodes.indices) {
 
-                val nodeA = nodes.getOrNull(i) ?: break
-                if (nodeA !is BranchNode) continue
+            val nodeA = nodes.getOrNull(i) ?: break
+            if (nodeA !is BranchNode) continue
 
-                fun isSmallCircle(nextNode: GraphingNode): Boolean {
-                    return nextNode is SequenceNode &&
-                            nextNode.next == nodeA && nextNode.inputs.size == 1
-                }
-
-                val ifTrue = nodeA.ifTrue
-                val ifFalse = nodeA.ifFalse
-                if (ifTrue == ifFalse) continue // not though over
-
-                val ifTrueIsCircle = isSmallCircle(ifTrue)
-                val ifFalseIsCircle = isSmallCircle(ifFalse)
-
-                val nodeB: GraphingNode
-                val nodeC: GraphingNode
-                val negate: Boolean
-
-                if (ifTrueIsCircle && !ifFalseIsCircle) {
-                    nodeB = ifTrue
-                    nodeC = ifFalse
-                    negate = false
-                } else if (ifFalseIsCircle && !ifTrueIsCircle) {
-                    nodeB = ifFalse
-                    nodeC = ifTrue
-                    negate = true
-                } else continue
-
-                changed = true
-                changed2 = true
-
-                val label = "smallCircleA${loopIndex++}"
-                nodeB.printer.append(Jump(label))
-                if (negate) nodeA.printer.append(I32EQZ)
-                nodeA.printer.append(
-                    IfBranch(
-                        nodeB.printer.instrs, emptyList(),
-                        blockParamsGetParams(nodeB),
-                        blockParamsGetResult(nodeB, null)
-                    )
-                )
-
-                val loopInstr = LoopInstr(
-                    label, nodeA.printer.instrs,
-                    blockParamsGetResult(nodeA, null)
-                )
-                nodeA.inputs.remove(nodeB)
-                val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
-                nodes.remove(nodeB)
-
-                if (printOps) {
-                    printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-                }
+            fun isSmallCircle(nextNode: GraphingNode): Boolean {
+                return nextNode is SequenceNode &&
+                        nextNode.next == nodeA && nextNode.inputs.size == 1
             }
-        } while (changed)
-        return changed2
+
+            val ifTrue = nodeA.ifTrue
+            val ifFalse = nodeA.ifFalse
+            if (ifTrue == ifFalse) continue // not though over
+
+            val ifTrueIsCircle = isSmallCircle(ifTrue)
+            val ifFalseIsCircle = isSmallCircle(ifFalse)
+
+            val nodeB: GraphingNode
+            val nodeC: GraphingNode
+            val negate: Boolean
+
+            if (ifTrueIsCircle && !ifFalseIsCircle) {
+                nodeB = ifTrue
+                nodeC = ifFalse
+                negate = false
+            } else if (ifFalseIsCircle && !ifTrueIsCircle) {
+                nodeB = ifFalse
+                nodeC = ifTrue
+                negate = true
+            } else continue
+
+            changed = true
+
+            val label = "smallCircleA${loopIndex++}"
+            nodeB.printer.append(Jump(label))
+            if (negate) nodeA.printer.append(I32EQZ)
+            nodeA.printer.append(
+                IfBranch(
+                    nodeB.printer.instrs, emptyList(),
+                    blockParamsGetParams(nodeB),
+                    blockParamsGetResult(nodeB, null)
+                )
+            )
+
+            val loopInstr = LoopInstr(
+                label, nodeA.printer.instrs,
+                blockParamsGetResult(nodeA, null)
+            )
+            nodeA.inputs.remove(nodeB)
+            val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
+            nodes.remove(nodeB)
+
+            if (printOps) {
+                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
+            }
+        }
+        return changed
     }
 
     /**
@@ -775,81 +775,77 @@ class StructuralAnalysis(
      * A -> B | C; B -> A | C
      * */
     private fun findSmallCircleB(): Boolean {
-        var changed2 = false
-        do {
-            var changed = false
-            for (i in nodes.indices) {
+        var changed = false
+        for (i in nodes.indices) {
 
-                val nodeA = nodes.getOrNull(i) ?: break
-                if (nodeA !is BranchNode) continue
+            val nodeA = nodes.getOrNull(i) ?: break
+            if (nodeA !is BranchNode) continue
 
-                fun isValidBAndC(nodeB: GraphingNode, nodeC: GraphingNode): Boolean {
-                    // check that B only goes to A and C
-                    return nodeB is BranchNode && (
-                            (nodeB.ifTrue == nodeA && nodeB.ifFalse == nodeC) ||
-                                    (nodeB.ifTrue == nodeC && nodeB.ifFalse == nodeA)) &&
-                            nodeB.inputs.size == 1
-                }
-
-                fun negateInner(nodeB: BranchNode, nodeC: GraphingNode): Boolean {
-                    return nodeB.ifTrue == nodeA && nodeB.ifFalse == nodeC
-                }
-
-                val ifTrue = nodeA.ifTrue
-                val ifFalse = nodeA.ifFalse
-                if (ifTrue == ifFalse) continue // not thought over yet
-
-                val ifTrueIsB = isValidBAndC(ifTrue, ifFalse)
-                val ifFalseIsB = isValidBAndC(ifFalse, ifTrue)
-
-                val nodeB: BranchNode
-                val nodeC: GraphingNode
-                val negate: Boolean
-
-                if (ifTrueIsB && !ifFalseIsB) {
-                    nodeB = ifTrue as BranchNode
-                    nodeC = ifFalse
-                    negate = false
-                } else if (ifFalseIsB && !ifTrueIsB) {
-                    nodeB = ifFalse as BranchNode
-                    nodeC = ifTrue
-                    negate = true
-                } else continue
-
-                val label = "smallCircleB${loopIndex++}"
-                if (negateInner(nodeB, nodeC)) {
-                    nodeB.printer.append(I32EQZ)
-                }
-                nodeB.printer.append(JumpIf(label))
-                if (negate) nodeA.printer.append(I32EQZ)
-                nodeA.printer.append(
-                    IfBranch(
-                        nodeB.printer.instrs, emptyList(),
-                        blockParamsGetParams(nodeB),
-                        blockParamsGetResult(nodeB, null)
-                    )
-                )
-
-                val loopInstr = LoopInstr(
-                    label, nodeA.printer.instrs,
-                    blockParamsGetResult(nodeA, null)
-                )
-
-                nodeA.inputs.remove(nodeB)
-                nodeC.inputs.remove(nodeB)
-                val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
-                nodes.remove(nodeB)
-
-                if (printOps) {
-                    printState(nodes, "smallCircleB [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-                }
-                checkState()
-
-                changed = true
-                changed2 = true
+            fun isValidBAndC(nodeB: GraphingNode, nodeC: GraphingNode): Boolean {
+                // check that B only goes to A and C
+                return nodeB is BranchNode && (
+                        (nodeB.ifTrue == nodeA && nodeB.ifFalse == nodeC) ||
+                                (nodeB.ifTrue == nodeC && nodeB.ifFalse == nodeA)) &&
+                        nodeB.inputs.size == 1
             }
-        } while (changed)
-        return changed2
+
+            fun negateInner(nodeB: BranchNode, nodeC: GraphingNode): Boolean {
+                return nodeB.ifTrue == nodeA && nodeB.ifFalse == nodeC
+            }
+
+            val ifTrue = nodeA.ifTrue
+            val ifFalse = nodeA.ifFalse
+            if (ifTrue == ifFalse) continue // not thought over yet
+
+            val ifTrueIsB = isValidBAndC(ifTrue, ifFalse)
+            val ifFalseIsB = isValidBAndC(ifFalse, ifTrue)
+
+            val nodeB: BranchNode
+            val nodeC: GraphingNode
+            val negate: Boolean
+
+            if (ifTrueIsB && !ifFalseIsB) {
+                nodeB = ifTrue as BranchNode
+                nodeC = ifFalse
+                negate = false
+            } else if (ifFalseIsB && !ifTrueIsB) {
+                nodeB = ifFalse as BranchNode
+                nodeC = ifTrue
+                negate = true
+            } else continue
+
+            val label = "smallCircleB${loopIndex++}"
+            if (negateInner(nodeB, nodeC)) {
+                nodeB.printer.append(I32EQZ)
+            }
+            nodeB.printer.append(JumpIf(label))
+            if (negate) nodeA.printer.append(I32EQZ)
+            nodeA.printer.append(
+                IfBranch(
+                    nodeB.printer.instrs, emptyList(),
+                    blockParamsGetParams(nodeB),
+                    blockParamsGetResult(nodeB, null)
+                )
+            )
+
+            val loopInstr = LoopInstr(
+                label, nodeA.printer.instrs,
+                blockParamsGetResult(nodeA, null)
+            )
+
+            nodeA.inputs.remove(nodeB)
+            nodeC.inputs.remove(nodeB)
+            val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
+            nodes.remove(nodeB)
+
+            if (printOps) {
+                printState(nodes, "smallCircleB [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
+            }
+            checkState()
+
+            changed = true
+        }
+        return changed
     }
 
     /**
@@ -858,51 +854,47 @@ class StructuralAnalysis(
      * */
     private fun mergeSmallCircles(): Boolean {
         val print = printOps && nodes.size == 2
-        var changed2 = false
-        do {
-            var changed = false
-            val firstNode = nodes.first()
-            for (i in nodes.indices) {
-                val node1 = nodes.getOrNull(i) ?: break
-                if (print) println("node1: $node1")
-                if (node1 is SequenceNode) {
-                    val node2 = node1.next
-                    if (print) println("node2: $node2")
-                    if (node1 != node2 && node2 is SequenceNode && node2.next == node1) {
-                        // we found such a circle
-                        val entry1 = node1.inputs.size > 1
-                        val entry2 = node2.inputs.size > 1
-                        if (print) println("e1/e2: $entry1/$entry2")
-                        if (entry1 && entry2) {
-                            // TO DO("duplicate functionality")
-                            // code duplication -> ignore this case
-                            continue
-                        } else if (entry1 && node2 != firstNode) {
-                            // append entry2 to entry1
-                            node1.printer.append(node2.printer)
-                            node1.inputs.remove(node2)
-                            node1.outputStack = node2.outputStack
-                            nodes.remove(node2)
-                            if (printOps) println("-${node2.index} by 7")
-                            makeNodeLoop("mergeSmallCircleA", node1, i)
-                        } else if (node1 != firstNode) {
-                            // append entry1 to entry2
-                            node2.printer.append(node1.printer)
-                            node2.inputs.remove(node1)
-                            node2.outputStack = node1.outputStack
-                            nodes.remove(node1)
-                            if (printOps) println("-${node1.index} by 8")
-                            val node2i = nodes.indexOf(node2)
-                            makeNodeLoop("mergeSmallCircleB", node2, node2i)
-                        }
-                        checkState()
-                        changed = true
-                        changed2 = true
+        var changed = false
+        val firstNode = nodes.first()
+        for (i in nodes.indices) {
+            val node1 = nodes.getOrNull(i) ?: break
+            if (print) println("node1: $node1")
+            if (node1 is SequenceNode) {
+                val node2 = node1.next
+                if (print) println("node2: $node2")
+                if (node1 != node2 && node2 is SequenceNode && node2.next == node1) {
+                    // we found such a circle
+                    val entry1 = node1.inputs.size > 1
+                    val entry2 = node2.inputs.size > 1
+                    if (print) println("e1/e2: $entry1/$entry2")
+                    if (entry1 && entry2) {
+                        // TO DO("duplicate functionality")
+                        // code duplication -> ignore this case
+                        continue
+                    } else if (entry1 && node2 != firstNode) {
+                        // append entry2 to entry1
+                        node1.printer.append(node2.printer)
+                        node1.inputs.remove(node2)
+                        node1.outputStack = node2.outputStack
+                        nodes.remove(node2)
+                        if (printOps) println("-${node2.index} by 7")
+                        makeNodeLoop("mergeSmallCircleA", node1, i)
+                    } else if (node1 != firstNode) {
+                        // append entry1 to entry2
+                        node2.printer.append(node1.printer)
+                        node2.inputs.remove(node1)
+                        node2.outputStack = node1.outputStack
+                        nodes.remove(node1)
+                        if (printOps) println("-${node1.index} by 8")
+                        val node2i = nodes.indexOf(node2)
+                        makeNodeLoop("mergeSmallCircleB", node2, node2i)
                     }
+                    checkState()
+                    changed = true
                 }
             }
-        } while (changed)
-        return changed2
+        }
+        return changed
     }
 
     private fun trySolveLinearTree(): Boolean {
@@ -916,9 +908,9 @@ class StructuralAnalysis(
      * */
     fun joinNodes(): Builder {
 
-        isLookingAtSpecial =
-            sig.name == "findDiscrepancy"
+        isLookingAtSpecial = false
 
+        @Suppress("KotlinConstantConditions")
         if (isLookingAtSpecial) {
             printOps = true
         }
@@ -960,35 +952,38 @@ class StructuralAnalysis(
         StackValidator.validateStack(nodes, methodTranslator)
 
         while (true) {
-            var changed2 = false
-            for (step in 0 until 13) {
-                val changed2i = when (step) {
-                    0 -> removeEmptyIfStatements()
-                    1 -> duplicateSimpleReturnNodes()
-                    2 -> joinSequences()
-                    3 -> removeDeadEnds()
-                    4 -> findWhereBothBranchesTerminate()
-                    5 -> findWhileTrueLoops()
-                    6 -> findWhileLoops()
-                    7 -> replaceSimpleBranch()
-                    8 -> mergeGeneralBranching()
-                    9 -> mergeSmallCircles()
-                    10 -> findSmallCircleA()
-                    11 -> findSmallCircleB()
-                    12 -> removeNodesWithoutInputs()
-                    else -> false
-                }
-                if (changed2i) {
-                    if (printOps) println("Change by [$step]")
-                    checkState()
-                    if (canReturnFirstNode()) {
-                        return firstNodeForReturn()
+            var hadAnyChange = false
+            for (step in 0 until 14) {
+                while (true) {
+                    val hadStepChange = when (step) {
+                        0 -> removeEmptyIfStatements()
+                        1 -> duplicateSimpleReturnNodes()
+                        2 -> joinFirstSequence()
+                        3 -> joinSequences()
+                        4 -> removeDeadEnds()
+                        5 -> findWhereBothBranchesTerminate()
+                        6 -> findWhileTrueLoops()
+                        7 -> findWhileLoops()
+                        8 -> replaceSimpleBranch()
+                        9 -> mergeGeneralBranching()
+                        10 -> mergeSmallCircles()
+                        11 -> findSmallCircleA()
+                        12 -> findSmallCircleB()
+                        13 -> removeNodesWithoutInputs()
+                        else -> false
                     }
-                    changed2 = true
+                    if (hadStepChange) {
+                        if (printOps) println("Change by [$step]")
+                        checkState()
+                        if (canReturnFirstNode()) {
+                            return firstNodeForReturn()
+                        }
+                        hadAnyChange = true
+                    } else break
                 }
             }
 
-            if (!changed2) {
+            if (!hadAnyChange) {
                 checkState()
                 if (trySolveLinearTree()) {
                     assertTrue(canReturnFirstNode())
@@ -996,12 +991,12 @@ class StructuralAnalysis(
                 }
             }
 
-            if (!changed2) {
-                changed2 = removeNodesWithoutInputs() // this should be handled by the loop above!!
-                if (changed2) LOGGER.warn("Secondary check was somehow successful")
+            if (!hadAnyChange) {
+                hadAnyChange = removeNodesWithoutInputs() // this should be handled by the loop above!!
+                if (hadAnyChange) LOGGER.warn("Secondary check was somehow successful")
             }
 
-            if (!changed2) {
+            if (!hadAnyChange) {
                 if (printOps) printState(nodes, "Before large switch statement:")
                 methodTranslator.localVariables1.add(LocalVariable("lbl", i32))
                 val switchStatement = createLargeSwitchStatement2(this)

@@ -138,6 +138,21 @@ class MethodTranslator(
     val descriptor: String,
 ) : MethodVisitor(api) {
 
+    companion object {
+        val callTable = ByteArrayOutputStream2(1024)
+        val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
+
+        private var printOps = false
+        private var comments = true
+
+        private val notStackPushedMethods = listOf(
+            "stackPush", "stackPop", "printStackTraceLine",
+            "createGCFieldTable", "findFieldsByClass", "setStackTrace",
+            "calloc", "findGap", "allocateNewSpace", "writeClass",
+            "Throwable_printStackTrace_V"
+        )
+    }
+
     private var isAbstract = false
     private val stack = ArrayList<String>()
     private val argsMapping = HashMap<Int, Int>()
@@ -155,9 +170,9 @@ class MethodTranslator(
     val sig = MethodSig.c(clazz, name, descriptor)
     val canThrowError = canThrowError(sig)
 
-    private val enableStackPush = enableTracing && (canThrowError || crashOnAllExceptions) &&
-            sig.name != "stackPush" && sig.name != "stackPop" && sig.name != "printStackTraceLine" &&
-            sig.name != "createGCFieldTable" && sig.name != "setStackTrace"
+    private val enableStackPush = enableTracing &&
+            (canThrowError || crashOnAllExceptions) &&
+            sig.name !in notStackPushedMethods
 
     private val isStatic = access.hasFlag(ACC_STATIC)
 
@@ -1140,7 +1155,7 @@ class MethodTranslator(
                         isEmpty -> {
                             pop(splitArgs, false, ret)
                             if (comments) printer.comment("skipping empty2 $sig1")
-                            for(j in splitArgs.indices) printer.drop() // drop arguments
+                            for (j in splitArgs.indices) printer.drop() // drop arguments
                             printer.drop() // drop called
                             calledCanThrow = false
                         }
@@ -2051,14 +2066,6 @@ class MethodTranslator(
             callTable.writeLE32(line)
         }
         return callTable.size() / 12 - 1
-    }
-
-    companion object {
-        val callTable = ByteArrayOutputStream2(1024)
-        val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
-
-        private var printOps = false
-        private var comments = true
     }
 
 }

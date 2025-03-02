@@ -15,7 +15,11 @@ import wasm.parser.*
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
 var enableCppTracing = true
-val targetClusters = 20
+
+/**
+ * if you want to change this, you need to change the C++ file list in CMakeLists.txt
+ * */
+val numTargetClusters = 20
 
 val writer = StringBuilder2(1 shl 16)
 val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/cpp")
@@ -117,7 +121,7 @@ fun wasm2cpp(
     val functionsByName = createFunctionByNameMap(functions, imports)
     functions.removeIf { it.funcName.startsWith("getNth_") }
     writeHeader(functions, functionTable, imports, globals)
-    val clusters = splitFunctionsIntoClusters(functions, targetClusters)
+    val clusters = splitFunctionsIntoClusters(functions, numTargetClusters)
     for (i in clusters.indices) {
         writeCluster(i, clusters[i], globals, functionsByName)
     }

@@ -5,8 +5,8 @@ import me.anno.utils.structures.arrays.IntArrayList;
 
 import java.util.Objects;
 
-import static jvm.JVM32.log;
 import static jvm.LWJGLxOpenGL.rgba2argb;
+import static jvm.NativeLog.log;
 
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This

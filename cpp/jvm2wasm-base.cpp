@@ -140,24 +140,24 @@ void java_lang_System_gc_V() { gcCtr = 1000000; }
 void jvm_GarbageCollector_markJSReferences_V() { }
 void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
 
-i32 jvm_JVM32_log_III(i32 code, i32 r) { std::cout << code << ", " << r << std::endl; return r; }
-void jvm_JVM32_log_DV(f64 x) { std::cout << x << std::endl; }
-void jvm_JVM32_log_ILjava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c, i32 d) { std::cout << a << ", " << strToCpp(b) << ", " << strToCpp(c) << ", " << d << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringCCV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringDV(i32 a, f64 b) { std::cout << strToCpp(a) << ", " << b << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringIIIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << b << ", " << c << ", " << d << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringIIV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << strToCpp(c) << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringIV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << b << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringDV(i32 a, i32 b, f64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << strToCpp(d) << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringJV(i32 a, i32 b, i64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << ", " << d << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << strToCpp(b) << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringLjava_lang_StringZV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
-void jvm_JVM32_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::endl; }
+i32 jvm_NativeLog_log_III(i32 code, i32 r) { std::cout << code << ", " << r << std::endl; return r; }
+void jvm_NativeLog_log_DV(f64 x) { std::cout << x << std::endl; }
+void jvm_NativeLog_log_ILjava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c, i32 d) { std::cout << a << ", " << strToCpp(b) << ", " << strToCpp(c) << ", " << d << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringCCV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringDV(i32 a, f64 b) { std::cout << strToCpp(a) << ", " << b << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringIIIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << b << ", " << c << ", " << d << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringIIV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << b << ", " << strToCpp(c) << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringIV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << b << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringDV(i32 a, i32 b, f64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringILjava_lang_StringV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << strToCpp(d) << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringJV(i32 a, i32 b, i64 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << ", " << d << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << strToCpp(c) << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << strToCpp(b) << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringZV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::endl; }
 
 std::vector<i32> callocStatistics;
 void jvm_JVM32_trackCalloc_IV(i32 classId) {

@@ -12,6 +12,7 @@ import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.*;
+import static jvm.NativeLog.log;
 
 @SuppressWarnings("unused")
 public class JVM32 {
@@ -57,78 +58,6 @@ public class JVM32 {
         return read32(staticInstancesOffset() + (clazz << 2)) + offset;
     }
 
-    @NoThrow
-    @JavaScript(code = "console.log(arg0, arg1); return arg1;")
-    public static native int log(int code, int v);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), arg1);")
-    public static native void log(String msg, int param);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), arg1);")
-    public static native void log(String msg, double param);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), arg1, arg2);")
-    public static native void log(String msg, int param, int param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), String.fromCharCode(arg1), String.fromCharCode(arg2));")
-    public static native void log(String msg, char param, char param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), str(arg2));")
-    public static native void log(String msg, String param, String param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
-    public static native void log(String msg, String param, int param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
-    public static native void log(String msg, String param, long param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
-    public static native void log(String msg, String param, double param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2);")
-    public static native void log(String msg, String param, boolean param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), arg1, arg2, arg3);")
-    public static native void log(String msg, int param, int param2, int param3);
-
-    @NoThrow
-    @JavaScript(code = "console.log(arg0, str(arg1), str(arg2), arg3);")
-    public static native void log(int i, String msg, String param, int param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), str(arg2), arg3);")
-    public static native void log(String i, String msg, String param, int param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2, str(arg3));")
-    public static native void log(String i, String msg, int param, String param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), arg1, str(arg2));")
-    public static native void log(String msg, int param, String param2);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0));")
-    public static native void log(String msg);
-
-    @NoThrow
-    @JavaScript(code = "console.log(arg0);")
-    public static native void log(double v);
-
-    @NoThrow
-    @JavaScript(code = "console.log(str(arg0), str(arg1));")
-    public static native void log(String msg, String param);
-
     // instance, class -> instance, error
     @Alias(names = "checkCast")
     public static int checkCast(int instance, int clazz) {
@@ -157,6 +86,7 @@ public class JVM32 {
 
     // can be removed in the future, just good for debugging
     @Alias(names = "debug")
+    @SuppressWarnings("rawtypes")
     public static void debug(Object instance, boolean staticToo) throws IllegalAccessException {
         if (instance == null) {
             log("null");
@@ -164,6 +94,7 @@ public class JVM32 {
             Class clazz = instance.getClass();
             log("Class", clazz.getName());
             Field[] fields = clazz.getFields();
+            //noinspection ConstantValue
             if (fields != null) for (Field f : fields) {
                 if (f == null) continue;
                 if (staticToo || !Modifier.isStatic(f.getModifiers())) {

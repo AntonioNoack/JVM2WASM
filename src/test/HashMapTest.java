@@ -3,9 +3,8 @@ package test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.stream.Collectors;
 
-import static jvm.JVM32.log;
+import static jvm.NativeLog.log;
 
 public class HashMapTest {
 

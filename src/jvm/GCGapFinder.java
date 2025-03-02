@@ -5,10 +5,11 @@ import jvm.custom.WeakRef;
 import me.anno.utils.structures.arrays.IntArrayList;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.GarbageCollector.*;
 import static jvm.GCTraversal.classSizes;
+import static jvm.GarbageCollector.*;
 import static jvm.JVM32.*;
 import static jvm.JavaLang.getAddr;
+import static jvm.NativeLog.log;
 
 /**
  * "Sweep" of mark-and-sweep
