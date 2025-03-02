@@ -74,6 +74,8 @@ object HierarchyIndex {
     val exportedMethods = HashSet<MethodSig>(cap)
     val usesSelf = HashMap<MethodSig, Boolean>(cap)
 
+    val emptyFunctions = HashSet<MethodSig>(cap)
+
     // todo support static setter/getter methods as well :3
     val setterMethods = HashMap<MethodSig, FieldSig>(cap2)
     val getterMethods = HashMap<MethodSig, FieldSig>(cap2)

@@ -1,5 +1,6 @@
 package hierarchy
 
+import anyMethodThrows
 import api
 import dIndex
 import dyninvoke.DynPrinter
@@ -337,9 +338,17 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             dIndex.constructorDependencies[sig] = constructed
         }
 
+        if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
+            val callInstr =
+                if (anyMethodThrows) "call_indirect (type \$iXi)"
+                else "call_indirect (type \$iX)"
+            annotations.add(Annota("annotations/WASM", mapOf("code" to callInstr)))
+        }
+
         if (annotations.isNotEmpty()) {
             hIndex.annotations[sig] = annotations
         }
+
         if (interfaceCalls.isNotEmpty()) {
             dIndex.interfaceDependencies[sig] = interfaceCalls
             dIndex.knownInterfaceDependencies.addAll(interfaceCalls)
@@ -350,6 +359,10 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             if (isSetter && instructionIndex != 4) isSetter = false
             if (isGetter) hIndex.getterMethods[sig] = lastField!!
             if (isSetter) hIndex.setterMethods[sig] = lastField!!
+        }
+
+        if (instructionIndex == 1) { // only Return
+            hIndex.emptyFunctions.add(sig)
         }
 
         hIndex.usesSelf[sig] = usesSelf

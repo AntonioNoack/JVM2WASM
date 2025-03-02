@@ -10,6 +10,7 @@ import checkArrayAccess
 import checkClassCasts
 import checkIntDivisions
 import checkNullPointers
+import crashOnAllExceptions
 import dIndex
 import dependency.ActuallyUsedIndex
 import enableTracing
@@ -153,9 +154,12 @@ class MethodTranslator(
 
     val sig = MethodSig.c(clazz, name, descriptor)
     val canThrowError = canThrowError(sig)
-    private val canPush = enableTracing && canThrowError
-    private val isStatic = access.hasFlag(ACC_STATIC)
 
+    private val enableStackPush = enableTracing && (canThrowError || crashOnAllExceptions) &&
+            sig.name != "stackPush" && sig.name != "stackPop" && sig.name != "printStackTraceLine" &&
+            sig.name != "createGCFieldTable" && sig.name != "setStackTrace"
+
+    private val isStatic = access.hasFlag(ACC_STATIC)
 
     init {
         printOps = false // clazz == "kotlin/collections/CollectionsKt__ReversedViewsKt"
@@ -1116,6 +1120,8 @@ class MethodTranslator(
                         return field.name in gIndex.getFieldOffsets(field.clazz, true).fields
                     }
 
+                    val isEmpty = sig1 in hIndex.emptyFunctions
+
                     when {
                         setter != null -> {
                             visitFieldInsn2(
@@ -1129,6 +1135,13 @@ class MethodTranslator(
                                 if (isStatic(getter)) 0xb2 else 0xb4,
                                 getter.clazz, getter.name, getter.descriptor, true
                             )
+                            calledCanThrow = false
+                        }
+                        isEmpty -> {
+                            pop(splitArgs, false, ret)
+                            if (comments) printer.comment("skipping empty2 $sig1")
+                            for(j in splitArgs.indices) printer.drop() // drop arguments
+                            printer.drop() // drop called
                             calledCanThrow = false
                         }
                         else -> {
@@ -1186,7 +1199,7 @@ class MethodTranslator(
                     }
                 }
             }
-            // typically, <init>, but also can be private or super function; -> no resolution required
+            // invokespecial; typically, <init>, but also can be private or super function; -> no resolution required
             0xb7 -> {
                 if (!ignoreNonCriticalNullPointers) {
                     checkNotNull0(owner, name, ::getCaller)
@@ -1195,14 +1208,19 @@ class MethodTranslator(
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
                     printer.append(inline)
-                    printer.comment("special-inlined $sig")
+                    if (comments) printer.comment("special-inlined $sig")
                 } else {
-                    stackPush()
-                    val name2 = methodName(sig)
-                    assertFalse(sig in hIndex.abstractMethods)
-                    ActuallyUsedIndex.add(this.sig, sig)
-                    printer.append(Call(name2))
-                    stackPop()
+                    if (sig.descriptor == "()V" && sig in hIndex.emptyFunctions) {
+                        printer.drop()
+                        if (comments) printer.comment("skipping empty $sig")
+                    } else {
+                        stackPush()
+                        val name2 = methodName(sig)
+                        assertFalse(sig in hIndex.abstractMethods)
+                        ActuallyUsedIndex.add(this.sig, sig)
+                        printer.append(Call(name2))
+                        stackPop()
+                    }
                 }
             }
             // static, no resolution required
@@ -1233,13 +1251,13 @@ class MethodTranslator(
     }
 
     fun stackPush() {
-        if (canPush) {
+        if (enableStackPush) {
             printer.append(i32Const(getCallIndex())).append(Call("stackPush"))
         }
     }
 
     fun stackPop() {
-        if (canPush) {
+        if (enableStackPush) {
             printer.append(Call("stackPop"))
         }
     }
@@ -1365,7 +1383,7 @@ class MethodTranslator(
         }
 
         if (!canThrowError) {
-            printer.append(Call("panic"))
+            printer.append(Call.panic)
             if (mustThrow) {
                 printer.append(Unreachable)
             }
@@ -1789,7 +1807,7 @@ class MethodTranslator(
         else -> if (is32Bits) Call.setVIOFieldI32 else Call.setVIOFieldI64
     }
 
-    private fun callClinit(clazz: String) {
+    private fun callStaticInit(clazz: String) {
         if (name == "<clinit>" && clazz == this.clazz) {
             if (comments) printer.comment("skipped <clinit>, we're inside of it")
             return
@@ -1848,7 +1866,7 @@ class MethodTranslator(
             0xb2 -> {
                 // get static
                 if (name in enumFieldsNames) {
-                    callClinit(owner)
+                    callStaticInit(owner)
                     printer.append(i32Const(gIndex.getClassIndex(owner)))
                         .append(Call("findClass"))
                         .append(
@@ -1864,7 +1882,7 @@ class MethodTranslator(
                     printer.append(I32Add).append(I32Load).comment("enum values")
                     printer.push(wasmType)
                 } else if (fieldOffset != null) {
-                    callClinit(owner)
+                    callStaticInit(owner)
                     printer.push(wasmType)
                     // load class index
                     if (precalculateStaticFields) {
@@ -1907,7 +1925,7 @@ class MethodTranslator(
                     printer.comment("enum values")
                     printer.pop(wasmType)
                 } else if (fieldOffset != null) {
-                    callClinit(owner)
+                    callStaticInit(owner)
                     printer.pop(wasmType)
                     if (precalculateStaticFields) {
                         val staticPtr = staticLookup[owner]!! + fieldOffset

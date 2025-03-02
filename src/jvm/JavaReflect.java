@@ -5,6 +5,7 @@ import annotations.NoThrow;
 import annotations.WASM;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
 import kotlin.jvm.internal.ClassReference;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -26,33 +27,39 @@ public class JavaReflect {
     };
 
     @NoThrow
+    @Nullable
+    @SuppressWarnings("rawtypes")
     @Alias(names = "java_lang_Class_getFields_ALjava_lang_reflect_Field")
-    public static <V> int getFields(Class<V> clazz) {
-        return read32(getAddr(clazz) + objectOverhead + 4);
+    public static Field[] getFields(Class clazz) {
+        return ptrTo(read32(getAddr(clazz) + objectOverhead + 4));
     }
 
+    @SuppressWarnings("rawtypes")
     @Alias(names = "java_lang_Class_getField_Ljava_lang_StringLjava_lang_reflect_Field")
-    public static <V> Field Class_getField(Class<V> clazz, String name) throws NoSuchFieldException {
+    public static Field Class_getField(Class clazz, String name) {
         // using class instance, find fields
         if (clazz == null || name == null) throw new NullPointerException("Class.getField()");
-        int fields = getFields(clazz);
-        int length = fields == 0 ? 0 : arrayLength(fields);
-        // log("class for fields", getAddr(clazz));
-        // log("fields*, length", fields, length);
-        // log("looking for field", searchedField);
-        for (int i = 0; i < length; i++) {
-            Field field = ptrTo(read32(fields + arrayOverhead + (i << 2)));
-            String fieldName = field.getName();
-            // log("field[i]:", fieldName);
-            // log("field[i].offset:", getFieldOffset(field));
-            if (name.equals(fieldName)) return field;
+        while (true) {
+            Field[] fields = getFields(clazz);
+            int length = fields == null ? 0 : fields.length;
+            // log("class for fields", getAddr(clazz));
+            // log("fields*, length", fields, length);
+            // log("looking for field", searchedField);
+            for (int i = 0; i < length; i++) {
+                Field field = fields[i];
+                String fieldName = field.getName();
+                // log("field[i]:", fieldName);
+                // log("field[i].offset:", getFieldOffset(field));
+                if (name.equals(fieldName)) return field;
+            }
+            // use parent class as well, so we need fewer entries in each array
+            Class prevClass = clazz;
+            clazz = clazz.getSuperclass();
+            if (clazz == null) {
+                log("looked for field, but failed", prevClass.getName(), name);
+                return null; // not really JVM-conform, but we don't want exception-throwing
+            }
         }
-        // todo use parent class as well
-        // todo for that, we need to store the parent class...
-        // if (getAddr(clazz) == findClass(0))
-        log("looked for field, but failed", clazz.getName(), name);
-        throw new NoSuchFieldException(name);
-        // else return Class_getField(ptrTo(findClass(getParentClassIdx())), name);
     }
 
     @Alias(names = "java_lang_Class_getDeclaredField_Ljava_lang_StringLjava_lang_reflect_Field")
@@ -65,16 +72,18 @@ public class JavaReflect {
         return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
     }
 
-    private static final NoSuchMethodException noSuchMethodEx = new NoSuchMethodException();
-
+    // private static final NoSuchMethodException noSuchMethodEx = new NoSuchMethodException();
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
-    public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) throws NoSuchMethodException {
+    public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) {
         if (name == null) return null;
         Method[] methods = Class_getDeclaredMethods(self);
         for (Method method : methods) {
-            if (matches(method, name, parameters)) return method;
+            if (matches(method, name, parameters)) {
+                return method;
+            }
         }
-        throw noSuchMethodEx;
+        return null; // not JVM conform, but we need to be able to run a JVM without exceptions
+        // throw noSuchMethodEx;
     }
 
     @Alias(names = "java_lang_Class_getDeclaredMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
@@ -102,7 +111,7 @@ public class JavaReflect {
     public static int getFieldOffset(Field field) {
         int offset = read32(getAddr(field) + objectOverhead + 9);// hardcoded, could be a global :)
         if (offset < objectOverhead && !Modifier.isStatic(field.getModifiers()))
-            throw new IllegalStateException("Field offset must not be zero");
+            throwJs("Field offset must not be zero");
         return offset;
     }
 
@@ -468,7 +477,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")
-    public static <V> Class<V> java_lang_Class_getSuperclass_Ljava_lang_Class(Class<V> clazz) {
+    public static <V> Class<V> Class_getSuperclass_Ljava_lang_Class(Class<V> clazz) {
         int idx = getClassIndex(clazz);
         if (idx <= 0) return null;
         int superClassIdx = getSuperClass(idx);
@@ -568,13 +577,14 @@ public class JavaReflect {
         }
         int constructorPtr = resolveIndirectByClass(classIndex, 4); // (id+1)<<2, id = 0
         int instance = createInstance(classIndex);
+        log("Creating class instance", classIndex, constructorPtr);
         // todo it would be good, if we have a value for stackPush/stackPop here
-        invoke(instance, constructorPtr);
+        callConstructor(instance, constructorPtr);
         return ptrTo(instance);
     }
 
-    @WASM(code = "call_indirect (type $iXi)")
-    public static native void invoke(int obj, int methodPtr);
+    // @WASM(code = anyMethodThrows ? "call_indirect (type $iXi)" : "call_indirect (type $iX)")
+    private static native void callConstructor(int obj, int methodPtr);
 
     @Alias(names = "java_lang_Class_toString_Ljava_lang_String")
     public static <V> String java_lang_Class_toString_Ljava_lang_String(Class<V> clazz) {

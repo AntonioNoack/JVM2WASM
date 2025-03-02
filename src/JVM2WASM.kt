@@ -13,6 +13,10 @@ import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import utils.*
+import utils.DynIndex.appendDynamicFunctionTable
+import utils.DynIndex.appendInheritanceTable
+import utils.DynIndex.appendInvokeDynamicTable
+import utils.DynIndex.methodTablePtr
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder
@@ -23,15 +27,16 @@ const val api = ASM9
 
 // todo calculate dependency-tree from static initialization,
 //  and call that once at the start, and then never again
+// alternative/improvement:
+// todo on each branch, mark which classes have been static-initialized,
+//  and remove those on all necessarily following branches
+
 
 // optimizations:
 // done when there is no child implementations for a non-final, non-static function, call it directly
 // todo also track, which methods theoretically can throw errors: mark them, and all their callers; -> optimization
 // call_indirect/interface is more complicated... all methods need to have the same signature
-// todo if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead (-> modify findUniquelyImplemented())
-
-// todo on each branch, mark which classes have been static-initialized,
-//  and remove those on all necessarily following branches
+// done if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead (-> modify findUniquelyImplemented())
 
 
 // todo Companion-objects are unique, so make all their fields and themselves static;
@@ -542,8 +547,6 @@ fun jvm2wasm() {
     defineGlobal("Z", ptrType, clInitFlagTable)
     defineGlobal("L", ptrType, throwableLookupPtr)
     defineGlobal("R", ptrType, resourceTablePtr)
-
-    // todo if we run out of stack space, throw exception
 
     defineGlobal("q", ptrType, ptr) // stack end ptr
     ptr += stackSize

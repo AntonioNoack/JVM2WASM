@@ -496,8 +496,8 @@ public class JVM32 {
     }
 
     @NoThrow
-    public static int getSuperClass(int instanceClass) {
-        int tableAddress = read32(inheritanceTable() + (instanceClass << 2));
+    public static int getSuperClass(int classIdx) {
+        int tableAddress = read32(inheritanceTable() + (classIdx << 2));
         if (tableAddress == 0) return 0;
         return read32(tableAddress);
     }
@@ -1110,7 +1110,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @JavaScript(code = "console.log('  '.repeat(arg0)+arg1+'.'+arg2+':'+arg3)")
+    @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
     private static native void printStackTraceLine(int depth, String clazz, String method, int line);
 
     @NoThrow

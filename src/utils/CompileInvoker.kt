@@ -111,8 +111,7 @@ fun compileToWASM(printer: StringBuilder2) {
                 printAsync(process.inputStream, false)
                 printAsync(process.errorStream, true)
                 val stream = process.outputStream
-                stream.write("cd ~\n".toByteArray())
-                stream.write("./comp.sh\n".toByteArray())
+                stream.write("cd ~ && ./comp.sh\n".toByteArray())
                 stream.close()
                 process.waitFor()
             } else System.err.println("Compiling via WSL is broken :/")

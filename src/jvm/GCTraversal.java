@@ -69,7 +69,7 @@ public class GCTraversal {
 
     @NoThrow
     private static void traverseInstance(int instance, int clazz) {
-        int fields = read32(getAddr(fieldsByClass) + arrayOverhead + (clazz << 2));// fieldsByClass[clazz]
+        int fields = read32(getAddr(fieldOffsetsByClass) + arrayOverhead + (clazz << 2));// fieldsByClass[clazz]
         if (fields == 0) return; // no fields to process
         int size = arrayLength(fields);
         fields += arrayOverhead;
@@ -81,79 +81,89 @@ public class GCTraversal {
         }
     }
 
-    private static int[][] fieldsByClass;
+    private static int[][] fieldOffsetsByClass;
     private static int[] staticFields;
     public static int[] classSizes;
 
-    @NoThrow
-    private static void createGCFieldTable() {
-        // classes
-        int nc = numClasses();
-        int[][] fieldsByClass2 = new int[nc][];
-        fieldsByClass = fieldsByClass2;
-        int[] classSizes2 = new int[nc];
-        classSizes = classSizes2;
+    private static int findFieldsByClass(Class<Object> clazz, int classIdx) {
+
+        Field[] fields = getFields(clazz);
+        int instanceFieldCtr = 0;
         int staticFieldCtr = 0;
-        for (int i = 0; i < nc; i++) {
-            classSizes2[i] = JVM32.getInstanceSize(i);
-            Class<Object> clazz = ptrTo(findClass(i));
-            int fields = getFields(clazz);
-            if (fields == 0) continue;
-            // count fields
-            int fieldCtr = 0;
-            int length = arrayLength(fields);
-            int ptr = fields + arrayOverhead;
-            for (int j = 0; j < length; j++) {
-                Field field = ptrTo(read32(ptr));
+
+        if (fields != null) {
+            for (Field field : fields) {
                 int mods = field.getModifiers();
                 // check if type is relevant
                 if (!Modifier.isNative(mods)) {
                     if (Modifier.isStatic(mods)) {
                         staticFieldCtr++;
                     } else {
-                        fieldCtr++;
+                        instanceFieldCtr++;
                     }
-                }
-                ptr += 4;
-            }
-            if (fieldCtr > 0) {
-                int[] offsets = new int[fieldCtr];
-                fieldsByClass2[i] = offsets;
-                ptr = fields + arrayOverhead;
-                fieldCtr = 0;
-                for (int j = 0; j < length; j++) {
-                    Field field = ptrTo(read32(ptr));
-                    int mods = field.getModifiers();
-                    // check if type is relevant
-                    if (!Modifier.isNative(mods) && !Modifier.isStatic(mods)) {// masking could be optimized
-                        offsets[fieldCtr++] = getFieldOffset(field);
-                    }
-                    ptr += 4;
                 }
             }
         }
-        int ctr = 0;
-        int[] staticFields2 = new int[staticFieldCtr];
-        // log("Counted {} static fields", staticFieldCtr);
-        staticFields = staticFields2;
-        for (int i = 0; i < nc; i++) {
-            Class<Object> clazz = ptrTo(findClass(i));
-            int fields = getFields(clazz);
-            if (fields == 0) continue;
-            // count fields
-            int length = arrayLength(fields);
-            int staticOffset = findStatic(i, 0);
-            int ptr = fields + arrayOverhead;
-            for (int j = 0; j < length; j++) {
-                Field field = ptrTo(read32(ptr));
-                int mods = field.getModifiers();
-                // check if type is relevant
-                if (!Modifier.isNative(mods)) {
-                    if (Modifier.isStatic(mods)) {
-                        staticFields2[ctr++] = staticOffset + getFieldOffset(field);
+
+        Class<Object> parentClass = clazz.getSuperclass();
+        int[] parentFields = null;
+        if (parentClass != null) {
+            int parentClassIdx = getSuperClass(classIdx);
+            parentFields = fieldOffsetsByClass[parentClassIdx];
+            if (parentFields != null) {
+                instanceFieldCtr += parentFields.length;
+            }
+        }
+
+        if (instanceFieldCtr > 0) {
+            int[] fieldOffsets = fieldOffsetsByClass[classIdx] = new int[instanceFieldCtr];
+            instanceFieldCtr = 0;
+            if (parentFields != null) {
+                int parentFieldsLength = parentFields.length;
+                System.arraycopy(parentFields, 0, fieldOffsets, 0, parentFieldsLength);
+                instanceFieldCtr += parentFieldsLength;
+            }
+            if (fields != null) {
+                for (Field field : fields) {
+                    int mods = field.getModifiers();
+                    // check if type is relevant
+                    if (!Modifier.isNative(mods) && !Modifier.isStatic(mods)) {// masking could be optimized
+                        fieldOffsets[instanceFieldCtr++] = getFieldOffset(field);
                     }
                 }
-                ptr += 4;
+            }
+        }
+
+        return staticFieldCtr;
+    }
+
+    @NoThrow
+    private static void createGCFieldTable() {
+        // classes
+        int numClasses = numClasses();
+        GCTraversal.fieldOffsetsByClass = new int[numClasses][];
+        int[] classSizes = GCTraversal.classSizes = new int[numClasses];
+        int staticFieldCtr = 0;
+        for (int classIdx = 0; classIdx < numClasses; classIdx++) {
+            classSizes[classIdx] = JVM32.getInstanceSize(classIdx);
+            Class<Object> clazz = ptrTo(findClass(classIdx));
+            staticFieldCtr += findFieldsByClass(clazz, classIdx);
+        }
+        int ctr = 0;
+        int[] staticFields = GCTraversal.staticFields = new int[staticFieldCtr];
+        // log("Counted {} static fields", staticFieldCtr);
+        for (int i = 0; i < numClasses; i++) {
+            Class<Object> clazz = ptrTo(findClass(i));
+            Field[] fields = getFields(clazz);
+            if (fields == null) continue;
+            // count fields
+            int staticOffset = findStatic(i, 0);
+            for (Field field : fields) {
+                int mods = field.getModifiers();
+                // check if type is relevant
+                if (!Modifier.isNative(mods) && Modifier.isStatic(mods)) {
+                    staticFields[ctr++] = staticOffset + getFieldOffset(field);
+                }
             }
         }
     }

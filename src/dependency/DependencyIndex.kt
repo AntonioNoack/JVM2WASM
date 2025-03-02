@@ -114,7 +114,7 @@ object DependencyIndex {
         remaining.addAll(usedMethods)
 
         for ((ci, fo) in gIndex.fieldOffsets) {
-            if (ci.hasFlag(1) && fo.fields.isNotEmpty()) { // static
+            if (ci.hasFlag(1) && fo.hasFields()) { // static
                 remaining.add(MethodSig.c(gIndex.classNames[ci shr 1], "<clinit>", "()V"))
             }
         }

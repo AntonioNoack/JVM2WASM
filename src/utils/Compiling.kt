@@ -127,6 +127,8 @@ fun listEntryPoints() {
             }
         }
     }
+
+    LOGGER.info("Empty functions: ${hIndex.emptyFunctions.size}")
 }
 
 fun resolveGenericTypes() {

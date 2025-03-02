@@ -213,24 +213,24 @@ fun String.escapeChars() =
         }
     }.joinToString("")
 
+private fun getAliases(sig: MethodSig): List<String> {
+    val alias = hIndex.annotations[sig]
+        ?.firstOrNull { it.clazz == "annotations/Alias" }
+        ?: return emptyList()
+    @Suppress("UNCHECKED_CAST")
+    return alias.properties["names"] as List<String>
+}
+
 fun methodName(sig: MethodSig): String {
-    // check if alias exists
-    val alias = hIndex.annotations[sig]?.firstOrNull { it.clazz == "annotations/Alias" }
-    val v = if (alias != null) {
-        @Suppress("UNCHECKED_CAST")
-        alias.properties["names"] as List<String>
-    } else null
-    return if (!v.isNullOrEmpty()) v[0]
+    val aliases = getAliases(sig)
+    return if (aliases.isNotEmpty()) aliases.first()
     else methodName2(sig.clazz, sig.name, sig.descriptor)
 }
 
 fun methodNames(sig: MethodSig): List<String> {
-    // check if alias exists
-    val alias = hIndex.annotations[sig]?.firstOrNull { it.clazz == "annotations/Alias" }
-    return if (alias != null) {
-        @Suppress("UNCHECKED_CAST")
-        (alias.properties["names"] as List<String>).toList()
-    } else listOf(methodName2(sig.clazz, sig.name, sig.descriptor))
+    return getAliases(sig).ifEmpty {
+        listOf(methodName2(sig.clazz, sig.name, sig.descriptor))
+    }
 }
 
 fun methodName(clazz: String, name: String, descriptor: String): String {

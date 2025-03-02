@@ -1,9 +1,8 @@
 package dependency
 
 import entrySig
-import hIndex
+import utils.DynIndex.dynIndexSig
 import utils.MethodSig
-import utils.dynIndexSig
 import utils.methodName
 
 object ActuallyUsedIndex {
@@ -13,20 +12,12 @@ object ActuallyUsedIndex {
     val uses = HashMap<String, HashSet<String>>()
 
     fun add(caller: MethodSig, called: MethodSig) {
-        if (false && caller.clazz == "kotlin/jvm/internal/PropertyReference1") {
-            println("Method-Translating/2: $caller -> $called")
-        }
         val callerName = methodName(caller)
         val calledName = methodName(called)
         val changed0 = usedBy.getOrPut(calledName) { HashSet() }.add(callerName)
         val changed1 = uses.getOrPut(callerName) { HashSet() }.add(calledName)
         if ((changed0 || changed1) && isLocked) {
             throw IllegalStateException("Cannot add dependencies after resolution!, $callerName -> $calledName")
-        }
-        if (changed0 || changed1) {
-            if (called in hIndex.abstractMethods) {
-
-            }
         }
     }
 

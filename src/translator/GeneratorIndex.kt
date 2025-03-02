@@ -9,7 +9,7 @@ import jvm.JVM32.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertFail
-import me.anno.utils.assertions.assertTrue
+import me.anno.utils.assertions.assertFalse
 import me.anno.utils.types.Booleans.toInt
 import replaceClass1
 import useWASMExceptions
@@ -212,7 +212,9 @@ object GeneratorIndex {
 
     data class FieldData(val offset: Int, val type: String)
 
-    class ClassOffsets(var offset: Int, val fields: HashMap<String, FieldData>) {
+    class ClassOffsets(var offset: Int, private val parentFields: ClassOffsets?) {
+        val fields = HashMap<String, FieldData>()
+
         val locked get() = locker != null
         var locker: String? = null
         fun lock(locker: String): ClassOffsets {
@@ -223,26 +225,56 @@ object GeneratorIndex {
         override fun toString(): String {
             return "+$offset, $fields"
         }
+
+        fun allFields(): Map<String, FieldData> {
+            val result = HashMap<String, FieldData>()
+            var offsets = this
+            while (true) {
+                result.putAll(offsets.fields)
+                offsets = offsets.parentFields ?: break
+            }
+            return result
+        }
+
+        fun hasFields(): Boolean {
+            var offsets = this
+            while (true) {
+                if (offsets.fields.isNotEmpty()) return true
+                offsets = offsets.parentFields ?: break
+            }
+            return false
+        }
+
+        fun get(name: String): FieldData? {
+            return fields[name] ?: parentFields?.get(name)
+        }
+
+        fun getOrPut(name: String, put: () -> FieldData): FieldData {
+            val prev = get(name)
+            if (prev != null) return prev
+            val newInstance = put()
+            fields[name] = newInstance
+            return newInstance
+        }
     }
 
-    val fieldOffsets = HashMap<Int, ClassOffsets>()
-
+    val fieldOffsets = HashMap<Int, ClassOffsets>(8192)
     var lockFields = false
 
     fun getFieldOffsets(clazz: String, static: Boolean): ClassOffsets {
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
         return fieldOffsets.getOrPut(getClassIndex(clazz) * 2 + static.toInt()) {
             if (static) {
-                ClassOffsets(0, HashMap())
+                ClassOffsets(0, null)
             } else {
                 // get parent class offset
                 val parentClass = hIndex.superClass[clazz]
                 if ('.' in (parentClass ?: "")) throw IllegalStateException(parentClass)
                 if (parentClass != null) {
                     val parentOffset = getFieldOffsets(parentClass, false).lock(clazz)
-                    ClassOffsets(parentOffset.offset, HashMap(parentOffset.fields))
+                    ClassOffsets(parentOffset.offset, parentOffset)
                 } else {
-                    ClassOffsets(objectOverhead, HashMap())
+                    ClassOffsets(objectOverhead, null)
                 }
             }
         }
@@ -251,13 +283,14 @@ object GeneratorIndex {
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
         if (lockClasses && getClassIndexOrNull(clazz) == null) return null
-        val fos = getFieldOffsets(clazz, static)
-        return if (lockFields) fos.fields[name]?.offset else {
-            fos.fields.getOrPut(name) {
-                assertTrue(!fos.locked) { "$clazz has been locked by ${fos.locker}" }
+        val fieldOffsets = getFieldOffsets(clazz, static)
+        return if (lockFields) fieldOffsets.get(name)?.offset else {
+            fieldOffsets.getOrPut(name) {
+                assertFalse(fieldOffsets.locked) { "$clazz has been locked by ${fieldOffsets.locker}" }
+                // todo align fields, and fill them into gaps, where possible
                 // if(static) println("$clazz/$name/$fieldSize")
-                val offset = fos.offset
-                fos.offset += storageSize(descriptor)
+                val offset = fieldOffsets.offset
+                fieldOffsets.offset += storageSize(descriptor)
                 FieldData(offset, descriptor)
             }.offset
         }
