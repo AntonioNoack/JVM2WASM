@@ -118,36 +118,37 @@ object ReplaceOptimizer {
         while (i < instructions.size) {
             when (val instr = instructions[i]) {
                 is IfBranch -> {
-                    val prevIdx = instructions.prevIndex(i)
-                    val prevInstr = instructions.getOrNull(prevIdx)
-                    fun swap() {
-                        val tmp = instr.ifTrue
-                        instr.ifTrue = instr.ifFalse
-                        instr.ifFalse = tmp
+                    fun optimizeBranches() {
+                        instr.ifTrue = optimizeUsingReplacements2(instr.ifTrue)
+                        instr.ifFalse = optimizeUsingReplacements2(instr.ifFalse)
                     }
-                    when (prevInstr) {
-                        I32EQZ -> {
-                            makeMutable().removeAt(prevIdx)
-                            swap()
-                            i -= 2
+                    if (instr.ifFalse.isNotEmpty()) {
+                        val prevIdx = instructions.prevIndex(i)
+                        val prevInstr = instructions.getOrNull(prevIdx)
+                        fun swap() {
+                            val tmp = instr.ifTrue
+                            instr.ifTrue = instr.ifFalse
+                            instr.ifFalse = tmp
                         }
-                        Call.fcmpl, Call.fcmpg -> {
-                            // NaN-signedness doesn't matter here
-                            makeMutable()[prevIdx] = F32EQ
-                            swap()
-                            i--
-                        }
-                        Call.dcmpl, Call.dcmpg -> {
-                            // NaN-signedness doesn't matter here
-                            makeMutable()[prevIdx] = F64EQ
-                            swap()
-                            i--
-                        }
-                        else -> {
-                            instr.ifTrue = optimizeUsingReplacements2(instr.ifTrue)
-                            instr.ifFalse = optimizeUsingReplacements2(instr.ifFalse)
+                        when (prevInstr) {
+                            I32EQZ -> {
+                                makeMutable().removeAt(prevIdx)
+                                swap()
+                                i--
+                            }
+                            Call.fcmpl, Call.fcmpg -> {
+                                // NaN-signedness doesn't matter here
+                                makeMutable()[prevIdx] = F32EQ
+                                swap()
+                            }
+                            Call.dcmpl, Call.dcmpg -> {
+                                // NaN-signedness doesn't matter here
+                                makeMutable()[prevIdx] = F64EQ
+                                swap()
+                            }
                         }
                     }
+                    optimizeBranches()
                 }
                 is LoopInstr -> {
                     instr.body = optimizeUsingReplacements2(instr.body)

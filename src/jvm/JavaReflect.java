@@ -618,7 +618,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object")
-    public static <V> Object java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<V> clazz, int length) {
+    public static <V> Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<V> clazz, int length) {
         // I don't think this might happen
         /*String name = clazz.getName();
         if (name == "int") return new int[length];
@@ -628,24 +628,30 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV")
-    public static <A, B> void java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV(Object self, Class<A> clazz, Class<B> clazz2, Object obj, int x) {
+    public static <A, B> void AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV(Object self, Class<A> clazz, Class<B> clazz2, Object obj, int x) {
     }
 
     @Alias(names = "java_lang_Class_reflectionData_Ljava_lang_ClassXReflectionData")
-    public static Object java_lang_Class_reflectionData_Ljava_lang_ClassXReflectionData(Object self) {
+    public static Object Class_reflectionData_Ljava_lang_ClassXReflectionData(Object self) {
         throw new RuntimeException("Cannot ask for reflection data, won't work");
     }
 
     @Alias(names = "java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method")
-    public static <V> Method[] java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Class<V> self) {
+    public static <V> Method[] Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Class<V> self) {
         return Class_getDeclaredMethods(self);
     }
 
     @Alias(names = "java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor")
-    public static <V> Object[] java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
+    public static <V> Object[] Class_getConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
             throws NoSuchFieldException, IllegalAccessException {
         if (getDynamicTableSize(getClassIndex(self)) == 0) return empty; // not constructable class
         return new Object[]{getConstructorWithoutArgs(self)}; // to do better implementation?
+    }
+
+    @Alias(names = "java_lang_Class_getDeclaredConstructors_ALjava_lang_reflect_Constructor")
+    public static <V> Object[] Class_getDeclaredConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
+            throws NoSuchFieldException, IllegalAccessException {
+        return Class_getConstructors_ALjava_lang_reflect_Constructor(self);
     }
 
     @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method")
@@ -749,6 +755,33 @@ public class JavaReflect {
     @Alias(names = "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter")
     public static Object[] Executable_getParameters(Object self) {
         return empty;// todo implement for panel-constructors...
+    }
+
+    @Alias(names = "java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
+    public static Object java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object clazz) {
+        return null;
+    }
+
+    @Alias(names = "java_lang_reflect_Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation")
+    public static Object Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation(Object[] classes, Object bytes) {
+        return null;
+    }
+
+    @Alias(names = "java_lang_reflect_Executable_isSynthetic_Z")
+    public static boolean Executable_isSynthetic_Z(Object self) {
+        // we could return here true for lambdas...
+        return false;
+    }
+
+    @Alias(names = "java_lang_reflect_Executable_isVarArgs_Z")
+    public static boolean Executable_isVarArgs_Z(Object self) {
+        return false; // not really needed at runtime, only for the compiler, is it?
+    }
+
+    @Alias(names = "java_lang_reflect_Executable_getGenericParameterTypes_ALjava_lang_reflect_Type")
+    public static Object[] Executable_getGenericParameterTypes_ALjava_lang_reflect_Type(Object self) {
+        // shall return generics... I don't think we need that at runtime
+        return empty;
     }
 
 }

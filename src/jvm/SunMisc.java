@@ -58,7 +58,7 @@ public class SunMisc {
     }
 
     @Alias(names = "sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe")
-    public static void sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe() {
+    public static Object sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe() {
         throw new RuntimeException("Unsafe is not supported!");
     }
 

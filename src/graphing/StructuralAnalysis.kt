@@ -303,12 +303,8 @@ class StructuralAnalysis(
         val label = "$name${loopIndex++}"
         node.printer.append(Jump(label))
         val newPrinter = Builder()
-        newPrinter.append(
-            LoopInstr(
-                label, node.printer.instrs,
-                blockParamsGetResult(node, null)
-            )
-        ).append(Unreachable)
+        val loopInstr = LoopInstr(label, node.printer.instrs, results = emptyList() /* cannot return anything */)
+        newPrinter.append(loopInstr).append(Unreachable)
         node.inputs.remove(node) // it no longer links to itself
         replaceNode(node, ReturnNode(newPrinter), i)
     }
@@ -488,10 +484,7 @@ class StructuralAnalysis(
         val label = "while${if (negate) "A" else "B"}${loopIndex++}"
         if (negate) node.printer.append(I32EQZ)
         node.printer.append(JumpIf(label))
-        val loopInstr = LoopInstr(
-            label, node.printer.instrs,
-            blockParamsGetResult(node, null)
-        )
+        val loopInstr = LoopInstr(label, node.printer.instrs, node.outputStack)
         val newNode = replaceNode(node, SequenceNode(Builder(loopInstr), nextNode), i)
         assertTrue(newNode.inputs.remove(newNode)) // no longer recursive
         if (printOps) printState(nodes, label)
@@ -755,10 +748,7 @@ class StructuralAnalysis(
                 )
             )
 
-            val loopInstr = LoopInstr(
-                label, nodeA.printer.instrs,
-                blockParamsGetResult(nodeA, null)
-            )
+            val loopInstr = LoopInstr(label, nodeA.printer.instrs, nodeA.outputStack)
             nodeA.inputs.remove(nodeB)
             val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
             nodes.remove(nodeB)
@@ -828,11 +818,7 @@ class StructuralAnalysis(
                 )
             )
 
-            val loopInstr = LoopInstr(
-                label, nodeA.printer.instrs,
-                blockParamsGetResult(nodeA, null)
-            )
-
+            val loopInstr = LoopInstr(label, nodeA.printer.instrs, nodeA.outputStack)
             nodeA.inputs.remove(nodeB)
             nodeC.inputs.remove(nodeB)
             val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)

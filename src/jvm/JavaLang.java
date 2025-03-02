@@ -364,6 +364,42 @@ public class JavaLang {
     }
 
     @NoThrow
+    @Alias(names = "java_lang_Thread_interrupt_V")
+    public static void Thread_interrupt_V(Thread self) {
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_Thread_checkAccess_V")
+    public static void Thread_checkAccess_V(Thread self) {
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_Thread_setNativeName_Ljava_lang_StringV")
+    public static void Thread_setNativeName_Ljava_lang_StringV(Thread self, String name) {
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_Thread_holdsLock_Ljava_lang_ObjectZ")
+    public static boolean Thread_holdsLock_Ljava_lang_ObjectZ(Object lock) {
+        // static function, why ever
+        return true;
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_Thread_isAlive_Z")
+    public static boolean Thread_isAlive_Z(Thread self) {
+        return Thread_currentThread() == thread;
+    }
+
+    private static Thread thread;
+
+    @Alias(names = "java_lang_Thread_currentThread_Ljava_lang_Thread")
+    public static Thread Thread_currentThread() {
+        if (thread == null) thread = new Thread("main");
+        return thread;
+    }
+
+    @NoThrow
     @JavaScript(code = "commandLine[arg1].push(String.fromCharCode(arg0))")
     public static native void printByte(int i, boolean justLog);
 
@@ -374,14 +410,6 @@ public class JavaLang {
     @NoThrow
     @JavaScript(code = "let strI = str(arg0); (arg1?console.log:console.error)(strI);")
     public static native void printString(String line, boolean justLog);
-
-    private static Thread thread;
-
-    @Alias(names = "java_lang_Thread_currentThread_Ljava_lang_Thread")
-    public static Thread Thread_currentThread() {
-        if (thread == null) thread = new Thread("main");
-        return thread;
-    }
 
     @Alias(names = "AW_clone_Ljava_lang_Object")
     public static Object Array_clone(Object[] base) {

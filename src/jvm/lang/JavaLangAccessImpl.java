@@ -1,6 +1,5 @@
 package jvm.lang;
 
-import annotations.WASM;
 import sun.misc.JavaLangAccess;
 import sun.nio.ch.Interruptible;
 import sun.reflect.ConstantPool;
@@ -114,7 +113,8 @@ public class JavaLangAccessImpl implements JavaLangAccess {
         }
     }
 
-    @WASM(code = "call_indirect (type $Xi)")
+    // needs to be assigned dynamically to differentiate between throwing/non-throwing functions
+    // @WASM(code = "call_indirect (type $Xi)")
     public static native void callStaticInit(int methodId);
 
     @Override

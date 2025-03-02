@@ -195,11 +195,12 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         //if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //    println("[M] $clazz $name $descriptor $signature")
 
-        val sig = MethodSig.c(clazz, name, descriptor)
+        val isStatic = access.hasFlag(ACC_STATIC)
+        val sig = MethodSig.c(clazz, name, descriptor, isStatic)
         if (signature != null) hIndex.genericMethodSigs[sig] = signature
         classMethods.add(sig)
-        if (access.hasFlag(ACC_STATIC)) index.staticMethods.add(sig)
-        if (isFinal || access.hasFlag(ACC_FINAL) || access.hasFlag(ACC_STATIC)) {
+        if (isStatic) index.staticMethods.add(sig)
+        if (isFinal || access.hasFlag(ACC_FINAL) || isStatic) {
             if (sig.clazz == "me/anno/gpu/OSWindow" && sig.name == "addCallbacks" && sig.descriptor == "()V")
                 throw IllegalStateException()
             index.finalMethods.add(sig)
@@ -224,8 +225,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             dep(type)
         }
 
-        return FirstMethodIndexer(sig, this, access.hasFlag(ACC_STATIC))
-
+        return FirstMethodIndexer(sig, this, isStatic)
     }
 
     override fun visitField(

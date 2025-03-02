@@ -4,20 +4,41 @@ import me.anno.utils.assertions.assertTrue
 import replaceClass1
 
 @Suppress("DataClassPrivateConstructor")
-data class MethodSig private constructor(val clazz: String, val name: String, val descriptor: String) {
+data class MethodSig private constructor(
+    val clazz: String,
+    val name: String,
+    val descriptor: String,
+    val isStatic: Boolean
+) {
 
     fun withClass(clazz: String): MethodSig {
-        return MethodSig(validateClassName(clazz), name, descriptor)
+        return MethodSig(validateClassName(clazz), name, descriptor, isStatic)
     }
 
     override fun toString() = "$clazz/$name$descriptor"
 
+    override fun hashCode(): Int {
+        // hash without static until we fix it
+        var hash = 31 * clazz.hashCode()
+        hash = hash * 31 + name.hashCode()
+        hash = hash * 31 + descriptor.hashCode()
+        return hash
+    }
+
+    override fun equals(other: Any?): Boolean {
+        // equals without static until we fix it
+        return other is MethodSig &&
+                other.clazz == clazz &&
+                other.name == name &&
+                other.descriptor == descriptor
+    }
+
     companion object {
 
-        fun c(clazz: String, name: String, descriptor: String): MethodSig {
+        fun c(clazz: String, name: String, descriptor: String, isStatic: Boolean): MethodSig {
             val clazz2 = validateClassName(clazz)
             val descriptor4 = validateDescriptor(descriptor)
-            return MethodSig(clazz2, name, descriptor4)
+            return MethodSig(clazz2, name, descriptor4, isStatic)
         }
 
         private fun validateClassName(clazz: String): String {

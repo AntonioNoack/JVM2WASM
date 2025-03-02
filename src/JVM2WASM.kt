@@ -199,11 +199,14 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
         clazz("jvm/ArrayAccessUnchecked")
     }
 
+    // todo use KotlynReflect instead
+    clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+
     // for debugging
     if (addDebugMethods) {
-        method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;"))
-        method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
-        method(MethodSig.c("java/lang/Thread", "<init>", "()V"))
+        method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;", false))
+        method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;", false))
+        method(MethodSig.c("java/lang/Thread", "<init>", "()V", false))
     }
 }
 
@@ -245,6 +248,10 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("jvm/SunMisc")
     clazz("jvm/Kotlin")
     clazz("engine/TextGen")
+
+    // todo use KotlynReflect instead
+    clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+    // kotlin.reflect.jvm.internal.ReflectionFactoryImpl
 
 }
 
@@ -309,7 +316,7 @@ fun isRootType(clazz: String): Boolean {
     }
 }
 
-val entrySig = MethodSig.c("", "entry", "()V")
+val entrySig = MethodSig.c("", "entry", "()V", false)
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
     jvm2wasm()
@@ -364,8 +371,8 @@ fun jvm2wasm() {
     findNoThrowMethods()
 
     // java_lang_StrictMath_sqrt_DD
-    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = listOf(F64_SQRT)
-    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = listOf(F64_SQRT)
+    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D", true)] = listOf(F64_SQRT)
+    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D", true)] = listOf(F64_SQRT)
 
     findAliases()
 
@@ -374,7 +381,7 @@ fun jvm2wasm() {
     findExportedMethods()
 
     // unknown (because idk where [] is implemented), can cause confusion for my compiler
-    hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
+    hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;", false))
 
     replaceRenamedDependencies()
     checkMissingClasses()

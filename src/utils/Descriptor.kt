@@ -233,12 +233,12 @@ fun methodNames(sig: MethodSig): List<String> {
     }
 }
 
-fun methodName(clazz: String, name: String, descriptor: String): String {
-    return methodName(MethodSig.c(clazz, name, descriptor))
+fun methodName(clazz: String, name: String, descriptor: String, isStatic: Boolean): String {
+    return methodName(MethodSig.c(clazz, name, descriptor, isStatic))
 }
 
 fun methodName(clazz: String, sig: InterfaceSig): String {
-    return methodName(MethodSig.c(clazz, sig.name, sig.descriptor))
+    return methodName(MethodSig.c(clazz, sig.name, sig.descriptor, false))
 }
 
 private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)

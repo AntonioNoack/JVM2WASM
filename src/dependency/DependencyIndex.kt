@@ -115,7 +115,7 @@ object DependencyIndex {
 
         for ((ci, fo) in gIndex.fieldOffsets) {
             if (ci.hasFlag(1) && fo.hasFields()) { // static
-                remaining.add(MethodSig.c(gIndex.classNames[ci shr 1], "<clinit>", "()V"))
+                remaining.add(MethodSig.c(gIndex.classNames[ci shr 1], "<clinit>", "()V", false))
             }
         }
 
@@ -140,13 +140,15 @@ object DependencyIndex {
                 // check for all interfaces, whether we should implement their functions
                 fun handleInterfaces(clazz1: String) {
                     val interfaces2 = hIndex.interfaces[clazz1]
-                    if (interfaces2 != null) for (interface1 in interfaces2) {
-                        handleBecomingConstructable(sig, interface1, newUsedMethods)
-                        handleInterfaces(interface1)
-                        val methods = hIndex.methods[interface1] ?: continue
-                        for (method2 in methods) {
-                            if (used(method2)) {
-                                newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor))
+                    if (interfaces2 != null) {
+                        for (interface1 in interfaces2) {
+                            handleBecomingConstructable(sig, interface1, newUsedMethods)
+                            handleInterfaces(interface1)
+                            val methods = hIndex.methods[interface1] ?: continue
+                            for (method2 in methods) {
+                                if (used(method2)) {
+                                    newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor, false))
+                                }
                             }
                         }
                     }
@@ -168,7 +170,7 @@ object DependencyIndex {
                     val superMethods = usedByClass[superClass]
                     if (superMethods != null) {
                         for (method2 in superMethods) {
-                            val childMethod = MethodSig.c(clazz, method2.name, method2.descriptor)
+                            val childMethod = MethodSig.c(clazz, method2.name, method2.descriptor, false)
                             if (method2 !in methodsWithForbiddenDependencies) {
                                 // if (clazz == "java/util/Collections\$SetFromMap") println("  marked $childMethod for use")
                                 newUsedMethods.add(childMethod)
@@ -365,7 +367,7 @@ object DependencyIndex {
 
                             // check if method is defined in super class
                             fun searchClass(clazz: String): Set<MethodSig>? {
-                                val method3 = MethodSig.c(clazz, sig.name, sig.descriptor)
+                                val method3 = MethodSig.c(clazz, sig.name, sig.descriptor, sig.isStatic)
                                 val dep = methodDependencies[method3]
                                 if (dep != null) return dep + method3
                                 // check interfaces
@@ -485,14 +487,14 @@ object DependencyIndex {
                     val strict = fieldsRWRequired
                     if (usedFieldsR != null) for (fi in usedFieldsR) {
                         if (fi.static && (!strict || fi in this.usedFieldsW)) {
-                            val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V")
+                            val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V", true)
                             if (sig1 !in this.usedMethods)
                                 newRemaining.add(sig1)
                         }
                     }
                     if (usedFieldsW != null) for (fi in usedFieldsW) {
                         if (fi.static && (!strict || fi in this.usedFieldsR)) {
-                            val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V")
+                            val sig1 = MethodSig.c(fi.clazz, "<clinit>", "()V", true)
                             if (sig1 !in this.usedMethods)
                                 newRemaining.add(sig1)
                         }

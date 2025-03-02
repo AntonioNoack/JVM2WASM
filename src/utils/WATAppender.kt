@@ -29,7 +29,7 @@ fun OutputStream.writeClass(clazz: Int) {
     for (i in 4 until objectOverhead) write(0)
 }
 
-class FieldEntry(val name: String, val field: GeneratorIndex.FieldData, val modifiers: Int)
+data class FieldEntry(val name: String, val field: GeneratorIndex.FieldData, val modifiers: Int)
 
 fun OutputStream.writeEmptyClass(clazzIndex: Int, classSize: Int) {
     writeClass(clazzIndex)

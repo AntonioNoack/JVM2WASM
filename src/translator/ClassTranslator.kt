@@ -3,7 +3,9 @@ package translator
 import api
 import dIndex
 import hIndex
+import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.*
+import org.objectweb.asm.Opcodes.ACC_STATIC
 import replaceClass1
 import utils.MethodSig
 import utils.methodName
@@ -62,13 +64,19 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
     ): MethodVisitor? {
         val writer = writer
         return if (writer == null) {
-            val sig = MethodSig.c(clazz, name, descriptor)
+            val isStatic = access.hasFlag(ACC_STATIC)
+            val sig = MethodSig.c(clazz, name, descriptor, isStatic)
             val methodName = methodName(sig)
             val map = hIndex.getAlias(sig)
             if ((sig !in dIndex.methodsWithForbiddenDependencies &&
                         sig in dIndex.usedMethods && map == sig) ||
-                // todo why is this not in usedMethods??? it's shown to be actually-used
-                methodName == "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter"
+                // todo why are these not in usedMethods??? they're shown to be actually-used
+                methodName == "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter" ||
+                methodName == "java_lang_reflect_Executable_getGenericParameterTypes_ALjava_lang_reflect_Type" ||
+                methodName == "java_lang_reflect_Executable_isVarArgs_Z" ||
+                methodName == "java_lang_reflect_Executable_isSynthetic_Z" ||
+                methodName == "java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation" ||
+                methodName == "java_lang_reflect_Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation"
             ) {
                 MethodTranslator(access, clazz, name, descriptor)
             } else null

@@ -31,6 +31,7 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Strings.shorten
+import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass1
@@ -139,6 +140,9 @@ class MethodTranslator(
 ) : MethodVisitor(api) {
 
     companion object {
+
+        private val LOGGER = LogManager.getLogger(MethodTranslator::class)
+
         val callTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
 
@@ -167,17 +171,17 @@ class MethodTranslator(
     private var currentNode = TranslatorNode(startLabel)
     var printer = currentNode.printer
 
-    val sig = MethodSig.c(clazz, name, descriptor)
+    private val isStatic = access.hasFlag(ACC_STATIC)
+
+    val sig = MethodSig.c(clazz, name, descriptor, isStatic)
     val canThrowError = canThrowError(sig)
 
     private val enableStackPush = enableTracing &&
             (canThrowError || crashOnAllExceptions) &&
             sig.name !in notStackPushedMethods
 
-    private val isStatic = access.hasFlag(ACC_STATIC)
-
     init {
-        printOps = false // clazz == "kotlin/collections/CollectionsKt__ReversedViewsKt"
+        printOps = clazz == "java/lang/ClassValue"
         if (printOps) println("Method-Translating $clazz.$name.$descriptor")
 
         nodes.add(currentNode)
@@ -1060,16 +1064,16 @@ class MethodTranslator(
         val args = descriptor.substring(1, i)
         val ret = descriptor.substring(i + 1)
         val splitArgs = split1(args).map { jvm2wasm(it) }
-        val static = opcode0 == 0xb8
-        val sig0 = MethodSig.c(owner, name, descriptor)
-        if (static != (sig0 in hIndex.staticMethods))
-            throw RuntimeException("Called static/non-static incorrectly, $static vs $sig0 (in $sig)")
+        val isStatic = opcode0 == 0xb8
+        val sig0 = MethodSig.c(owner, name, descriptor, isStatic)
+        if (isStatic != (sig0 in hIndex.staticMethods))
+            throw RuntimeException("Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)")
 
 
         val sig = hIndex.getAlias(sig0)
 
         val methodsByOwner = hIndex.methods.getOrPut(owner) { HashSet() }
-        if (sig == sig0 && methodsByOwner.add(sig0) && static) {
+        if (sig == sig0 && methodsByOwner.add(sig0) && isStatic) {
             hIndex.staticMethods.add(sig0)
         }
 
@@ -1827,7 +1831,7 @@ class MethodTranslator(
             if (comments) printer.comment("skipped <clinit>, we're inside of it")
             return
         } // it's currently being inited :)
-        val sig = MethodSig.c(clazz, "<clinit>", "()V")
+        val sig = MethodSig.c(clazz, "<clinit>", "()V", true)
         if (hIndex.methods[clazz]?.contains(sig) != true) {
             if (comments) printer.comment("skipped <clinit>, because empty")
             return
@@ -2038,22 +2042,27 @@ class MethodTranslator(
 
     override fun visitEnd() {
         if (!isAbstract) {
-            for (node in nodes) {
-                node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
+            try {
+                for (node in nodes) {
+                    node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
+                }
+                val nodes = TranslatorNode.convertNodes(nodes)
+                validateInputOutputStacks(nodes, sig)
+                if (true) {
+                    StackValidator.validateStack(nodes, this)
+                }
+                val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
+                optimizeUsingReplacements(jointBuilder)
+                val headPrinter1 = createFuncHead()
+                gIndex.translatedMethods[sig] = FunctionImpl(
+                    headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
+                    headPrinter1.locals, jointBuilder.instrs,
+                    headPrinter1.isExported
+                )
+            } catch (e: Throwable) {
+                LOGGER.warn("Error in $sig.visitEnd")
+                throw e
             }
-            val nodes = TranslatorNode.convertNodes(nodes)
-            validateInputOutputStacks(nodes, sig)
-            if (true) {
-                StackValidator.validateStack(nodes, this)
-            }
-            val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
-            optimizeUsingReplacements(jointBuilder)
-            val headPrinter1 = createFuncHead()
-            gIndex.translatedMethods[sig] = FunctionImpl(
-                headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
-                headPrinter1.locals, jointBuilder.instrs,
-                headPrinter1.isExported
-            )
         }
     }
 

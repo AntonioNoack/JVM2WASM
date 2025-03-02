@@ -667,7 +667,11 @@ void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstAr
 }
 
 i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
-roid kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return RET_VOID; }
+// roid kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return RET_VOID; }
+// ret32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
+// ret32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
+// ret32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return RET_NULL; }
+ret32 kotlin_jvm_internal_MutablePropertyReference_getSetter_Lkotlin_reflect_KMutablePropertyXSetter(i32) { return RET_NULL; }
 roid me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return RET_VOID; }
 roid new_java_text_SimpleDateFormat_V(i32) { return RET_VOID; }
 roid new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
@@ -690,8 +694,6 @@ ret32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { retur
 ret32 java_lang_Class_getModifiers_I(i32) { return RET_NULL; }
 ret32 java_lang_Class_getName0_Ljava_lang_String(i32) { return RET_NULL; }
 ret32 java_lang_Class_isInterface_Z(i32) { return RET_NULL; }
-ret32 java_lang_Thread_holdsLock_Ljava_lang_ObjectZ(i32) { return RET_NULL; }
-ret32 java_lang_Thread_isAlive_Z(i32) { return RET_NULL; }
 ret32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return RET_NULL; }
 ret32 java_lang_reflect_Field_acquireFieldAccessor_ZLsun_reflect_FieldAccessor(i32, i32) { return RET_NULL; }
 ret32 java_text_DateFormatSymbols_getProviderInstance_Ljava_util_LocaleLjava_text_DateFormatSymbols(i32) { return RET_NULL; }
@@ -707,9 +709,6 @@ ret32 java_util_zip_Deflater_deflateBytes_JABIIII(i32, i64, i32, i32, i32, i32) 
 ret64 java_util_zip_Deflater_init_IIZJ(i32, i32, i32) { return RET_NULL; }
 ret32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { return RET_NULL; }
 ret64 java_util_zip_Inflater_init_ZJ(i32) { return RET_NULL; }
-// i32i32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
-ret32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
-ret32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return RET_NULL; }
 ret32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return RET_NULL; }
 ret32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return RET_NULL; }
 ret32 me_anno_ecs_prefab_change_PathXCompanion_generateRandomId_Ljava_lang_String(i32) { return RET_NULL; }

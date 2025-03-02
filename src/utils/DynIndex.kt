@@ -10,7 +10,6 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
-import translator.GeneratorIndex
 
 object DynIndex {
 
@@ -20,7 +19,7 @@ object DynIndex {
 
     private val dynIndex = HashMap<String, DynIndexEntry>(4096)
     private val dynIndexSorted = ArrayList<DynIndexEntry>(4096)
-    val dynIndexSig = MethodSig.c("", "dynIndex", "()V")
+    val dynIndexSig = MethodSig.c("", "dynIndex", "()V", false)
 
     private fun addDynIndex(sig: MethodSig, name: String = methodName(sig)): Int {
         return dynIndex.getOrPut(name) {
@@ -143,7 +142,7 @@ object DynIndex {
                 for (idx in dynIndexToMethod.indices) {
 
                     val sig0 = dynIndexToMethod[idx]!!
-                    val sig = MethodSig.c(clazz, sig0.name, sig0.descriptor)
+                    val sig = MethodSig.c(clazz, sig0.name, sig0.descriptor, false)
 
                     fun methodIsAbstract(sig: MethodSig): Boolean {
                         if (sig in hIndex.abstractMethods) return true
@@ -383,7 +382,10 @@ object DynIndex {
                     }
 
                     if (hIndex.isEnumClass(clazz)) {
-                        val impl = findMethod(clazz, "<clinit>", "()V")
+                        val impl = findMethod(
+                            clazz, "<clinit>", "()V",
+                            isStatic0 = true, throwNotConstructable = true
+                        )
                         implFunctions0[staticInitIdx] = impl!!
                         addDynIndex(impl)
                     }
@@ -424,10 +426,11 @@ object DynIndex {
                 if (print) {
                     println(gIndex.interfaceIndex.entries.filter { it.value == 552 })
                     // this must exist and must be used!
+                    // todo current me: WTF is that???
                     printUsed(
                         MethodSig.c(
                             "java_lang_System_getProperty_Ljava_lang_StringLjava_lang_String",
-                            "apply", "(Ljava/lang/Object;)Ljava/lang/Object;"
+                            "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", true
                         )
                     )
                 }

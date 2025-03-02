@@ -20,14 +20,15 @@ import listLibrary
 import listSuperClasses
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertFail
-import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
+import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
+import org.objectweb.asm.Opcodes.ACC_STATIC
 import replaceClass1
 import resolvedMethods
 import translator.ClassTranslator
@@ -51,7 +52,7 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
 
 fun registerDefaultOffsets() {
 
-    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V")), 0)
+    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V", false)), 0)
     eq(gIndex.getType(true, "()V", true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
@@ -359,7 +360,7 @@ fun replaceRenamedDependencies() {
             .mapValues { (_, dependencies) ->
                 dependencies.map { sig ->
                     resolvedMethods.getOrPut(sig) {
-                        val found = findMethod(sig.clazz, sig.name, sig.descriptor, false) ?: sig
+                        val found = findMethod(sig.clazz, sig.name, sig.descriptor, sig.isStatic, false) ?: sig
                         if (found != sig) hIndex.setAlias(sig, found)
                         if ((found in hIndex.staticMethods) == (sig in hIndex.staticMethods)) found else sig
                     }
@@ -705,7 +706,8 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                         signature: String?,
                         exceptions: Array<out String>?
                     ): MethodVisitor? {
-                        val sig1 = MethodSig.c(clazz, name, descriptor)
+                        val isStatic = access.hasFlag(ACC_STATIC)
+                        val sig1 = MethodSig.c(clazz, name, descriptor, isStatic)
                         val map = hIndex.getAlias(sig1)
                         return if (sig1 !in dIndex.methodsWithForbiddenDependencies &&
                             sig1 in dIndex.usedMethods &&
@@ -723,7 +725,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     val synthClassName = synthClassName(sig1, dst)
                                     // println("lambda: $sig1 -> $synthClassName")
                                     gIndex.getClassIndex(synthClassName) // add class to index
-                                    val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
+                                    val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
                                     dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
                                 }
 
@@ -757,7 +759,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                 ) {
                                     if (opcode == 0xb6) { // invoke virtual
                                         val owner = replaceClass1(owner0)
-                                        val sig0 = MethodSig.c(owner, name, descriptor)
+                                        val sig0 = MethodSig.c(owner, name, descriptor, false)
                                         // just for checking if abstract
                                         if (sig0 !in hIndex.finalMethods) {
                                             // check if method is defined in parent class
@@ -765,8 +767,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                                 val superClass = hIndex.superClass[clazz]
                                                 if (superClass != null &&
                                                     MethodSig.c(
-                                                        superClass,
-                                                        name, descriptor
+                                                        superClass, name, descriptor, false
                                                     ) in hIndex.methods[superClass]!!
                                                 ) {
                                                     add(superClass)

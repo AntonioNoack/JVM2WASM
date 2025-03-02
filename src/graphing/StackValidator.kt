@@ -84,7 +84,7 @@ object StackValidator {
      * */
     fun validateStack(nodes: List<GraphingNode>, mt: MethodTranslator) {
         val returnTypes = getReturnTypes(mt.sig)
-        // println("Validating stack ${sa.sig} -> $returnTypes")
+        // println("Validating stack ${mt.sig} -> $returnTypes")
         for (node in nodes) {
             validateStack2(
                 mt.sig, node.printer, node.inputStack,

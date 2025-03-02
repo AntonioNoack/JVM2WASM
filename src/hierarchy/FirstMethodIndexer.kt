@@ -98,12 +98,12 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             clazz.dep(single(descriptor.substring(ix + 1)))
         }
 
-        val sig1 = MethodSig.c(owner, name, descriptor)
+        val isStatic = opcode == 0xb8
+        val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
 
-        val static = opcode == 0xb8
         val isNewMethod = hIndex.methods.getOrPut(owner) { HashSet() }.add(sig1)
         if (isNewMethod) {
-            if (static) hIndex.staticMethods.add(sig1)
+            if (isStatic) hIndex.staticMethods.add(sig1)
             if (hIndex.notImplementedMethods.add(sig1)) {
                 hIndex.hasSuperMaybeMethods.add(sig1)
             }
@@ -117,7 +117,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         } else {
             methods.add(sig1)
         }
-
     }
 
     override fun visitVarInsn(opcode: Int, varIndex: Int) {
@@ -176,7 +175,8 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // c) a function, that implements the target, calls b() using variables from a()
 
             // register new class (not visitable)
-            val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
+            // todo I really don't know of these called methods are static or not.. are they???
+            val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
             val synthClassName = synthClassName(sig, dst)
             val print = false// calledMethod.name == "<init>"
             if (print) println(args.joinToString())
@@ -210,7 +210,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
             visitMethodInsn(0, dst.owner, dst.name, dst.desc, false)
 
-            val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc)
+            val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc, false)
             methods.add(bridge)
             hIndex.jvmImplementedMethods.add(bridge)
 
@@ -218,7 +218,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
             methods.add(calledMethod)
 
-            val dlu = DelayedLambdaUpdate("$sig", calledMethod, descriptor, synthClassName, bridge)
+            val dlu = DelayedLambdaUpdate(sig.toString(), calledMethod, descriptor, synthClassName, bridge)
             needingBridgeUpdate[synthClassName] = dlu
 
             dIndex.methodDependencies[bridge] = hashSetOf(calledMethod)
@@ -342,6 +342,11 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             val callInstr =
                 if (anyMethodThrows) "call_indirect (type \$iXi)"
                 else "call_indirect (type \$iX)"
+            annotations.add(Annota("annotations/WASM", mapOf("code" to callInstr)))
+        } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
+            val callInstr =
+                if (anyMethodThrows) "call_indirect (type \$Xi)"
+                else "call_indirect (type \$X)"
             annotations.add(Annota("annotations/WASM", mapOf("code" to callInstr)))
         }
 
