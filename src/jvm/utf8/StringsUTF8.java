@@ -86,8 +86,8 @@ public class StringsUTF8 {
 	}
 
 	@Alias(names = "java_lang_String_charAt_IC")
-	public static int String_charAt(String str, int index) {
-		return getValue(str)[index] & 255;
+	public static char String_charAt(String str, int index) {
+		return (char) (getValue(str)[index] & 255);
 	}
 
 	@Alias(names = "java_lang_String_regionMatches_ILjava_lang_StringIIZ")

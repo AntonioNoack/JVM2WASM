@@ -227,8 +227,11 @@ class FunctionWriter(
             is LocalSet -> {
                 val local = localsByName[i.name]
                     ?: throw IllegalStateException("Missing local '${i.name}'")
-                if (i.name == "lbl") return
-                beginSetEnd(local.name, local.type)
+                if (i.name != "lbl") {
+                    beginSetEnd(local.name, local.type)
+                } else {
+                    pop(i32)
+                }
             }
             // loading
             I32Load8S -> load(i32, "int8_t")
@@ -446,44 +449,50 @@ class FunctionWriter(
                 writeCall(tmpVar, type.params, type.results)
             }
             is LoopInstr -> {
-                val resultNames = i.results.map { nextTemporaryVariable() }
-                for (j in i.results.indices) {
-                    begin().append(i.results[j]).append(' ')
-                        .append(resultNames[j]).append(" = 0").end()
-                }
-                // to do check if the label is used
-                begin().append(i.label).append(": while (true) {\n")
-                val stackSave = ArrayList(stack)
-                stack.clear()
-                depth++
-                val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
-                val i1 = i.body.size - lastIsContinue.toInt()
-                writeInstructions(i.body, 0, i1)
-
-                if (!lastIsContinue) {
-                    // save results
-                    for (j in i.results.lastIndex downTo 0) {
-                        begin().append(resultNames[j]).append(" = ")
-                            .append(pop(i.results[j])).end()
+                val firstInstr = i.body.firstOrNull()
+                if (i.body.size == 1 && firstInstr is SwitchCase &&
+                    i.results.isEmpty() && stack.isEmpty()
+                ) {
+                    writeSwitchCase(firstInstr)
+                } else {
+                    val resultNames = i.results.map { nextTemporaryVariable() }
+                    for (j in i.results.indices) {
+                        begin().append(i.results[j]).append(' ')
+                            .append(resultNames[j]).append(" = 0").end()
                     }
-                    begin().append("break").end()
-                } else assertTrue(i.results.isEmpty())
+                    // to do check if the label is used
+                    begin().append(i.label).append(": while (true) {\n")
+                    val stackSave = ArrayList(stack)
+                    stack.clear()
+                    depth++
+                    val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
+                    val i1 = i.body.size - lastIsContinue.toInt()
+                    writeInstructions(i.body, 0, i1)
 
-                depth--
-                stack.clear()
-                stack.addAll(stackSave)
-                for (j in i.results.indices) {
-                    push(i.results[j], resultNames[j])
+                    if (!lastIsContinue) {
+                        // save results
+                        for (j in i.results.lastIndex downTo 0) {
+                            begin().append(resultNames[j]).append(" = ")
+                                .append(pop(i.results[j])).end()
+                        }
+                        begin().append("break").end()
+                    } else assertTrue(i.results.isEmpty())
+
+                    depth--
+                    stack.clear()
+                    stack.addAll(stackSave)
+                    for (j in i.results.indices) {
+                        push(i.results[j], resultNames[j])
+                    }
+                    begin().append("}\n")
                 }
-                begin().append("}\n")
             }
             is Jump -> {
                 begin().append("goto ").append(i.label).end()
             }
             is JumpIf -> {
                 val condition = pop("i32")
-                begin().append("if (").append(condition).append(" != 0) { goto ")
-                    .append(i.label).append("; }\n")
+                begin().append("if (").append(condition).append(" != 0) { goto ").append(i.label).append("; }\n")
             }
             is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
@@ -504,10 +513,9 @@ class FunctionWriter(
 
     private fun writeSwitchCase(switchCase: SwitchCase) {
         // big monster, only 1 per function allowed, afaik
-        // assertEquals(1, depth)
         val cases = switchCase.cases
         val lblName = switchCase.lblName
-        assertEquals(0, stack.size)
+        assertTrue(stack.isEmpty()) { "Expected empty stack, got $stack" }
         depth++
 
         fun getBranchIdx(instructions: List<Instruction>): Int {

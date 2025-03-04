@@ -10,6 +10,7 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
+import utils.MethodResolver.resolveMethod
 
 object DynIndex {
 
@@ -34,16 +35,13 @@ object DynIndex {
         return dynIndex[name]!!
     }
 
-    fun appendDynamicFunctionTable(
-        printer: StringBuilder2,
-        implementedMethods: Map<String, MethodSig>
-    ) {
-        val nameToMethod = nameToMethod
+    fun appendDynamicFunctionTable(printer: StringBuilder2, implementedMethods: Map<String, MethodSig>) {
+        val nameToMethod = calculateNameToMethod()
         val dynamicFunctions = implementedMethods.entries
             .filter { (_, sig) -> // saving space by remove functions that cannot be invoked dynamically
-                sig.clazz != "?" &&
-                        sig.name != "<init>" &&
-                        sig.name != "<clinit>" &&
+                sig.clazz != INTERFACE_CALL_NAME &&
+                        sig.name != INSTANCE_INIT &&
+                        sig.name != STATIC_INIT &&
                         sig.name !in dynIndex &&
                         sig !in hIndex.staticMethods &&
                         sig !in hIndex.finalMethods &&
@@ -109,18 +107,19 @@ object DynIndex {
             val pic = gIndex.dynMethodIndices[clazz]
             if (pic != null) return pic
             if (clazz == 0) throw IllegalStateException("java/lang/Object must have dynamic function table!")
-            return getDynMethodIdx(gIndex.getClassIndex(hIndex.superClass[gIndex.classNames[clazz]]!!))
+            val superClazz = hIndex.superClass[gIndex.classNamesByIndex[clazz]] ?: "java/lang/Object"
+            return getDynMethodIdx(gIndex.getClassIndex(superClazz))
         }
 
         for (i in 0 until numClasses) {
             val dynMethods = getDynMethodIdx(i)
-            val clazz = gIndex.classNames[i]
+            val clazz = gIndex.classNamesByIndex[i]
 
             val print = i == 1929
             // could be written to a file for debugging
             if (print) println("  dynMethodIndex[$i: $clazz]: $dynMethods")
 
-            if (gIndex.classNames[i] !in dIndex.constructableClasses) {
+            if (gIndex.classNamesByIndex[i] !in dIndex.constructableClasses) {
                 if (print) println("  writing $i: $clazz to null, because not constructable")
                 methodTable.writeLE32(0)
                 if (printDebug) {
@@ -152,7 +151,7 @@ object DynIndex {
                         return methodIsAbstract(sig.withClass(superClass))
                     }
 
-                    val impl = findMethod(clazz, sig) ?: sig
+                    val impl = resolveMethod(sig, true) ?: sig
                     // if method is missing, find replacement
                     val mapped = hIndex.getAlias(impl)
                     val name = methodName(mapped)
@@ -265,18 +264,21 @@ object DynIndex {
         val classTableData = ByteArrayOutputStream2(numClasses * 4)
         val instTable = ByteArrayOutputStream2()
         var ptr = ptr0 + numClasses * 4
-        val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c("<clinit>", "()V"))
+        val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V"))
 
         assertEquals(objectOverhead + 8, gIndex.getFieldOffsets("java/lang/String", false).offset)
         for (classId in 0 until numClasses) {
-            if (classId == 0 || classId in 17 until 25) {
+            if (classId == 0 || classId in 17 until 25) { // 0 is Object, 17 until 25 are the native types
                 // write 0 :), no table space used
                 classTableData.writeLE32(0)
             } else {
 
-                val clazz = gIndex.classNames[classId]
-                val superClass = hIndex.superClass[clazz]
-                    ?: throw NullPointerException("Super class of $clazz ($classId) is unknown")
+                val clazz = gIndex.classNamesByIndex[classId]
+                var superClass = hIndex.superClass[clazz]
+                if (superClass == null) {
+                    LOGGER.warn("Super class of $clazz ($classId) is unknown")
+                    superClass = "java/lang/Object"
+                }
 
                 // filter for existing interfaces :)
                 val interfaces = HashSet<String>()
@@ -353,7 +355,7 @@ object DynIndex {
                     for (sig in dIndex.usedInterfaceCalls) {
                         // only if is actually instance of interface
                         if (sig.clazz in interfaces) {
-                            val impl = findMethod(clazz, sig)
+                            val impl = resolveMethod(sig.withClass(clazz), true)
                             if (impl == null) {
                                 if (print) println("[$clazz] $sig -> null")
                                 continue
@@ -382,17 +384,15 @@ object DynIndex {
                     }
 
                     if (hIndex.isEnumClass(clazz)) {
-                        val impl = findMethod(
-                            clazz, "<clinit>", "()V",
-                            isStatic0 = true, throwNotConstructable = true
-                        )
+                        val superInit = MethodSig.c(clazz, STATIC_INIT, "()V", true)
+                        val impl = resolveMethod(superInit, throwNotConstructable = true)
                         implFunctions0[staticInitIdx] = impl!!
                         addDynIndex(impl)
                     }
 
                     if (print) {
                         println("other functions:")
-                        for (sig in hIndex.methods[clazz] ?: emptySet()) {
+                        for (sig in hIndex.methodsByClass[clazz] ?: emptySet()) {
                             if (sig !in implFunctions0.values) {
                                 print("  ")
                                 printUsed(sig)

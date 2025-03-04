@@ -6,6 +6,8 @@ import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
+import me.anno.utils.assertions.assertFalse
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.lists.Lists.any2
 import org.objectweb.asm.Opcodes.ASM9
@@ -66,8 +68,11 @@ const val api = ASM9
 
 // we even could compile scene files to WASM for extremely fast load times 😄
 
-var exportAll = false // 15% space-saving; 10% in compressed
+var exportAll = false // 15% space-saving in WASM; 10% in compressed
 var exportHelpers = exportAll
+
+var useKotlynReflect = true
+var useDefaultKotlinReflection = false
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -97,6 +102,7 @@ var addDebugMethods = false
 var fieldsRWRequired = false
 
 var alwaysUseFieldCalls = true
+
 
 val stackSize = if (enableTracing) 1024 * 32 else 0
 
@@ -136,9 +142,14 @@ val classReplacements = hashMapOf(
     }
 }
 
-
-fun replaceClass0(clazz: String?) = classReplacements[clazz] ?: clazz
-fun replaceClass1(clazz: String) = classReplacements[clazz] ?: clazz
+fun replaceClass(clazz: String): String = replaceClassNullable(clazz)!!
+fun replaceClassNullable(clazz: String?): String? {
+    var clazz1 = clazz
+    if (useKotlynReflect && clazz1 != null) {
+        clazz1 = KotlynReflect.replaceClass(clazz1)
+    }
+    return classReplacements[clazz1] ?: clazz1
+}
 
 // forbid from being implemented -> "just" override its methods
 fun cannotUseClass(clazz: String): Boolean {
@@ -176,7 +187,7 @@ val cannotThrow = HashSet<String>(256)
 
 fun canThrowError(methodSig: MethodSig): Boolean {
     if (crashOnAllExceptions) return false
-    if (crashInStatic && methodSig.name == "<clinit>") return false
+    if (crashInStatic && methodSig.name == STATIC_INIT) return false
     return methodName(methodSig) !in cannotThrow
 }
 
@@ -199,14 +210,16 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
         clazz("jvm/ArrayAccessUnchecked")
     }
 
-    // todo use KotlynReflect instead
-    clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+    // todo support KotlinReflect
+    if (useDefaultKotlinReflection) {
+        clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+    }
 
     // for debugging
     if (addDebugMethods) {
         method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;", false))
         method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;", false))
-        method(MethodSig.c("java/lang/Thread", "<init>", "()V", false))
+        method(MethodSig.c("java/lang/Thread", INSTANCE_INIT, "()V", false))
     }
 }
 
@@ -250,13 +263,14 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("engine/TextGen")
 
     // todo use KotlynReflect instead
-    clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
-    // kotlin.reflect.jvm.internal.ReflectionFactoryImpl
+    if (useDefaultKotlinReflection) {
+        clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+    }
 
 }
 
 fun printMethodFieldStats() {
-    val usedFields = dIndex.usedFieldsR.filter { it in dIndex.usedFieldsW }
+    val usedFields = dIndex.usedGetters.filter { it in dIndex.usedSetters }
     if (dIndex.usedMethods.size + usedFields.size < 1000) {
 
         println("classes:")
@@ -357,11 +371,11 @@ fun jvm2wasm() {
     for (i in predefinedClasses.indices) {
         val clazz = predefinedClasses[i]
         gIndex.classIndex[clazz] = i
-        gIndex.classNames.add(clazz)
+        gIndex.classNamesByIndex.add(clazz)
     }
 
     registerDefaultOffsets()
-    listEntryPoints()
+    indexHierarchyFromEntryPoints()
 
     hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
     hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
@@ -385,7 +399,27 @@ fun jvm2wasm() {
 
     replaceRenamedDependencies()
     checkMissingClasses()
+
     resolveAll(entryClasses, entryPoints)
+
+    // todo this is somehow used, not-implemented, but we don't crash
+    val checked = MethodSig.c(
+        "kotlyn/reflect/full/KClasses", "getSuperclasses",
+        "(Lkotlin/reflect/KClass;)Ljava/util/List;", true
+    )
+    printUsed(checked)
+    println("flags: ${hIndex.classFlags[checked.clazz]}")
+    assertFalse(checked in hIndex.notImplementedMethods)
+
+    if (false) {
+        printUsed(validFinal)
+        printUsed(invalidFinal)
+        assertTrue(validFinal.clazz in dIndex.constructableClasses)
+        assertTrue(invalidFinal.clazz in dIndex.constructableClasses)
+        assertTrue(invalidFinal in dIndex.usedMethods)
+        assertTrue(validFinal in dIndex.usedMethods, "Valid final is unused??/2")
+    }
+
     indexFieldsInSyntheticMethods()
     calculateFieldOffsets()
     assignNativeCode()
@@ -408,8 +442,8 @@ fun jvm2wasm() {
     // only now usedMethods is complete
     printMethodFieldStats()
 
-    for (sig in dIndex.usedMethods
-        .filter { it in hIndex.nativeMethods }) {
+    for (sig in dIndex.usedMethods) {
+        if (sig !in hIndex.nativeMethods) continue
         val annotations = hIndex.annotations[sig] ?: continue
         if (annotations.any2 { it.clazz == "annotations/JavaScript" || it.clazz == "annotations/WASM" }) {
             hIndex.notImplementedMethods.remove(sig)
@@ -419,7 +453,6 @@ fun jvm2wasm() {
     }
 
     printNotImplementedMethods(importPrinter, missingMethods)
-
     printNativeMethods(importPrinter, missingMethods)
 
     val jsImplemented = generateJavaScriptFile(missingMethods)
@@ -504,17 +537,19 @@ fun jvm2wasm() {
     }
 
     listEntryPoints({
-        for (sig in hIndex.methods[it]!!) {
+        for (sig in hIndex.methodsByClass[it]!!) {
             ActuallyUsedIndex.add(entrySig, sig)
         }
     }, { sig ->
         ActuallyUsedIndex.add(entrySig, sig)
     })
 
+
     val usedMethods = ActuallyUsedIndex.resolve()
     usedButNotImplemented.retainAll(usedMethods)
 
-    val nameToMethod = nameToMethod
+
+    val nameToMethod = calculateNameToMethod()
     val usedBotNotImplementedMethods =
         usedButNotImplemented
             .mapNotNull { nameToMethod[it] }
@@ -588,14 +623,14 @@ fun jvm2wasm() {
 
     compileToWASM(headerPrinter)
 
-    println("  ${dIndex.constructableClasses.size}/${gIndex.classNames.size} classes are constructable")
+    println("  ${dIndex.constructableClasses.size}/${gIndex.classNamesByIndex.size} classes are constructable")
 }
 
 val globals = ArrayList<GlobalVariable>()
 
 fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
     println("\nMissing functions:")
-    val nameToMethod = nameToMethod
+    val nameToMethod = calculateNameToMethod()
     for (name in usedButNotImplemented) {
         println("  $name")
         println("    resolved: ${name in resolved}")

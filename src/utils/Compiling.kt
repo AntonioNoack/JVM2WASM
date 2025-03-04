@@ -4,13 +4,12 @@ import api
 import byteStrings
 import canThrowError
 import cannotThrow
-import cannotUseClass
 import dIndex
 import fieldsRWRequired
 import gIndex
 import hIndex
 import hierarchy.DelayedLambdaUpdate
-import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
+import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
 import hierarchy.FirstClassIndexer.Companion.readType
 import implementedMethods
@@ -29,10 +28,11 @@ import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.ACC_STATIC
-import replaceClass1
+import replaceClass
 import resolvedMethods
 import translator.ClassTranslator
 import translator.FoundBetterReader
+import utils.MethodResolver.resolveMethod
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
@@ -50,18 +50,22 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
     eq(gIndex.getFieldOffset(clazz, name, descriptor, false), objectOverhead + offset)
 }
 
+/**
+ * checks and registers offsets to be what we expect:
+ * they might be used elsewhere in the project hardcoded to certain addresses - we should clean that up in the future
+ * */
 fun registerDefaultOffsets() {
 
-    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", "<init>", "()V", false)), 0)
+    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", INSTANCE_INIT, "()V", false)), 0)
     eq(gIndex.getType(true, "()V", true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
-    gIndex.stringClass = gIndex.getClassIndex(replaceClass1("java/lang/String"))
+    gIndex.stringClass = gIndex.getClassIndex(replaceClass("java/lang/String"))
     gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
 
     eq(gIndex.getFieldOffset("[]", "length", "I", false), objectOverhead)
-    eq(gIndex.getFieldOffset(replaceClass1("java/lang/String"), "value", "[C", false), objectOverhead)
-    eq(gIndex.getFieldOffset(replaceClass1("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
+    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "value", "[C", false), objectOverhead)
+    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
 
     hIndex.registerSuperClass("java/lang/reflect/Field", "java/lang/reflect/AccessibleObject")
     hIndex.registerSuperClass("java/lang/reflect/Executable", "java/lang/reflect/AccessibleObject")
@@ -105,12 +109,12 @@ fun registerDefaultOffsets() {
     hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "I", true)] = arrayOverhead
     hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "Z", true)] = trackAllocations
 
-    eq(gIndex.getInterfaceIndex(InterfaceSig.c("<clinit>", "()V")), 0)
+    eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V")), 0)
     gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
 
 }
 
-fun listEntryPoints() {
+fun indexHierarchyFromEntryPoints() {
     listEntryPoints { clazz ->
         if (hIndex.doneClasses.add(clazz)) {
             ClassReader(clazz)
@@ -135,7 +139,7 @@ fun listEntryPoints() {
 fun resolveGenericTypes() {
     LOGGER.info("[resolveGenericTypes]")
     for ((clazz, superTypes) in hIndex.genericSuperTypes) {
-        val baseMethods = hIndex.methods[clazz] ?: continue
+        val baseMethods = hIndex.methodsByClass[clazz] ?: continue
         val ownGenerics = hIndex.generics[clazz]
         for (superType in superTypes) {
 
@@ -160,7 +164,7 @@ fun resolveGenericTypes() {
 
             // to do find all abstract methods in superType to be mapped
             // to do all parent classes as well (?)
-            val abstractMethods = hIndex.methods[clearSuperType]
+            val abstractMethods = hIndex.methodsByClass[clearSuperType]
                 ?.filter { it in hIndex.abstractMethods && it in hIndex.genericMethodSigs }
                 ?: continue
 
@@ -271,7 +275,7 @@ fun findNoThrowMethods() {
 
 fun findAliases() {
     LOGGER.info("[findAliases]")
-    val nameToMethod0 = nameToMethod
+    val nameToMethod0 = calculateNameToMethod()
     for ((sig, annotations) in hIndex.annotations) {
         val alias = annotations.firstOrNull { it.clazz == "annotations/Alias" }
         if (alias != null) {
@@ -318,11 +322,12 @@ fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {
     }
     listEntryPoints({ clazz ->
         // all implemented methods
-        entryPoints.addAll(hIndex.methods[clazz] ?: emptySet())
+        entryPoints.addAll(hIndex.methodsByClass[clazz] ?: emptySet())
         entryClass(clazz)
     }) {
-        if (it.name == "<init>")
+        if (it.name == INSTANCE_INIT) {
             entryClass(it.clazz)
+        }
         entryPoints.add(it)
     }
 
@@ -342,14 +347,14 @@ fun replaceRenamedDependencies() {
     LOGGER.info("[replaceRenamedDependencies]")
     // replace dependencies to get rid of things
     val methodNameToSig = HashMap<String, MethodSig>()
-    for (sig in hIndex.methods.map { it.value }.flatten()) {
+    for (sig in hIndex.methodsByClass.map { it.value }.flatten()) {
         methodNameToSig[methodName2(sig.clazz, sig.name, sig.descriptor)] = sig
     }
     for ((src, dst) in hIndex.methodAliases) {
         val src1 = methodNameToSig[src] ?: continue
         dIndex.methodDependencies[src1] = dIndex.methodDependencies[dst] ?: HashSet()
-        dIndex.fieldDependenciesR[src1] = dIndex.fieldDependenciesR[dst] ?: HashSet()
-        dIndex.fieldDependenciesW[src1] = dIndex.fieldDependenciesW[dst] ?: HashSet()
+        dIndex.getterDependencies[src1] = dIndex.getterDependencies[dst] ?: HashSet()
+        dIndex.setterDependencies[src1] = dIndex.setterDependencies[dst] ?: HashSet()
         dIndex.constructorDependencies[src1] = dIndex.constructorDependencies[dst] ?: HashSet()
         dIndex.interfaceDependencies[src1] = dIndex.interfaceDependencies[dst] ?: HashSet()
     }
@@ -360,7 +365,7 @@ fun replaceRenamedDependencies() {
             .mapValues { (_, dependencies) ->
                 dependencies.map { sig ->
                     resolvedMethods.getOrPut(sig) {
-                        val found = findMethod(sig.clazz, sig.name, sig.descriptor, sig.isStatic, false) ?: sig
+                        val found = resolveMethod(sig, false) ?: sig
                         if (found != sig) hIndex.setAlias(sig, found)
                         if ((found in hIndex.staticMethods) == (sig in hIndex.staticMethods)) found else sig
                     }
@@ -371,7 +376,7 @@ fun replaceRenamedDependencies() {
 
 fun checkMissingClasses() {
     LOGGER.info("[checkMissingClasses]")
-    for (clazz in hIndex.methods.keys) {
+    for (clazz in hIndex.methodsByClass.keys) {
         val superClass = hIndex.superClass[clazz] ?: continue
         if (clazz !in (hIndex.childClasses[superClass] ?: emptySet())) {
             assertFail("Missing $clazz in $superClass")
@@ -382,7 +387,7 @@ fun checkMissingClasses() {
 fun resolveAll(entryClasses: Set<String>, entryPoints: Set<MethodSig>) {
     LOGGER.info("[resolveAll]")
     val clock = Clock("ResolveAll")
-    dIndex.resolve(entryClasses, entryPoints, ::cannotUseClass)
+    dIndex.resolve(entryClasses, entryPoints)
     clock.stop("dIndex.resolve()")
 }
 
@@ -397,11 +402,11 @@ fun indexFieldsInSyntheticMethods() {
 
 fun calculateFieldOffsets() {
     LOGGER.info("[calculateFieldOffsets]")
-    val usedFields = HashSet(dIndex.usedFieldsR)
+    val usedFields = HashSet(dIndex.usedGetters)
     if (fieldsRWRequired) {
-        usedFields.retainAll(dIndex.usedFieldsW)
+        usedFields.retainAll(dIndex.usedSetters)
     } else {
-        usedFields.addAll(dIndex.usedFieldsW)
+        usedFields.addAll(dIndex.usedSetters)
     }
     val nativeClasses = listOf("I", "F", "B", "S", "Z", "J", "C", "D")
     val fieldsByClass = usedFields.groupBy { it.clazz }
@@ -546,8 +551,8 @@ fun ensureIndexForConstructableClasses() {
 fun ensureIndexForInterfacesAndSuperClasses() {
     LOGGER.info("[ensureIndexForInterfacesAndSuperClasses]")
     var i = 0 // size could change
-    while (i < gIndex.classNames.size) {
-        val clazzName = gIndex.classNames[i++]
+    while (i < gIndex.classNamesByIndex.size) {
+        val clazzName = gIndex.classNamesByIndex[i++]
         val superClass = hIndex.superClass[clazzName]
         if (superClass != null) gIndex.getClassIndex(superClass)
         val interfaces = hIndex.interfaces[clazzName]
@@ -561,7 +566,7 @@ fun findClassesToLoad(aliasedMethods: List<MethodSig>): List<String> {
     return (dIndex.usedMethods + aliasedMethods)
         .map { it.clazz }
         .filter { clazz ->
-            clazz != "?" &&
+            clazz != INTERFACE_CALL_NAME &&
                     clazz !in hIndex.syntheticClasses &&
                     clazz !in hIndex.missingClasses
         }
@@ -675,12 +680,17 @@ fun printNativeMethods(importPrinter: StringBuilder2, missingMethods: HashSet<Me
     }
 }
 
+/**
+ * To get stuff working quickly, just let all missing implementations return 0 until they have been implemented.
+ * todo make this optional, we might wanna fail instead
+ * */
 fun createPseudoJSImplementations(
     jsImplemented: Map<String, *>,
     missingMethods: Set<MethodSig>
 ): Map<String, MethodSig> {
     val jsPseudoImplemented = HashMap<String, MethodSig>()
     for (sig in missingMethods) {
+        // if there is a WASM implementation, we don't need a JS implementation
         if ((hIndex.annotations[sig] ?: emptyList()).any { it.clazz == "annotations/WASM" }) continue
         val name = methodName(sig)
         if (name in jsImplemented) continue
@@ -722,7 +732,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     vararg args: Any?
                                 ) {
                                     val dst = args[1] as Handle
-                                    val synthClassName = synthClassName(sig1, dst)
+                                    val synthClassName = getSynthClassName(sig1, dst)
                                     // println("lambda: $sig1 -> $synthClassName")
                                     gIndex.getClassIndex(synthClassName) // add class to index
                                     val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
@@ -730,7 +740,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                 }
 
                                 override fun visitTypeInsn(opcode: Int, type: String) {
-                                    gIndex.getClassIndex(replaceClass1(type)) // add class to index
+                                    gIndex.getClassIndex(replaceClass(type)) // add class to index
                                 }
 
                                 override fun visitTryCatchBlock(
@@ -740,13 +750,13 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     type: String?
                                 ) {
                                     if (type != null) {
-                                        gIndex.getClassIndex(replaceClass1(type)) // add class to index
+                                        gIndex.getClassIndex(replaceClass(type)) // add class to index
                                     }
                                 }
 
                                 override fun visitLdcInsn(value: Any?) {
                                     if (value is Type) { // add class to index
-                                        gIndex.getClassIndex(replaceClass1(single(value.descriptor)))
+                                        gIndex.getClassIndex(replaceClass(single(value.descriptor)))
                                     }
                                 }
 
@@ -758,7 +768,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     isInterface: Boolean
                                 ) {
                                     if (opcode == 0xb6) { // invoke virtual
-                                        val owner = replaceClass1(owner0)
+                                        val owner = replaceClass(owner0)
                                         val sig0 = MethodSig.c(owner, name, descriptor, false)
                                         // just for checking if abstract
                                         if (sig0 !in hIndex.finalMethods) {
@@ -768,7 +778,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                                 if (superClass != null &&
                                                     MethodSig.c(
                                                         superClass, name, descriptor, false
-                                                    ) in hIndex.methods[superClass]!!
+                                                    ) in hIndex.methodsByClass[superClass]!!
                                                 ) {
                                                     add(superClass)
                                                 } else {

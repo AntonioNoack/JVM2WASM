@@ -6,14 +6,14 @@ import hIndex
 import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.ACC_STATIC
-import replaceClass1
+import replaceClass
 import utils.MethodSig
 import utils.methodName
 
 class ClassTranslator(val clazz: String) : ClassVisitor(api) {
 
     init {
-        if (replaceClass1(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
+        if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
 
     private val minVersion = 50

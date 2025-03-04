@@ -7,6 +7,21 @@ import wasm.parser.FunctionImpl
 import kotlin.math.max
 
 fun splitFunctionsIntoClusters(functions: List<FunctionImpl>, numClusters: Int): List<Clustering> {
+
+    if (numClusters > 1 && disableClustersForInspection) {
+        val result = ArrayList<Clustering>(numClusters)
+        val clustering = Clustering(functions, 1)
+        result.add(clustering)
+
+        findDependencies(functions, result)
+
+        val emptyCluster = Clustering(ArrayList(0), 0)
+        while (result.size < numClusters) {
+            result.add(emptyCluster)
+        }
+        return result
+    }
+
     val root = Cluster("", null)
     for (function in functions) {
         val funcName = function.funcName
@@ -26,7 +41,7 @@ fun splitFunctionsIntoClusters(functions: List<FunctionImpl>, numClusters: Int):
     }
 
     val targetComplexity = root.complexity / (2 * numClusters)
-    val result = ArrayList<Clustering>()
+    val result = ArrayList<Clustering>(numClusters * 2)
     collectNodes(root, targetComplexity, result)
     findDependencies(functions, result)
 
@@ -34,7 +49,7 @@ fun splitFunctionsIntoClusters(functions: List<FunctionImpl>, numClusters: Int):
         val smallest = result.minBy { it.complexity }
         result.remove(smallest)
         val secondSmallest = result.minBy { it.complexity }
-        secondSmallest.functions.addAll(smallest.functions)
+        ( secondSmallest.functions as ArrayList).addAll(smallest.functions)
         (secondSmallest.imports as HashSet<FunctionImpl>).addAll(smallest.imports)
     }
 
@@ -126,7 +141,7 @@ fun collectNodes(cluster: Cluster, targetComplexity: Int, dst: ArrayList<Cluster
         currentComplexity += selfComplexity
         val prevDst = dst.minByOrNull { it.complexity }
         if (prevDst != null && prevDst.complexity + currentComplexity <= targetComplexity * 3 / 2) {
-            prevDst.functions.addAll(currentList)
+            (prevDst.functions as ArrayList).addAll(currentList)
             prevDst.complexity += currentComplexity
         } else {
             dst.add(Clustering(currentList, currentComplexity))
@@ -184,7 +199,7 @@ fun getCluster(root: Cluster, path: List<String>): Cluster {
     return node
 }
 
-class Clustering(val functions: ArrayList<FunctionImpl>, var complexity: Int) {
+class Clustering(val functions: List<FunctionImpl>, var complexity: Int) {
     var imports: Collection<FunctionImpl> = emptySet()
 
     override fun toString(): String {

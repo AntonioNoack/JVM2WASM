@@ -8,10 +8,7 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import org.objectweb.asm.Handle
 import translator.MethodTranslator
-import utils.FieldSig
-import utils.MethodSig
-import utils.methodName2
-import utils.split1
+import utils.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
 
@@ -122,8 +119,8 @@ class DelayedLambdaUpdate(
                 FieldSig(synthClassName, fieldName, arg, false)
             }.toMutableSet()
         if (needsSelf) fields += FieldSig(synthClassName, "self", "Ljava/lang/Object;", false)
-        dIndex.fieldDependenciesR[bridgeMethod] = fields
-        dIndex.fieldDependenciesW[bridgeMethod] = fields
+        dIndex.getterDependencies[bridgeMethod] = fields
+        dIndex.setterDependencies[bridgeMethod] = fields
     }
 
     // load all fields
@@ -222,7 +219,7 @@ class DelayedLambdaUpdate(
         if (print) println("calling $calledMethod")
 
         // call the original function
-        val isConstructor = calledMethod.name == "<init>"
+        val isConstructor = calledMethod.name == INSTANCE_INIT
         if (isConstructor) {
             // to do we have to register this potentially as creating a new class
             val clazz = calledMethod.clazz
@@ -270,7 +267,7 @@ class DelayedLambdaUpdate(
 
         val needingBridgeUpdate = HashMap<String, DelayedLambdaUpdate>()
 
-        fun synthClassName(sig: MethodSig, dst: Handle): String { // should be as unique as possible
+        fun getSynthClassName(sig: MethodSig, dst: Handle): String { // should be as unique as possible
             return methodName2(dst.owner, dst.name, dst.desc) + "x" +
                     methodName2(sig.clazz, sig.name, sig.descriptor).hashCode().toString(16)
         }

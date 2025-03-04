@@ -21,7 +21,7 @@ import graphing.StackValidator.validateInputOutputStacks
 import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
-import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
+import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -34,7 +34,7 @@ import me.anno.utils.types.Strings.shorten
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
-import replaceClass1
+import replaceClass
 import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
@@ -204,7 +204,7 @@ class MethodTranslator(
                 println("////////////////////////\n")
             }
             printHeader()
-            if (name == "<clinit>") {
+            if (name == STATIC_INIT) {
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
                 printer.append(i32Const(clazz1))
@@ -806,7 +806,7 @@ class MethodTranslator(
 
         val dst = args[1] as Handle
 
-        val synthClassName = synthClassName(sig, dst)
+        val synthClassName = getSynthClassName(sig, dst)
         val dlu = DelayedLambdaUpdate.needingBridgeUpdate[synthClassName]!!
         val fields = dlu.fields
 
@@ -1043,7 +1043,7 @@ class MethodTranslator(
         descriptor: String,
         isInterface: Boolean
     ) {
-        val owner = replaceClass1(owner0)
+        val owner = replaceClass(owner0)
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
     }
 
@@ -1056,7 +1056,7 @@ class MethodTranslator(
         checkThrowable: Boolean
     ): Boolean {
 
-        val owner = replaceClass1(owner0)
+        val owner = replaceClass(owner0)
 
         if (printOps) println("  [call] ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface")
 
@@ -1072,7 +1072,7 @@ class MethodTranslator(
 
         val sig = hIndex.getAlias(sig0)
 
-        val methodsByOwner = hIndex.methods.getOrPut(owner) { HashSet() }
+        val methodsByOwner = hIndex.methodsByClass.getOrPut(owner) { HashSet() }
         if (sig == sig0 && methodsByOwner.add(sig0) && isStatic) {
             hIndex.staticMethods.add(sig0)
         }
@@ -1087,7 +1087,7 @@ class MethodTranslator(
 
         when (opcode0) {
             0xb9 -> {
-                val variants = getMethodVariants(sig0)
+                val variants = findConstructableChildImplementations(sig0)
                 if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
                     // invoke interface
                     // load interface/function index
@@ -1126,10 +1126,16 @@ class MethodTranslator(
                     pop(splitArgs, false, ret)
                     stackPop()
 
-                } else if (sig0 in hIndex.finalMethods) {
+                } else if (
+                    sig0 in hIndex.finalMethods // &&
+                    // todo a method that is final should always pass this, but somehow,
+                    //  me/anno/utils/hpc/WorkSplitter/processUnbalanced(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V
+                    //  doesn't pass the test
+                    // findConstructableChildImplementations(sig0).size < 2
+                ) {
 
-                    val sigs = getMethodVariants(sig0)
-                    assertTrue(sigs.size < 2) { "Unclear $sig0 -> $sig?" }
+                    val sigs = findConstructableChildImplementations(sig0)
+                    assertTrue(sigs.size < 2) { "Unclear $sig0 -> $sig?, options: $sigs" }
                     val sig1 = sigs.firstOrNull() ?: sig
 
                     val setter = hIndex.setterMethods[sig1]
@@ -1190,7 +1196,7 @@ class MethodTranslator(
                         }
                     }
                 } else {
-                    val options = getMethodVariants(sig0)
+                    val options = findConstructableChildImplementations(sig0)
                     if (!resolveIndirect(sig0, splitArgs, ret, options, ::getCaller, calledCanThrow, owner)) {
                         // method can have well-defined place in class :) -> just precalculate that index
                         // looks up the class, and in the class-function lut, it looks up the function ptr
@@ -1571,7 +1577,7 @@ class MethodTranslator(
     }
 
     override fun visitTypeInsn(opcode: Int, type0: String) {
-        val type = replaceClass1(type0)
+        val type = replaceClass(type0)
         if (printOps) println("  [${OpCode[opcode]}] $type")
         when (opcode) {
             0xbb -> {
@@ -1827,12 +1833,12 @@ class MethodTranslator(
     }
 
     private fun callStaticInit(clazz: String) {
-        if (name == "<clinit>" && clazz == this.clazz) {
+        if (name == STATIC_INIT && clazz == this.clazz) {
             if (comments) printer.comment("skipped <clinit>, we're inside of it")
             return
         } // it's currently being inited :)
-        val sig = MethodSig.c(clazz, "<clinit>", "()V", true)
-        if (hIndex.methods[clazz]?.contains(sig) != true) {
+        val sig = MethodSig.c(clazz, STATIC_INIT, "()V", true)
+        if (hIndex.methodsByClass[clazz]?.contains(sig) != true) {
             if (comments) printer.comment("skipped <clinit>, because empty")
             return
         }
@@ -1847,7 +1853,7 @@ class MethodTranslator(
 
     private val precalculateStaticFields = true
     override fun visitFieldInsn(opcode: Int, owner0: String, name: String, descriptor: String) {
-        visitFieldInsn2(opcode, replaceClass1(owner0), name, descriptor, true)
+        visitFieldInsn2(opcode, replaceClass(owner0), name, descriptor, true)
     }
 
     private fun Builder.dupI32(): Builder {

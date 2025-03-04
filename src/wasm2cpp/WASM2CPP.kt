@@ -17,9 +17,11 @@ private val LOGGER = LogManager.getLogger("WASM2CPP")
 var enableCppTracing = true
 
 /**
- * if you want to change this, you need to change the C++ file list in CMakeLists.txt
+ * if you want to change this, you need to change the C++ file list in CMakeLists.txt;
+ * or change "disableClustersForInspection"
  * */
 val numTargetClusters = 20
+var disableClustersForInspection = true
 
 val writer = StringBuilder2(1 shl 16)
 val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/cpp")

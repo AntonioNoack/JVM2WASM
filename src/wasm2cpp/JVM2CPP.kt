@@ -1,6 +1,7 @@
 package wasm2cpp
 
 import jvm2wasm
+import me.anno.utils.Clock
 import me.anno.utils.assertions.assertEquals
 import utils.i32
 import wasm.instr.*
@@ -15,6 +16,9 @@ import wasm.parser.WATParser
 
 fun main() {
     // todo create nicely-readable C++
+    //  -> get access to original variable names, and use them where possible
+    //  -> inline more arguments
+    val clock = Clock("JVM2CPP")
     jvm2wasm()
     val testWATParser = true
     if (testWATParser) {
@@ -24,6 +28,7 @@ fun main() {
         //  probably because SwitchCase -> text -> SwitchCase is different
         wasm2cppFromMemory()
     }
+    clock.total("JVM2CPP")
 }
 
 fun testSwitchCase() {

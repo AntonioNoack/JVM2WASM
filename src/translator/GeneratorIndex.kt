@@ -11,7 +11,7 @@ import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.types.Booleans.toInt
-import replaceClass1
+import replaceClass
 import useWASMExceptions
 import utils.*
 import wasm.instr.FuncType
@@ -112,13 +112,13 @@ object GeneratorIndex {
         }.funcName
     }
 
-    val classNames = ArrayList<String>()
+    val classNamesByIndex = ArrayList<String>()
     val classIndex = HashMap<String, Int>()
 
     var lockClasses = false
 
     fun getClassIndex(name: String): Int {
-        val name2 = replaceClass1(name)
+        val name2 = replaceClass(name)
         if (name != name2) TODO()
         if ('.' in name) throw IllegalArgumentException(name)
         if (name in classIndex) return classIndex[name]!!
@@ -126,7 +126,7 @@ object GeneratorIndex {
         return if (!name.startsWith("[")) {
             if (lockClasses) throw IllegalStateException("Missing class $name")
             classIndex.getOrPut(name) {
-                classNames.add(name)
+                classNamesByIndex.add(name)
                 classIndex.size
             }
         } else classIndex["[]"]!!

@@ -1,7 +1,8 @@
 package utils
 
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
-import replaceClass1
+import replaceClass
 
 @Suppress("DataClassPrivateConstructor")
 data class MethodSig private constructor(
@@ -12,6 +13,7 @@ data class MethodSig private constructor(
 ) {
 
     fun withClass(clazz: String): MethodSig {
+        if (clazz == this.clazz) return this
         return MethodSig(validateClassName(clazz), name, descriptor, isStatic)
     }
 
@@ -42,49 +44,78 @@ data class MethodSig private constructor(
         }
 
         private fun validateClassName(clazz: String): String {
-            val clazz2 = if (clazz.startsWith("[[") || clazz.startsWith("[L")) "[]" else replaceClass1(clazz)
+            val clazz2 =
+                if (clazz.startsWith("[[") || clazz.startsWith("[L")) "[]"
+                else replaceClass(clazz)
             if (clazz2.startsWith("[L")) throw IllegalArgumentException(clazz)
             if ('.' in clazz2) throw IllegalStateException(clazz)
             return clazz2
         }
 
         fun validateDescriptor(descriptor: String): String {
-            val descriptor2 = if ('/' in descriptor) descriptor.replace('/', '_') else descriptor
-            val descriptor3 = if ('$' in descriptor2) descriptor2.replace('$', 'X') else descriptor2
-            val descriptor4 = if ('[' in descriptor3) descriptor3.replace('[', 'A') else descriptor3
-            val j = descriptor4.indexOf(')')
-            if (!descriptor4.startsWith('(') || j < 0 || j != descriptor4.lastIndexOf(')')) {
-                throw IllegalArgumentException("Expected () in $descriptor4")
+            val j = descriptor.indexOf(')')
+            if (!descriptor.startsWith('(') || j < 0 || j != descriptor.lastIndexOf(')')) {
+                throw IllegalArgumentException("Expected () in $descriptor")
             }
             var i = 1
-            search@ while (i < descriptor4.length) {
-                when (descriptor4[i]) {
-                    in "IJFDZSBC" -> i++
-                    'V' -> {
-                        assertTrue(i == descriptor4.lastIndex)
+            val builder = StringBuilder2(descriptor.length)
+            builder.append('(')
+            search@ while (i < descriptor.length) {
+                when (val char0 = descriptor[i]) {
+                    in "IJFDZSBC" -> {
+                        builder.append(char0)
                         i++
                     }
-                    'A' -> {
+                    'V' -> {
+                        builder.append('V')
+                        assertTrue(i == descriptor.lastIndex) // must be last character
                         i++
-                        assertTrue(descriptor4[i] !in ")V")
+                    }
+                    '[', 'A' -> {
+                        builder.append('A')
+                        assertTrue(descriptor[i + 1] !in ")V") // next one must be neither ')' nor 'V'
+                        i++
                     }
                     'L' -> {
                         // good :)
                         // skip until ;
                         // expect only latin chars and under-scores
+                        val startI = i + 1
                         while (true) {
-                            when (descriptor4[i++]) {
-                                in 'A'..'Z', in 'a'..'z', in '0'..'9', '_' -> {}
-                                ';' -> continue@search
-                                else -> throw IllegalArgumentException("Unexpected symbol in descriptor: $descriptor4")
+                            when (descriptor[i++]) {
+                                in 'A'..'Z', in 'a'..'z', in '0'..'9', '_', '/', '$' -> {
+                                    // ok
+                                }
+                                ';' -> {
+                                    val endI = i - 1
+                                    val className = descriptor.substring(startI, endI)
+                                    builder.append('L')
+                                    val b0 = builder.size
+                                    builder.append(replaceClass(className))
+                                    for (k in b0 until builder.length) {
+                                        // replace chars as needed
+                                        when (builder[k].toInt().toChar()) {
+                                            '/' -> builder[k] = '_'.code.toByte()
+                                            '$' -> builder[k] = '$'.code.toByte()
+                                        }
+                                    }
+                                    builder.append(';')
+                                    continue@search
+                                }
+                                else -> throw IllegalArgumentException("Unexpected symbol in descriptor: $descriptor")
                             }
                         }
                     }
-                    ')' -> i++
-                    else -> throw IllegalArgumentException("Unexpected symbol in descriptor: $descriptor4")
+                    ')' -> {
+                        assertEquals(i, j) // must be at j-th place
+                        builder.append(')')
+                        i++
+                    }
+                    else -> throw IllegalArgumentException("Unexpected symbol in descriptor: $descriptor")
                 }
             }
-            return descriptor4
+            // println("$descriptor -> $builder")
+            return builder.toString()
         }
     }
 }

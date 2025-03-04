@@ -63,20 +63,25 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getDeclaredField_Ljava_lang_StringLjava_lang_reflect_Field")
-    public static <V> Field Class_getDeclaredField(Class<V> clazz, String name) throws NoSuchFieldException {
+    public static <V> Field Class_getDeclaredField(Class<V> clazz, String name) {
         return Class_getField(clazz, name);
     }
 
     @Alias(names = "java_lang_Class_getDeclaredMethods_ALjava_lang_reflect_Method")
     public static <V> Method[] Class_getDeclaredMethods(Class<V> clazz) {
+        // should be fine, right?
+        return Class_getMethods(clazz);
+    }
+
+    @Alias(names = "java_lang_Class_getMethods_ALjava_lang_reflect_Method")
+    public static <V> Method[] Class_getMethods(Class<V> clazz) {
         return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
     }
 
-    // private static final NoSuchMethodException noSuchMethodEx = new NoSuchMethodException();
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) {
         if (name == null) return null;
-        Method[] methods = Class_getDeclaredMethods(self);
+        Method[] methods = Class_getMethods(self);
         for (Method method : methods) {
             if (matches(method, name, parameters)) {
                 return method;

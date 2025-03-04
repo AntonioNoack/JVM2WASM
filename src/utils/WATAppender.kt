@@ -56,7 +56,7 @@ private fun fillInClassNames(
     classSize: Int, nameOffset: Int, indexStartPtr: Int
 ) {
     for (clazz in 0 until numClasses) {
-        val name = gIndex.classNames[clazz].replace('/', '.') // getName() returns name with dots
+        val name = gIndex.classNamesByIndex[clazz].replace('/', '.') // getName() returns name with dots
         val strPtr = gIndex.getString(name, indexStartPtr + classData.size(), classData)
         val dstPtr = clazz * classSize + nameOffset
         val pos = classData.position
@@ -111,7 +111,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
         val fieldSize = fieldOffsets0.offset
         for (clazz in 0 until numClasses) {
 
-            val className = gIndex.classNames[clazz]
+            val className = gIndex.classNamesByIndex[clazz]
             val classPtr = indexStartPtr + clazz * classSize
             // if (className !in dIndex.constructableClasses) continue
 
@@ -287,9 +287,10 @@ fun appendFunctionTypes(printer: StringBuilder2) {
     }
 }
 
-val nameToMethod
-    get() = hIndex.methods.map { it.value }.flatten()
+fun calculateNameToMethod(): Map<String, MethodSig> {
+    return hIndex.methodsByClass.map { it.value }.flatten()
         .associateBy { methodName(it) }
+}
 
 val functionTable = ArrayList<String>()
 
@@ -306,7 +307,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
     var ptr = clInitFlagTable + numClasses // 1 byte for flag for init
     val staticBuffer = ByteArrayOutputStream2(numClasses * 4)
     for (i in 0 until numClasses) {
-        val className = gIndex.classNames[i]
+        val className = gIndex.classNamesByIndex[i]
         val fieldOffsets = gIndex.getFieldOffsets(className, true)
         val size = fieldOffsets.offset
         if (size == 0) {

@@ -6,9 +6,10 @@ import dIndex
 import dyninvoke.DynPrinter
 import hIndex
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
-import hierarchy.DelayedLambdaUpdate.Companion.synthClassName
+import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
+import me.anno.utils.assertions.assertEquals
 import org.objectweb.asm.*
-import replaceClass1
+import replaceClass
 import utils.*
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
@@ -101,7 +102,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val isStatic = opcode == 0xb8
         val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
 
-        val isNewMethod = hIndex.methods.getOrPut(owner) { HashSet() }.add(sig1)
+        val isNewMethod = HierarchyIndex.registerMethod(sig1)
         if (isNewMethod) {
             if (isStatic) hIndex.staticMethods.add(sig1)
             if (hIndex.notImplementedMethods.add(sig1)) {
@@ -159,7 +160,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (method.owner == "java/lang/invoke/LambdaMetafactory" && (method.name == "metafactory" || method.name == "altMetafactory") && args.size >= 3) {
 
             val baseClass = "java/lang/Object" //(args[0] as Type).returnType.descriptor
-            val interface1 = single(descriptor.substring(descriptor.lastIndexOf(')') + 1))
+            val interface1 = replaceClass(single(descriptor.substring(descriptor.lastIndexOf(')') + 1)))
             val dst = args[1] as Handle
 
             visitMethodInsn(0, dst.owner, dst.name, dst.desc, false)
@@ -177,7 +178,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // register new class (not visitable)
             // todo I really don't know of these called methods are static or not.. are they???
             val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
-            val synthClassName = synthClassName(sig, dst)
+            val synthClassName = getSynthClassName(sig, dst)
             val print = false// calledMethod.name == "<init>"
             if (print) println(args.joinToString())
 
@@ -225,7 +226,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
             constructed.add(synthClassName)
 
-            hIndex.methods[synthClassName] = hashSetOf(bridge)
+            hIndex.registerMethod(bridge)
 
         } else {
             DynPrinter.print(name, descriptor, method, args)
@@ -246,7 +247,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isGetter = false
         isSetter = false
         instructionIndex++
-        val type = replaceClass1(type0)
+        val type = replaceClass(type0)
         clazz.dep(type)
         if (opcode == 0xbb) {
             if (type.endsWith("[]")) throw IllegalStateException(type)
@@ -283,7 +284,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isGetter = false
         isSetter = false
         instructionIndex++
-        if (type != null) clazz.dep(replaceClass1(type))
+        if (type != null) clazz.dep(replaceClass(type))
     }
 
     private var lastField: FieldSig? = null
@@ -293,7 +294,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (instructionIndex != 2 && isSetter) isSetter = false
         instructionIndex++
 
-        val owner = replaceClass1(owner0)
+        val owner = replaceClass(owner0)
         clazz.dep(owner)
 
         // only getters are of importance, because setters without getters don't matter
@@ -303,27 +304,10 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (sig !in hIndex.finalFields) {
             // fields are only relevant if they are both written and read
             when (opcode) {
-                0xb2 -> {
-                    // get
-                    fieldsR.add(sig)
-                    // methods.add(MethodSig.c(owner, "<clinit>", "()V"))
-                }
-
-                0xb3 -> {
-                    // put static
-                    fieldsW.add(sig)
-                    // methods.add(MethodSig.c(owner, "<clinit>", "()V"))
-                }
-
-                0xb4 -> {
-                    // get field
-                    fieldsR.add(sig)
-                }
-
-                0xb5 -> {
-                    // put field
-                    fieldsW.add(sig)
-                }
+                0xb2 -> fieldsR.add(sig)// get static
+                0xb3 -> fieldsW.add(sig)  // put static
+                0xb4 -> fieldsR.add(sig)   // get field
+                0xb5 -> fieldsW.add(sig)  // put field
             }
         }
     }
@@ -331,8 +315,8 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     override fun visitEnd() {
 
         if (methods.isNotEmpty()) dIndex.methodDependencies[sig] = methods
-        if (fieldsR.isNotEmpty()) dIndex.fieldDependenciesR[sig] = fieldsR
-        if (fieldsW.isNotEmpty()) dIndex.fieldDependenciesW[sig] = fieldsW
+        if (fieldsR.isNotEmpty()) dIndex.getterDependencies[sig] = fieldsR
+        if (fieldsW.isNotEmpty()) dIndex.setterDependencies[sig] = fieldsW
 
         if (constructed.isNotEmpty()) {
             dIndex.constructorDependencies[sig] = constructed

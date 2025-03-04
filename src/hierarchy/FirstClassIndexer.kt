@@ -2,6 +2,7 @@ package hierarchy
 
 import api
 import hIndex
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.types.Booleans.hasFlag
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.ClassReader
@@ -9,8 +10,8 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.FieldVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
-import replaceClass0
-import replaceClass1
+import replaceClass
+import replaceClassNullable
 import utils.*
 import java.io.IOException
 
@@ -20,7 +21,7 @@ import java.io.IOException
 class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVisitor(api) {
 
     init {
-        if (replaceClass1(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
+        if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
 
     companion object {
@@ -63,7 +64,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             when (next0) {
                 "Z", "B", "S", "C", "I", "J", "F", "D" -> {}
                 else -> {
-                    val next = replaceClass1(next0)
+                    val next = replaceClass(next0)
                     if (!next.startsWith("[") && hIndex.doneClasses.add(next)) {
                         try {
                             ClassReader(next)
@@ -79,8 +80,6 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
     }
 
-    private val classMethods = index.methods.getOrPut(clazz) { HashSet() }
-
     fun dep(owner: String) = Companion.dep(owner, clazz)
 
     var isInterface = false
@@ -95,8 +94,13 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         interfaces0: Array<String>
     ) {
 
-        val name = replaceClass1(name0)
-        val interfaces = interfaces0.map { replaceClass1(it) }
+        val name = replaceClass(name0)
+        val interfaces = interfaces0.map { replaceClass(it) }
+
+        if (name != name0) {
+            // ensure we visit the replaced class, too
+            dep(name)
+        }
 
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //     println("[C] $name ($signature): $superName, ${interfaces.joinToString()}")
@@ -109,9 +113,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             hIndex.interfaceClasses.add(name)
         }
 
-        // if (name.startsWith("java/nio")) println("visiting $name, super: $superName0")
-
-        var superName = replaceClass0(superName0)
+        var superName = replaceClassNullable(superName0)
         if (superName == null && name != "java/lang/Object") superName = "java/lang/Object"
         if (superName != null) {
             index.registerSuperClass(name, superName)
@@ -123,50 +125,53 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             dep(interfaceI)
         }
 
-        // class/super-class/interface contains generics-parameters
         if (signature != null) {
-            var i = 0
-            // println("$clazz: $signature")
-            if (signature.startsWith("<")) {
-                // parse custom generic parameters
-                // T:superType;V:nextType;
-                i = 1
-                val genericParams = ArrayList<GenericSig>() // name -> type
-                while (signature[i] != '>') {
-                    val j = signature.indexOf(':', i)
-                    if (j < 0) throw IllegalStateException("$i has no further ':'s")
-                    val k0 = if (signature[j + 1] == ':') j + 2 else j + 1
-                    val k = signature.readType(k0) // double colon... why ever...
-                    if (signature[k - 1] != ';') throw IllegalStateException("end is ${signature[k - 1]}")
-                    val genericsName = signature.substring(i, j)
-                    val genericsSuperType = signature.substring(k0, k)
-                    genericParams.add(GenericSig("T$genericsName;", genericsSuperType))
-                    i = k
-                }
-                i++ // skip '>'
-                if (genericParams.isNotEmpty()) {
-                    index.generics[clazz] = genericParams
-                    // println("  >> setting generics of $clazz to $genericParams")
-                }
-            }
-            // read all super types
-            // they might contain generics as well
-            // format: Type1Type2Type3
-            val superTypes = ArrayList<String>(interfaces.size + 1)
-            while (i < signature.length) {
-                val k = signature.readType(i)
+            // class/super-class/interface contains generics-parameters
+            findGenericSuperTypes(signature, interfaces)
+        }
+    }
+
+    private fun findGenericSuperTypes(signature: String, interfaces: List<String>) {
+        var i = 0
+        // println("$clazz: $signature")
+        if (signature.startsWith("<")) {
+            // parse custom generic parameters
+            // T:superType;V:nextType;
+            i = 1
+            val genericParams = ArrayList<GenericSig>() // name -> type
+            while (signature[i] != '>') {
+                val j = signature.indexOf(':', i)
+                if (j < 0) throw IllegalStateException("$i has no further ':'s")
+                val k0 = if (signature[j + 1] == ':') j + 2 else j + 1
+                val k = signature.readType(k0) // double colon... why ever...
                 if (signature[k - 1] != ';') throw IllegalStateException("end is ${signature[k - 1]}")
-                // find whether it has generics
-                val hasGenerics = signature.indexOf('<', i) in i..k
-                if (hasGenerics) {
-                    superTypes.add(signature.substring(i, k))
-                }
+                val genericsName = signature.substring(i, j)
+                val genericsSuperType = signature.substring(k0, k)
+                genericParams.add(GenericSig("T$genericsName;", genericsSuperType))
                 i = k
             }
-            hIndex.genericSuperTypes[clazz] = superTypes
-            // println("  > $clazz -> $genericParams : $superTypes")
+            i++ // skip '>'
+            if (genericParams.isNotEmpty()) {
+                index.generics[clazz] = genericParams
+                // println("  >> setting generics of $clazz to $genericParams")
+            }
         }
-
+        // read all super types
+        // they might contain generics as well
+        // format: Type1Type2Type3
+        val superTypes = ArrayList<String>(interfaces.size + 1)
+        while (i < signature.length) {
+            val k = signature.readType(i)
+            if (signature[k - 1] != ';') throw IllegalStateException("end is ${signature[k - 1]}")
+            // find whether it has generics
+            val hasGenerics = signature.indexOf('<', i) in i..k
+            if (hasGenerics) {
+                superTypes.add(signature.substring(i, k))
+            }
+            i = k
+        }
+        hIndex.genericSuperTypes[clazz] = superTypes
+        // println("  > $clazz -> $genericParams : $superTypes")
     }
 
     override fun visitInnerClass(name: String, outerName: String?, innerName: String?, access: Int) {
@@ -192,33 +197,56 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         exceptions: Array<String>?
     ): MethodVisitor {
 
-        //if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
-        //    println("[M] $clazz $name $descriptor $signature")
-
+        val isAbstract = access.hasFlag(ACC_ABSTRACT)
+        val isNative = access.hasFlag(ACC_NATIVE)
+        val isFinal = access.hasFlag(ACC_FINAL)
         val isStatic = access.hasFlag(ACC_STATIC)
+
         val sig = MethodSig.c(clazz, name, descriptor, isStatic)
-        if (signature != null) hIndex.genericMethodSigs[sig] = signature
-        classMethods.add(sig)
-        if (isStatic) index.staticMethods.add(sig)
-        if (isFinal || access.hasFlag(ACC_FINAL) || isStatic) {
+
+        if (name == "getSuperclasses") {
+            println(
+                "[M] $clazz $name $descriptor $signature, " +
+                        "abstract? $isAbstract, native? $isNative, final? $isFinal, static? $isStatic"
+            )
+            val checked = MethodSig.c(
+                "kotlyn/reflect/full/KClasses", "getSuperclasses",
+                "(Lkotlin/reflect/KClass;)Ljava/util/List;", true
+            )
+            assertEquals(checked, sig)
+        }
+
+        if (signature != null) {
+            hIndex.genericMethodSigs[sig] = signature
+        }
+
+        HierarchyIndex.registerMethod(sig)
+
+        if (isStatic) {
+            index.staticMethods.add(sig)
+        }
+
+        if (this.isFinal || isFinal || isStatic) {
             if (sig.clazz == "me/anno/gpu/OSWindow" && sig.name == "addCallbacks" && sig.descriptor == "()V")
                 throw IllegalStateException()
             index.finalMethods.add(sig)
         }
 
-        if (access.hasFlag(ACC_ABSTRACT) || access.hasFlag(ACC_NATIVE)) {
-            index.notImplementedMethods.add(sig)
-            if (access.hasFlag(ACC_ABSTRACT)) {
+        when {
+            isAbstract -> {
                 index.abstractMethods.add(sig)
-            } else {
+                index.notImplementedMethods.add(sig)
+            }
+            isNative -> {
                 index.nativeMethods.add(sig)
             }
-        } else {
-            index.jvmImplementedMethods.add(sig)
+            else -> {
+                index.jvmImplementedMethods.add(sig)
+            }
         }
 
-        if (isInterface && name != "<clinit>" && !access.hasFlag(ACC_ABSTRACT)) {
-            hIndex.interfaceDefaults.getOrPut(sig) { HashSet() }.add(sig)
+        if (isInterface && name != STATIC_INIT && !isAbstract) {
+            hIndex.interfaceDefaults.getOrPut(sig, ::HashSet).add(sig)
         }
 
         for (type in split1(descriptor.substring(1, descriptor.lastIndexOf(')')))) {

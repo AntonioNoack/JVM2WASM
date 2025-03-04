@@ -468,8 +468,6 @@ i32 arrayLength(i32 instance) {
     return r32(instance + objectOverhead);
 }
 
-roid java_lang_Thread_setNativeName_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
-
 void jvm_JavaThrowable_printStackTraceEnd_V() {}
 void jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV(i32 name, i32 message) {
     std::string msg = strToCpp(message);

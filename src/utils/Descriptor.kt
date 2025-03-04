@@ -5,7 +5,7 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
-import replaceClass1
+import replaceClass
 import wasm.instr.FuncType
 
 val f32 = "f32"
@@ -36,7 +36,7 @@ fun single(d: String, generics: Boolean = false): String {
             // read until ;
             val j = d.indexOf2(';', i + 1)
             val n = d.substring(i - pad, j + pad)
-            if (generics) n else replaceClass1(n)
+            if (generics) n else replaceClass(n)
         }
 
         else -> throw IllegalArgumentException(d)
@@ -246,8 +246,8 @@ private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1
 fun methodName2(clazz: String, name: String, args: String): String {
     return methodName2Cache.getOrPut(Triple(clazz, name, args)) {
         when (name) {
-            "<clinit>" -> "static|$clazz|$args"
-            "<init>" -> "new|$clazz|$args"
+            STATIC_INIT -> "static|$clazz|$args"
+            INSTANCE_INIT -> "new|$clazz|$args"
             else -> "$clazz|$name|$args"
         }.escapeChars()
     }

@@ -29,7 +29,7 @@ fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.clazz): String? {
 val builder = StringBuilder2(512)
 fun printUsed(sig: MethodSig) {
     builder.append("  ").append(sig).append(":")
-    if (sig in (hIndex.methods[sig.clazz] ?: emptySet())) builder.append(" known")
+    if (sig in (hIndex.methodsByClass[sig.clazz] ?: emptySet())) builder.append(" known")
     if (sig in dIndex.usedMethods) builder.append(" used")
     else {
         // check all super classes
@@ -46,6 +46,8 @@ fun printUsed(sig: MethodSig) {
 
     if (sig in hIndex.jvmImplementedMethods) builder.append(" jvm-implemented")
     if (sig in hIndex.notImplementedMethods) builder.append(" not-implemented")
+    if (sig in hIndex.customImplementedMethods) builder.append(" custom-implemented")
+    if (sig in gIndex.translatedMethods) builder.append(" translated")
     if (sig in hIndex.staticMethods) builder.append(" static")
     if (sig in hIndex.nativeMethods) builder.append(" native")
     if (sig in hIndex.abstractMethods) builder.append(" abstract")
@@ -75,7 +77,7 @@ fun printUsed(sig: MethodSig) {
     if (!uses.isNullOrEmpty()) builder.append(" uses: ").append(uses)
     if (builder.endsWith(":")) {
         val str = sig.toString()
-        val closestMatch = hIndex.methods.values.flatten().minByOrNull { str.distance(it.toString()) }
+        val closestMatch = hIndex.methodsByClass.values.flatten().minByOrNull { str.distance(it.toString()) }
         builder.append(" closest-match: $closestMatch")
     }
     println(builder.toString())

@@ -1,7 +1,9 @@
 package hierarchy
 
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.Opcodes.*
+import replaceClass
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
@@ -17,7 +19,7 @@ object HierarchyIndex {
     val interfaces = HashMap<String, List<String>>(cap)
     val interfaceClasses = HashSet<String>()
 
-    val methods = HashMap<String, HashSet<MethodSig>>(cap)
+    val methodsByClass = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
 
     val generics = HashMap<String, List<GenericSig>>(cap) // name, superType
@@ -37,6 +39,10 @@ object HierarchyIndex {
     val annotations = HashMap<MethodSig, List<Annota>>(cap2)
 
     val methodAliases = HashMap<String, MethodSig>(cap)
+
+    fun registerMethod(method: MethodSig): Boolean {
+        return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)
+    }
 
     fun getAlias(sig: MethodSig): MethodSig {
         val sig1 = methodAliases[methodName(sig)] ?: sig

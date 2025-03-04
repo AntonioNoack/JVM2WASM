@@ -5,10 +5,12 @@ import dIndex
 import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
+import hierarchy.HierarchyIndex.getAlias
 import ignoreNonCriticalNullPointers
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.*
+import utils.MethodResolver.resolveMethod
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
@@ -93,12 +95,17 @@ object ResolveIndirect {
         // find all viable children
         // group them by implementation
         val allChildren = findAllConstructableChildren(sig0.clazz)
+            .map { clazz ->
+                val sigI = sig0.withClass(clazz)
+                val method = resolveMethod(sigI, true) ?: getAlias(sigI)
+                clazz to method
+            }
 
         val groupedByClass = allChildren
-            .groupBy { hIndex.getAlias(sig0.withClass(it)) }
-            .map { it.key to it.value }
-            .filter { it.second.isNotEmpty() }
-            .sortedBy { it.second.size } // biggest case last
+            .groupBy { it.second }
+            .map { (impl, classes) ->
+                impl to classes.map { (name, _) -> name }
+            }.sortedBy { it.second.size } // biggest case last
 
         if (groupedByClass.isEmpty()) {
             // printUsed(sig0)
