@@ -26,31 +26,13 @@ fun StringBuilder2.import1(funcName: String, params: List<String>, results: List
 
 fun StringBuilder2.import2(sig: MethodSig) {
     val desc = sig.descriptor
-    val di = desc.lastIndexOf(')')
-    val wasm = hIndex.annotations[sig]?.filter { it.clazz == "annotations/WASM" }
-    if (wasm.isNullOrEmpty()) {
-        if (sig in hIndex.abstractMethods) return
-        if (hIndex.getAlias(sig) == sig ||
-            (hIndex.annotations[sig] ?: emptyList()).any { it.clazz == "annotations/Alias" }
-        ) {
-            import1(
-                methodName(sig),
-                (if (sig in hIndex.staticMethods) emptyList() else listOf(ptrType)) +
-                        split1(desc.substring(1, di)).map { jvm2wasm(it) },
-                if (canThrowError(sig) && !useWASMExceptions) {
-                    if (desc.endsWith(")V")) {
-                        listOf(ptrType)
-                    } else {
-                        listOf(jvm2wasm1(desc[di + 1]), ptrType)
-                    }
-                } else {
-                    if (desc.endsWith(")V")) {
-                        emptyList()
-                    } else {
-                        listOf(jvm2wasm1(desc[di + 1]))
-                    }
-                }
-            )
-        }
+    if (hIndex.hasAnnotation(sig, Annotations.WASM)) return
+    if (sig in hIndex.abstractMethods) return
+    if (hIndex.getAlias(sig) == sig || hIndex.hasAnnotation(sig, Annotations.ALIAS)) {
+        val self = if (sig in hIndex.staticMethods) emptyList() else listOf(ptrType)
+        val params = desc.wasmParams
+        val canThrowError1 = canThrowError(sig) && !useWASMExceptions
+        val returned = desc.getResultWASMTypes(canThrowError1)
+        import1(methodName(sig), self + params, returned)
     }
 }

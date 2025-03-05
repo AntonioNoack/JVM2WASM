@@ -11,8 +11,7 @@ fun createJSImports(
         jsFileText.append("  ").append(name).append("(")
         // append parameters
         val desc = sig.descriptor
-        val di = desc.lastIndexOf(')')
-        for (i in split1(desc.substring(1, di)).indices) {
+        for (i in desc.params.indices) {
             if (i > 0) jsFileText.append(",")
             jsFileText.append("arg").append(i)
         }

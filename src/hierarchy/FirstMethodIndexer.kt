@@ -5,12 +5,15 @@ import api
 import dIndex
 import dyninvoke.DynPrinter
 import hIndex
-import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
-import me.anno.utils.assertions.assertEquals
+import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import org.objectweb.asm.*
 import replaceClass
-import utils.*
+import utils.Annotations
+import utils.Descriptor.Companion.validateDescriptor
+import utils.FieldSig
+import utils.MethodSig
+import utils.single
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
 
@@ -31,14 +34,13 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     // local.get 1
     // field.set
     // return nothing
-    val args = split2(sig.descriptor)
-    private var isSetter = args.size == 2 && args.last() == "V"
+    private var isSetter = sig.descriptor.params.size == 2 && sig.descriptor.returnType == null
 
     // not static,
     // local.get 0
     // field.get
     // return sth
-    private var isGetter = args.size == 1 && args.last() != "V"
+    private var isGetter = sig.descriptor.params.isEmpty() && sig.descriptor.returnType != null
 
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         isSetter = false
@@ -91,13 +93,11 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         instructionIndex++
 
         clazz.dep(owner)
-        val ix = descriptor.lastIndexOf(')')
-        for (type in split1(descriptor.substring(1, ix))) {
-            clazz.dep(type)
-        }
-        if (!descriptor.endsWith(")V")) {
-            clazz.dep(single(descriptor.substring(ix + 1)))
-        }
+
+        val descriptor1 = validateDescriptor(descriptor)
+        for (type in descriptor1.params) clazz.dep(type)
+        val retType = descriptor1.returnType
+        if (retType != null) clazz.dep(retType)
 
         val isStatic = opcode == 0xb8
         val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
@@ -136,12 +136,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         instructionIndex++
     }
 
-    override fun visitInvokeDynamicInsn(
-        name: String,
-        descriptor: String,
-        method: Handle,
-        vararg args: Any
-    ) {
+    override fun visitInvokeDynamicInsn(name: String, descriptor: String, method: Handle, vararg args: Any) {
         isSetter = false
         isGetter = false
         instructionIndex++
@@ -260,7 +255,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val properties = HashMap<String, Any?>()
         val clazz = single(descriptor)
         annotations.add(Annota(clazz, properties))
-        if (clazz == "annotations/UsedIfIndexed") {
+        if (clazz == Annotations.USED_IF_DEFINED) {
             dIndex.usedMethods.add(sig)
         }
         return object : AnnotationVisitor(api) {
@@ -326,12 +321,12 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             val callInstr =
                 if (anyMethodThrows) "call_indirect (type \$iXi)"
                 else "call_indirect (type \$iX)"
-            annotations.add(Annota("annotations/WASM", mapOf("code" to callInstr)))
+            annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
         } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
             val callInstr =
                 if (anyMethodThrows) "call_indirect (type \$Xi)"
                 else "call_indirect (type \$X)"
-            annotations.add(Annota("annotations/WASM", mapOf("code" to callInstr)))
+            annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
         }
 
         if (annotations.isNotEmpty()) {

@@ -1,14 +1,20 @@
 package utils
 
+import utils.Descriptor.Companion.validateDescriptor
+
 @Suppress("DataClassPrivateConstructor")
-data class InterfaceSig private constructor(val name: String, val descriptor: String) {
+data class InterfaceSig private constructor(val name: String, val descriptor: Descriptor) {
     constructor(sig: MethodSig) : this(sig.name, sig.descriptor)
 
     override fun toString() = "$name/$descriptor"
 
     companion object {
+        fun c(name: String, descriptor: Descriptor): InterfaceSig {
+            return InterfaceSig(name, descriptor)
+        }
+
         fun c(name: String, descriptor: String): InterfaceSig {
-            return InterfaceSig(name, MethodSig.validateDescriptor(descriptor))
+            return c(name, validateDescriptor(descriptor))
         }
     }
 }

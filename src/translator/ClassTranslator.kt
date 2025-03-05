@@ -78,7 +78,7 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
                 methodName == "java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation" ||
                 methodName == "java_lang_reflect_Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation"
             ) {
-                MethodTranslator(access, clazz, name, descriptor)
+                MethodTranslator(access, clazz, name, sig.descriptor)
             } else null
         } else {
             writer.visitMethod(access, name, descriptor, signature, exceptions)

@@ -21,7 +21,6 @@ import me.anno.utils.Clock
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
-import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
@@ -33,6 +32,7 @@ import resolvedMethods
 import translator.ClassTranslator
 import translator.FoundBetterReader
 import utils.MethodResolver.resolveMethod
+import utils.Descriptor.Companion.validateDescriptor
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
@@ -57,7 +57,7 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
 fun registerDefaultOffsets() {
 
     eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", INSTANCE_INIT, "()V", false)), 0)
-    eq(gIndex.getType(true, "()V", true), FuncType(listOf(), listOf(ptrType)))
+    eq(gIndex.getType(true, validateDescriptor("()V"), true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(replaceClass("java/lang/String"))
@@ -186,7 +186,7 @@ fun resolveGenericTypes() {
                     val desc2 = hIndex.genericMethodSigs[method]!!
                     val desc2i = descWithoutGenerics(desc2)
                     // if so, no base-type generics are present -> nothing needs to be replaced or mapped
-                    if (method.descriptor == desc2i) continue
+                    if (method.descriptor.raw == desc2i) continue
 
                     /*if (!hasPrintedHeader) {
                         println("mapping task [$clazz]: $generics to $superType by $params")
@@ -250,7 +250,7 @@ fun resolveGenericTypes() {
                     val newDesc = newDescBuilder.toString()
 
                     // check if this newly generated signature is implemented
-                    val implMethod = candidates.firstOrNull { it.descriptor == newDesc }
+                    val implMethod = candidates.firstOrNull { it.descriptor.raw == newDesc }
                     if (implMethod != null) {
                         // define mapping
                         val sig2 = method.withClass(clazz)
@@ -267,7 +267,7 @@ fun resolveGenericTypes() {
 fun findNoThrowMethods() {
     LOGGER.info("[findNoThrowMethods]")
     for ((sig, annotations) in hIndex.annotations) {
-        if (annotations.any2 { it.clazz == "annotations/NoThrow" }) {
+        if (annotations.any2 { it.clazz == Annotations.NO_THROW }) {
             cannotThrow.add(methodName(sig))
         }
     }
@@ -277,7 +277,7 @@ fun findAliases() {
     LOGGER.info("[findAliases]")
     val nameToMethod0 = calculateNameToMethod()
     for ((sig, annotations) in hIndex.annotations) {
-        val alias = annotations.firstOrNull { it.clazz == "annotations/Alias" }
+        val alias = annotations.firstOrNull { it.clazz == Annotations.ALIAS }
         if (alias != null) {
             @Suppress("UNCHECKED_CAST")
             val aliasNames = alias.properties["names"] as List<String>
@@ -292,7 +292,7 @@ fun findAliases() {
                 hIndex.setAlias(aliasName, sig)
             }
         }
-        val revAlias = annotations.firstOrNull { it.clazz == "annotations/RevAlias" }
+        val revAlias = annotations.firstOrNull { it.clazz == Annotations.REV_ALIAS }
         if (revAlias != null) {
             val aliasName = revAlias.properties["name"] as String
             if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
@@ -337,7 +337,7 @@ fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {
 fun findExportedMethods() {
     LOGGER.info("[findExportedMethods]")
     for ((sig, a) in hIndex.annotations) {
-        if (a.any2 { it.clazz == "annotations/Export" }) {
+        if (a.any2 { it.clazz == Annotations.EXPORT_CLASS }) {
             hIndex.exportedMethods.add(sig)
         }
     }
@@ -348,7 +348,7 @@ fun replaceRenamedDependencies() {
     // replace dependencies to get rid of things
     val methodNameToSig = HashMap<String, MethodSig>()
     for (sig in hIndex.methodsByClass.map { it.value }.flatten()) {
-        methodNameToSig[methodName2(sig.clazz, sig.name, sig.descriptor)] = sig
+        methodNameToSig[methodName2(sig.clazz, sig.name, sig.descriptor.raw)] = sig
     }
     for ((src, dst) in hIndex.methodAliases) {
         val src1 = methodNameToSig[src] ?: continue
@@ -441,12 +441,12 @@ fun printInterfaceIndex() {
 fun assignNativeCode() {
     LOGGER.info("[assignNativeCode]")
     for ((method, code, noinline) in hIndex.annotations.entries
-        .mapNotNull { m ->
-            val wasm = m.value.firstOrNull { it.clazz == "annotations/WASM" }
+        .mapNotNull { (method, annotations) ->
+            val wasm = annotations.firstOrNull { it.clazz == Annotations.WASM }
             if (wasm != null)
                 Triple(
-                    m.key, wasm.properties["code"] as String,
-                    m.value.any { it.clazz == "annotations/NoInline" })
+                    method, wasm.properties["code"] as String,
+                    annotations.any { it.clazz == Annotations.NO_INLINE })
             else null
         }) {
         if (noinline) {
@@ -464,8 +464,7 @@ fun parseInlineWASM(code: String): List<Instruction> {
 fun generateJavaScriptFile(missingMethods: HashSet<MethodSig>): Map<String, Pair<MethodSig, String>> {
     val jsImplemented = HashMap<String, Pair<MethodSig, String>>() // name -> sig, impl
     for (sig in dIndex.usedMethods) {
-        val annot = hIndex.annotations[sig] ?: continue
-        val js = annot.firstOrNull2 { it.clazz == "annotations/JavaScript" } ?: continue
+        val js = hIndex.getAnnotation(sig, Annotations.JAVASCRIPT) ?: continue
         val code = js.properties["code"] as String
         missingMethods.remove(sig)
         for (name in methodNames(sig)) {
@@ -591,19 +590,19 @@ fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<Me
     ) {
         val canThrow = canThrowError(func)
         val desc = func.descriptor
-        val dx = desc.lastIndexOf(')')
         // export? no, nobody should call these
         bodyPrinter.append("(func $").append(methodName(func)).append(" (param")
-        for (param in split1(desc.substring(1, dx))) {
-            bodyPrinter.append(' ').append(jvm2wasm(param))
+        for (param in desc.wasmParams) {
+            bodyPrinter.append(' ').append(param)
         }
         bodyPrinter.append(") (result")
-        val hasReturnType = !desc.endsWith(")V")
-        if (hasReturnType) bodyPrinter.append(' ').append(jvm2wasm1(desc[dx + 1]))
+        val returnType = desc.returnType
+        val hasReturnType = returnType != null
+        if (hasReturnType) bodyPrinter.append(' ').append(jvm2wasmTyped(returnType!!))
         if (canThrow) bodyPrinter.append(' ').append(ptrType)
         bodyPrinter.append(")")
         if (hasReturnType || canThrow) {
-            if (hasReturnType) bodyPrinter.append(" ").append(jvm2wasm1(desc[dx + 1])).append(".const 0")
+            if (hasReturnType) bodyPrinter.append(" ").append(jvm2wasmTyped(returnType!!)).append(".const 0")
             if (canThrow) bodyPrinter.append(" call \$throwAME")
         }
         bodyPrinter.append(")\n")
@@ -691,7 +690,7 @@ fun createPseudoJSImplementations(
     val jsPseudoImplemented = HashMap<String, MethodSig>()
     for (sig in missingMethods) {
         // if there is a WASM implementation, we don't need a JS implementation
-        if ((hIndex.annotations[sig] ?: emptyList()).any { it.clazz == "annotations/WASM" }) continue
+        if (hIndex.hasAnnotation(sig, Annotations.WASM)) continue
         val name = methodName(sig)
         if (name in jsImplemented) continue
         jsPseudoImplemented[name] = sig

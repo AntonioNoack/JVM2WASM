@@ -16,11 +16,12 @@ class DelayedLambdaUpdate(
     private val source: String,
     val calledMethod: MethodSig,
     private val descriptor: String,
-    val synthClassName: String,
+    private val synthClassName: String,
     val bridgeMethod: MethodSig,
 ) {
 
     private fun isNative(type: String): Boolean {
+        // todo replace this logic with Descriptor.validate() and NativeTypes
         return type[0] != 'L' && type[0] != 'T' && type[0] !in "[A"
     }
 
@@ -113,10 +114,10 @@ class DelayedLambdaUpdate(
         // load all fields
         val ix = descriptor.lastIndexOf(')')
         val fields = split1(descriptor.substring(1, ix), true)
-            .mapIndexed { i, arg ->
+            .mapIndexed { i, rawType ->
                 val fieldName = "f$i"
-                gIndex.getFieldOffset(synthClassName, fieldName, arg, false)!!
-                FieldSig(synthClassName, fieldName, arg, false)
+                gIndex.getFieldOffset(synthClassName, fieldName, rawType, false)!!
+                FieldSig(synthClassName, fieldName, rawType, false)
             }.toMutableSet()
         if (needsSelf) fields += FieldSig(synthClassName, "self", "Ljava/lang/Object;", false)
         dIndex.getterDependencies[bridgeMethod] = fields
@@ -143,8 +144,8 @@ class DelayedLambdaUpdate(
         // build synthetic method code
         val printer = MethodTranslator(0, bridgeMethod.clazz, bridgeMethod.name, bridgeMethod.descriptor)
         val wantedDescriptor = calledMethod.descriptor
-        val ix3 = wantedDescriptor.lastIndexOf(')')
-        val wantedParams = split1(wantedDescriptor.substring(1, ix3), true)
+        val ix3 = wantedDescriptor.raw.lastIndexOf(')')
+        val wantedParams = split1(wantedDescriptor.raw.substring(1, ix3), true)
 
         val print = false
 
@@ -191,8 +192,8 @@ class DelayedLambdaUpdate(
         }
 
         // append arguments to this function as values
-        val ix2 = bridgeMethod.descriptor.lastIndexOf(')')
-        val fields2 = split1(bridgeMethod.descriptor.substring(1, ix2), true)
+        val ix2 = bridgeMethod.descriptor.raw.lastIndexOf(')')
+        val fields2 = split1(bridgeMethod.descriptor.raw.substring(1, ix2), true)
         for (i in fields2.indices) {
             val arg = fields2[i]
             val wanted = wantedParams.getOrNull(k++)
@@ -205,8 +206,8 @@ class DelayedLambdaUpdate(
                 'D' -> 0x18
                 else -> 0x19
             }
-            // index is not correctly incremented for double/long
-            printer.visitVarInsn2(opcode, -1, i + 1)
+            // todo validate that this is correct...
+            printer.visitVarInsn2(opcode, -1, printer.localVarsWithParams[i + 1])
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
                 boxUnbox(arg, wanted ?: "", printer, true)
             }
@@ -230,11 +231,7 @@ class DelayedLambdaUpdate(
 
         var couldThrow = printer.visitMethodInsn2(
             if (isInterface) 0xb9 else if (callingStatic) 0xb8 else 0xb6,
-            calledMethod.clazz,
-            calledMethod.name,
-            calledMethod.descriptor,
-            isInterface,
-            false
+            calledMethod, isInterface, false
         )
 
         // java/util/Spliterator$OfInt/tryAdvance(Ljava/util/function/Consumer;)Z
@@ -246,8 +243,8 @@ class DelayedLambdaUpdate(
         // error code; this method will always be able to throw errors, because we cannot annotate it (except maybe later)
 
         // unboxing for result
-        val ret0 = if (isConstructor) "Ljava/lang/Object;" else wantedDescriptor.substring(ix3 + 1)
-        val ret1 = bridgeMethod.descriptor.substring(ix2 + 1)
+        val ret0 = if (isConstructor) "Ljava/lang/Object;" else wantedDescriptor.raw.substring(ix3 + 1)
+        val ret1 = bridgeMethod.descriptor.raw.substring(ix2 + 1)
         if (ret0 != ret1 && isNative(ret0) != isNative(ret1)) {
             if (couldThrow) printer.handleThrowable()
             boxUnbox(ret0, ret1, printer, false)
@@ -269,7 +266,7 @@ class DelayedLambdaUpdate(
 
         fun getSynthClassName(sig: MethodSig, dst: Handle): String { // should be as unique as possible
             return methodName2(dst.owner, dst.name, dst.desc) + "x" +
-                    methodName2(sig.clazz, sig.name, sig.descriptor).hashCode().toString(16)
+                    methodName2(sig.clazz, sig.name, sig.descriptor.raw).hashCode().toString(16)
         }
     }
 }

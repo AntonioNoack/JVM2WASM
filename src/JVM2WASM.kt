@@ -9,7 +9,6 @@ import me.anno.maths.Maths.ceilDiv
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.structures.lists.Lists.any2
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
@@ -444,8 +443,9 @@ fun jvm2wasm() {
 
     for (sig in dIndex.usedMethods) {
         if (sig !in hIndex.nativeMethods) continue
-        val annotations = hIndex.annotations[sig] ?: continue
-        if (annotations.any2 { it.clazz == "annotations/JavaScript" || it.clazz == "annotations/WASM" }) {
+        if (hIndex.hasAnnotation(sig, Annotations.JAVASCRIPT) ||
+            hIndex.hasAnnotation(sig, Annotations.WASM)
+        ) {
             hIndex.notImplementedMethods.remove(sig)
             hIndex.customImplementedMethods.add(sig)
             // println("Marked $sig as custom")

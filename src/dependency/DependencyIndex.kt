@@ -346,7 +346,7 @@ object DependencyIndex {
                 || usedGetters1.any { isForbiddenClass(it.clazz) }
                 || usedSetters1.any { isForbiddenClass(it.clazz) }
             ) {
-                if (sig.clazz == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor == "hashCode()I")
+                if (sig.clazz == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor.raw == "hashCode()I")
                     throw IllegalStateException("$sig is native, not forbidden")
                 methodsWithForbiddenDependencies.add(sig)
                 checkState(10)

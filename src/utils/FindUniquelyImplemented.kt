@@ -79,12 +79,12 @@ fun findMethodsWithoutChildClasses(): Int {
 // todo remove these conditions when it works
 val invalidFinal = MethodSig.c(
     "me/anno/utils/hpc/WorkSplitter", "processUnbalanced",
-    "(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V", false
+    "(IIILme/anno/utils/hpc/WorkSplitterXTask1d;)V", false
 )
 
 val validFinal = MethodSig.c(
     "me/anno/utils/hpc/ProcessingQueue", "processUnbalanced",
-    "(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V", false
+    "(IIILme/anno/utils/hpc/WorkSplitterXTask1d;)V", false
 )
 
 /**

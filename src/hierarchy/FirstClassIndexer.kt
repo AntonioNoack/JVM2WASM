@@ -227,7 +227,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         }
 
         if (this.isFinal || isFinal || isStatic) {
-            if (sig.clazz == "me/anno/gpu/OSWindow" && sig.name == "addCallbacks" && sig.descriptor == "()V")
+            if (sig.clazz == "me/anno/gpu/OSWindow" && sig.name == "addCallbacks" && sig.descriptor.raw == "()V")
                 throw IllegalStateException()
             index.finalMethods.add(sig)
         }

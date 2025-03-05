@@ -197,7 +197,7 @@ object SolveLinearTree {
         retNode.outputStack = emptyList()
         nodes.add(retNode)
 
-        if (false && sa.sig.name == "getType" && sa.sig.descriptor == "(Ljava_lang_String;)Lme_anno_input_KeyCombinationXType;") {
+        if (false && sa.sig.name == "getType" && sa.sig.descriptor.raw == "(Ljava_lang_String;)Lme_anno_input_KeyCombinationXType;") {
             println()
             println("-------------------------------------------------------------")
             println(sa.sig)

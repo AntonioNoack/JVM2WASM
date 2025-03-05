@@ -1,9 +1,9 @@
 package hierarchy
 
-import me.anno.utils.assertions.assertEquals
+import me.anno.utils.structures.lists.Lists.any2
+import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.Opcodes.*
-import replaceClass
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
@@ -42,6 +42,18 @@ object HierarchyIndex {
 
     fun registerMethod(method: MethodSig): Boolean {
         return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)
+    }
+
+    fun getAnnotations(sig: MethodSig): List<Annota> {
+        return annotations[sig] ?: emptyList()
+    }
+
+    fun getAnnotation(sig: MethodSig, clazz: String): Annota? {
+        return getAnnotations(sig).firstOrNull2 { it.clazz == clazz }
+    }
+
+    fun hasAnnotation(sig: MethodSig, clazz: String): Boolean {
+        return getAnnotation(sig,clazz) != null
     }
 
     fun getAlias(sig: MethodSig): MethodSig {

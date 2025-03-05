@@ -83,8 +83,8 @@ object GeneratorIndex {
 
     // register type in index list
     // return name of that type
-    fun getType(static: Boolean, descriptor: String, canThrow: Boolean): FuncType {
-        val wasmType = splitToType(static, descriptor, canThrow)
+    fun getType(static: Boolean, descriptor: Descriptor, canThrow: Boolean): FuncType {
+        val wasmType = descriptorToFuncType(static, descriptor, canThrow)
         types.add(wasmType)
         return wasmType
     }
@@ -185,7 +185,7 @@ object GeneratorIndex {
     }
 
     var lockedDynIndex = false
-    fun getDynMethodIdx(clazz: String, name: String, descriptor: String): Int {
+    fun getDynMethodIdx(clazz: String, name: String, descriptor: Descriptor): Int {
         if (clazz.startsWith("[L") || clazz.startsWith("[["))
             return getDynMethodIdx("[]", name, descriptor)
         val clazzMap = getDynMethodIdx(clazz)

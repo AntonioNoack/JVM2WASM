@@ -42,15 +42,8 @@ object StackValidator {
     private val LOGGER = LogManager.getLogger(StackValidator::class)
 
     fun getReturnTypes(sig: MethodSig): List<String> {
-        val descriptor = sig.descriptor
-        val ix = descriptor.lastIndexOf(')')
-        val valueRetType = if (!descriptor.endsWith(")V")) {
-            listOf(jvm2wasm1(descriptor[ix + 1]))
-        } else emptyList()
         val hasErrorRetType = canThrowError(sig) && !useWASMExceptions
-        val errorRetType = if (hasErrorRetType) listOf(ptrType) else emptyList()
-        // println("ret params[$sig]: $valueRetType + $hasErrorRetType")
-        return valueRetType + errorRetType
+        return sig.descriptor.getResultWASMTypes(hasErrorRetType)
     }
 
     private fun validateLocalVariables(localVarsWithParams: List<LocalVar>):
@@ -90,7 +83,7 @@ object StackValidator {
                 mt.sig, node.printer, node.inputStack,
                 when {
                     node.isReturn -> returnTypes
-                    node.isBranch -> node.outputStack + listOf(i32)
+                    node.isBranch -> node.outputStack + listOf(i32) // i32 = condition
                     else -> node.outputStack
                 }, returnTypes,
                 mt.localVarsWithParams
@@ -113,8 +106,8 @@ object StackValidator {
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        val print = false
-        if (print) println("Validating stack ${sig.name}/$params -> $normalResults/$returnResults")
+        val print = sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "get"
+        if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
         for (i in instructions) {
             if (print && i !is IfBranch && i !is LoopInstr && i !is SwitchCase) {
@@ -189,11 +182,10 @@ object StackValidator {
                         stack.pop(ptrType)
                     }
                     // push return values
-                    stack.addAll(getRetType(func))
-                    // push error
-                    if (!useWASMExceptions && canThrowError1(func)) {
-                        stack.push(ptrType)
-                    }
+                    val canThrow = !useWASMExceptions && canThrowError1(func)
+                    val retTypes = getRetType(func, canThrow)
+                    if (print) println("call ${i.name} -> $func -> $retTypes")
+                    stack.addAll(retTypes)
                 }
                 is CallIndirect -> {
                     stack.pop(i32) // method pointer
@@ -224,27 +216,20 @@ object StackValidator {
             }
         }
         assertTrue(stack.endsWith(normalResults), "Stack incorrect, $normalResults vs $stack")
-        // println()
     }
 
     private fun getCallParams(func: Any): List<String> {
         return when (func) {
             is FunctionImpl -> func.params // helper function
-            is MethodSig -> split3(func.descriptor).map { jvm2wasm(it) }
+            is MethodSig -> func.descriptor.wasmParams
             else -> throw NotImplementedError()
         }
     }
 
-    private fun getRetType(func: Any): List<String> {
+    private fun getRetType(func: Any, canThrow: Boolean): List<String> {
         return when (func) {
             is FunctionImpl -> func.results // helper function
-            is MethodSig -> {
-                val descriptor = func.descriptor
-                val ix = descriptor.lastIndexOf(')')
-                if (!descriptor.endsWith(")V")) {
-                    listOf(jvm2wasm1(descriptor[ix + 1]))
-                } else emptyList()
-            }
+            is MethodSig -> func.descriptor.getResultWASMTypes(canThrow)
             else -> assertFail()
         }
     }

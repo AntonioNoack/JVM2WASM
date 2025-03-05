@@ -25,7 +25,7 @@ object ResolveIndirect {
 
     private val LOGGER = LogManager.getLogger(ResolveIndirect::class)
 
-    private const val maxOptions = 16
+    private const val maxOptionsInTree = 16
 
     private fun findAllConstructableChildren(clazz0: String): HashSet<String> {
         val allChildren = HashSet<String>()
@@ -55,7 +55,7 @@ object ResolveIndirect {
     }
 
     private fun MethodTranslator.callSingleOption(
-        sigJ: MethodSig, splitArgs: List<String>, ret: String,
+        sigJ: MethodSig, splitArgs: List<String>, ret: String?,
         owner: String, getCaller: (Builder) -> Unit,
         sig0: MethodSig, calledCanThrow: Boolean
     ) {
@@ -72,7 +72,7 @@ object ResolveIndirect {
     }
 
     fun MethodTranslator.resolveIndirect(
-        sig0: MethodSig, splitArgs: List<String>, ret: String,
+        sig0: MethodSig, splitArgs: List<String>, ret: String?,
         options: Set<MethodSig>, getCaller: (Builder) -> Unit,
         calledCanThrow: Boolean,
         owner: String
@@ -80,13 +80,13 @@ object ResolveIndirect {
         if (options.size == 1) {
             callSingleOption(options.first(), splitArgs, ret, owner, getCaller, sig0, calledCanThrow)
             return true
-        } else if (options.size < maxOptions) {
+        } else if (options.size < maxOptionsInTree) {
             return resolveIndirectTree(sig0, splitArgs, ret, options, getCaller, calledCanThrow, owner)
         } else return false
     }
 
     private fun MethodTranslator.resolveIndirectTree(
-        sig0: MethodSig, splitArgs: List<String>, ret: String,
+        sig0: MethodSig, splitArgs: List<String>, ret: String?,
         options: Set<MethodSig>, getCaller: (Builder) -> Unit,
         calledCanThrow: Boolean,
         owner: String
@@ -116,7 +116,7 @@ object ResolveIndirect {
         val numTests = (0 until groupedByClass.lastIndex)
             .sumOf { groupedByClass[it].second.size }
 
-        if (numTests < maxOptions) {
+        if (numTests < maxOptionsInTree) {
 
             fun createPyramidCondition(classes2: List<String>): ArrayList<Instruction> {
                 val result = ArrayList<Instruction>(classes2.size * 5)
@@ -137,7 +137,7 @@ object ResolveIndirect {
 
             fun getResult(): List<String> {
                 val result = ArrayList<String>(2)
-                if (ret != "V") result.add(jvm2wasm(ret))
+                if (ret != null) result.add(jvm2wasmTyped(ret))
                 if (calledCanThrow) result.add(ptrType)
                 return result
             }
@@ -184,7 +184,7 @@ object ResolveIndirect {
                 val helperName = "tree_${sig0.toString().escapeChars()}"
                 helperFunctions.getOrPut(helperName) {
                     val results = ArrayList<String>(2)
-                    if (ret != "V") results.add(jvm2wasm(ret))
+                    if (ret != null) results.add(jvm2wasmTyped(ret))
                     if (canThrowError) results.add(ptrType)
 
                     // local variable for dupi32
