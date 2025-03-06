@@ -1,10 +1,6 @@
 package utils
 
 import hIndex
-import me.anno.utils.assertions.assertFail
-import me.anno.utils.types.Booleans.toInt
-import me.anno.utils.types.Strings.indexOf2
-import replaceClass
 import wasm.instr.FuncType
 
 val f32 = "f32"
@@ -16,69 +12,6 @@ val i64 = "i64"
 // quite a few bits expect i32 though... hard to change now
 val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
-
-fun single(d: String, generics: Boolean = false): String {
-    var i = 0
-    while (d[i] in "[A") i++
-    val pad = generics.toInt()
-    return d.substring(0, i) + when (d[i++]) {
-        'Z' -> "Z"
-        'C' -> "C"
-        'B' -> "B"
-        'S' -> "S"
-        'I' -> "I"
-        'J' -> "J"
-        'F' -> "F"
-        'D' -> "D"
-        'V' -> "V"
-        'L', 'T' -> {
-            // read until ;
-            val j = d.indexOf2(';', i + 1)
-            val n = d.substring(i - pad, j + pad)
-            if (generics) n else replaceClass(n)
-        }
-
-        else -> throw IllegalArgumentException(d)
-    }
-}
-
-fun split1(d: String, generics: Boolean = false): List<String> {
-    val result = ArrayList<String>()
-    var i = 0
-    val pad = generics.toInt()
-    fun readType(): String {
-        return when (d[i++]) {
-            'Z' -> "Z"
-            'C' -> "C"
-            'B' -> "B"
-            'S' -> "S"
-            'I' -> "I"
-            'J' -> "J"
-            'F' -> "F"
-            'D' -> "D"
-            'L', 'T' -> {
-                // read until ;
-                val j = d.indexOf(';', i + 1)
-                val str = d.substring(i - pad, j + pad)
-                i = j + 1
-                str
-            }
-            '[', 'A' -> "[${readType()}"
-            else -> assertFail(d)
-        }
-    }
-    while (i < d.length) {
-        result.add(readType())
-    }
-    return result
-}
-
-fun split2(d: String, generics: Boolean = false): List<String> {
-    val ix = d.lastIndexOf(')')
-    val base = split1(d.substring(1, ix), generics) as ArrayList
-    base.add(single(d.substring(ix + 1), generics))
-    return base
-}
 
 fun genericsTypes(sig: MethodSig): String {
     return genericsTypes(sig.descriptor, sig in hIndex.staticMethods)
@@ -117,17 +50,6 @@ fun descriptorToFuncType(isStatic: Boolean, descriptor: Descriptor, canThrow: Bo
     return FuncType(params, results)
 }
 
-fun jvm2wasmRaw(d: String): String = when (d) {
-    "boolean", "char", "short", "byte", "int", "float", "double", "long" ->
-        throw IllegalArgumentException("Use jvm2wasmTyped")
-    "Z", "C", "S", "B", "I" -> i32
-    "F" -> f32
-    "D" -> f64
-    "J" -> i64
-    "V" -> ""
-    else -> ptrType
-}
-
 fun jvm2wasmTyped(d: String): String = when (d) {
     "Z", "C", "S", "B", "I", "F", "D", "J", "V" ->
         throw IllegalArgumentException("Use jvm2wasmRaw")
@@ -138,21 +60,12 @@ fun jvm2wasmTyped(d: String): String = when (d) {
     else -> ptrType
 }
 
-fun jvm2wasm1(d: Char): String = when (d) {
-    'Z', 'C', 'B', 'S', 'I' -> i32
-    'J' -> i64
-    'F' -> f32
-    'D' -> f64
-    else -> ptrType
-}
-
-fun storageSize(d: String): Int = when (d[0]) {
-    'Z', 'B' -> 1
-    'C', 'S' -> 2
-    'I', 'F' -> 4
-    'J', 'D' -> 8
-    'L', '[', 'A' -> if (is32Bits) 4 else 8
-    else -> throw IllegalArgumentException(d)
+fun storageSize(d: String): Int = when (d) {
+    "boolean", "byte" -> 1
+    "char", "short" -> 2
+    "int", "float" -> 4
+    "long", "double" -> 8
+    else -> if (is32Bits) 4 else 8
 }
 
 fun String.escapeChars() =

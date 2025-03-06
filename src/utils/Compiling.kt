@@ -19,6 +19,7 @@ import listLibrary
 import listSuperClasses
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertFail
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
@@ -32,7 +33,6 @@ import resolvedMethods
 import translator.ClassTranslator
 import translator.FoundBetterReader
 import utils.MethodResolver.resolveMethod
-import utils.Descriptor.Companion.validateDescriptor
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
@@ -57,57 +57,57 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
 fun registerDefaultOffsets() {
 
     eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", INSTANCE_INIT, "()V", false)), 0)
-    eq(gIndex.getType(true, validateDescriptor("()V"), true), FuncType(listOf(), listOf(ptrType)))
+    eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
     gIndex.stringClass = gIndex.getClassIndex(replaceClass("java/lang/String"))
     gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
 
-    eq(gIndex.getFieldOffset("[]", "length", "I", false), objectOverhead)
+    eq(gIndex.getFieldOffset("[]", "length", "int", false), objectOverhead)
     eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "value", "[C", false), objectOverhead)
-    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "hash", "I", false), objectOverhead + ptrSize)
+    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "hash", "int", false), objectOverhead + ptrSize)
 
     hIndex.registerSuperClass("java/lang/reflect/Field", "java/lang/reflect/AccessibleObject")
     hIndex.registerSuperClass("java/lang/reflect/Executable", "java/lang/reflect/AccessibleObject")
     hIndex.registerSuperClass("java/lang/reflect/Constructor", "java/lang/reflect/Executable")
 
-    gIndex.getFieldOffset("java/lang/System", "in", "Ljava/io/InputStream;", true)
-    gIndex.getFieldOffset("java/lang/System", "out", "Ljava/io/PrintStream;", true)
-    gIndex.getFieldOffset("java/lang/System", "err", "Ljava/io/PrintStream;", true)
-    eq("java/lang/Throwable", "detailMessage", "Ljava/lang/String;", 0)
-    eq("java/lang/Throwable", "stackTrace", "[Ljava/lang/StackTraceElement;", ptrSize)
+    gIndex.getFieldOffset("java/lang/System", "in", "java/io/InputStream", true)
+    gIndex.getFieldOffset("java/lang/System", "out", "java/io/PrintStream", true)
+    gIndex.getFieldOffset("java/lang/System", "err", "java/io/PrintStream", true)
+    eq("java/lang/Throwable", "detailMessage", "java/lang/String", 0)
+    eq("java/lang/Throwable", "stackTrace", "[java/lang/StackTraceElement", ptrSize)
 
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "declaringClass", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "methodName", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "fileName", "Ljava/lang/String;", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "I", false)
+    gIndex.getFieldOffset("java/lang/StackTraceElement", "declaringClass", "java/lang/String", false)
+    gIndex.getFieldOffset("java/lang/StackTraceElement", "methodName", "java/lang/String", false)
+    gIndex.getFieldOffset("java/lang/StackTraceElement", "fileName", "java/lang/String", false)
+    gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "int", false)
 
-    eq(gIndex.getFieldOffset("java/lang/Class", "name", "Ljava/lang/String", false), objectOverhead + 0)
-    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[Ljava/lang/reflect/Field", false), objectOverhead + ptrSize)
-    eq("java/lang/Class", "methods", "[Ljava/lang/reflect/Method", ptrSize * 2)
-    eq("java/lang/Class", "index", "I", ptrSize * 3)
+    eq(gIndex.getFieldOffset("java/lang/Class", "name", "java/lang/String", false), objectOverhead + 0)
+    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[java/lang/reflect/Field", false), objectOverhead + ptrSize)
+    eq("java/lang/Class", "methods", "java/lang/reflect/Method", ptrSize * 2)
+    eq("java/lang/Class", "index", "int", ptrSize * 3)
 
     gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "securityCheckCache", "Ljava/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "Z", false) // 4
-    gIndex.getFieldOffset("java/lang/reflect/Field", "securityCheckCache", "Ljava/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/Field", "override", "Z", false) // 4
-    eq("java/lang/reflect/Field", "name", "Ljava/lang/String", 1 + ptrSize)
-    eq("java/lang/reflect/Field", "slot", "I", 1 + 2 * ptrSize)
-    eq("java/lang/reflect/Field", "type", "Ljava/lang/Class", 1 + 2 * ptrSize + 4)
-    eq("java/lang/reflect/Field", "modifiers", "I", 1 + 3 * ptrSize + 4)
-    eq("java/lang/reflect/Field", "clazz", "Ljava/lang/Class", 1 + 3 * ptrSize + 2 * 4)
+    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "boolean", false) // 4
+    gIndex.getFieldOffset("java/lang/reflect/Field", "securityCheckCache", "java/lang/Object", false) // 0
+    gIndex.getFieldOffset("java/lang/reflect/Field", "override", "boolean", false) // 4
+    eq("java/lang/reflect/Field", "name", "java/lang/String", 1 + ptrSize)
+    eq("java/lang/reflect/Field", "slot", "int", 1 + 2 * ptrSize)
+    eq("java/lang/reflect/Field", "type", "java/lang/Class", 1 + 2 * ptrSize + 4)
+    eq("java/lang/reflect/Field", "modifiers", "int", 1 + 3 * ptrSize + 4)
+    eq("java/lang/reflect/Field", "clazz", "java/lang/Class", 1 + 3 * ptrSize + 2 * 4)
 
     // for sun/misc
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSeed", "J", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSecondarySeed", "J", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomProbe", "I", false)
+    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSeed", "long", false)
+    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSecondarySeed", "long", false)
+    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomProbe", "int", false)
 
     gIndex.getFieldOffset("java/lang/Class", "enumConstants", "[]", false)
 
     // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
-    hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "I", true)] = objectOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "I", true)] = arrayOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "Z", true)] = trackAllocations
+    hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "int", true)] = objectOverhead
+    hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "int", true)] = arrayOverhead
+    hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "boolean", true)] = trackAllocations
 
     eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V")), 0)
     gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
@@ -140,12 +140,12 @@ fun resolveGenericTypes() {
     LOGGER.info("[resolveGenericTypes]")
     for ((clazz, superTypes) in hIndex.genericSuperTypes) {
         val baseMethods = hIndex.methodsByClass[clazz] ?: continue
-        val ownGenerics = hIndex.generics[clazz]
+        val ownGenerics = hIndex.genericsByClass[clazz]
         for (superType in superTypes) {
 
             // todo map all its generic methods
-            val clearSuperType = single(descWithoutGenerics(superType))
-            val generics = hIndex.generics[clearSuperType]
+            val clearSuperType = Descriptor.parseType(descWithoutGenerics(superType))
+            val generics = hIndex.genericsByClass[clearSuperType]
 
             if (generics == null) {
                 LOGGER.warn("Missing generics of $clearSuperType by $superType")
@@ -209,13 +209,19 @@ fun resolveGenericTypes() {
                         continue
                     }
 
-                    val mappedParams = params.mapNotNull { p ->
-                        if (p[0] == 'T') {
-                            (generics.firstOrNull { it.name == p }
-                                ?: ownGenerics?.firstOrNull { it.name == p }
+                    val mappedParams = params.mapNotNull { rawType ->
+                        val rawType1 = if (rawType[0] == 'T') {
+                            (generics.firstOrNull { it.name == rawType }
+                                ?: ownGenerics?.firstOrNull { it.name == rawType }
                                     // ?: throw NullPointerException("Didn't find mapping for $p, own generics: $ownGenerics")
                                     )?.superClass
-                        } else p
+                        } else rawType
+                        // todo support and propagate generic parameters (?)
+                        //  we need to convert our classes to actual types then
+                        val rawType2 = if (rawType1 != null && '<' in rawType1) {
+                            rawType1.substring(0, rawType1.indexOf('<')) + ";"
+                        } else rawType1
+                        if (rawType2 != null) Descriptor.parseType(rawType2) else null
                     }
 
                     if (mappedParams.size != params.size) {
@@ -232,31 +238,34 @@ fun resolveGenericTypes() {
                         continue
                     }
 
-                    val desc2j = split2(desc2i, true)
-                    val mappedDesc = desc2j.map { p ->
-                        if (p[0] == 'T') {
-                            mappedParams[generics.indexOfFirst { it.name == p }]
-                        } else p
-                    }
+                    val genericsMap = generics.indices
+                        .associate { idx ->
+                            val name = generics[idx].name
+                            assertTrue(name.startsWith('T'))
+                            assertTrue(name.endsWith(';'))
+                            val name1 = name.substring(1, name.lastIndex) // strip T and ;
+                            name1 to mappedParams[idx]
+                        }
 
-                    // generate a new signature
-                    val newDescBuilder = StringBuilder2(mappedDesc.sumOf { it.length } + 2)
-                    newDescBuilder.append('(')
-                    for (j in 0 until mappedDesc.size - 1) {
-                        newDescBuilder.append(mappedDesc[j])
-                    }
-                    newDescBuilder.append(')')
-                    newDescBuilder.append(mappedDesc.last())
-                    val newDesc = newDescBuilder.toString()
+                    val newDesc = Descriptor.parseDescriptor(desc2i, genericsMap)
 
                     // check if this newly generated signature is implemented
-                    val implMethod = candidates.firstOrNull { it.descriptor.raw == newDesc }
+                    val implMethod = candidates
+                        .firstOrNull { it.descriptor == newDesc }
                     if (implMethod != null) {
                         // define mapping
                         val sig2 = method.withClass(clazz)
                         if (sig2 == implMethod) throw NotImplementedError()
                         hIndex.setAlias(sig2, implMethod)
-                    } else LOGGER.warn("Missing mapping for [$clazz]: $generics to $superType by $params, $candidates")
+                    } else {
+                        LOGGER.warn("Missing mapping for $method")
+                        LOGGER.warn("  class: $clazz")
+                        LOGGER.warn("  generics: $generics")
+                        LOGGER.warn("  superType: $superType")
+                        LOGGER.warn("  params: $params")
+                        LOGGER.warn("  candidates: $candidates")
+                        LOGGER.warn("  searched: $newDesc")
+                    }
 
                 }
             }
@@ -739,7 +748,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                 }
 
                                 override fun visitTypeInsn(opcode: Int, type: String) {
-                                    gIndex.getClassIndex(replaceClass(type)) // add class to index
+                                    gIndex.getClassIndex(Descriptor.parseTypeMixed(type)) // add class to index
                                 }
 
                                 override fun visitTryCatchBlock(
@@ -755,7 +764,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
 
                                 override fun visitLdcInsn(value: Any?) {
                                     if (value is Type) { // add class to index
-                                        gIndex.getClassIndex(replaceClass(single(value.descriptor)))
+                                        gIndex.getClassIndex(Descriptor.parseType(value.descriptor))
                                     }
                                 }
 
@@ -767,7 +776,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     isInterface: Boolean
                                 ) {
                                     if (opcode == 0xb6) { // invoke virtual
-                                        val owner = replaceClass(owner0)
+                                        val owner = Descriptor.parseTypeMixed(owner0)
                                         val sig0 = MethodSig.c(owner, name, descriptor, false)
                                         // just for checking if abstract
                                         if (sig0 !in hIndex.finalMethods) {

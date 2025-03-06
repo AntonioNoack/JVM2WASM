@@ -59,9 +59,12 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             return readType1(i)
         }
 
-        fun dep(next0: String, self: String) {
+        fun dep(next0: String?, self: String) {
             when (next0) {
-                "Z", "B", "S", "C", "I", "J", "F", "D" -> {}
+                "Z", "B", "S", "C", "I", "J", "F", "D", "V",
+                "boolean", "byte", "short", "char", "int", "long", "float", "double", null -> {
+                    // class cannot be read
+                }
                 else -> {
                     val next = replaceClass(next0)
                     if (!next.startsWith("[") && hIndex.doneClasses.add(next)) {
@@ -79,7 +82,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
     }
 
-    fun dep(owner: String) = Companion.dep(owner, clazz)
+    fun dep(owner: String?) = Companion.dep(owner, clazz)
 
     var isInterface = false
     var isFinal = false
@@ -151,7 +154,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             }
             i++ // skip '>'
             if (genericParams.isNotEmpty()) {
-                index.generics[clazz] = genericParams
+                index.genericsByClass[clazz] = genericParams
                 // println("  >> setting generics of $clazz to $genericParams")
             }
         }
@@ -179,10 +182,10 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         // println("inner class $clazz -> $name, $outerName, $innerName, $access")
         // if the class isn't static, it probably transfers generics :)
         if (!access.hasFlag(ACC_STATIC)) {
-            val g0 = index.generics[name]
-            val g1 = index.generics[clazz]
+            val g0 = index.genericsByClass[name]
+            val g1 = index.genericsByClass[clazz]
             if (g0 != null || g1 != null) {
-                index.generics[name] = (g0 ?: emptyList()) + (g1 ?: emptyList())
+                index.genericsByClass[name] = (g0 ?: emptyList()) + (g1 ?: emptyList())
             }
         }
     }
@@ -233,7 +236,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             hIndex.interfaceDefaults.getOrPut(sig, ::HashSet).add(sig)
         }
 
-        for (type in split1(descriptor.substring(1, descriptor.lastIndexOf(')')))) {
+        for (type in sig.descriptor.params) {
             dep(type)
         }
 
@@ -250,8 +253,9 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
         // if field is final, just create a map, and don't even try to access those fields : make them "virtual"
         //  just hardcode them in the assembly :)
+        val type = Descriptor.parseType(descriptor)
         if (value != null && access.hasFlag(ACC_FINAL)) {
-            hIndex.finalFields[FieldSig(clazz, name, descriptor, access.hasFlag(ACC_STATIC))] = value
+            hIndex.finalFields[FieldSig(clazz, name, type, access.hasFlag(ACC_STATIC))] = value
         }
 
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
@@ -262,7 +266,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         // todo this needs to be executed at the start of <clinit> / <init>
         //if (value != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //    println("todo: assign $clazz $name $descriptor $signature to \"$value\" (static? ${access.hasFlag(ACC_STATIC)})")
-        dep(single(descriptor))
+        dep(type)
         return null
     }
 

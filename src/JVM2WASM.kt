@@ -143,8 +143,9 @@ val classReplacements = hashMapOf(
 
 fun replaceClass(clazz: String): String = replaceClassNullable(clazz)!!
 fun replaceClassNullable(clazz: String?): String? {
-    var clazz1 = clazz
-    if (useKotlynReflect && clazz1 != null) {
+    var clazz1 = clazz ?: return null
+    assertTrue(!clazz1.endsWith(";"), clazz1)
+    if (useKotlynReflect) {
         clazz1 = KotlynReflect.replaceClass(clazz1)
     }
     return classReplacements[clazz1] ?: clazz1

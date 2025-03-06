@@ -9,11 +9,11 @@ import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import org.objectweb.asm.*
 import replaceClass
+import sun.security.krb5.internal.crypto.Des
 import utils.Annotations
-import utils.Descriptor.Companion.validateDescriptor
+import utils.Descriptor
 import utils.FieldSig
 import utils.MethodSig
-import utils.single
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
 
@@ -83,10 +83,12 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         instructionIndex++
     }
 
-    override fun visitMethodInsn(
-        opcode: Int, owner: String, name: String, descriptor: String,
-        isInterface: Boolean
-    ) {
+    override fun visitMethodInsn(opcode: Int, owner0: String, name: String, descriptor: String, isInterface: Boolean) {
+        val owner = Descriptor.parseTypeMixed(owner0)
+        visitMethodInsn1(opcode, owner, name, descriptor, isInterface)
+    }
+
+    private fun visitMethodInsn1(opcode: Int, owner: String, name: String, descriptor: String, isInterface: Boolean) {
 
         isSetter = false
         isGetter = false
@@ -94,7 +96,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
         clazz.dep(owner)
 
-        val descriptor1 = validateDescriptor(descriptor)
+        val descriptor1 = Descriptor.c(descriptor)
         for (type in descriptor1.params) clazz.dep(type)
         val retType = descriptor1.returnType
         if (retType != null) clazz.dep(retType)
@@ -136,7 +138,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         instructionIndex++
     }
 
-    override fun visitInvokeDynamicInsn(name: String, descriptor: String, method: Handle, vararg args: Any) {
+    override fun visitInvokeDynamicInsn(name: String, descriptor0: String, method: Handle, vararg args: Any) {
         isSetter = false
         isGetter = false
         instructionIndex++
@@ -152,13 +154,14 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         // to do idea: can we call the original factory,
         // to do and create an instance that way? :) [security flaw, if we host this!!]
 
+        val descriptor = Descriptor.c(descriptor0)
         if (method.owner == "java/lang/invoke/LambdaMetafactory" && (method.name == "metafactory" || method.name == "altMetafactory") && args.size >= 3) {
 
             val baseClass = "java/lang/Object" //(args[0] as Type).returnType.descriptor
-            val interface1 = replaceClass(single(descriptor.substring(descriptor.lastIndexOf(')') + 1)))
+            val interface1 = descriptor.returnType!!
             val dst = args[1] as Handle
 
-            visitMethodInsn(0, dst.owner, dst.name, dst.desc, false)
+            visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
 
             // DynPrinter.print(name, descriptor, method, args)
             // println("dyn $interface1")
@@ -204,7 +207,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // actual function, which is being implemented by dst
             hIndex.missingClasses.add(synthClassName)
 
-            visitMethodInsn(0, dst.owner, dst.name, dst.desc, false)
+            visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
 
             val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc, false)
             methods.add(bridge)
@@ -234,7 +237,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isSetter = false
         instructionIndex++
         if (value is Type) {
-            clazz.dep(single(value.descriptor))
+            clazz.dep(Descriptor.parseType(value.descriptor))
         }
     }
 
@@ -242,7 +245,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         isGetter = false
         isSetter = false
         instructionIndex++
-        val type = replaceClass(type0)
+        val type = Descriptor.parseTypeMixed(type0)
         clazz.dep(type)
         if (opcode == 0xbb) {
             if (type.endsWith("[]")) throw IllegalStateException(type)
@@ -253,7 +256,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
     override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor {
         val properties = HashMap<String, Any?>()
-        val clazz = single(descriptor)
+        val clazz = Descriptor.parseType(descriptor)
         annotations.add(Annota(clazz, properties))
         if (clazz == Annotations.USED_IF_DEFINED) {
             dIndex.usedMethods.add(sig)
@@ -293,7 +296,8 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         clazz.dep(owner)
 
         // only getters are of importance, because setters without getters don't matter
-        val sig = FieldSig(owner, name, descriptor, opcode < 0xb4)
+        val type = Descriptor.parseType(descriptor)
+        val sig = FieldSig(owner, name, type, opcode < 0xb4)
         lastField = sig
         // final fields can be inlined :)
         if (sig !in hIndex.finalFields) {

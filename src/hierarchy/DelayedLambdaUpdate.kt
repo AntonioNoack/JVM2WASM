@@ -15,54 +15,53 @@ import wasm.instr.Instructions.Return
 class DelayedLambdaUpdate(
     private val source: String,
     val calledMethod: MethodSig,
-    private val descriptor: String,
+    val descriptor: Descriptor,
     private val synthClassName: String,
     val bridgeMethod: MethodSig,
 ) {
 
-    private fun isNative(type: String): Boolean {
-        // todo replace this logic with Descriptor.validate() and NativeTypes
-        return type[0] != 'L' && type[0] != 'T' && type[0] !in "[A"
+    private fun isNative(type: String?): Boolean {
+        return type != null && type in NativeTypes.nativeTypes
     }
 
-    private fun boxUnbox(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+    private fun boxUnbox(arg: String?, arg2: String?, printer: MethodTranslator, checkThrowable: Boolean) {
         if (isNative(arg)) box(arg, arg2, printer, checkThrowable)
         else unbox(arg, arg2, printer, checkThrowable)
     }
 
-    private fun box(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+    private fun box(arg: String?, arg2: String?, printer: MethodTranslator, checkThrowable: Boolean) {
         assertTrue(isNative(arg))
         val invokeStatic = 0xb8
         when (arg) {
-            "B" -> printer.visitMethodInsn2(
+            "byte" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
                 false, checkThrowable
             )
-            "S" -> printer.visitMethodInsn2(
+            "short" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
                 false, checkThrowable
             )
-            "C" -> printer.visitMethodInsn2(
+            "char" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
                 false, checkThrowable
             )
-            "I" -> printer.visitMethodInsn2(
+            "int" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
                 false, checkThrowable
             )
-            "J" -> printer.visitMethodInsn2(
+            "long" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
                 false, checkThrowable
             )
-            "F" -> printer.visitMethodInsn2(
+            "float" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
                 false, checkThrowable
             )
-            "D" -> printer.visitMethodInsn2(
+            "double" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
                 false, checkThrowable
             )
-            "Z" -> printer.visitMethodInsn2(
+            "boolean" -> printer.visitMethodInsn2(
                 invokeStatic, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
                 false, checkThrowable
             )
@@ -70,39 +69,39 @@ class DelayedLambdaUpdate(
         }
     }
 
-    private fun unbox(arg: String, arg2: String, printer: MethodTranslator, checkThrowable: Boolean) {
+    private fun unbox(arg: String?, arg2: String?, printer: MethodTranslator, checkThrowable: Boolean) {
         assertFalse(isNative(arg))
         val invokeVirtual = 0xb6
         when (arg2) {
-            "B" -> printer.visitMethodInsn2(
+            "byte" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Byte", "byteValue", "()B",
                 false, checkThrowable
             )
-            "S" -> printer.visitMethodInsn2(
+            "short" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Short", "shortValue", "()S",
                 false, checkThrowable
             )
-            "C" -> printer.visitMethodInsn2(
+            "char" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Character", "charValue", "()C",
                 false, checkThrowable
             )
-            "I" -> printer.visitMethodInsn2(
+            "int" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Integer", "intValue", "()I",
                 false, checkThrowable
             )
-            "J" -> printer.visitMethodInsn2(
+            "long" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Long", "longValue", "()J",
                 false, checkThrowable
             )
-            "F" -> printer.visitMethodInsn2(
+            "float" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Float", "floatValue", "()F",
                 false, checkThrowable
             )
-            "D" -> printer.visitMethodInsn2(
+            "double" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Double", "doubleValue", "()D",
                 false, checkThrowable
             )
-            "Z" -> printer.visitMethodInsn2(
+            "boolean" -> printer.visitMethodInsn2(
                 invokeVirtual, "java/lang/Boolean", "booleanValue", "()Z",
                 false, checkThrowable
             )
@@ -112,24 +111,15 @@ class DelayedLambdaUpdate(
 
     fun indexFields() {
         // load all fields
-        val ix = descriptor.lastIndexOf(')')
-        val fields = split1(descriptor.substring(1, ix), true)
-            .mapIndexed { i, rawType ->
+        val fields = descriptor.params
+            .mapIndexed { i, type ->
                 val fieldName = "f$i"
-                gIndex.getFieldOffset(synthClassName, fieldName, rawType, false)!!
-                FieldSig(synthClassName, fieldName, rawType, false)
+                gIndex.getFieldOffset(synthClassName, fieldName, type, false)!!
+                FieldSig(synthClassName, fieldName, type, false)
             }.toMutableSet()
-        if (needsSelf) fields += FieldSig(synthClassName, "self", "Ljava/lang/Object;", false)
+        if (needsSelf) fields += FieldSig(synthClassName, "self", "java/lang/Object", false)
         dIndex.getterDependencies[bridgeMethod] = fields
         dIndex.setterDependencies[bridgeMethod] = fields
-    }
-
-    // load all fields
-    val fields: List<String>
-
-    init {
-        val ix = descriptor.lastIndexOf(')')
-        fields = split1(descriptor.substring(1, ix), true)
     }
 
     private val isInterface
@@ -144,8 +134,7 @@ class DelayedLambdaUpdate(
         // build synthetic method code
         val printer = MethodTranslator(0, bridgeMethod.clazz, bridgeMethod.name, bridgeMethod.descriptor)
         val wantedDescriptor = calledMethod.descriptor
-        val ix3 = wantedDescriptor.raw.lastIndexOf(')')
-        val wantedParams = split1(wantedDescriptor.raw.substring(1, ix3), true)
+        val wantedParams = wantedDescriptor.params
 
         val print = false
 
@@ -170,13 +159,14 @@ class DelayedLambdaUpdate(
             if (usesSelf) {
                 printer.printer.comment("[0] += self")
                 printer.visitVarInsn(0x2a, 0) // local.get this
-                printer.visitFieldInsn2(0xb4, synthClassName, "self", "Ljava/lang/Object;", false) // get field
+                printer.visitFieldInsn2(0xb4, synthClassName, "self", "java/lang/Object", false) // get field
             } else {
                 printer.printer.append(i32Const0).comment("self, unused")
             }
             if (!callingStatic) k--
         }
 
+        val fields = descriptor.params
         for (i in fields.indices) {
             val arg = fields[i]
             val fieldName = "f$i"
@@ -192,18 +182,17 @@ class DelayedLambdaUpdate(
         }
 
         // append arguments to this function as values
-        val ix2 = bridgeMethod.descriptor.raw.lastIndexOf(')')
-        val fields2 = split1(bridgeMethod.descriptor.raw.substring(1, ix2), true)
+        val fields2 = bridgeMethod.descriptor.params
         for (i in fields2.indices) {
             val arg = fields2[i]
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[2] += $arg ($wanted)")
             printer.printer.comment("[2] += $arg")
-            val opcode = when (arg[0]) {
-                'Z', 'C', 'B', 'S', 'I' -> 0x15
-                'J' -> 0x16
-                'F' -> 0x17
-                'D' -> 0x18
+            val opcode = when (arg) {
+                "boolean", "char", "byte", "short", "int" -> 0x15
+                "long" -> 0x16
+                "float" -> 0x17
+                "double" -> 0x18
                 else -> 0x19
             }
             // todo validate that this is correct...
@@ -243,8 +232,8 @@ class DelayedLambdaUpdate(
         // error code; this method will always be able to throw errors, because we cannot annotate it (except maybe later)
 
         // unboxing for result
-        val ret0 = if (isConstructor) "Ljava/lang/Object;" else wantedDescriptor.raw.substring(ix3 + 1)
-        val ret1 = bridgeMethod.descriptor.raw.substring(ix2 + 1)
+        val ret0 = if (isConstructor) "java/lang/Object" else wantedDescriptor.returnType
+        val ret1 = bridgeMethod.descriptor.returnType
         if (ret0 != ret1 && isNative(ret0) != isNative(ret1)) {
             if (couldThrow) printer.handleThrowable()
             boxUnbox(ret0, ret1, printer, false)
@@ -262,7 +251,7 @@ class DelayedLambdaUpdate(
 
     companion object {
 
-        val needingBridgeUpdate = HashMap<String, DelayedLambdaUpdate>()
+        val needingBridgeUpdate = HashMap<String, DelayedLambdaUpdate>(4096)
 
         fun getSynthClassName(sig: MethodSig, dst: Handle): String { // should be as unique as possible
             return methodName2(dst.owner, dst.name, dst.desc) + "x" +

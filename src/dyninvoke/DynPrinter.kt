@@ -1,11 +1,12 @@
 package dyninvoke
 
 import org.objectweb.asm.Handle
+import utils.Descriptor
 
 object DynPrinter {
     fun print(
         name: String,
-        descriptor: String,
+        descriptor: Descriptor,
         method: Handle,
         args: Array<out Any>
     ) {

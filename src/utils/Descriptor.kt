@@ -1,6 +1,7 @@
 package utils
 
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import replaceClass
 import utils.NativeTypes.nativeMapping
@@ -35,20 +36,43 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
         // we call this a million times, so each entry 40 times -> definitely worth it :)
         private val descriptorCache = HashMap<String, Descriptor>(1 shl 15)
 
-        fun validateDescriptor(descriptor: String): Descriptor {
+        fun c(descriptor: String): Descriptor {
             return descriptorCache.getOrPut(descriptor) {
-                parseDescriptor(descriptor)
+                parseDescriptor(descriptor, emptyMap())
             }
         }
 
-        private fun parseDescriptor(descriptor: String): Descriptor {
+        private val typeCache = HashMap<String, String>(1 shl 10)
 
-            assertTrue("me_anno_utils" !in descriptor)
+        fun parseType(descriptor: String): String {
+            return typeCache.getOrPut(descriptor) {
+                parseTypeImpl(descriptor)
+            }
+        }
+
+        fun parseTypeMixed(descriptor: String): String {
+            return if (descriptor.endsWith(";")) {
+                // todo this really shouldn't happen, why are we getting mixed results???
+                // assertTrue(descriptor.startsWith(";")) // maybe arrays are the cause?? -> nope
+                parseType(descriptor)
+            } else replaceClass(descriptor)
+        }
+
+        private fun parseTypeImpl(descriptor: String): String {
+            val tmp = "($descriptor)V" // would be nice if we could avoid that
+            val desc = c(tmp)
+            assertNull(desc.returnType)
+            assertEquals(1, desc.params.size)
+            return desc.params[0]
+        }
+
+        fun parseDescriptor(descriptor: String, generics: Map<String, String>): Descriptor {
 
             val j = descriptor.indexOf(')')
             if (!descriptor.startsWith('(') || j < 0 || j != descriptor.lastIndexOf(')')) {
                 throw IllegalArgumentException("Expected () in $descriptor")
             }
+
             var i = 1
             var i0 = 1
             val args = ArrayList<String>()
@@ -72,7 +96,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
                         builder.append('A')
                         assertTrue(descriptor[i] !in ")V") // next one must be neither ')' nor 'V'
                     }
-                    'L' -> {
+                    'L', 'T' -> {
                         // good :)
                         // skip until ;
                         // expect only latin chars and under-scores
@@ -87,16 +111,20 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
                                     val depth = startI - i0 - 1
                                     val className = descriptor.substring(startI, endI)
                                     for (k in 0 until depth) builder.append('[')
+
                                     builder.append('L')
                                     val b0 = builder.size
-                                    val className2 = replaceClass(className)
+                                    val className2 =
+                                        if (char0 == 'L') replaceClass(className)
+                                        else generics[className]!!
                                     builder.append(className2)
-                                    if (depth > 0) {
-                                        // to do optimize allocation, we can reuse the outer builder
-                                        args.add("[".repeat(depth) + className2)
-                                    } else {
-                                        args.add(className2)
-                                    }
+
+                                    // to do optimize allocation, we can reuse the outer builder
+                                    args.add(
+                                        if (depth > 0) "[".repeat(depth) + className2
+                                        else className2
+                                    )
+
                                     for (k in b0 until builder.length) {
                                         // replace chars as needed
                                         when (builder[k].toInt().toChar()) {
@@ -124,7 +152,8 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
 
             val returnType = if (!descriptor.endsWith(")V")) args.removeLast() else null
             val descriptor1 = Descriptor(args, returnType, builder.toString())
-            // println("'$descriptor' -> '$builder', $args, $returnType")
+            println("'$descriptor' -> '$builder', $args, $returnType, $generics")
+            assertTrue(";;" !in descriptor1.raw, descriptor1.raw)
             return descriptor1
         }
     }

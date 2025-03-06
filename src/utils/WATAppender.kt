@@ -154,24 +154,19 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                     classData.writeLE32(name) // name
                     classData.writeLE32(field.field.offset) // slot
                     val ci = when (val typeName = field.field.type) {
-                        "I" -> gIndex.getClassIndex("int")
-                        "F" -> gIndex.getClassIndex("float")
-                        "Z" -> gIndex.getClassIndex("boolean")
-                        "B" -> gIndex.getClassIndex("byte")
-                        "S" -> gIndex.getClassIndex("short")
-                        "C" -> gIndex.getClassIndex("char")
-                        "J" -> gIndex.getClassIndex("long")
-                        "D" -> gIndex.getClassIndex("double")
+                        in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
                         "[]" -> gIndex.getClassIndex("[]")
                         else -> {
-                            if (typeName.startsWith("L")) {
-                                gIndex.getClassIndexOrParents(typeName.substring(1))
-                            } else if (typeName.startsWith("[L") || typeName.startsWith("[[")) {
-                                gIndex.getClassIndex("[]")
-                            } else if (typeName.startsWith("[") && typeName.length == 2) {
+                            if (
+                                typeName.startsWith("[") &&
+                                typeName.length == 2 &&
+                                typeName[1] in "ZBSCIJFD"
+                            ) { // native array
                                 gIndex.getClassIndex(typeName)
+                            } else if (typeName.startsWith("[")) {
+                                gIndex.getClassIndex("[]")
                             } else {
-                                throw IllegalStateException(typeName)
+                                gIndex.getClassIndexOrParents(typeName)
                             }
                         }
                     }

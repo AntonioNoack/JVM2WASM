@@ -96,6 +96,7 @@ data class Call(val name: String) : Instruction {
 
         val panic = Call("panic")
         val readClass = Call("readClass")
+        val findClass = Call("findClass")
         val findStatic = Call("findStatic")
         val instanceOf = Call("instanceOf")
         val instanceOfNonInterface = Call("instanceOfNonInterface")

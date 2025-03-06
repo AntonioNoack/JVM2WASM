@@ -8,8 +8,10 @@ import isRootType
 import jvm.JVM32.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertFalse
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass
 import useWASMExceptions
@@ -119,10 +121,10 @@ object GeneratorIndex {
 
     fun getClassIndex(name: String): Int {
         val name2 = replaceClass(name)
-        if (name != name2) TODO()
-        if ('.' in name) throw IllegalArgumentException(name)
+        assertEquals(name2, name)
+        assertFalse('.' in name)
         if (name in classIndex) return classIndex[name]!!
-        if ("[]" in name) throw IllegalArgumentException(name)
+        assertFalse("[]" in name)
         return if (!name.startsWith("[")) {
             if (lockClasses) throw IllegalStateException("Missing class $name")
             classIndex.getOrPut(name) {
@@ -281,6 +283,7 @@ object GeneratorIndex {
     }
 
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {
+        assertTrue(!descriptor.endsWith(';') && descriptor != "I", descriptor)
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
         if (lockClasses && getClassIndexOrNull(clazz) == null) return null
         val fieldOffsets = getFieldOffsets(clazz, static)

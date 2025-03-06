@@ -826,11 +826,11 @@ class MethodTranslator(
 
         val synthClassName = getSynthClassName(sig, dst)
         val dlu = DelayedLambdaUpdate.needingBridgeUpdate[synthClassName]!!
-        val fields = dlu.fields
+        val fields = dlu.descriptor.params
 
         // register new class (not visitable)
         printer.append(i32Const(gIndex.getClassIndex(synthClassName)))
-        if (dlu.fields.isEmpty() && !dlu.usesSelf) {
+        if (fields.isEmpty() && !dlu.usesSelf) {
             // no instance is needed 😁
             printer.push(ptrType).append(Call.getClassIndexPtr)
             if (comments) printer.comment(synthClassName)
@@ -852,27 +852,27 @@ class MethodTranslator(
             ///////////////////////////////
             // is this the correct order? should be :)
             for (i in fields.lastIndex downTo 0) {
-                val field = fields[i]
+                val type = fields[i]
                 printer.append(createdInstance.localGet) // instance
-                val offset = gIndex.getFieldOffset(synthClassName, "f$i", field, false)
+                val offset = gIndex.getFieldOffset(synthClassName, "f$i", type, false)
                 if (offset == null) {
                     printUsed(sig)
                     println("constructor-dependency? ${synthClassName in dIndex.constructorDependencies[sig]!!}")
-                    throw NullPointerException("Missing $synthClassName.f$i ($field), constructable? ${synthClassName in dIndex.constructableClasses}")
+                    throw NullPointerException("Missing $synthClassName.f$i ($type), constructable? ${synthClassName in dIndex.constructableClasses}")
                 }
                 if (comments) printer.comment("set field #$i")
                 if (alwaysUseFieldCalls) {
                     printer
                         .append(i32Const(offset))
-                        .append(getVIOStoreCall(field))
+                        .append(getVIOStoreCall(type))
                 } else {
                     printer
                         .append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
                         .append(if (is32Bits) I32Add else I64Add)
-                        .append(Call("swap${jvm2wasmRaw(field)}$ptrType")) // swap ptr and value
-                        .append(getStoreInstr2(field))
+                        .append(Call("swap${jvm2wasmTyped(type)}$ptrType")) // swap ptr and value
+                        .append(getStoreInstr2(type))
                 }
-                printer.pop(jvm2wasmRaw(field))
+                printer.pop(jvm2wasmTyped(type))
             }
 
             // get the instance, ready to continue :)
@@ -967,8 +967,9 @@ class MethodTranslator(
             is Type -> {
                 printer.push(i32)
                 // used for assert() with getClassLoader()
-                printer.append(i32Const(gIndex.getClassIndex(single(value.descriptor))))
-                printer.append(Call("findClass"))
+                val type = Descriptor.parseType(value.descriptor)
+                printer.append(i32Const(gIndex.getClassIndex(type)))
+                printer.append(Call.findClass)
                 if (comments) printer.comment("class $value")
             }
             else -> throw IllegalArgumentException("unknown '$value', ${value.javaClass}\n")
@@ -1055,36 +1056,24 @@ class MethodTranslator(
     }
 
     override fun visitMethodInsn(
-        opcode0: Int,
-        owner0: String,
-        name: String,
-        descriptor: String,
-        isInterface: Boolean
+        opcode0: Int, owner0: String, name: String,
+        descriptor: String, isInterface: Boolean
     ) {
-        val owner = replaceClass(owner0)
+        val owner = Descriptor.parseTypeMixed(owner0)
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
     }
 
 
     fun visitMethodInsn2(
-        opcode0: Int,
-        owner0: String,
-        name: String,
-        descriptor: String,
-        isInterface: Boolean,
-        checkThrowable: Boolean
+        opcode0: Int, owner0: String, name: String, descriptor: String,
+        isInterface: Boolean, checkThrowable: Boolean
     ): Boolean {
         val isStatic = opcode0 == 0xb8
         val sig0 = MethodSig.c(owner0, name, descriptor, isStatic)
         return visitMethodInsn2(opcode0, sig0, isInterface, checkThrowable)
     }
 
-    fun visitMethodInsn2(
-        opcode0: Int,
-        sig0: MethodSig,
-        isInterface: Boolean,
-        checkThrowable: Boolean
-    ): Boolean {
+    fun visitMethodInsn2(opcode0: Int, sig0: MethodSig, isInterface: Boolean, checkThrowable: Boolean): Boolean {
 
         val owner = sig0.clazz
         val name = sig0.name
@@ -1605,7 +1594,7 @@ class MethodTranslator(
     }
 
     override fun visitTypeInsn(opcode: Int, type0: String) {
-        val type = replaceClass(type0)
+        val type = Descriptor.parseTypeMixed(type0)
         if (printOps) println("  [${OpCode[opcode]}] $type")
         when (opcode) {
             0xbb -> {
@@ -1775,78 +1764,84 @@ class MethodTranslator(
         if (comments) printer.comment(label.toString())
     }
 
-    private fun getLoadInstr(descriptor: String): Instruction = when (single(descriptor)) {
-        "Z", "B" -> I32Load8S
-        "S" -> I32Load16S
-        "C" -> I32Load16U
-        "I" -> I32Load
-        "J" -> I64Load
-        "F" -> F32Load
-        "D" -> F64Load
+    private fun getLoadInstr(descriptor: String): Instruction = when (descriptor) {
+        "boolean", "byte" -> I32Load8S
+        "short" -> I32Load16S
+        "char" -> I32Load16U
+        "int" -> I32Load
+        "long" -> I64Load
+        "float" -> F32Load
+        "double" -> F64Load
         else -> if (is32Bits) I32Load else I64Load
     }
 
-    private fun getStoreInstr(descriptor: String) = getStoreInstr2(single(descriptor))
+    private fun getStoreInstr(descriptor: String) = getStoreInstr2(descriptor)
 
     private fun getStoreInstr2(descriptor: String): Instruction = when (descriptor) {
-        "Z", "B" -> I32Store8
-        "S", "C" -> I32Store16
-        "I" -> I32Store
-        "J" -> I64Store
-        "F" -> F32Store
-        "D" -> F64Store
+        "boolean", "byte" -> I32Store8
+        "short", "char" -> I32Store16
+        "int" -> I32Store
+        "long" -> I64Store
+        "float" -> F32Store
+        "double" -> F64Store
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) I32Store else I64Store
     }
 
     private fun getStaticLoadCall(descriptor: String): Instruction = when (descriptor) {
-        "Z", "B" -> Call.getStaticFieldS8
-        "S" -> Call.getStaticFieldS16
-        "C" -> Call.getStaticFieldU16
-        "I" -> Call.getStaticFieldI32
-        "J" -> Call.getStaticFieldI64
-        "F" -> Call.getStaticFieldF32
-        "D" -> Call.getStaticFieldF64
+        "boolean", "byte" -> Call.getStaticFieldS8
+        "short" -> Call.getStaticFieldS16
+        "char" -> Call.getStaticFieldU16
+        "int" -> Call.getStaticFieldI32
+        "long" -> Call.getStaticFieldI64
+        "float" -> Call.getStaticFieldF32
+        "double" -> Call.getStaticFieldF64
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) Call.getStaticFieldI32 else Call.getStaticFieldI64
     }
 
-    private fun getLoadCall(descriptor: String): Instruction = when (single(descriptor)) {
-        "Z", "B" -> Call.getFieldS8
-        "S" -> Call.getFieldS16
-        "C" -> Call.getFieldU16
-        "I" -> Call.getFieldI32
-        "J" -> Call.getFieldI64
-        "F" -> Call.getFieldF32
-        "D" -> Call.getFieldF64
+    private fun getLoadCall(descriptor: String): Instruction = when (descriptor) {
+        "boolean", "byte" -> Call.getFieldS8
+        "short" -> Call.getFieldS16
+        "char" -> Call.getFieldU16
+        "int" -> Call.getFieldI32
+        "long" -> Call.getFieldI64
+        "float" -> Call.getFieldF32
+        "double" -> Call.getFieldF64
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) Call.getFieldI32 else Call.getFieldI64
     }
 
     private fun getStaticStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "Z", "B" -> Call.setStaticFieldI8
-        "S", "C" -> Call.setStaticFieldI16
-        "I" -> Call.setStaticFieldI32
-        "J" -> Call.setStaticFieldI64
-        "F" -> Call.setStaticFieldF32
-        "D" -> Call.setStaticFieldF64
+        "boolean", "byte" -> Call.setStaticFieldI8
+        "short", "char" -> Call.setStaticFieldI16
+        "int" -> Call.setStaticFieldI32
+        "long" -> Call.setStaticFieldI64
+        "float" -> Call.setStaticFieldF32
+        "double" -> Call.setStaticFieldF64
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) Call.setStaticFieldI32 else Call.setStaticFieldI64
     }
 
     private fun getStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "Z", "B" -> Call.setFieldI8
-        "S", "C" -> Call.setFieldI16
-        "I" -> Call.setFieldI32
-        "J" -> Call.setFieldI64
-        "F" -> Call.setFieldF32
-        "D" -> Call.setFieldF64
+        "boolean", "byte" -> Call.setFieldI8
+        "short", "char" -> Call.setFieldI16
+        "int" -> Call.setFieldI32
+        "long" -> Call.setFieldI64
+        "float" -> Call.setFieldF32
+        "double" -> Call.setFieldF64
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) Call.setFieldI32 else Call.setFieldI64
     }
 
     private fun getVIOStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "Z", "B" -> Call.setVIOFieldI8
-        "S", "C" -> Call.setVIOFieldI16
-        "I" -> Call.setVIOFieldI32
-        "J" -> Call.setVIOFieldI64
-        "F" -> Call.setVIOFieldF32
-        "D" -> Call.setVIOFieldF64
+        "boolean", "byte" -> Call.setVIOFieldI8
+        "short", "char" -> Call.setVIOFieldI16
+        "int" -> Call.setVIOFieldI32
+        "long" -> Call.setVIOFieldI64
+        "float" -> Call.setVIOFieldF32
+        "double" -> Call.setVIOFieldF64
+        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
         else -> if (is32Bits) Call.setVIOFieldI32 else Call.setVIOFieldI64
     }
 
@@ -1871,26 +1866,27 @@ class MethodTranslator(
 
     private val precalculateStaticFields = true
     override fun visitFieldInsn(opcode: Int, owner0: String, name: String, descriptor: String) {
-        visitFieldInsn2(opcode, replaceClass(owner0), name, descriptor, true)
+        val type = Descriptor.parseType(descriptor)
+        visitFieldInsn2(opcode, replaceClass(owner0), name, type, true)
     }
 
     private fun Builder.dupI32(): Builder {
         return dupI32(tmpI32)
     }
 
-    fun visitFieldInsn2(opcode: Int, owner: String, name: String, descriptor: String, checkNull: Boolean) {
+    fun visitFieldInsn2(opcode: Int, owner: String, name: String, type: String, checkNull: Boolean) {
         // get offset to field, and store value there
         // if static, find field first... static[]
         // getstatic, putstatic, getfield, putfield
-        if (printOps) println("  [field] ${OpCode[opcode]}, $owner, $name, $descriptor")
-        val wasmType = jvm2wasm1(descriptor[0])
+        if (printOps) println("  [field] ${OpCode[opcode]}, $owner, $name, $type")
+        val wasmType = jvm2wasmTyped(type)
         val static = opcode <= 0xb3
-        val fieldOffset = gIndex.getFieldOffset(owner, name, descriptor, static)
-        val sig = FieldSig(owner, name, descriptor, static)
+        val fieldOffset = gIndex.getFieldOffset(owner, name, type, static)
+        val sig = FieldSig(owner, name, type, static)
         val value = hIndex.finalFields[sig]
         val setter = opcode == 0xb3 || opcode == 0xb5
         if (value != null) {
-            if (!checkNull) throw IllegalStateException("Field $owner,$name,$descriptor is final")
+            if (!checkNull) throw IllegalStateException("Field $owner,$name,$type is final")
             if (setter) {
                 printer.pop(stack.last()) // pop value
             }
@@ -1910,18 +1906,15 @@ class MethodTranslator(
                 // get static
                 if (name in enumFieldsNames) {
                     callStaticInit(owner)
-                    printer.append(i32Const(gIndex.getClassIndex(owner)))
-                        .append(Call("findClass"))
-                        .append(
-                            i32Const(
-                                gIndex.getFieldOffset(
-                                    "java/lang/Class",
-                                    "enumConstants",
-                                    "[Ljava/lang/Object;",
-                                    false
-                                )!!
-                            )
-                        )
+                    val clazzIndex = gIndex.getClassIndex(owner)
+                    val fieldOffset1 = gIndex.getFieldOffset(
+                        "java/lang/Class", "enumConstants",
+                        "java/lang/Object", false
+                    )!!
+                    printer
+                        .append(i32Const(clazzIndex))
+                        .append(Call.findClass)
+                        .append(i32Const(fieldOffset1))
                     printer.append(I32Add).append(I32Load).comment("enum values")
                     printer.push(wasmType)
                 } else if (fieldOffset != null) {
@@ -1936,12 +1929,12 @@ class MethodTranslator(
                             .append(i32Const(gIndex.getClassIndex(owner)))
                             .append(i32Const(fieldOffset))
                             // class index, field offset -> static value
-                            .append(Call("findStatic"))
+                            .append(Call.findStatic)
                     }
                     if (alwaysUseFieldCalls) {
-                        printer.append(getStaticLoadCall(descriptor))
+                        printer.append(getStaticLoadCall(type))
                     } else {
-                        printer.append(getLoadInstr(descriptor))
+                        printer.append(getLoadInstr(type))
                     }
                     if (comments) printer.comment("get static '$owner.$name'")
                 } else {
@@ -1951,19 +1944,15 @@ class MethodTranslator(
             0xb3 -> {
                 // put static
                 if (name in enumFieldsNames) {
+                    val clazzIndex = gIndex.getClassIndex(owner)
+                    val fieldOffset1 = gIndex.getFieldOffset(
+                        "java/lang/Class", "enumConstants",
+                        "java/lang/Object", false
+                    )!!
                     printer
-                        .append(i32Const(gIndex.getClassIndex(owner)))
-                        .append(Call("findClass"))
-                        .append(
-                            i32Const(
-                                gIndex.getFieldOffset(
-                                    "java/lang/Class",
-                                    "enumConstants",
-                                    "[Ljava/lang/Object;",
-                                    false
-                                )!!
-                            )
-                        )
+                        .append(i32Const(clazzIndex))
+                        .append(Call.findClass)
+                        .append(i32Const(fieldOffset1))
                     printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
                     printer.comment("enum values")
                     printer.pop(wasmType)
@@ -1980,7 +1969,7 @@ class MethodTranslator(
                             // ;; class index, field offset -> static value
                             .append(Call.findStatic)
                     }
-                    printer.append(getStaticStoreCall(descriptor))
+                    printer.append(getStaticStoreCall(type))
                     if (comments) printer.comment("put static '$owner.$name'")
                 } else {
                     printer.pop(wasmType)
@@ -2007,12 +1996,11 @@ class MethodTranslator(
                 if (fieldOffset != null) {
                     printer.append(i32Const(fieldOffset))
                     if (alwaysUseFieldCalls) {
-                        printer
-                            .append(getLoadCall(descriptor))
+                        printer.append(getLoadCall(type))
                     } else {
                         printer
                             .append(I32Add)
-                            .append(getLoadInstr(descriptor))
+                            .append(getLoadInstr(type))
                     }
                 } else {
                     printer
@@ -2048,11 +2036,11 @@ class MethodTranslator(
                         printer.append(ParamGet[0])
                             .append(i32Const(fieldOffset))
                             .append(I32Add).append(ParamGet[1])
-                            .append(getStoreInstr(descriptor))
+                            .append(getStoreInstr(type))
                     } else {
                         // we'd need to call a function twice, so call a generic functions for this
                         printer.append(i32Const(fieldOffset))
-                            .append(getStoreCall(descriptor))
+                            .append(getStoreCall(type))
                     }
                 } else {
                     printer.drop().drop()

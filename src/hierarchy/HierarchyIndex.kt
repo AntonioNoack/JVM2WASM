@@ -22,7 +22,7 @@ object HierarchyIndex {
     val methodsByClass = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
 
-    val generics = HashMap<String, List<GenericSig>>(cap) // name, superType
+    val genericsByClass = HashMap<String, List<GenericSig>>(cap) // name, superType
     val genericSuperTypes = HashMap<String, List<String>>(cap)
     val genericMethodSignatures = HashMap<MethodSig, String>(cap)
 

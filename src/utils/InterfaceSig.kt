@@ -1,7 +1,5 @@
 package utils
 
-import utils.Descriptor.Companion.validateDescriptor
-
 @Suppress("DataClassPrivateConstructor")
 data class InterfaceSig private constructor(val name: String, val descriptor: Descriptor) {
     constructor(sig: MethodSig) : this(sig.name, sig.descriptor)
@@ -14,7 +12,7 @@ data class InterfaceSig private constructor(val name: String, val descriptor: De
         }
 
         fun c(name: String, descriptor: String): InterfaceSig {
-            return c(name, validateDescriptor(descriptor))
+            return c(name, Descriptor.c(descriptor))
         }
     }
 }

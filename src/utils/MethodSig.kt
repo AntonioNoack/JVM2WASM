@@ -1,7 +1,6 @@
 package utils
 
 import replaceClass
-import utils.Descriptor.Companion.validateDescriptor
 
 @Suppress("DataClassPrivateConstructor")
 data class MethodSig private constructor(
@@ -38,7 +37,7 @@ data class MethodSig private constructor(
 
         fun c(clazz: String, name: String, descriptor: String, isStatic: Boolean): MethodSig {
             val clazz2 = validateClassName(clazz)
-            val descriptor2 = validateDescriptor(descriptor)
+            val descriptor2 = Descriptor.c(descriptor)
             return MethodSig(clazz2, name, descriptor2, isStatic)
         }
 
