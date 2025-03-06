@@ -1,14 +1,16 @@
 package graphing
 
 import crashOnAllExceptions
+import graphing.EndNodeExtractor.tryExtractEnd
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
+import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
+import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
 import org.apache.logging.log4j.LogManager
-import translator.LocalVar
 import translator.MethodTranslator
 import utils.Builder
 import utils.i32
@@ -27,7 +29,6 @@ import wasm.instr.Instructions.I64LES
 import wasm.instr.Instructions.I64LTS
 import wasm.instr.Instructions.I64NE
 import wasm.instr.Instructions.Unreachable
-import wasm.parser.LocalVariable
 import java.io.File
 
 class StructuralAnalysis(
@@ -70,6 +71,30 @@ class StructuralAnalysis(
                 }
                 node.index = j
             }
+        }
+
+        fun renumber2(nodes: MutableList<GraphingNode>) {
+            // print renumbering???
+            val invalidIndex = Int.MAX_VALUE
+            for (j in nodes.indices) {
+                val node = nodes[j]
+                node.index = invalidIndex
+                assertTrue(node.inputs.isNotEmpty() || j == 0)
+            }
+            var nextIndex = 0
+            Recursion.processRecursive(nodes[0]) { node, remaining ->
+                if (node.index == invalidIndex) {
+                    node.index = nextIndex++
+                    remaining.addAll(node.outputs)
+                }
+            }
+            for (j in nodes.indices) {
+                val node = nodes[j]
+                assertNotEquals(invalidIndex, node.index)
+            }
+            val firstNode = nodes.first()
+            nodes.sortBy { it.index }
+            assertEquals(firstNode, nodes.first())
         }
 
         fun printState(nodes: List<GraphingNode>, title: String) {
@@ -174,7 +199,7 @@ class StructuralAnalysis(
         }
     }
 
-    private fun <V : GraphingNode> replaceNode(oldNode: GraphingNode, newNode: V, i: Int): V {
+    fun <V : GraphingNode> replaceNode(oldNode: GraphingNode, newNode: V, i: Int): V {
         assertNotSame(oldNode, newNode)
         assertSame(oldNode, nodes[i])
         newNode.inputs.addAll(oldNode.inputs)
@@ -292,7 +317,7 @@ class StructuralAnalysis(
                 return from.inputStack
             }
         } else if (from.outputStack.isNotEmpty()) {
-            if (!from.isReturn) {
+            if (from !is ReturnNode) {
                 return from.outputStack
             }
         }// else if(printOps) append(";; no return values found in ${node.index}\n")
@@ -883,10 +908,6 @@ class StructuralAnalysis(
         return changed
     }
 
-    private fun trySolveLinearTree(): Boolean {
-        return SolveLinearTree.solve(nodes, this)
-    }
-
     var isLookingAtSpecial = false
 
     /**
@@ -896,7 +917,6 @@ class StructuralAnalysis(
 
         isLookingAtSpecial = false
 
-        @Suppress("KotlinConstantConditions")
         if (isLookingAtSpecial) {
             printOps = true
         }
@@ -971,7 +991,15 @@ class StructuralAnalysis(
 
             if (!hadAnyChange) {
                 checkState()
-                if (trySolveLinearTree()) {
+                if (trySolveLinearTree(nodes, this, true, emptyMap())) {
+                    assertTrue(canReturnFirstNode())
+                    return firstNodeForReturn()
+                }
+            }
+
+            if (!hadAnyChange) {
+                checkState()
+                if (tryExtractEnd(this)) {
                     assertTrue(canReturnFirstNode())
                     return firstNodeForReturn()
                 }
@@ -984,7 +1012,7 @@ class StructuralAnalysis(
 
             if (!hadAnyChange) {
                 if (printOps) printState(nodes, "Before large switch statement:")
-                methodTranslator.localVariables1.add(LocalVariable("lbl", i32))
+                methodTranslator.addLocalVariable("lbl", i32, "I")
                 val switchStatement = createLargeSwitchStatement2(this)
                 assertFalse(isLookingAtSpecial, "Looking at $sig")
                 return switchStatement
@@ -1002,16 +1030,6 @@ class StructuralAnalysis(
 
         // if we're here, it's really complicated,
         // and there isn't any easy ends
-    }
-
-    private val stackVariables = HashSet<String>()
-    fun getStackVarName(i: Int, type: String): String {
-        val name = "s$i$type"
-        if (stackVariables.add(name)) {
-            methodTranslator.localVariables1.add(LocalVariable(name, type))
-            methodTranslator.localVarsWithParams.add(LocalVar("?", type, name, -1, false))
-        }
-        return name
     }
 }
 

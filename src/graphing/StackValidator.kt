@@ -51,10 +51,10 @@ object StackValidator {
         val localVars = HashMap<String, String>(localVarsWithParams.size)
         val params = ArrayList<String>()
         for (v in localVarsWithParams) {
-            if (v.localGet is LocalGet) {
+            if (v.getter is LocalGet) {
                 assertNull(localVars.put(v.wasmName, v.wasmType))
             } else {
-                val index = (v.localGet as ParamGet).index
+                val index = (v.getter as ParamGet).index
                 assertEquals(params.size, index)
                 params.add(v.wasmType)
             }
@@ -72,6 +72,11 @@ object StackValidator {
         return this
     }
 
+    private fun ArrayList<String>.pop(value: String, context: String): ArrayList<String> {
+        assertEquals(value, removeLastOrNull()) { "Error dropping $context" }
+        return this
+    }
+
     /**
      * relatively expensive validation function to check whether all stack-operations add up
      * */
@@ -81,9 +86,9 @@ object StackValidator {
         for (node in nodes) {
             validateStack2(
                 mt.sig, node.printer, node.inputStack,
-                when {
-                    node.isReturn -> returnTypes
-                    node.isBranch -> node.outputStack + listOf(i32) // i32 = condition
+                when (node) {
+                    is ReturnNode -> returnTypes
+                    is BranchNode -> node.outputStack + listOf(i32) // i32 = condition
                     else -> node.outputStack
                 }, returnTypes,
                 mt.localVarsWithParams
@@ -106,7 +111,7 @@ object StackValidator {
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        val print = sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "get"
+        val print = false
         if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
         for (i in instructions) {
@@ -120,7 +125,8 @@ object StackValidator {
                 )
                 is LocalSet -> stack.pop(
                     localVarTypes[i.name]
-                        ?: throw IllegalStateException("Missing $i")
+                        ?: throw IllegalStateException("Missing $i"),
+                    i.name
                 )
                 is ParamGet -> stack.push(paramsTypes[i.index])
                 is ParamSet -> stack.pop(paramsTypes[i.index])
@@ -212,6 +218,15 @@ object StackValidator {
                 I64Store -> stack.pop(i64).pop(ptrType)
                 F32Store -> stack.pop(f32).pop(ptrType)
                 F64Store -> stack.pop(f64).pop(ptrType)
+                is SwitchCase -> {
+                    assertTrue(stack.isEmpty())
+                    for (case in i.cases) {
+                        validateStack3(
+                            sig, case, emptyList(), emptyList(), returnResults,
+                            localVarTypes, paramsTypes
+                        )
+                    }
+                }
                 else -> throw NotImplementedError(i.toString())
             }
         }

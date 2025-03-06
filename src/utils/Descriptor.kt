@@ -124,7 +124,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
 
             val returnType = if (!descriptor.endsWith(")V")) args.removeLast() else null
             val descriptor1 = Descriptor(args, returnType, builder.toString())
-            println("'$descriptor' -> '$builder', $args, $returnType")
+            // println("'$descriptor' -> '$builder', $args, $returnType")
             return descriptor1
         }
     }

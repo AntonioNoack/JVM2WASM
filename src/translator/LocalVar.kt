@@ -14,4 +14,7 @@ class LocalVar(
 ) {
     val localGet = if (isParam) ParamGet[index] else LocalGet(wasmName)
     val localSet = if (isParam) ParamSet[index] else LocalSet(wasmName)
+
+    val getter get() = localGet
+    val setter get() = localSet
 }

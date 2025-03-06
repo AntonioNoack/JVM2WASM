@@ -2,7 +2,6 @@ package hierarchy
 
 import api
 import hIndex
-import me.anno.utils.assertions.assertEquals
 import me.anno.utils.types.Booleans.hasFlag
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.ClassReader
@@ -199,25 +198,12 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
         val isAbstract = access.hasFlag(ACC_ABSTRACT)
         val isNative = access.hasFlag(ACC_NATIVE)
-        val isFinal = access.hasFlag(ACC_FINAL)
+        val isFinal = access.hasFlag(ACC_FINAL) or this.isFinal
         val isStatic = access.hasFlag(ACC_STATIC)
 
         val sig = MethodSig.c(clazz, name, descriptor, isStatic)
-
-        if (name == "getSuperclasses") {
-            println(
-                "[M] $clazz $name $descriptor $signature, " +
-                        "abstract? $isAbstract, native? $isNative, final? $isFinal, static? $isStatic"
-            )
-            val checked = MethodSig.c(
-                "kotlyn/reflect/full/KClasses", "getSuperclasses",
-                "(Lkotlin/reflect/KClass;)Ljava/util/List;", true
-            )
-            assertEquals(checked, sig)
-        }
-
         if (signature != null) {
-            hIndex.genericMethodSigs[sig] = signature
+            hIndex.genericMethodSignatures[sig] = signature
         }
 
         HierarchyIndex.registerMethod(sig)
@@ -226,9 +212,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
             index.staticMethods.add(sig)
         }
 
-        if (this.isFinal || isFinal || isStatic) {
-            if (sig.clazz == "me/anno/gpu/OSWindow" && sig.name == "addCallbacks" && sig.descriptor.raw == "()V")
-                throw IllegalStateException()
+        if (isFinal || isStatic) {
             index.finalMethods.add(sig)
         }
 

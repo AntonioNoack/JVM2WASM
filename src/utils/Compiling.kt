@@ -165,7 +165,7 @@ fun resolveGenericTypes() {
             // to do find all abstract methods in superType to be mapped
             // to do all parent classes as well (?)
             val abstractMethods = hIndex.methodsByClass[clearSuperType]
-                ?.filter { it in hIndex.abstractMethods && it in hIndex.genericMethodSigs }
+                ?.filter { it in hIndex.abstractMethods && it in hIndex.genericMethodSignatures }
                 ?: continue
 
             for (method in abstractMethods) {
@@ -183,7 +183,7 @@ fun resolveGenericTypes() {
                 if (candidates.isNotEmpty()) {
 
                     // remove generics from call (for now)
-                    val desc2 = hIndex.genericMethodSigs[method]!!
+                    val desc2 = hIndex.genericMethodSignatures[method]!!
                     val desc2i = descWithoutGenerics(desc2)
                     // if so, no base-type generics are present -> nothing needs to be replaced or mapped
                     if (method.descriptor.raw == desc2i) continue

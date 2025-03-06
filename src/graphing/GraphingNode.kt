@@ -10,8 +10,6 @@ abstract class GraphingNode(val printer: Builder) {
     var index = -1
     val inputs = HashSet<GraphingNode>()
 
-    val isBranch get() = this is BranchNode
-    val isReturn get() = this is ReturnNode
     var hasNoCode = false
 
     abstract val outputs: List<GraphingNode>

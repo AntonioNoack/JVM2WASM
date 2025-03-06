@@ -24,7 +24,7 @@ object HierarchyIndex {
 
     val generics = HashMap<String, List<GenericSig>>(cap) // name, superType
     val genericSuperTypes = HashMap<String, List<String>>(cap)
-    val genericMethodSigs = HashMap<MethodSig, String>(cap)
+    val genericMethodSignatures = HashMap<MethodSig, String>(cap)
 
     val interfaceDefaults = HashMap<MethodSig, HashSet<MethodSig>>()
 

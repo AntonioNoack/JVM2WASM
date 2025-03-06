@@ -174,12 +174,33 @@ class MethodTranslator(
     val sig = MethodSig.c(clazz, name, descriptor, isStatic)
     val canThrowError = canThrowError(sig)
 
+    fun addLocalVariable(name: String, type: String, descriptor: String): LocalVar {
+        assertTrue(localVariables1.none { it.name == name }) { "Duplicate variable $name" }
+        localVariables1.add(LocalVariable(name, type))
+        val localVar = LocalVar(descriptor, type, name, -1000 - localVarsWithParams.size, false)
+        localVarsWithParams.add(localVar)
+        return localVar
+    }
+
+    private val stackVariables = HashSet<String>()
+    fun getStackVarName(i: Int, type: String): String {
+        val name = "s$i$type"
+        if (stackVariables.add(name)) {
+            addLocalVariable(name, type, "?")
+        }
+        return name
+    }
+
+    var linearTreeNodeIndex = 0
+    var endNodeExtractorIndex = 0
+    var endNodeIndex = 0
+
     private val enableStackPush = enableTracing &&
             (canThrowError || crashOnAllExceptions) &&
             sig.name !in notStackPushedMethods
 
     init {
-        printOps = clazz == "me/anno/input/KeyCombination\$Companion" && name == "get"
+        printOps = false
         if (printOps) println("Method-Translating $clazz.$name.$descriptor")
 
         nodes.add(currentNode)

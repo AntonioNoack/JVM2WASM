@@ -108,12 +108,12 @@ class Builder(capacity: Int = 16) {
 
     fun dupI32(tmp: LocalVar): Builder {
         val lastInstr = instrs.lastOrNull()
-        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is Const) {
+        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is GlobalGet || lastInstr is Const) {
             append(lastInstr)
         } else {
-            append(tmp.localSet)
-            append(tmp.localGet)
-            append(tmp.localGet)
+            append(tmp.setter)
+            append(tmp.getter)
+            append(tmp.getter)
         }
         return this
     }
