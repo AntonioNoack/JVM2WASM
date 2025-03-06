@@ -160,7 +160,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
                             if (
                                 typeName.startsWith("[") &&
                                 typeName.length == 2 &&
-                                typeName[1] in "ZBSCIJFD"
+                                typeName[1] in NativeTypes.joined
                             ) { // native array
                                 gIndex.getClassIndex(typeName)
                             } else if (typeName.startsWith("[")) {

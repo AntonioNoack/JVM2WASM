@@ -114,4 +114,28 @@ object HierarchyIndex {
         return flags.hasFlag(ACC_ENUM)
     }
 
+    fun isChildClassOfInterface(child: String, parent: String): Boolean {
+        if (child == parent) return true
+        if (parent in (interfaces[child] ?: emptyList())) {
+            return true
+        }
+        val parent1 = superClass[child] ?: return false
+        return isChildClassOfInterface(parent1, parent)
+    }
+
+    fun isChildClassOfSuper(child: String, parent: String): Boolean {
+        if (child == parent) return true
+        val parent1 = superClass[child] ?: return false
+        return isChildClassOfInterface(parent1, parent)
+    }
+
+    fun isChildClassOf(child: String, parent: String): Boolean {
+        return if (isInterfaceClass(parent)) {
+            isChildClassOfInterface(child, parent)
+        } else {
+            isChildClassOfSuper(child, parent)
+        }
+    }
+
+
 }

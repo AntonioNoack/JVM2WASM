@@ -249,9 +249,36 @@ fun resolveGenericTypes() {
 
                     val newDesc = Descriptor.parseDescriptor(desc2i, genericsMap)
 
+                    fun matchesDescriptor0(candidate: String, expected: String): Boolean {
+                        if (candidate == expected) return true
+                        if (candidate.startsWith("[") != expected.startsWith("[")) return false
+                        if (candidate.startsWith("["))
+                            return matchesDescriptor0(candidate.substring(1), expected.substring(1))
+                        // candidate is allowed to be a child of expected
+                        return hIndex.isChildClassOf(candidate, expected)
+                    }
+
+                    fun matchesDescriptor(candidate: String?, expected: String?): Boolean {
+                        if (candidate == expected) return true
+                        if ((candidate == null) != (expected == null)) return false
+                        return matchesDescriptor0(candidate!!, expected!!)
+                    }
+
+                    fun matchesDescriptor(candidate: Descriptor, expected: Descriptor): Boolean {
+                        if (candidate.params.size != newDesc.params.size) return false
+                        for (k in candidate.params.indices) {
+                            if (!matchesDescriptor(candidate.params[k], expected.params[k])) {
+                                return false
+                            }
+                        }
+                        return matchesDescriptor(candidate.returnType, expected.returnType)
+                    }
+
                     // check if this newly generated signature is implemented
-                    val implMethod = candidates
-                        .firstOrNull { it.descriptor == newDesc }
+                    val implMethod =
+                        candidates.firstOrNull { it.descriptor == newDesc }
+                            ?: candidates.firstOrNull { matchesDescriptor(it.descriptor, newDesc) }
+
                     if (implMethod != null) {
                         // define mapping
                         val sig2 = method.withClass(clazz)
@@ -259,14 +286,17 @@ fun resolveGenericTypes() {
                         hIndex.setAlias(sig2, implMethod)
                     } else {
                         LOGGER.warn("Missing mapping for $method")
-                        LOGGER.warn("  class: $clazz")
-                        LOGGER.warn("  generics: $generics")
-                        LOGGER.warn("  superType: $superType")
-                        LOGGER.warn("  params: $params")
-                        LOGGER.warn("  candidates: $candidates")
-                        LOGGER.warn("  searched: $newDesc")
+                        LOGGER.info("Missing mapping for $method") // twice, so it doesn't get mixed
+                        LOGGER.info("  class: $clazz")
+                        LOGGER.info("  generics: $generics")
+                        LOGGER.info("  superType: $superType")
+                        LOGGER.info("  params: $params")
+                        LOGGER.info("  candidates: $candidates")
+                        LOGGER.info("  newDesc: $newDesc")
+                        if (method.clazz == "me/anno/graph/hdb/allocator/AllocationManager") {
+                            throw IllegalStateException()
+                        }
                     }
-
                 }
             }
         }
