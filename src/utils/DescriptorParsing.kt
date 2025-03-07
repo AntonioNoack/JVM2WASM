@@ -120,11 +120,12 @@ fun methodName(clazz: String, sig: InterfaceSig): String {
 private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)
 
 fun methodName2(clazz: String, name: String, args: String): String {
-    return methodName2Cache.getOrPut(Triple(clazz, name, args)) {
+    val clazz2 = if(clazz.startsWith("[") && clazz !in NativeTypes.nativeArrays) "[]" else clazz
+    return methodName2Cache.getOrPut(Triple(clazz2, name, args)) {
         when (name) {
-            STATIC_INIT -> "static|$clazz|$args"
-            INSTANCE_INIT -> "new|$clazz|$args"
-            else -> "$clazz|$name|$args"
+            STATIC_INIT -> "static|$clazz2|$args"
+            INSTANCE_INIT -> "new|$clazz2|$args"
+            else -> "$clazz2|$name|$args"
         }.escapeChars()
     }
 }

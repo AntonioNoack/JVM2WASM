@@ -183,7 +183,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
 
             val returnType = if (!descriptor.endsWith(")V")) args.removeLast() else null
             val descriptor1 = Descriptor(args, returnType, builder.toString())
-            println("'$descriptor' -> '$builder', $args, $returnType, $generics")
+            // println("'$descriptor' -> '$builder', $args, $returnType, $generics")
             assertTrue(";;" !in descriptor1.raw, descriptor1.raw)
             assertTrue("A[" !in descriptor1.raw, descriptor1.raw)
             return descriptor1

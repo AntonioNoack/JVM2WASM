@@ -19,6 +19,7 @@ import listLibrary
 import listSuperClasses
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertFail
+import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
@@ -39,6 +40,7 @@ import wasm.parser.FunctionImpl
 import wasm.parser.Import
 import wasm.parser.WATParser
 import java.io.IOException
+import java.util.stream.Collectors
 
 private val LOGGER = LogManager.getLogger("Compiling")
 
@@ -282,20 +284,16 @@ fun resolveGenericTypes() {
                     if (implMethod != null) {
                         // define mapping
                         val sig2 = method.withClass(clazz)
-                        if (sig2 == implMethod) throw NotImplementedError()
+                        assertNotEquals(sig2, implMethod)
                         hIndex.setAlias(sig2, implMethod)
                     } else {
-                        LOGGER.warn("Missing mapping for $method")
                         LOGGER.info("Missing mapping for $method") // twice, so it doesn't get mixed
                         LOGGER.info("  class: $clazz")
-                        LOGGER.info("  generics: $generics")
+                        LOGGER.info("  generics: $genericsMap")
                         LOGGER.info("  superType: $superType")
                         LOGGER.info("  params: $params")
                         LOGGER.info("  candidates: $candidates")
                         LOGGER.info("  newDesc: $newDesc")
-                        if (method.clazz == "me/anno/graph/hdb/allocator/AllocationManager") {
-                            throw IllegalStateException()
-                        }
                     }
                 }
             }

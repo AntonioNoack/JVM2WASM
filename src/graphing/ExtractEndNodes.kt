@@ -20,7 +20,11 @@ import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
 import wasm.instr.LoopInstr
 
-object EndNodeExtractor {
+/**
+ * Extract all definitely returning, non-recursive nodes.
+ * Convert them into a tree, and solve the start traditionally.
+ * */
+object ExtractEndNodes {
 
     fun tryExtractEnd(sa: StructuralAnalysis): Boolean {
         val endNodes = findEndNodes(sa)
@@ -69,6 +73,18 @@ object EndNodeExtractor {
         }
     }
 
+    private fun validateNodes(sa: StructuralAnalysis, endNodes: Set<GraphingNode>) {
+        assertTrue(endNodes.size < sa.nodes.size)
+        assertTrue(sa.nodes.first() !in endNodes)
+        for (node in sa.nodes) {
+            if (node.outputs.all2 { it in endNodes }) {
+                assertTrue(node in endNodes) {
+                    "${node.index} should be endNode"
+                }
+            }
+        }
+    }
+
     private fun createMergedCode(sa: StructuralAnalysis, endNodes: Set<GraphingNode>): Builder {
 
         val print = false
@@ -85,29 +101,19 @@ object EndNodeExtractor {
             println()
             println("------------------------------------------------------")
             println(
-                "Merging code, " +
+                "ExtractEnd, " +
                         "nodes: 0-${sa.nodes.lastIndex - endNodes.size}, " +
                         "end: ${sa.nodes.size - endNodes.size}-${sa.nodes.lastIndex}"
             )
             printState(sa.nodes, "MergeCode")
         }
 
-        assertTrue(endNodes.size < sa.nodes.size)
-        assertTrue(sa.nodes.first() !in endNodes)
-
-        // validate all nodes
-        for (node in sa.nodes) {
-            if (node.outputs.all2 { it in endNodes }) {
-                assertTrue(node in endNodes) {
-                    "${node.index} should be endNode"
-                }
-            }
-        }
+        if (validate) validateNodes(sa, endNodes)
 
         val mt = sa.methodTranslator
-        val label = "firstRun${mt.endNodeExtractorIndex++}"
-        val labelVar = mt.addLocalVariable(label, i32, "I")
-        val jumpInstr = Jump(label)
+        val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
+        val firstRunVariable = mt.addLocalVariable(firstRunLabel, i32, "I")
+        val jumpInstr = Jump(firstRunLabel)
 
         val extraInputs = HashMap<GraphingNode, List<LocalVar>>()
         fun getInputLabel(endNode: GraphingNode): LocalVar {
@@ -118,15 +124,70 @@ object EndNodeExtractor {
             }.first()
         }
 
-        if (validate) validateStack(sa.nodes, sa.methodTranslator)
+        if (validate) validateStack(sa.nodes, mt)
 
+        // replace goto-end-node to jumps to it
+        assertTrue(sa.nodes.all2 { it in endNodes || it !is ReturnNode })
+        replaceGotoEndNodes(sa, validate, print, endNodes) { node, next ->
+            val setLabel = getInputLabel(next)
+            val branchPrinter = Builder()
+            storeStack(branchPrinter, node.outputStack, mt)
+            // append "label-setter"
+            branchPrinter.append(i32Const1).append(setLabel.setter)
+            // branch to loop start = the beginning of the end
+            branchPrinter.append(jumpInstr)
+            branchPrinter
+        }
+        sa.nodes.removeIf { it in endNodes }
+        if (print) printState(sa.nodes, "Removed end nodes")
+
+        val firstNodeCode = solve(sa, sa.nodes)
+        firstNodeCode.prepend(listOf(i32Const0, firstRunVariable.setter)) // don't run a second time
+        firstNodeCode.append(Unreachable) // end of it should be unreachable
+
+        val endNodesList = ArrayList(endNodes)
+        for (endNode in endNodesList) {
+            // unlink inputs
+            endNode.inputs.removeIf { it !in endNodes }
+        }
+
+        assertTrue(extraInputs.isNotEmpty())
+        if (print) println(endNodesList.map { node -> "${node.index}.extra=${extraInputs[node]?.map { it.wasmName }}" })
+        assertTrue(SolveLinearTree.trySolveLinearTree(endNodesList, mt, false, extraInputs))
+        assertEquals(1, endNodesList.size)
+        val endNodeCode = endNodesList.first().printer
+
+        val body = listOf(
+            firstRunVariable.getter,
+            IfBranch(firstNodeCode.instrs, endNodeCode.instrs, emptyList(), emptyList()),
+            Unreachable // should be unreachable, too
+        )
+
+        val dst = Builder(3)
+        dst.append(i32Const1).append(firstRunVariable.setter)
+        dst.append(LoopInstr(firstRunLabel, body, emptyList()))
+        return dst
+    }
+
+    fun solve(sa: StructuralAnalysis, nodes: List<GraphingNode>): Builder {
+        // good enough???
+        return StructuralAnalysis(sa.methodTranslator, ArrayList(nodes))
+            .joinNodes()
+    }
+
+    fun replaceGotoEndNodes(
+        sa: StructuralAnalysis,
+        validate: Boolean, print: Boolean,
+        endNodes: Set<GraphingNode>,
+        getJumpInstructions: (node: GraphingNode, next: GraphingNode) -> Builder
+    ) {
         // replace goto-end-node to jumps to it
         for (i in sa.nodes.indices) {
             val node = sa.nodes[i]
             if (node in endNodes) continue
 
             when (node) {
-                is ReturnNode -> assertFail()
+                is ReturnNode -> {} // nothing to replace
                 is BranchNode -> {
                     val endTrue = node.ifTrue in endNodes
                     val endFalse = node.ifFalse in endNodes
@@ -140,14 +201,9 @@ object EndNodeExtractor {
                             // printState(sa.nodes, "Before if-jump $node, $endTrue, $endFalse")
                             if (endFalse) node.printer.append(I32EQZ)
                             val endNode = if (endTrue) node.ifTrue else node.ifFalse
-                            val setLabel = getInputLabel(endNode)
-                            // jump-to-end-block conditionally
-                            val branchPrinter = Builder()
-                            storeStack(branchPrinter, endNode.inputStack, sa.methodTranslator)
-                            branchPrinter.append(i32Const1).append(setLabel.setter).append(jumpInstr)
                             node.printer.append(
                                 IfBranch(
-                                    branchPrinter.instrs, emptyList(),
+                                    getJumpInstructions(node, endNode).instrs, emptyList(),
                                     node.outputStack, node.outputStack
                                 )
                             )
@@ -162,16 +218,10 @@ object EndNodeExtractor {
                 }
                 is SequenceNode -> {
                     if (node.next in endNodes) {
-                        val setLabel = getInputLabel(node.next)
-                        val branchPrinter = Builder(node.printer.length + node.outputStack.size * 2 + 3)
-                        branchPrinter.append(node.printer)
-                        storeStack(branchPrinter, node.outputStack, sa.methodTranslator)
-                        // append "label-setter"
-                        branchPrinter.append(i32Const1).append(setLabel.setter)
-                        // branch to loop start = the beginning of the end
-                        branchPrinter.append(jumpInstr)
                         // convert node to return node
-                        sa.replaceNode(node, ReturnNode(branchPrinter), i)
+                        val builder = getJumpInstructions(node, node.next)
+                        builder.prepend(node.printer)
+                        sa.replaceNode(node, ReturnNode(builder), i)
                         if (print) printState(sa.nodes, "After next-jump [$i]")
                         if (validate) validateStack(sa.nodes, sa.methodTranslator)
                     }
@@ -179,41 +229,6 @@ object EndNodeExtractor {
                 else -> assertFail()
             }
         }
-        sa.nodes.removeIf { it in endNodes }
-        if (print) printState(sa.nodes, "Removed end nodes")
-
-        val firstNodeCode = solve(sa, sa.nodes)
-        firstNodeCode.prepend(listOf(i32Const0, labelVar.setter)) // don't run a second time
-        firstNodeCode.append(Unreachable) // end of it should be unreachable
-
-        val endNodesList = ArrayList(endNodes)
-        for (endNode in endNodesList) {
-            // unlink inputs
-            endNode.inputs.removeIf { it !in endNodes }
-        }
-
-        assertTrue(extraInputs.isNotEmpty())
-        if (print) println(endNodesList.map { node -> "${node.index}.extra=${extraInputs[node]?.map { it.wasmName }}" })
-        assertTrue(SolveLinearTree.trySolveLinearTree(endNodesList, sa, false, extraInputs))
-        assertEquals(1, endNodesList.size)
-        val endNodeCode = endNodesList.first().printer
-
-        val body = listOf(
-            labelVar.getter,
-            IfBranch(firstNodeCode.instrs, endNodeCode.instrs, emptyList(), emptyList()),
-            Unreachable // should be unreachable, too
-        )
-
-        val dst = Builder(3)
-        dst.append(i32Const1).append(labelVar.setter)
-        dst.append(LoopInstr(label, body, emptyList()))
-        return dst
-    }
-
-    fun solve(sa: StructuralAnalysis, nodes: List<GraphingNode>): Builder {
-        // good enough???
-        return StructuralAnalysis(sa.methodTranslator, ArrayList(nodes))
-            .joinNodes()
     }
 
 }

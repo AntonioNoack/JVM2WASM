@@ -127,7 +127,10 @@ object LargeSwitchStatement {
     }
 
     fun loadStack(node: GraphingNode, mt: MethodTranslator) {
-        val inputs = node.inputStack
+        loadStack(node.inputStack, node.printer, mt)
+    }
+
+    fun loadStack(inputs: List<String>, printer: Builder, mt: MethodTranslator) {
         if (inputs.isEmpty()) return
         val pre = Builder()
         if (comments) pre.comment("load stack $inputs")
@@ -135,7 +138,7 @@ object LargeSwitchStatement {
             val type = inputs[idx]
             pre.append(LocalGet(mt.getStackVarName(idx, type)))
         }
-        node.printer.prepend(pre)
+        printer.prepend(pre)
     }
 
     fun storeStack(node: GraphingNode, mt: MethodTranslator) {

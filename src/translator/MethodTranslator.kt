@@ -192,7 +192,9 @@ class MethodTranslator(
     }
 
     var linearTreeNodeIndex = 0
+    var startNodeExtractorIndex = 0
     var endNodeExtractorIndex = 0
+    var bigLoopExtractorIndex = 0
     var endNodeIndex = 0
 
     private val enableStackPush = enableTracing &&

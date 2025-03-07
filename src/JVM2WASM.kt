@@ -645,5 +645,8 @@ fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<Stri
         }
     }
     println()
+    println("additional info:")
+    printUsed(MethodSig.c("java/lang/reflect/Constructor", "getDeclaredAnnotations", "()[Ljava/lang/Object;", false))
+    printUsed(MethodSig.c("java/lang/reflect/Executable", "getDeclaredAnnotations", "()[Ljava/lang/Object;", false))
     throw IllegalStateException("Missing ${usedButNotImplemented.size} functions")
 }

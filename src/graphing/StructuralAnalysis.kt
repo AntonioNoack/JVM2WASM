@@ -1,13 +1,14 @@
 package graphing
 
 import crashOnAllExceptions
-import graphing.EndNodeExtractor.tryExtractEnd
+import graphing.ExtractBigLoop.tryExtractBigLoop
+import graphing.ExtractEndNodes.tryExtractEnd
+import graphing.ExtractStartNodes.tryExtractStart
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
-import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
 import org.apache.logging.log4j.LogManager
@@ -61,40 +62,51 @@ class StructuralAnalysis(
         val equalPairs = equalPairs0.associate { it } +
                 equalPairs0.associate { it.second to it.first }
 
-        fun renumber(nodes: List<GraphingNode>) {
+        fun renumber(nodes: List<GraphingNode>, offset: Int = 0) {
             if (printOps) println("renumbering:")
             for (j in nodes.indices) {
                 val node = nodes[j]
+                val newIndex = j + offset
                 // if (node.hasNoCode()) throw IllegalStateException()
                 if (printOps && node.index >= 0) {
-                    println("${node.index} -> $j")
+                    println("${node.index} -> $newIndex")
                 }
-                node.index = j
+                node.index = newIndex
             }
         }
 
         fun renumber2(nodes: MutableList<GraphingNode>) {
             // print renumbering???
-            val invalidIndex = Int.MAX_VALUE
-            for (j in nodes.indices) {
-                val node = nodes[j]
-                node.index = invalidIndex
-                assertTrue(node.inputs.isNotEmpty() || j == 0)
+            for (i in nodes.indices) {
+                nodes[i].index = -1
             }
-            var nextIndex = 0
-            Recursion.processRecursive(nodes[0]) { node, remaining ->
-                if (node.index == invalidIndex) {
-                    node.index = nextIndex++
-                    remaining.addAll(node.outputs)
+
+            val currentNodes = LinkedHashSet<GraphingNode>()
+            val nextNodes = ArrayList<GraphingNode>()
+
+            var ni = 0
+            nextNodes.add(nodes.first())
+            while (nextNodes.isNotEmpty()) {
+                val node = nextNodes.removeLast()
+                if (node.index == -1) {
+                    node.index = ni++
+                    for (next in node.outputs) {
+                        if (next.index == -1) {
+                            currentNodes.add(next)
+                        }
+                    }
+                }
+                if (nextNodes.isEmpty()) {
+                    nextNodes.addAll(currentNodes)
+                    nextNodes.reverse()
+                    currentNodes.clear()
                 }
             }
-            for (j in nodes.indices) {
-                val node = nodes[j]
-                assertNotEquals(invalidIndex, node.index)
-            }
-            val firstNode = nodes.first()
+
+            nodes.removeIf { it.index < 0 } // not reachable
+            assertEquals(0, nodes[0].index) // first node must stay the same
             nodes.sortBy { it.index }
-            assertEquals(firstNode, nodes.first())
+            assertEquals(0, nodes[0].index) // first node must stay the same
         }
 
         fun printState(nodes: List<GraphingNode>, title: String) {
@@ -212,14 +224,14 @@ class StructuralAnalysis(
         return newNode
     }
 
-    private fun replaceSelfIO(oldNode: GraphingNode, newNode: GraphingNode) {
+    fun replaceSelfIO(oldNode: GraphingNode, newNode: GraphingNode) {
         if (oldNode in oldNode.inputs) {
             newNode.inputs.remove(oldNode)
             newNode.inputs.add(newNode)
         }
     }
 
-    private fun replaceOutputs(oldNode: GraphingNode, newNode: GraphingNode) {
+    fun replaceOutputs(oldNode: GraphingNode, newNode: GraphingNode) {
         for (output in oldNode.outputs) {
             val relatedNodes = output.inputs
             relatedNodes.remove(oldNode)
@@ -227,7 +239,7 @@ class StructuralAnalysis(
         }
     }
 
-    private fun replaceInputs(oldNode: GraphingNode, newNode: GraphingNode) {
+    fun replaceInputs(oldNode: GraphingNode, newNode: GraphingNode) {
         for (input in oldNode.inputs) {
             when (input) {
                 is BranchNode -> {
@@ -241,7 +253,7 @@ class StructuralAnalysis(
         }
     }
 
-    private fun replaceLinks(oldNode: GraphingNode, newNode: GraphingNode) {
+    fun replaceLinks(oldNode: GraphingNode, newNode: GraphingNode) {
         replaceSelfIO(oldNode, newNode)
         replaceOutputs(oldNode, newNode)
         replaceInputs(oldNode, newNode)
@@ -991,9 +1003,16 @@ class StructuralAnalysis(
 
             if (!hadAnyChange) {
                 checkState()
-                if (trySolveLinearTree(nodes, this, true, emptyMap())) {
+                if (trySolveLinearTree(nodes, methodTranslator, true, emptyMap())) {
                     assertTrue(canReturnFirstNode())
                     return firstNodeForReturn()
+                }
+            }
+
+            if (!hadAnyChange) {
+                checkState()
+                if (tryExtractStart(this)) {
+                    hadAnyChange = true
                 }
             }
 
@@ -1002,6 +1021,14 @@ class StructuralAnalysis(
                 if (tryExtractEnd(this)) {
                     assertTrue(canReturnFirstNode())
                     return firstNodeForReturn()
+                }
+            }
+
+
+            if (!hadAnyChange) {
+                checkState()
+                if (tryExtractBigLoop(this)) {
+                    hadAnyChange = true
                 }
             }
 

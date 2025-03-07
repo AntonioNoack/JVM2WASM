@@ -2,6 +2,7 @@ package jvm;
 
 import annotations.Alias;
 import annotations.NoThrow;
+import annotations.UsedIfIndexed;
 import annotations.WASM;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
 import kotlin.jvm.internal.ClassReference;
@@ -712,8 +713,20 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
-    public static Object java_lang_reflect_Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
-        return null;
+    public static Object[] Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
+        return empty;
+    }
+
+    @UsedIfIndexed
+    @Alias(names = "java_lang_reflect_Executable_getDeclaredAnnotations_AW")
+    public static Object[] Executable_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
+        return empty;
+    }
+
+    @UsedIfIndexed
+    @Alias(names = "java_lang_reflect_Executable_getParameters_AW")
+    public static Object[] java_lang_reflect_Executable_getParameters_AW(Object self) {
+        return empty;
     }
 
     @Alias(names = "java_lang_reflect_Constructor_newInstance_ALjava_lang_ObjectLjava_lang_Object")

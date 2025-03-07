@@ -104,11 +104,11 @@ object SolveLinearTree {
     }
 
     fun trySolveLinearTree(
-        nodes: MutableList<GraphingNode>, sa: StructuralAnalysis,
+        nodes: MutableList<GraphingNode>, mt: MethodTranslator,
         firstNodeIsEntry: Boolean, extraInputs: Map<GraphingNode, List<LocalVar>>
     ): Boolean {
 
-        val retTypes = StackValidator.getReturnTypes(sa.sig)
+        val retTypes = StackValidator.getReturnTypes(mt.sig)
         val firstNode = nodes.first()
         val isSorted = nodes.sortByTopology { node -> node.inputs } != null
         if (!isSorted) {
@@ -120,7 +120,7 @@ object SolveLinearTree {
         }
 
         val print = false
-        if (print) println("SolveLinearTree[${sa.sig}]")
+        if (print) println("SolveLinearTree[${mt.sig}]")
 
         if (firstNodeIsEntry) {
             assertSame(nodes.first(), firstNode)
@@ -133,18 +133,18 @@ object SolveLinearTree {
         val validate = true
         if (validate) {
             if (print) {
-                println(sa.sig)
-                printState(sa.nodes, "Validating")
+                println(mt.sig)
+                printState(nodes, "Validating")
             }
-            StackValidator.validateStack(nodes, sa.methodTranslator)
+            StackValidator.validateStack(nodes, mt)
         }
 
         // create labels for all nodes
-        val labels = createLabels(nodes, sa.methodTranslator)
+        val labels = createLabels(nodes, mt)
         val resultPrinter = Builder()
 
         // set labels to 1/0 at the end of each node
-        setLabelsInNodes(nodes, sa.methodTranslator, labels)
+        setLabelsInNodes(nodes, mt, labels)
 
         // set all labels to 0 at the start
         initializeLabels(nodes, labels, resultPrinter)
@@ -246,8 +246,8 @@ object SolveLinearTree {
             }
 
             if (validate) StackValidator.validateStack2( // O(n²)
-                sa.sig, printer, emptyList(), emptyList(), retTypes,
-                sa.methodTranslator.localVarsWithParams
+                mt.sig, printer, emptyList(), emptyList(), retTypes,
+                mt.localVarsWithParams
             )
         }
 
@@ -260,11 +260,11 @@ object SolveLinearTree {
         if (print) {
             println()
             println("-------------------------------------------------------------")
-            println(sa.sig)
+            println(mt.sig)
             println()
             println(nodes.first().printer)
         }
-        StackValidator.validateStack(nodes, sa.methodTranslator)
+        StackValidator.validateStack(nodes, mt)
 
         return true
     }

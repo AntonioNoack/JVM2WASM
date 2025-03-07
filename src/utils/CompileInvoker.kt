@@ -37,7 +37,7 @@ fun printUsed(sig: MethodSig) {
         while (parent != null) {
             val sig2 = sig.withClass(parent)
             if (sig2 in dIndex.usedMethods) {
-                builder.append(" used-by-$parent")
+                builder.append(" used-by-parent:$parent")
                 break
             }
             parent = hIndex.superClass[parent]

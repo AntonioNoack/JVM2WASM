@@ -9,6 +9,7 @@ import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
+import me.anno.utils.structures.Compare.ifSame
 import org.apache.logging.log4j.LogManager
 import utils.MethodResolver.resolveMethod
 
@@ -35,6 +36,14 @@ object DynIndex {
         return dynIndex[name]!!
     }
 
+    data class SortingKey(val sig: MethodSig) : Comparable<SortingKey> {
+        override fun compareTo(other: SortingKey): Int {
+            return sig.name.compareTo(other.sig.name).ifSame {
+                sig.descriptor.raw.compareTo(other.sig.descriptor.raw)
+            }
+        }
+    }
+
     fun appendDynamicFunctionTable(printer: StringBuilder2, implementedMethods: Map<String, MethodSig>) {
         val nameToMethod = calculateNameToMethod()
         val dynamicFunctions = implementedMethods.entries
@@ -48,7 +57,7 @@ object DynIndex {
                         sig !in hIndex.abstractMethods &&
                         hIndex.getAlias(sig) == sig
             }
-            .sortedBy { it.value.name + "/" + it.value.descriptor }
+            .sortedBy { (_, sig) -> SortingKey(sig) }
         for ((name, sig) in dynamicFunctions) {
             if (nameToMethod[name] in hIndex.abstractMethods)
                 throw IllegalStateException("$name is abstract, but also listed")

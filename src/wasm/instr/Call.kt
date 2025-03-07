@@ -6,6 +6,8 @@ data class Call(val name: String) : Instruction {
 
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)
+        if (name == "Ajava_lang_Object_clone_Ljava_lang_Object")
+            throw IllegalArgumentException()
     }
 
     override fun toString(): String = "call \$$name"
