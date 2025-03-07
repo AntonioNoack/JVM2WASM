@@ -55,6 +55,7 @@ import java.util.Objects;
 import static engine.GFXBase2Kt.renderFrame2;
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
+import static jvm.JavaLang.Object_toString;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
@@ -474,7 +475,7 @@ public class Engine {
     // trying to save space by getting rid of TextWriter (1 MB in wasm text)
     @Alias(names = "me_anno_io_Saveable_toString_Ljava_lang_String")
     private static String me_anno_io_Saveable_toString_Ljava_lang_String(Object self) {
-        return self.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(self));
+        return Object_toString(self);
     }
 
     // trying to save space by getting rid of TextWriter (1 MB in wasm text)

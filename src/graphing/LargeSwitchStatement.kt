@@ -6,6 +6,7 @@ import graphing.StructuralAnalysis.Companion.comments
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.assertFail
+import me.anno.utils.assertions.assertTrue
 import translator.MethodTranslator
 import utils.Builder
 import utils.i32
@@ -31,12 +32,10 @@ object LargeSwitchStatement {
 
     fun createLargeSwitchStatement2(sa: StructuralAnalysis): Builder {
         val nodes0 = sa.nodes
+
         val firstNode = nodes0.first()
         val firstIsLinear = firstNode !is BranchNode && firstNode.inputs.isEmpty()
         val nodes = if (firstIsLinear) filterFirstIsLinear(nodes0) else nodes0
-
-        renumber(nodes)
-        if (firstIsLinear) firstNode.index = nodes.size
 
         if (sa.isLookingAtSpecial) {
             printState(nodes0, "Before GraphID")
@@ -51,8 +50,11 @@ object LargeSwitchStatement {
             println(graphId)
         }
 
-        val lblName = "lbl"
-        val lblSet = LocalSet(lblName)
+        renumber(nodes)
+        if (firstIsLinear) firstNode.index = nodes.size
+
+        val label = "lbl"
+        val lblSet = LocalSet(label)
 
         // create large switch-case-statement
         // https://musteresel.github.io/posts/2020/01/webassembly-text-br_table-example.html
@@ -86,14 +88,16 @@ object LargeSwitchStatement {
             }
         }
 
-        val loopIdx = sa.loopIndex++
-        val loopName = "b$loopIdx"
+        val loopName = "b${sa.methodTranslator.nextLoopIndex++}"
+        val loopInstr = LoopInstr(loopName, emptyList(), emptyList(), emptyList())
+        val jump = Jump(loopInstr)
 
         val printer = Builder()
         if (firstIsLinear) {
             if (comments) printer.comment("execute -1")
             finishBlock(firstNode)
             printer.append(firstNode.printer)
+            assertTrue(printer.lastOrNull()?.isReturning() != true)
         } else {
             printer
                 .append(i32Const(nodes.first().index))
@@ -109,7 +113,7 @@ object LargeSwitchStatement {
             if (comments) node.printer.prepend(Comment("execute ${node.index}"))
             finishBlock(node)
             // close block
-            node.printer.append(Jump(loopName))
+            node.printer.append(jump)
         }
 
         for (node in nodes) {
@@ -117,8 +121,9 @@ object LargeSwitchStatement {
         }
 
         // good like that???
-        val switch = SwitchCase(lblName, nodes.map { it.printer.instrs })
-        printer.append(LoopInstr(loopName, listOf(switch), emptyList()))
+        val switch = SwitchCase(label, nodes.map { it.printer.instrs }, emptyList(), emptyList())
+        loopInstr.body = listOf(switch)
+        printer.append(loopInstr)
 
         // close loop
         printer.append(Unreachable)

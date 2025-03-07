@@ -113,7 +113,8 @@ object ExtractEndNodes {
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
         val firstRunVariable = mt.addLocalVariable(firstRunLabel, i32, "I")
-        val jumpInstr = Jump(firstRunLabel)
+        val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
+        val jumpInstr = Jump(loopInstr)
 
         val extraInputs = HashMap<GraphingNode, List<LocalVar>>()
         fun getInputLabel(endNode: GraphingNode): LocalVar {
@@ -157,7 +158,7 @@ object ExtractEndNodes {
         assertEquals(1, endNodesList.size)
         val endNodeCode = endNodesList.first().printer
 
-        val body = listOf(
+        loopInstr.body = listOf(
             firstRunVariable.getter,
             IfBranch(firstNodeCode.instrs, endNodeCode.instrs, emptyList(), emptyList()),
             Unreachable // should be unreachable, too
@@ -165,7 +166,7 @@ object ExtractEndNodes {
 
         val dst = Builder(3)
         dst.append(i32Const1).append(firstRunVariable.setter)
-        dst.append(LoopInstr(firstRunLabel, body, emptyList()))
+        dst.append(loopInstr)
         return dst
     }
 

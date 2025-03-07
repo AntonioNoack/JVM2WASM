@@ -3,6 +3,8 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 
+import static jvm.JVM32.throwJs;
+
 public class SunMisc {
 
     @NoThrow
@@ -26,6 +28,12 @@ public class SunMisc {
         // could be fixed in the future;
         // is being used for security at the moment, so idc
         return SunMisc.class;
+    }
+
+    @NoThrow
+    @Alias(names = "sun_reflect_Reflection_quickCheckMemberAccess_Ljava_lang_ClassIZ")
+    public static boolean sun_reflect_Reflection_quickCheckMemberAccess_Ljava_lang_ClassIZ(Object clazz, int modifiers) {
+        return true;
     }
 
     @NoThrow
@@ -59,7 +67,8 @@ public class SunMisc {
 
     @Alias(names = "sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe")
     public static Object sun_misc_Unsafe_getUnsafe_Lsun_misc_Unsafe() {
-        throw new RuntimeException("Unsafe is not supported!");
+        throwJs("Unsafe is not supported!");
+        return null;
     }
 
 }

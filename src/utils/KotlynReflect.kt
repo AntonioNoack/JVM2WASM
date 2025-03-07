@@ -4,8 +4,13 @@ object KotlynReflect {
 
     private const val COMMON_PREFIX = "kotlin/"
     private val paths = listOf(
+        // todo add all newly discovered paths also to Rem'sEngine/Export-module
         "reflect/",
         "jvm/internal/Property",
+        "jvm/internal/CallableReference",
+        "jvm/internal/FunctionReference",
+        // "jvm/internal/FunctionReferenceImpl", // covered by line above
+        "jvm/internal/AdaptedFunctionReference",
         "jvm/internal/Reflection",
         "jvm/internal/MutableProperty",
         "jvm/JvmClassMappingKt",

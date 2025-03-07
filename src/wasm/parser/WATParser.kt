@@ -28,6 +28,8 @@ class WATParser {
     private val params = ArrayList<String>()
     private val results = ArrayList<String>()
 
+    val breakableByLabel = HashMap<String, BreakableInstruction>()
+
     fun parse(text: String) {
         val tokens = parseTokens(text)
         // parse it
@@ -290,6 +292,26 @@ class WATParser {
         }
     }
 
+    private fun readParams(list: TokenList, i0: Int, name: String = "param"): Pair<Int, List<String>> {
+        return if (list.getType(i0) == TokenType.OPEN_BRACKET &&
+            list.getType(i0 + 1) == TokenType.NAME &&
+            list.getString(i0 + 1) == name
+        ) {
+            var i = i0
+            val results = ArrayList<String>()
+            i += 2 // skip open-bracket and name
+            while (list.getType(i) == TokenType.NAME) {
+                results.add(list.getString(i++))
+            }
+            list.consume(TokenType.CLOSE_BRACKET, i++)
+            i to results
+        } else i0 to emptyList()
+    }
+
+    private fun readResults(list: TokenList, i0: Int): Pair<Int, List<String>> {
+        return readParams(list, i0, "result")
+    }
+
     private fun parseFunctionBlock(list: TokenList, i0: Int): FunctionBlock {
         val result = ArrayList<Instruction>()
         var i = i0
@@ -328,25 +350,10 @@ class WATParser {
                         }
                         "if" -> {
                             // (if (then ...) (else ...))
-                            val params = ArrayList<String>()
-                            val results = ArrayList<String>()
+                            val (k0, params) = readParams(list, i)
+                            val (k1, results) = readResults(list, k0)
+                            i = k1
                             list.consume(TokenType.OPEN_BRACKET, i++)
-                            if (list.getString(i) == "param") {
-                                i++
-                                while (list.getType(i) == TokenType.NAME) {
-                                    params.add(list.getString(i++))
-                                }
-                                list.consume(TokenType.CLOSE_BRACKET, i++)
-                                list.consume(TokenType.OPEN_BRACKET, i++)
-                            }
-                            if (list.getString(i) == "result") {
-                                i++
-                                while (list.getType(i) == TokenType.NAME) {
-                                    results.add(list.getString(i++))
-                                }
-                                list.consume(TokenType.CLOSE_BRACKET, i++)
-                                list.consume(TokenType.OPEN_BRACKET, i++)
-                            }
                             list.consume(TokenType.NAME, "then", i++)
                             val (j, ifTrue) = parseFunctionBlock(list, i)
                             i = j
@@ -362,55 +369,73 @@ class WATParser {
                         "loop" -> {
                             // (loop $b1886 (result)
                             val label = list.consume(TokenType.DOLLAR, i++)
-                            val results = ArrayList<String>()
-                            if (list.getType(i) == TokenType.OPEN_BRACKET &&
-                                list.getType(i + 1) == TokenType.NAME &&
-                                list.getString(i + 1) == "result"
-                            ) {
-                                i += 2 // skip open-bracket and "result"
-                                while (list.getType(i) == TokenType.NAME) {
-                                    results.add(list.getString(i++))
-                                }
-                                list.consume(TokenType.CLOSE_BRACKET, i++)
-                            }
+                            val (k0, params) = readParams(list, i)
+                            val (k1, results) = readResults(list, k0)
+                            i = k1
+                            val instr = LoopInstr(label, emptyList(), params, results)
+                            breakableByLabel[label] = instr
                             val (j, body) = parseFunctionBlock(list, i)
-                            result.add(LoopInstr(label, body, results))
+                            assertEquals(instr, breakableByLabel.remove(label))
+                            instr.body = body
+                            result.add(instr)
                             return FunctionBlock(j, result)
                         }
                         "br" -> {
                             val label = list.consume(TokenType.DOLLAR, i++)
-                            result.add(Jump(label))
+                            result.add(Jump(breakableByLabel[label]!!))
                         }
                         "br_if" -> {
                             val label = list.consume(TokenType.DOLLAR, i++)
-                            result.add(JumpIf(label))
+                            result.add(JumpIf(breakableByLabel[label]!!))
                         }
                         "block" -> {
                             // (block (block (block (block (block (block (block (block (block
                             //  (block local.get $lbl (br_table 0 1 2 3 4 5 6 7 8))
                             var depth = 0
-                            while (list.getType(i) == TokenType.OPEN_BRACKET) {
+                            while (list.getType(i) == TokenType.OPEN_BRACKET &&
+                                list.getType(i + 1) == TokenType.NAME &&
+                                list.getString(i + 1) == "block"
+                            ) {
                                 i++
                                 list.consume(TokenType.NAME, "block", i++)
                                 depth++
                             }
-                            list.consume(TokenType.NAME, "local.get", i++)
-                            val lblName = list.consume(TokenType.DOLLAR, i++)
-                            list.consume(TokenType.OPEN_BRACKET, i++)
-                            list.consume(TokenType.NAME, "br_table", i++)
-                            for (j in 0 until depth) {
-                                list.consume(TokenType.NUMBER, j.toString(), i++)
+
+                            if (depth == 0) {
+                                // just a labelled block
+                                val label = list.consume(TokenType.DOLLAR, i++)
+                                val (k0, params) = readParams(list, i)
+                                val (k1, results) = readResults(list, k0)
+                                val block = BlockInstr(label, emptyList(), params, results)
+                                breakableByLabel[label] = block
+                                val (k2, instructions) = parseFunctionBlock(list, k1)
+                                assertEquals(block, breakableByLabel.remove(label))
+                                block.body = instructions
+                                result.add(block)
+                                return FunctionBlock(k2, result)
+                            } else {
+                                // switch-case block
+                                list.consume(TokenType.NAME, "local.get", i++)
+                                val label = list.consume(TokenType.DOLLAR, i++)
+                                list.consume(TokenType.OPEN_BRACKET, i++)
+                                list.consume(TokenType.NAME, "br_table", i++)
+                                for (j in 0 until depth) {
+                                    list.consume(TokenType.NUMBER, j.toString(), i++)
+                                }
+                                list.consume(TokenType.CLOSE_BRACKET, i++)
+                                list.consume(TokenType.CLOSE_BRACKET, i++)
+                                val cases = ArrayList<List<Instruction>>()
+                                val instr = SwitchCase(label, cases, emptyList(), emptyList())
+                                breakableByLabel[label] = instr
+                                for (j in 0 until depth) {
+                                    val (k, instructions) = parseFunctionBlock(list, i)
+                                    cases.add(instructions)
+                                    i = k
+                                }
+                                assertEquals(instr, breakableByLabel.remove(label))
+                                result.add(instr)
+                                return FunctionBlock(i, result)
                             }
-                            list.consume(TokenType.CLOSE_BRACKET, i++)
-                            list.consume(TokenType.CLOSE_BRACKET, i++)
-                            val cases = ArrayList<List<Instruction>>()
-                            for (j in 0 until depth) {
-                                val (k, instructions) = parseFunctionBlock(list, i)
-                                cases.add(instructions)
-                                i = k
-                            }
-                            result.add(SwitchCase(lblName, cases))
-                            return FunctionBlock(i, result)
                         }
                         else -> {
                             val simple = simpleInstructions[instrName]

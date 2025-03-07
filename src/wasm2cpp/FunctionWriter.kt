@@ -448,6 +448,12 @@ class FunctionWriter(
                     .append(tmpType).append(">(indirect[").append(pop("i32")).append("])").end()
                 writeCall(tmpVar, type.params, type.results)
             }
+            is BlockInstr -> {
+                // write body
+                writeInstructions(i.body)
+                // write label at end as jump target
+                begin().append(i.label).append(":\n")
+            }
             is LoopInstr -> {
                 val firstInstr = i.body.firstOrNull()
                 if (i.body.size == 1 && firstInstr is SwitchCase &&
@@ -488,9 +494,11 @@ class FunctionWriter(
                 }
             }
             is Jump -> {
+                // C++ doesn't have proper continue@label/break@label, so use goto
                 begin().append("goto ").append(i.label).end()
             }
             is JumpIf -> {
+                // C++ doesn't have proper continue@label/break@label, so use goto
                 val condition = pop("i32")
                 begin().append("if (").append(condition).append(" != 0) { goto ").append(i.label).append("; }\n")
             }
@@ -499,7 +507,7 @@ class FunctionWriter(
             is Comment -> {
                 begin().append("// ").append(i.name).append('\n')
             }
-            else -> assertFail(i.toString())
+            else -> assertFail("Unknown instruction type ${i.javaClass}")
         }
     }
 
@@ -514,7 +522,7 @@ class FunctionWriter(
     private fun writeSwitchCase(switchCase: SwitchCase) {
         // big monster, only 1 per function allowed, afaik
         val cases = switchCase.cases
-        val lblName = switchCase.lblName
+        val lblName = switchCase.label
         assertTrue(stack.isEmpty()) { "Expected empty stack, got $stack" }
         depth++
 

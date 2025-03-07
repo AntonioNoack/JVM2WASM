@@ -196,6 +196,7 @@ class MethodTranslator(
     var endNodeExtractorIndex = 0
     var bigLoopExtractorIndex = 0
     var endNodeIndex = 0
+    var nextLoopIndex = 0
 
     private val enableStackPush = enableTracing &&
             (canThrowError || crashOnAllExceptions) &&

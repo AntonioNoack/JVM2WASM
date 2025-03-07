@@ -148,7 +148,7 @@ object ExtractBigLoop {
 
         val mt = sa.methodTranslator
         val loopLabel = "bigLoop${mt.bigLoopExtractorIndex++}"
-        val jumpInstr = Jump(loopLabel)
+        // val jumpInstr = Jump(loopLabel)
 
         if (validate) validateStack(sa.nodes, sa.methodTranslator)
 

@@ -12,6 +12,7 @@ import translator.MethodTranslator
 import utils.Builder
 import utils.i32
 import wasm.instr.Const
+import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32Or
@@ -119,8 +120,8 @@ object SolveLinearTree {
             return false
         }
 
-        val print = false
-        if (print) println("SolveLinearTree[${mt.sig}]")
+        val print = mt.clazz == "jvm/JVM32" && mt.name == "getInstanceSize"
+        if (print) println("SolveLinearTree[${mt.sig}, $firstNodeIsEntry, $extraInputs]")
 
         if (firstNodeIsEntry) {
             assertSame(nodes.first(), firstNode)
@@ -204,10 +205,12 @@ object SolveLinearTree {
             val nodeInputs = node.inputs.toList()
             val printer = if (hasRootInput) {
                 depth[node.index] = 0
+                // println("appending ${node.index} onto root")
                 resultPrinter
             } else {
                 assertTrue(nodeInputs.isNotEmpty())
                 val common = findCommonNode(nodeInputs)
+                // println("appending ${node.index} onto ${common?.index ?: "root!"}")
                 if (common != null) {
                     depth[node.index] = depth[common.index] + 1 // we're one deeper
                     common.printer
@@ -239,11 +242,8 @@ object SolveLinearTree {
                 addCondition(extraInputs1[j])
             }
 
-            if (hadCondition) {
-                printer.append(IfBranch(node.printer.instrs))
-            } else {
-                printer.append(node.printer)
-            }
+            if (!hadCondition) printer.append(i32Const1)
+            printer.append(IfBranch(node.printer.instrs))
 
             if (validate) StackValidator.validateStack2( // O(n²)
                 mt.sig, printer, emptyList(), emptyList(), retTypes,

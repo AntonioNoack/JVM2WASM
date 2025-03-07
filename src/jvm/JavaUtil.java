@@ -127,7 +127,12 @@ public class JavaUtil {
         } else return obj;
     }
 
-    @Alias(names = "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringALjava_lang_ObjectLjava_lang_String")
+    @Alias(names = "java_lang_String_format_Ljava_lang_StringAWLjava_lang_String")
+    public static String String_format(String format, Object[] args) {
+        return String_format(null, format, args);
+    }
+
+    @Alias(names = "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringAWLjava_lang_String")
     public static String String_format(Locale locale, String format, Object[] args) {
         int idx = 0;
         StringBuilder result = new StringBuilder(format.length());
@@ -177,20 +182,20 @@ public class JavaUtil {
         return result.toString();
     }
 
-    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV")
-    public static <V> void Arrays_sort_ALjava_lang_ObjectIILjava_util_ComparatorV(V[] o, int start, int end, Comparator<V> c) {
+    @Alias(names = "java_util_Arrays_sort_AWIILjava_util_ComparatorV")
+    public static <V> void Arrays_sort_AWIILjava_util_ComparatorV(V[] o, int start, int end, Comparator<V> c) {
         InPlaceStableSort.sort(start, end, o, c);
     }
 
-    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectLjava_util_ComparatorV")
-    public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o, Comparator<V> c) {
+    @Alias(names = "java_util_Arrays_sort_AWLjava_util_ComparatorV")
+    public static <V> void Arrays_sort_AWLjava_util_ComparatorV(V[] o, Comparator<V> c) {
         InPlaceStableSort.sort(0, o.length, o, c);
     }
 
     private static Comparator<Object> comparator;
 
-    @Alias(names = "java_util_Arrays_sort_ALjava_lang_ObjectV")
-    public static <V> void Arrays_sort_ALjava_lang_ObjectV(V[] o) {
+    @Alias(names = "java_util_Arrays_sort_AWV")
+    public static <V> void Arrays_sort_AWV(V[] o) {
         if (comparator == null) //noinspection unchecked
             comparator = (a, b) -> ((Comparable<Object>) a).compareTo(b);
         InPlaceStableSort.sort(0, o.length, o, comparator);
@@ -291,7 +296,7 @@ public class JavaUtil {
         fill64(ptr + (start << 3), ptr + (end << 3), value);
     }
 
-    @Alias(names = "java_util_Arrays_fill_ALjava_lang_ObjectIILjava_lang_ObjectV")
+    @Alias(names = "java_util_Arrays_fill_AWIILjava_lang_ObjectV")
     public static void Arrays_fill(Object[] data, int start, int end, Object value) {
         rangeCheck(data.length, start, end);
         int ptr = getAddr(data) + arrayOverhead;
@@ -333,7 +338,7 @@ public class JavaUtil {
         return self.get(self.size() - 1);
     }
 
-    @Alias(names = "java_util_ArrayList_copyInto_ALjava_lang_ObjectV")
+    @Alias(names = "java_util_ArrayList_copyInto_AWV")
     public static <V> void Stack_copyInto(ArrayList<V> self, Object[] dst) throws NoSuchFieldException, IllegalAccessException {
         Object[] src = (Object[]) ArrayList.class.getDeclaredField("elementData").get(self);
         System.arraycopy(src, 0, dst, 0, self.size());

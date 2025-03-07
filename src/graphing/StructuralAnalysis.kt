@@ -132,8 +132,6 @@ class StructuralAnalysis(
 
     }
 
-    var loopIndex = 0
-
     val sig get() = methodTranslator.sig
 
     private fun checkState(node: GraphingNode, nextNode: GraphingNode, nodeSet: Set<GraphingNode>) {
@@ -337,10 +335,10 @@ class StructuralAnalysis(
     }
 
     private fun makeNodeLoop(name: String, node: GraphingNode, i: Int) {
-        val label = "$name${loopIndex++}"
-        node.printer.append(Jump(label))
+        val label = "$name${methodTranslator.nextLoopIndex++}"
+        val loopInstr = LoopInstr(label, node.printer.instrs, emptyList(), emptyList() /* cannot return anything */)
+        node.printer.append(Jump(loopInstr))
         val newPrinter = Builder()
-        val loopInstr = LoopInstr(label, node.printer.instrs, results = emptyList() /* cannot return anything */)
         newPrinter.append(loopInstr).append(Unreachable)
         node.inputs.remove(node) // it no longer links to itself
         replaceNode(node, ReturnNode(newPrinter), i)
@@ -395,7 +393,7 @@ class StructuralAnalysis(
                 val prev = curr.inputs.first()
                 if (prev !is SequenceNode) continue // cannot merge
                 if (prev === curr) continue // cannot merge either
-                if (prev == firstNode) continue // should not remove that node
+                if (prev == firstNode) continue // should not remove that node;
                 // replace inputs with inputs of previous node
                 curr.inputs.clear()
                 curr.inputs.addAll(prev.inputs)
@@ -518,10 +516,10 @@ class StructuralAnalysis(
             printState(nodes, "Pre-WhileLoop${node.index}")
         }
 
-        val label = "while${if (negate) "A" else "B"}${loopIndex++}"
+        val label = "while${if (negate) "A" else "B"}${methodTranslator.nextLoopIndex++}"
         if (negate) node.printer.append(I32EQZ)
-        node.printer.append(JumpIf(label))
-        val loopInstr = LoopInstr(label, node.printer.instrs, node.outputStack)
+        val loopInstr = LoopInstr(label, node)
+        node.printer.append(JumpIf(loopInstr))
         val newNode = replaceNode(node, SequenceNode(Builder(loopInstr), nextNode), i)
         assertTrue(newNode.inputs.remove(newNode)) // no longer recursive
         if (printOps) printState(nodes, label)
@@ -774,8 +772,9 @@ class StructuralAnalysis(
 
             changed = true
 
-            val label = "smallCircleA${loopIndex++}"
-            nodeB.printer.append(Jump(label))
+            val label = "smallCircleA${methodTranslator.nextLoopIndex++}"
+            val jump = Jump(BreakableInstruction.tmp)
+            nodeB.printer.append(jump)
             if (negate) nodeA.printer.append(I32EQZ)
             nodeA.printer.append(
                 IfBranch(
@@ -785,7 +784,8 @@ class StructuralAnalysis(
                 )
             )
 
-            val loopInstr = LoopInstr(label, nodeA.printer.instrs, nodeA.outputStack)
+            val loopInstr = LoopInstr(label, nodeA)
+            jump.owner = loopInstr
             nodeA.inputs.remove(nodeB)
             val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
             nodes.remove(nodeB)
@@ -841,11 +841,12 @@ class StructuralAnalysis(
                 negate = true
             } else continue
 
-            val label = "smallCircleB${loopIndex++}"
+            val label = "smallCircleB${methodTranslator.nextLoopIndex++}"
             if (negateInner(nodeB, nodeC)) {
                 nodeB.printer.append(I32EQZ)
             }
-            nodeB.printer.append(JumpIf(label))
+            val jump = JumpIf(BreakableInstruction.tmp)
+            nodeB.printer.append(jump)
             if (negate) nodeA.printer.append(I32EQZ)
             nodeA.printer.append(
                 IfBranch(
@@ -855,7 +856,8 @@ class StructuralAnalysis(
                 )
             )
 
-            val loopInstr = LoopInstr(label, nodeA.printer.instrs, nodeA.outputStack)
+            val loopInstr = LoopInstr(label, nodeA)
+            jump.owner = loopInstr
             nodeA.inputs.remove(nodeB)
             nodeC.inputs.remove(nodeB)
             val newNodeA = replaceNode(nodeA, SequenceNode(Builder(loopInstr), nodeC), i)
@@ -928,14 +930,10 @@ class StructuralAnalysis(
     fun joinNodes(): Builder {
 
         isLookingAtSpecial = false
+        printOps = isLookingAtSpecial
 
-        if (isLookingAtSpecial) {
-            printOps = true
-        }
-
-        // printOps = true
         if (printOps) {
-            println("\n${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
+            println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
         }
 
         assertFalse(nodes.isEmpty())
@@ -964,6 +962,7 @@ class StructuralAnalysis(
         checkState()
 
         if (canReturnFirstNode()) {
+            if (isLookingAtSpecial) throw IllegalStateException("Looking at $sig")
             return firstNodeForReturn()
         }
 
@@ -994,6 +993,10 @@ class StructuralAnalysis(
                         if (printOps) println("Change by [$step]")
                         checkState()
                         if (canReturnFirstNode()) {
+                            if (isLookingAtSpecial) {
+                                printState(nodes, "solved normally")
+                                throw IllegalStateException("Looking at $sig")
+                            }
                             return firstNodeForReturn()
                         }
                         hadAnyChange = true
@@ -1005,6 +1008,10 @@ class StructuralAnalysis(
                 checkState()
                 if (trySolveLinearTree(nodes, methodTranslator, true, emptyMap())) {
                     assertTrue(canReturnFirstNode())
+                    if (isLookingAtSpecial) {
+                        printState(nodes, "solved linear")
+                        throw IllegalStateException("Looking at $sig")
+                    }
                     return firstNodeForReturn()
                 }
             }
@@ -1020,6 +1027,10 @@ class StructuralAnalysis(
                 checkState()
                 if (tryExtractEnd(this)) {
                     assertTrue(canReturnFirstNode())
+                    if (isLookingAtSpecial) {
+                        printState(nodes, "solved extract end")
+                        throw IllegalStateException("Looking at $sig")
+                    }
                     return firstNodeForReturn()
                 }
             }
@@ -1041,7 +1052,10 @@ class StructuralAnalysis(
                 if (printOps) printState(nodes, "Before large switch statement:")
                 methodTranslator.addLocalVariable("lbl", i32, "I")
                 val switchStatement = createLargeSwitchStatement2(this)
-                assertFalse(isLookingAtSpecial, "Looking at $sig")
+                if (isLookingAtSpecial) {
+                    printState(nodes, "solved large switch statement")
+                    throw IllegalStateException("Looking at $sig")
+                }
                 return switchStatement
             }
         }
@@ -1055,8 +1069,6 @@ class StructuralAnalysis(
         // - implement sub-functions that jump to each other
         // - implement a large switch-case statement, that loads the stack, stores the stack, and sets the target label for each remaining round 😅
 
-        // if we're here, it's really complicated,
-        // and there isn't any easy ends
     }
 }
 

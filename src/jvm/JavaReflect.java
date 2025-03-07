@@ -30,7 +30,7 @@ public class JavaReflect {
     @NoThrow
     @Nullable
     @SuppressWarnings("rawtypes")
-    @Alias(names = "java_lang_Class_getFields_ALjava_lang_reflect_Field")
+    @Alias(names = "java_lang_Class_getFields_AW")
     public static Field[] getFields(Class clazz) {
         return ptrTo(read32(getAddr(clazz) + objectOverhead + 4));
     }
@@ -68,18 +68,18 @@ public class JavaReflect {
         return Class_getField(clazz, name);
     }
 
-    @Alias(names = "java_lang_Class_getDeclaredMethods_ALjava_lang_reflect_Method")
+    @Alias(names = "java_lang_Class_getDeclaredMethods_AW")
     public static <V> Method[] Class_getDeclaredMethods(Class<V> clazz) {
         // should be fine, right?
         return Class_getMethods(clazz);
     }
 
-    @Alias(names = "java_lang_Class_getMethods_ALjava_lang_reflect_Method")
+    @Alias(names = "java_lang_Class_getMethods_AW")
     public static <V> Method[] Class_getMethods(Class<V> clazz) {
         return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
     }
 
-    @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
+    @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringAWLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) {
         if (name == null) return null;
         Method[] methods = Class_getMethods(self);
@@ -92,8 +92,8 @@ public class JavaReflect {
         // throw noSuchMethodEx;
     }
 
-    @Alias(names = "java_lang_Class_getDeclaredMethod_Ljava_lang_StringALjava_lang_ClassLjava_lang_reflect_Method")
-    public static <V> Method Class_getDeclaredMethod(Class<V> self, String name, Class<?>[] parameters) throws NoSuchMethodException {
+    @Alias(names = "java_lang_Class_getDeclaredMethod_Ljava_lang_StringAWLjava_lang_reflect_Method")
+    public static <V> Method Class_getDeclaredMethod(Class<V> self, String name, Class<?>[] parameters) {
         return Class_getMethod(self, name, parameters);
     }
 
@@ -517,8 +517,8 @@ public class JavaReflect {
 
     private static final Object[] empty = new Object[0];
 
-    @Alias(names = "java_lang_Class_getDeclaredFields_ALjava_lang_reflect_Field")
-    public static <V> Object[] java_lang_Class_getDeclaredFields_ALjava_lang_reflect_Field(Class<V> clazz) {
+    @Alias(names = "java_lang_Class_getDeclaredFields_AW")
+    public static <V> Object[] java_lang_Class_getDeclaredFields_AW(Class<V> clazz) {
         // should be ok, I think...
         // just nobody must modify our fields
         // todo should not return fields of super class
@@ -528,16 +528,15 @@ public class JavaReflect {
         return ptrTo(fields);
     }
 
-    @Alias(names = "java_lang_reflect_Field_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
-    public static <V> Object[] Field_getDeclaredAnnotations(Field field) {
+    @Alias(names = "java_lang_reflect_Field_getDeclaredAnnotations_AW")
+    public static Object[] Field_getDeclaredAnnotations(Field field) {
         // todo implement annotation instances
         if (field == null) throw new NullPointerException("getDeclaredAnnotations");
         return empty;
     }
 
-    @Alias(names = "java_lang_reflect_AccessibleObject_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
-    public static <V> Object[] AccessibleObject_getDeclaredAnnotations(AccessibleObject object) {
-        if (object == null) throw new NullPointerException("getDeclaredAnnotations2");
+    @Alias(names = "java_lang_reflect_AccessibleObject_getDeclaredAnnotations_AW")
+    public static Object[] AccessibleObject_getDeclaredAnnotations(AccessibleObject object) {
         return empty;
     }
 
@@ -601,8 +600,8 @@ public class JavaReflect {
         return clazz.getName();
     }
 
-    @Alias(names = "java_lang_Class_getAnnotations_ALjava_lang_annotation_Annotation")
-    public static <V> Annotation[] java_lang_Class_getAnnotations_ALjava_lang_annotation_Annotation(Class<V> clazz) {
+    @Alias(names = "java_lang_Class_getAnnotations_AW")
+    public static <V> Annotation[] java_lang_Class_getAnnotations_AW(Class<V> clazz) {
         // todo implement this properly
         return new Annotation[0];
     }
@@ -618,8 +617,8 @@ public class JavaReflect {
         return false;
     }
 
-    @Alias(names = "java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type")
-    public static Object[] java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type() {
+    @Alias(names = "java_lang_Class_getGenericInterfaces_AW")
+    public static Object[] java_lang_Class_getGenericInterfaces_AW() {
         return empty; // not yet implemented / supported
     }
 
@@ -642,32 +641,32 @@ public class JavaReflect {
         throw new RuntimeException("Cannot ask for reflection data, won't work");
     }
 
-    @Alias(names = "java_lang_Class_privateGetPublicMethods_ALjava_lang_reflect_Method")
-    public static <V> Method[] Class_privateGetPublicMethods_ALjava_lang_reflect_Method(Class<V> self) {
+    @Alias(names = "java_lang_Class_privateGetPublicMethods_AW")
+    public static <V> Method[] Class_privateGetPublicMethods_AW(Class<V> self) {
         return Class_getDeclaredMethods(self);
     }
 
-    @Alias(names = "java_lang_Class_getConstructors_ALjava_lang_reflect_Constructor")
-    public static <V> Object[] Class_getConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
+    @Alias(names = "java_lang_Class_getConstructors_AW")
+    public static <V> Object[] Class_getConstructors_AW(Class<V> self)
             throws NoSuchFieldException, IllegalAccessException {
         if (getDynamicTableSize(getClassIndex(self)) == 0) return empty; // not constructable class
         return new Object[]{getConstructorWithoutArgs(self)}; // to do better implementation?
     }
 
-    @Alias(names = "java_lang_Class_getDeclaredConstructors_ALjava_lang_reflect_Constructor")
-    public static <V> Object[] Class_getDeclaredConstructors_ALjava_lang_reflect_Constructor(Class<V> self)
+    @Alias(names = "java_lang_Class_getDeclaredConstructors_AW")
+    public static <V> Object[] Class_getDeclaredConstructors_AW(Class<V> self)
             throws NoSuchFieldException, IllegalAccessException {
-        return Class_getConstructors_ALjava_lang_reflect_Constructor(self);
+        return Class_getConstructors_AW(self);
     }
 
-    @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method")
-    public static <V> Method[] java_lang_Class_privateGetDeclaredMethods_ZALjava_lang_reflect_Method(Class<V> self, boolean sth) {
+    @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZAW")
+    public static <V> Method[] java_lang_Class_privateGetDeclaredMethods_ZAW(Class<V> self, boolean sth) {
         return Class_getDeclaredMethods(self);
     }
 
     private static Constructor<Object>[] constructors;
 
-    @Alias(names = "java_lang_Class_getConstructor_ALjava_lang_ClassLjava_lang_reflect_Constructor")
+    @Alias(names = "java_lang_Class_getConstructor_AWLjava_lang_reflect_Constructor")
     public static <V> Constructor<V> getConstructor(Class<V> self, Object[] args)
             throws NoSuchFieldException, IllegalAccessException {
         if (args == null) {
@@ -712,32 +711,27 @@ public class JavaReflect {
         return self.getClass().getName();
     }
 
-    @Alias(names = "java_lang_reflect_Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation")
-    public static Object[] Constructor_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
+    @Alias(names = "java_lang_reflect_Constructor_getDeclaredAnnotations_AW")
+    public static Object[] Constructor_getDeclaredAnnotations_AW(Object self) {
         return empty;
     }
 
     @UsedIfIndexed
     @Alias(names = "java_lang_reflect_Executable_getDeclaredAnnotations_AW")
-    public static Object[] Executable_getDeclaredAnnotations_ALjava_lang_annotation_Annotation(Object self) {
+    public static Object[] Executable_getDeclaredAnnotations_AW(Object self) {
         return empty;
     }
 
-    @UsedIfIndexed
-    @Alias(names = "java_lang_reflect_Executable_getParameters_AW")
-    public static Object[] java_lang_reflect_Executable_getParameters_AW(Object self) {
-        return empty;
-    }
-
-    @Alias(names = "java_lang_reflect_Constructor_newInstance_ALjava_lang_ObjectLjava_lang_Object")
-    public static <V> V java_lang_reflect_Constructor_newInstance_ALjava_lang_ObjectLjava_lang_Object(Constructor<V> self, Object[] args) throws InstantiationException, IllegalAccessException {
+    @Alias(names = "java_lang_reflect_Constructor_newInstance_AWLjava_lang_Object")
+    public static <V> V Constructor_newInstance_AWLjava_lang_Object(Constructor<V> self, Object[] args)
+            throws InstantiationException, IllegalAccessException {
         if (args != null && args.length != 0)
             throw new IllegalArgumentException("Constructors with arguments aren't yet supported in WASM");
         return self.getDeclaringClass().newInstance();
     }
 
-    @Alias(names = "java_lang_Class_getInterfaces_ALjava_lang_Class")
-    public static Object[] java_lang_Class_getInterfaces_ALjava_lang_Class(Object self) {
+    @Alias(names = "java_lang_Class_getInterfaces_AW")
+    public static Object[] java_lang_Class_getInterfaces_AW(Object self) {
         return empty;// to do -> not really used anyway
     }
 
@@ -770,7 +764,7 @@ public class JavaReflect {
     public static void java_lang_ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV(Object clazz, String file, boolean sth) {
     }
 
-    @Alias(names = "java_lang_reflect_Executable_getParameters_ALjava_lang_reflect_Parameter")
+    @Alias(names = "java_lang_reflect_Executable_getParameters_AW")
     public static Object[] Executable_getParameters(Object self) {
         return empty;// todo implement for panel-constructors...
     }
@@ -780,9 +774,9 @@ public class JavaReflect {
         return null;
     }
 
-    @Alias(names = "java_lang_reflect_Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation")
-    public static Object Executable_sharedGetParameterAnnotations_ALjava_lang_ClassABAALjava_lang_annotation_Annotation(Object[] classes, Object bytes) {
-        return null;
+    @Alias(names = "java_lang_reflect_Executable_sharedGetParameterAnnotations_AWABAAWn")
+    public static Object[] Executable_sharedGetParameterAnnotations_AWABAAW(Object[] classes, Object bytes) {
+        return empty;
     }
 
     @Alias(names = "java_lang_reflect_Executable_isSynthetic_Z")
@@ -796,8 +790,8 @@ public class JavaReflect {
         return false; // not really needed at runtime, only for the compiler, is it?
     }
 
-    @Alias(names = "java_lang_reflect_Executable_getGenericParameterTypes_ALjava_lang_reflect_Type")
-    public static Object[] Executable_getGenericParameterTypes_ALjava_lang_reflect_Type(Object self) {
+    @Alias(names = "java_lang_reflect_Executable_getGenericParameterTypes_AW")
+    public static Object[] Executable_getGenericParameterTypes_AW(Object self) {
         // shall return generics... I don't think we need that at runtime
         return empty;
     }

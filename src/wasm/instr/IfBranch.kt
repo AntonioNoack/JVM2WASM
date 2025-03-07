@@ -1,6 +1,8 @@
 package wasm.instr
 
 import utils.StringBuilder2
+import wasm.instr.Instruction.Companion.appendParams
+import wasm.instr.Instruction.Companion.appendResults
 
 data class IfBranch(
     var ifTrue: List<Instruction>, var ifFalse: List<Instruction>,
@@ -18,16 +20,8 @@ data class IfBranch(
     override fun toString(depth: Int, builder: StringBuilder2) {
         for (i in 0 until depth) builder.append("  ")
         builder.append("(if")
-        if (params.isNotEmpty()) {
-            builder.append(" (param")
-            for (param in params) builder.append(" ").append(param)
-            builder.append(")")
-        }
-        if (results.isNotEmpty()) {
-            builder.append(" (result")
-            for (result in results) builder.append(" ").append(result)
-            builder.append(")")
-        }
+        appendParams(params, builder)
+        appendResults(results, builder)
         builder.append(" (then\n")
         for (instr in ifTrue) {
             instr.toString(depth + 1, builder)
@@ -51,5 +45,19 @@ data class IfBranch(
         val trueReturns = ifTrue.lastOrNull { it !is Comment }?.isReturning() ?: false
         val falseReturns = ifFalse.lastOrNull { it !is Comment }?.isReturning() ?: false
         return trueReturns && falseReturns
+    }
+
+    override fun equals(other: Any?): Boolean {
+        return other === this ||
+                other is IfBranch &&
+                other.params == params &&
+                other.results == results &&
+                other.ifTrue == ifTrue &&
+                other.ifFalse == ifFalse
+    }
+
+    override fun hashCode(): Int {
+        // todo what can we use here???
+        return 0 // idk, this is bad :/
     }
 }

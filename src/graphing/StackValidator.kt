@@ -134,14 +134,10 @@ object StackValidator {
                 is GlobalSet -> stack.pop(i32)
                 Return -> {
                     assertTrue(stack.endsWith(returnResults), "Stack incorrect, $returnResults vs $stack")
-                    // println()
-                    // done :)
-                    return
+                    return // done :)
                 }
                 Unreachable -> {
-                    // println()
-                    // done :)
-                    return
+                    return // done :)
                 }
                 is IfBranch -> {
                     stack.pop(i32)
@@ -201,6 +197,15 @@ object StackValidator {
                     }
                     stack.addAll(i.type.results)
                 }
+                is BlockInstr -> {
+                    // to do confirm Jump[If](BlockInstr) has correct stack
+                    assertTrue(stack.endsWith(params))
+                    validateStack3(
+                        sig, i.body, stack, i.results, returnResults,
+                        localVarTypes, paramsTypes
+                    )
+                    if (i.isReturning()) return // done
+                }
                 is LoopInstr -> {
                     validateStack3(
                         sig, i.body, stack, i.results, returnResults,
@@ -208,8 +213,14 @@ object StackValidator {
                     )
                     if (i.isReturning()) return // done
                 }
-                is Jump -> return
-                is JumpIf -> stack.pop(i32)
+                is Jump -> {
+                    // todo check results match stack
+                    return
+                }
+                is JumpIf -> {
+                    stack.pop(i32)
+                    // todo check results match stack
+                }
                 I32Load8U, I32Load8S, I32Load16U, I32Load16S, I32Load -> stack.pop(ptrType).push(i32)
                 I64Load -> stack.pop(ptrType).push(i64)
                 F32Load -> stack.pop(ptrType).push(f32)

@@ -2,6 +2,8 @@ package wasm.parser
 
 import utils.StringBuilder2
 import wasm.instr.Instruction
+import wasm.instr.Instruction.Companion.appendParams
+import wasm.instr.Instruction.Companion.appendResults
 
 open class FunctionImpl(
     val funcName: String, val params: List<String>, val results: List<String>,
@@ -15,20 +17,8 @@ open class FunctionImpl(
         if (isExported) {
             builder.append(" (export \"").append(funcName).append("\")")
         }
-        if (params.isNotEmpty()) {
-            builder.append(" (param")
-            for (param in params) {
-                builder.append(' ').append(param)
-            }
-            builder.append(")")
-        }
-        if (results.isNotEmpty()) {
-            builder.append(" (result")
-            for (result in results) {
-                builder.append(' ').append(result)
-            }
-            builder.append(")")
-        }
+        appendParams(params, builder)
+        appendResults(results, builder)
         builder.append("\n")
         for (local in locals) {
             builder.append("  (local \$").append(local.name).append(' ').append(local.type).append(")\n")

@@ -175,7 +175,7 @@ public class JavaThrowable {
 
     }
 
-    @Alias(names = "java_lang_Thread_getStackTrace_ALjava_lang_StackTraceElement")
+    @Alias(names = "java_lang_Thread_getStackTrace_AW")
     public static StackTraceElement[] Thread_getStackTrace(Thread thread) {
 
         int sp = getStackPtr();

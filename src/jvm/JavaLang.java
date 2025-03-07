@@ -480,10 +480,11 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Object_clone_Ljava_lang_Object")
-    public static Object java_lang_Object_clone_Ljava_lang_Object(Object obj)
+    public static Object java_lang_Object_clone_Ljava_lang_Object(Object self)
             throws CloneNotSupportedException, InstantiationException, IllegalAccessException {
-        if (obj instanceof Cloneable) {
-            return obj.getClass().newInstance();
+        if (self instanceof Cloneable) {
+            // todo copy all properties...
+            return self.getClass().newInstance();
         } else throw new CloneNotSupportedException();
     }
 
@@ -620,13 +621,13 @@ public class JavaLang {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
-    @Alias(names = "java_lang_Runtime_exec_ALjava_lang_StringLjava_lang_Process")
-    public static Process java_lang_Runtime_exec_ALjava_lang_StringLjava_lang_Process(Runtime rt, String[] args) {
+    @Alias(names = "java_lang_Runtime_exec_AWLjava_lang_Process")
+    public static Process java_lang_Runtime_exec_AWLjava_lang_Process(Runtime rt, String[] args) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
-    @Alias(names = "java_lang_Runtime_exec_ALjava_lang_StringALjava_lang_StringLjava_io_FileLjava_lang_Process")
-    public static Process java_lang_Runtime_exec_ALjava_lang_StringALjava_lang_StringLjava_io_FileLjava_lang_Process(Runtime rt, String[] args, String[] args2, File file) {
+    @Alias(names = "java_lang_Runtime_exec_AWAWLjava_io_FileLjava_lang_Process")
+    public static Process java_lang_Runtime_exec_AWAWLjava_io_FileLjava_lang_Process(Runtime rt, String[] args, String[] args2, File file) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
@@ -762,6 +763,10 @@ public class JavaLang {
     @Alias(names = "me_anno_maths_Maths_random_D")
     public static double me_anno_maths_Maths_random_D() {
         return PlatformThreadLocalRandom_getImplRandom(null).nextDouble();
+    }
+
+    public static String Object_toString(Object self) {
+        return self.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(self));
     }
 
 }

@@ -3,25 +3,16 @@ package utils
 import canThrowError
 import hIndex
 import useWASMExceptions
+import wasm.instr.Instruction.Companion.appendParams
+import wasm.instr.Instruction.Companion.appendResults
 import wasm.parser.Import
 
 fun StringBuilder2.import1(funcName: String, params: List<String>, results: List<String>) {
     imports.add(Import(funcName, params, results))
     append("(import \"jvm\" \"").append(funcName).append("\" (func $").append(funcName)
-    if (params.isNotEmpty()) {
-        append(" (param")
-        for (input in params) {
-            append(' ')
-            append(input)
-        }
-        append(')')
-    }
-    append(" (result")
-    for (output in results) {
-        append(' ')
-        append(output)
-    }
-    append(")))\n")
+    appendParams(params, this)
+    appendResults(results, this)
+    append("))\n")
 }
 
 fun StringBuilder2.import2(sig: MethodSig) {

@@ -122,6 +122,7 @@ public class UTF8String implements CharSequence, Comparable<String> {
         return String_format(null, format, args);
     }
 
+    @NotNull
     @Override
     public String toString() {
         return ptrTo(getAddr(this));

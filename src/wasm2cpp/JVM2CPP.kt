@@ -81,26 +81,29 @@ fun testWATParser(func0: FunctionImpl) {
 }
 
 fun testFunction(): FunctionImpl {
-    val lblName = "lbl"
+    val label = "lbl"
     val loopName = "loop"
+    val loopInstr = LoopInstr(
+        loopName, emptyList(),
+        emptyList(), emptyList()
+    )
+    loopInstr.body = listOf(
+        SwitchCase(
+            label,
+            listOf(
+                listOf(i32Const1, LocalSet(label), Jump(loopInstr)),
+                listOf(i32Const2, LocalSet(label), Jump(loopInstr)),
+                emptyList()
+            ), emptyList(), emptyList()
+        ),
+        Call("AfterSwitch")
+    )
     return FunctionImpl(
         "testFunc", listOf(i32, i32), listOf(i32),
-        listOf(LocalVariable(lblName, i32)),
+        listOf(LocalVariable(label, i32)),
         listOf(
-            i32Const0, LocalSet(lblName),
-            LoopInstr(
-                loopName, listOf(
-                    SwitchCase(
-                        lblName,
-                        listOf(
-                            listOf(i32Const1, LocalSet(lblName), Jump(loopName)),
-                            listOf(i32Const2, LocalSet(lblName), Jump(loopName)),
-                            emptyList()
-                        )
-                    ),
-                    Call("AfterSwitch")
-                ), results = emptyList()
-            ),
+            i32Const0, LocalSet(label),
+            loopInstr,
             Call("AfterLoop"),
             i32ConstM1, // return value
         ),

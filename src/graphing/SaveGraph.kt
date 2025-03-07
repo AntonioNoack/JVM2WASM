@@ -52,7 +52,7 @@ object SaveGraph {
 
     fun graphId(sa: StructuralAnalysis): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
-        StructuralAnalysis.renumber2(sa.nodes)
+        if (false) StructuralAnalysis.renumber2(sa.nodes)
         if (false) normalizeGraph(sa.nodes)
         val nodes = sa.nodes
         val builder = StringBuilder(nodes.size * 5)

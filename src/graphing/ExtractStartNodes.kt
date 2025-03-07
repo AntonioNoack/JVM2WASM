@@ -139,7 +139,8 @@ object ExtractStartNodes {
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunS${mt.startNodeExtractorIndex++}"
         val firstRunVariable = mt.addLocalVariable(firstRunLabel, i32, "I")
-        val jumpInstr = Jump(firstRunLabel)
+        val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
+        val jumpInstr = Jump(loopInstr)
 
         if (validate) validateStack(sa.nodes, sa.methodTranslator)
 
@@ -191,7 +192,7 @@ object ExtractStartNodes {
         treeRoot.prepend(listOf(i32Const0, firstRunVariable.setter)) // don't run a second time
         treeRoot.append(Unreachable) // end of it should be unreachable
 
-        val body = listOf(
+        loopInstr.body = listOf(
             firstRunVariable.getter,
             IfBranch(
                 treeRoot.instrs, // anything after is unreachable
@@ -202,7 +203,7 @@ object ExtractStartNodes {
 
         val dst = Builder()
         dst.append(i32Const1).append(firstRunVariable.setter)
-        dst.append(LoopInstr(firstRunLabel, body, emptyList()))
+        dst.append(loopInstr)
         loadStack(middle, sa.methodTranslator)
         middle.printer.prepend(dst)
 
