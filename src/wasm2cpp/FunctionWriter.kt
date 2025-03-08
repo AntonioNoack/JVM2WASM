@@ -99,14 +99,19 @@ class FunctionWriter(
         return i0.name
     }
 
-    private fun push(type: String, name: String = nextTemporaryVariable()): String {
+    private fun push(type: String, name: String): String {
         stack.add(StackElement(type, name))
         // println("push -> $stack")
         return name
     }
 
+    private fun pushNew(type: String): String {
+        return push(type, nextTemporaryVariable())
+    }
+
     private fun beginNew(type: String): StringBuilder2 {
-        return begin().append(type).append(' ').append(push(type)).append(" = ")
+        val name = pushNew(type)
+        return begin().append(type).append(' ').append(name).append(" = ")
     }
 
     private fun beginSetEnd(name: String, type: String) {
@@ -134,13 +139,13 @@ class FunctionWriter(
         }
 
         if (funcName == "wasStaticInited") {
-            beginNew("i32").append("0").end()
+            beginNew(i32).append("0").end()
             return
         }
 
         if (!enableCppTracing) {
             if (funcName == "stackPush" || funcName == "stackPop") {
-                if (funcName == "stackPush") pop("i32")
+                if (funcName == "stackPush") pop(i32)
                 return
             }
         }
@@ -522,7 +527,7 @@ class FunctionWriter(
     private fun writeSwitchCase(switchCase: SwitchCase) {
         // big monster, only 1 per function allowed, afaik
         val cases = switchCase.cases
-        val lblName = switchCase.label
+        val label = switchCase.label
         assertTrue(stack.isEmpty()) { "Expected empty stack, got $stack" }
         depth++
 
@@ -546,7 +551,7 @@ class FunctionWriter(
                 val next = instructions.getOrNull(ni)
                 val instr = instructions[i]
 
-                if (next is LocalSet && next.name == lblName) {
+                if (next is LocalSet && next.name == label) {
                     var nni = nextInstr(instructions, ni)
                     var nextNext = instructions[nni]
                     while (nextNext !is Jump) {

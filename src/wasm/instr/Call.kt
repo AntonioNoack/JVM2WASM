@@ -113,6 +113,9 @@ data class Call(val name: String) : Instruction {
         val checkCast = Call("checkCast")
         val checkCastExact = Call("checkCastExact")
 
+        val stackPush = Call("stackPush")
+        val stackPop = Call("stackPop")
+
         val lcmp = Call("lcmp")
         val fcmpl = Call("fcmpl") // -1 if NaN
         val fcmpg = Call("fcmpg") // +1 if NaN

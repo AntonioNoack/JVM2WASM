@@ -31,6 +31,7 @@ fun defineFunctionImplementations(
     functions: List<FunctionImpl>, globals: Map<String, GlobalVariable>,
     functionsByName: Map<String, FunctionImpl>
 ) {
+    "".split("")
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
     val tested =

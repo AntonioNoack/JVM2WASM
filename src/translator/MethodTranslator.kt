@@ -1297,13 +1297,15 @@ class MethodTranslator(
 
     fun stackPush() {
         if (enableStackPush) {
-            printer.append(i32Const(getCallIndex())).append(Call("stackPush"))
+            printer
+                .append(i32Const(getCallIndex()))
+                .append(Call.stackPush)
         }
     }
 
     fun stackPop() {
         if (enableStackPush) {
-            printer.append(Call("stackPop"))
+            printer.append(Call.stackPop)
         }
     }
 

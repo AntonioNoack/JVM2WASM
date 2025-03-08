@@ -32,6 +32,19 @@ const val api = ASM9
 //  -> automatically replace all Kotlin-reflect stuff with KotlynReflect, or for now,
 //     add this dependency manually
 
+// todo replace simple bridge methods like the following with just an alias
+/**
+ * i32 me_anno_engine_ui_render_RenderModeXCompanion_getNO_DEPTH_Lme_anno_engine_ui_render_RenderMode(i32 p0) {
+ *   // L117163766
+ *   // line 176
+ *   stackPush(34886);
+ *   i32 tmp0 = me_anno_engine_ui_render_RenderMode_accessXgetNO_DEPTHXcp_Lme_anno_engine_ui_render_RenderMode();
+ *   // static call
+ *   stackPop();
+ *   return tmp0;
+ * }
+ * */
+
 // todo calculate dependency-tree from static initialization,
 //  and call that once at the start, and then never again
 // alternative/improvement:
@@ -262,9 +275,10 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("jvm/Kotlin")
     clazz("engine/TextGen")
 
-    // todo use KotlynReflect instead
     if (useDefaultKotlinReflection) {
         clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
+    } else if (!useKotlynReflect) {
+        clazz("jvm/KotlinReflect")
     }
 
 }

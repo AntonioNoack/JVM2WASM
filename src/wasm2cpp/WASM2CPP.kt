@@ -72,7 +72,7 @@ fun validateGlobals(parsed1: Map<String, GlobalVariable>) {
 fun validateFunctionTable(parsed: List<String>) {
     if (functionTable.isEmpty()) return
     assertEquals(functionTable, parsed)
-    LOGGER.info("Validated function table |${parsed.size}|")
+    LOGGER.info("Validated function table, ${parsed.size} entries")
 }
 
 fun validateParsedFunctionsWithOriginals(parsed1: Collection<FunctionImpl>) {
