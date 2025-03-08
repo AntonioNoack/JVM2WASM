@@ -18,6 +18,7 @@ import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
 import utils.DynIndex.methodTablePtr
+import utils.NativeHelperFunctions.appendNativeHelperFunctions
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder
@@ -524,7 +525,7 @@ fun jvm2wasm() {
     ptr = appendInheritanceTable(dataPrinter, ptr, numClasses)
     // class -> function[] for resolveIndirect
     ptr = appendInvokeDynamicTable(dataPrinter, ptr, numClasses)
-    // java.lang.Class, with name, fields
+    // java.lang.Class, with name, fields and methods
     ptr = appendClassInstanceTable(dataPrinter, ptr, numClasses)
     // idx -> class, line for stack trace
     ptr = appendThrowableLookup(dataPrinter, ptr)

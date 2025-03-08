@@ -1,4 +1,4 @@
-package dyninvoke
+package hierarchy
 
 import org.objectweb.asm.Handle
 import utils.Descriptor

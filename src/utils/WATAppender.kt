@@ -94,6 +94,112 @@ private fun fillInClassModifiers(
     }
 }
 
+private fun fillInFields(
+    numClasses: Int, classData: ByteArrayOutputStream2,
+    classSize: Int, indexStartPtr: Int,
+    fieldsOffset: Int,
+) {
+    val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
+    val fieldCache = HashMap<FieldEntry, Int>()
+    val fieldOffsets0 = gIndex.getFieldOffsets("java/lang/reflect/Field", false)
+    val fieldNameOffset = fieldOffsets0.get("name")!!.offset
+    val fieldSize = fieldOffsets0.offset
+    for (clazz in 0 until numClasses) {
+
+        val className = gIndex.classNamesByIndex[clazz]
+        val classPtr = indexStartPtr + clazz * classSize
+        // if (className !in dIndex.constructableClasses) continue
+
+        val instanceModifier = 0
+        val staticModifier = ACC_STATIC
+        val instanceFields = gIndex.getFieldOffsets(className, false).fields
+            .entries.map { (name, field) ->
+                FieldEntry(name, field, instanceModifier + isNativeType(field.type).toInt(ACC_NATIVE))
+            }
+
+        val staticFields = gIndex.getFieldOffsets(className, true).fields
+            .entries.map { (name, field) ->
+                FieldEntry(name, field, staticModifier + isNativeType(field.type).toInt(ACC_NATIVE))
+            }
+
+        val allFields = (instanceFields + staticFields)
+            .sortedWith { a, b ->
+                // this sorting could be used to optimize a little
+                // todo do we use this sorting anywhere? if not, we could remove it, too
+                val na = !isNativeType(a.field.type)
+                val nb = !isNativeType(b.field.type)
+                na.compareTo(nb).ifSame { a.name.compareTo(b.name) }
+            }
+
+        if (allFields.isEmpty()) {
+            // let the field-array pointer be null
+            continue
+        }
+
+        val fieldPointers = IntArray(allFields.size) {
+            val field = allFields[it]
+            fieldCache.getOrPut(field) {
+                // create new field instance
+                val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
+                val fieldPtr = indexStartPtr + classData.size()
+                classData.writeClass(fieldClassIndex)
+                for (i in objectOverhead until fieldNameOffset) {
+                    classData.write(0)
+                }
+                classData.writeLE32(name) // name
+                classData.writeLE32(field.field.offset) // slot
+                val ci = when (val typeName = field.field.type) {
+                    in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
+                    "[]" -> gIndex.getClassIndex("[]")
+                    else -> {
+                        if (
+                            typeName.startsWith("[") &&
+                            typeName.length == 2 &&
+                            typeName[1] in NativeTypes.joined
+                        ) { // native array
+                            gIndex.getClassIndex(typeName)
+                        } else if (typeName.startsWith("[")) {
+                            gIndex.getClassIndex("[]")
+                        } else {
+                            gIndex.getClassIndexOrParents(typeName)
+                        }
+                    }
+                }
+                classData.writeLE32(indexStartPtr + classSize * ci) // type
+                classData.writeLE32(field.modifiers)
+                classData.writeLE32(classPtr) // clazz -> declaring class
+                for (i in 20 + fieldNameOffset until fieldSize) {// 20, because we wrote 5x4 bytes
+                    classData.write(0)
+                }
+                assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
+                fieldPtr
+            }
+        }
+
+        if (clazz < 10) {
+            LOGGER.info(
+                "Fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $allFields, " +
+                        allFields.joinToString { "${gIndex.getString(it.name)}" })
+        } else if (clazz == 10 && numClasses > 11) LOGGER.info("...")
+
+        // create new fields array
+        val arrayPtr = indexStartPtr + classData.size()
+        classData.writeClass(1) // object array
+        classData.writeLE32(allFields.size) // array length
+
+        for (fieldPtr in fieldPointers) {
+            classData.writeLE32(fieldPtr)
+        }
+
+        val dstPtr = clazz * classSize + fieldsOffset
+        val pos = classData.position
+        classData.position = dstPtr
+        classData.writeLE32(arrayPtr)
+        classData.position = pos
+
+    }
+}
+
 var classInstanceTablePtr = 0
 fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
     LOGGER.info("[appendClassInstanceTable]")
@@ -102,7 +208,6 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
     val classFields = gIndex.getFieldOffsets("java/lang/Class", false)
     val classClassIndex = gIndex.getClassIndex("java/lang/Class")
-    val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
     val classSize = classFields.offset
 
     LOGGER.info("java/lang/Class.fields: ${classFields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
@@ -122,106 +227,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
     if (modifierOffset != null) fillInClassModifiers(numClasses, classData, classSize, modifierOffset)
 
     val fieldsOffset = classFields.get("fields")?.offset
-    if (fieldsOffset != null) {
-        val fieldCache = HashMap<FieldEntry, Int>()
-        val fieldOffsets0 = gIndex.getFieldOffsets("java/lang/reflect/Field", false)
-        val fieldNameOffset = fieldOffsets0.get("name")!!.offset
-        val fieldSize = fieldOffsets0.offset
-        for (clazz in 0 until numClasses) {
-
-            val className = gIndex.classNamesByIndex[clazz]
-            val classPtr = indexStartPtr + clazz * classSize
-            // if (className !in dIndex.constructableClasses) continue
-
-            val instanceModifier = 0
-            val staticModifier = ACC_STATIC
-            val instanceFields = gIndex.getFieldOffsets(className, false).fields
-                .entries.map { (name, field) ->
-                    FieldEntry(name, field, instanceModifier + isNativeType(field.type).toInt(ACC_NATIVE))
-                }
-
-            val staticFields = gIndex.getFieldOffsets(className, true).fields
-                .entries.map { (name, field) ->
-                    FieldEntry(name, field, staticModifier + isNativeType(field.type).toInt(ACC_NATIVE))
-                }
-
-            val allFields = (instanceFields + staticFields)
-                .sortedWith { a, b ->
-                    // this sorting could be used to optimize a little
-                    // todo do we use this sorting anywhere? if not, we could remove it, too
-                    val na = !isNativeType(a.field.type)
-                    val nb = !isNativeType(b.field.type)
-                    na.compareTo(nb).ifSame { a.name.compareTo(b.name) }
-                }
-
-            if (allFields.isEmpty()) {
-                // let the field-array pointer be null
-                continue
-            }
-
-            val fieldPointers = IntArray(allFields.size) {
-                val field = allFields[it]
-                fieldCache.getOrPut(field) {
-                    // create new field instance
-                    val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
-                    val fieldPtr = indexStartPtr + classData.size()
-                    classData.writeClass(fieldClassIndex)
-                    for (i in objectOverhead until fieldNameOffset) {
-                        classData.write(0)
-                    }
-                    classData.writeLE32(name) // name
-                    classData.writeLE32(field.field.offset) // slot
-                    val ci = when (val typeName = field.field.type) {
-                        in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
-                        "[]" -> gIndex.getClassIndex("[]")
-                        else -> {
-                            if (
-                                typeName.startsWith("[") &&
-                                typeName.length == 2 &&
-                                typeName[1] in NativeTypes.joined
-                            ) { // native array
-                                gIndex.getClassIndex(typeName)
-                            } else if (typeName.startsWith("[")) {
-                                gIndex.getClassIndex("[]")
-                            } else {
-                                gIndex.getClassIndexOrParents(typeName)
-                            }
-                        }
-                    }
-                    classData.writeLE32(indexStartPtr + classSize * ci) // type
-                    classData.writeLE32(field.modifiers)
-                    classData.writeLE32(classPtr) // clazz -> declaring class
-                    for (i in 20 + fieldNameOffset until fieldSize) {// 20, because we wrote 5x4 bytes
-                        classData.write(0)
-                    }
-                    assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
-                    fieldPtr
-                }
-            }
-
-            if (clazz < 10) {
-                LOGGER.info(
-                    "Fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $allFields, " +
-                            allFields.joinToString { "${gIndex.getString(it.name)}" })
-            } else if (clazz == 10 && numClasses > 11) LOGGER.info("...")
-
-            // create new fields array
-            val arrayPtr = indexStartPtr + classData.size()
-            classData.writeClass(1) // object array
-            classData.writeLE32(allFields.size) // array length
-
-            for (fieldPtr in fieldPointers) {
-                classData.writeLE32(fieldPtr)
-            }
-
-            val dstPtr = clazz * classSize + fieldsOffset
-            val pos = classData.position
-            classData.position = dstPtr
-            classData.writeLE32(arrayPtr)
-            classData.position = pos
-
-        }
-    }
+    if (fieldsOffset != null) fillInFields(numClasses, classData, classSize, indexStartPtr, fieldsOffset)
 
     val methodsOffset = classFields.get("methods")?.offset
     if (methodsOffset != null) {
@@ -351,15 +357,8 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
 
 val segments = ArrayList<DataSection>()
 
-fun appendData(printer: StringBuilder2, startIndex: Int, vararg data: ByteArrayOutputStream2): Int {
-    val totalSize = data.sumOf { it.size() }
-    val joined = ByteArray(totalSize)
-    var offset = 0
-    for (dataI in data) {
-        dataI.data.values.copyInto(joined, offset, 0, dataI.size())
-        offset += dataI.size()
-    }
-    return appendData(printer, startIndex, joined)
+fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArrayOutputStream2): Int {
+    return appendData(printer, startIndex, data.toByteArray())
 }
 
 fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {

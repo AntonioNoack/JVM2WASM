@@ -73,7 +73,7 @@ object SolveLinearTree {
             is SequenceNode -> {
                 // set labels to true
                 node.printer
-                    .append(Const.i32Const1).append(labels[2 * i].setter)
+                    .append(i32Const1).append(labels[2 * i].setter)
                 storeStack(node, mt)
             }
             else -> assertFail()

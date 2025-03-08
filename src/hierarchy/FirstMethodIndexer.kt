@@ -3,7 +3,6 @@ package hierarchy
 import anyMethodThrows
 import api
 import dIndex
-import dyninvoke.DynPrinter
 import hIndex
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate

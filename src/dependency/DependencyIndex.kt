@@ -188,7 +188,7 @@ object DependencyIndex {
                 val superMethods = usedByClass[superClass]
                 if (superMethods != null) {
                     for (method2 in superMethods) {
-                        val childMethod = MethodSig.c(clazz, method2.name, method2.descriptor, false)
+                        val childMethod = method2.withClass(clazz)
                         if (method2 !in methodsWithForbiddenDependencies) {
                             // if (clazz == "java/util/Collections\$SetFromMap") println("  marked $childMethod for use")
                             newUsedMethods.add(childMethod)
