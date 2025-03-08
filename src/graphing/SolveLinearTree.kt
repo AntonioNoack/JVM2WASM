@@ -108,7 +108,6 @@ object SolveLinearTree {
         nodes: MutableList<GraphingNode>, mt: MethodTranslator,
         firstNodeIsEntry: Boolean, extraInputs: Map<GraphingNode, List<LocalVar>>
     ): Boolean {
-
         val retTypes = StackValidator.getReturnTypes(mt.sig)
         val firstNode = nodes.first()
         val isSorted = nodes.sortByTopology { node -> node.inputs } != null

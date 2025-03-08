@@ -25,13 +25,6 @@ object Assignments {
             is LocalSet -> insertAssignment(instr.name, i, result)
             is ParamSet -> insertAssignment(instr.name, i, result)
             is GlobalSet -> insertAssignment(instr.name, i, result)
-            is SimpleInstr,
-            is Jump, is JumpIf,
-            is Call, is CallIndirect,
-            is LocalGet, is ParamGet, is GlobalGet,
-            is Comment -> {
-                // nothing to do
-            }
             is LoopInstr -> insertAssignments(instr.body, i, result)
             is IfBranch -> {
                 insertAssignments(instr.ifTrue, i, result)
@@ -42,7 +35,11 @@ object Assignments {
                     insertAssignments(instr.cases[j], i, result)
                 }
             }
-            else -> throw NotImplementedError("Unknown instruction ")
+            is SimpleInstr, is Const, is Jump, is JumpIf, is Comment,
+            is Call, is CallIndirect, is LocalGet, is ParamGet, is GlobalGet -> {
+                // nothing to do
+            }
+            else -> throw NotImplementedError("Unknown instruction ${instr.javaClass}")
         }
     }
 

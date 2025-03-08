@@ -1,6 +1,7 @@
 package wasm2cpp
 
 import me.anno.utils.assertions.*
+import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
@@ -92,21 +93,44 @@ class FunctionWriter(
     }
 
     private fun pop(type: String): String {
+        return popElement(type).expr
+    }
+
+    private fun popElement(type: String): StackElement {
         val i0 = stack.removeLastOrNull()
             ?: assertFail("Tried popping $type, but stack was empty")
         // println("pop -> $i0 + $stack")
         assertEquals(type, i0.type) { "pop($type) vs $stack + $i0" }
-        return i0.name
+        return i0
     }
 
-    private fun push(type: String, name: String): String {
-        stack.add(StackElement(type, name))
+    private fun isTemporaryVariable(name: String): Boolean {
+        return name.startsWith("tmp")
+    }
+
+    private fun push(type: String, name: String) {
+        val names = if (isTemporaryVariable(name)) emptyList() else listOf(name)
+        pushWithNames(type, name, names, false)
+    }
+
+    private fun pushElements(type: String, expression: String, sources: List<StackElement>, isBoolean: Boolean) {
+        val names = sources.flatMap { it.names }.distinct()
+        pushWithNames(type, expression, names, isBoolean)
+    }
+
+    private fun pushConstant(type: String, expression: String) {
+        pushWithNames(type, expression, emptyList(), false)
+    }
+
+    private fun pushWithNames(type: String, expression: String, names: List<String>, isBoolean: Boolean) {
+        stack.add(StackElement(type, expression, names, isBoolean))
         // println("push -> $stack")
-        return name
     }
 
     private fun pushNew(type: String): String {
-        return push(type, nextTemporaryVariable())
+        val name = nextTemporaryVariable()
+        push(type, name)
+        return name
     }
 
     private fun beginNew(type: String): StringBuilder2 {
@@ -193,41 +217,129 @@ class FunctionWriter(
     }
 
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
+        val assignments = Assignments.findAssignments(instructions)
         for (i in i0 until i1) {
             val instr = instructions[i]
-            writeInstruction(instr)
+            writeInstruction(instr, i, assignments)
             if (instr.isReturning()) return true
         }
         return false
     }
 
+    private fun needsNewVariable(name: String, assignments: Map<String, Int>?, i: Int): Boolean {
+        return Assignments.hasAssignment(assignments, name, i)
+    }
+
+    private fun needsNewVariable(names: List<String>, assignments: Map<String, Int>?, i: Int): Boolean {
+        return names.any2 { name -> needsNewVariable(name, assignments, i) }
+    }
+
     private fun writeInstruction(i: Instruction) {
+        writeInstruction(i, Int.MAX_VALUE, null)
+    }
+
+    private fun isNameOrNumber(expression: String): Boolean {
+        return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
+                expression.toDoubleOrNull() != null
+    }
+
+    private fun isNumber(expression: String): Boolean {
+        for (i in expression.indices) {
+            val char = expression[i]
+            when (char) {
+                in '0'..'9' -> {} // ok
+                // difficult -> just use built-in, even if a little slow
+                '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
+                else -> return false
+            }
+        }
+        return true // all digits -> a number
+    }
+
+    private fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
+        if (isNameOrNumber(expression.expr)) {
+            append(expression.expr)
+        } else {
+            append('(').append(expression.expr).append(')')
+        }
+        return this
+    }
+
+    private val tmpExprBuilder = StringBuilder2()
+    private fun unaryInstr(
+        aType: String, rType: String,
+        k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
+        combine: (StackElement, StringBuilder2) -> Unit,
+    ) {
+        val a = popElement(aType)
+        if (a.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
+            beginNew(rType)
+            combine(a, writer)
+            writer.end()
+        } else {
+            val tmp = tmpExprBuilder
+            combine(a, tmp)
+            val combined = tmp.toString()
+            tmp.clear()
+            pushWithNames(rType, combined, a.names, isBoolean)
+        }
+    }
+
+    private fun binaryInstr(
+        aType: String, bType: String, rType: String,
+        k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
+        combine: (StackElement, StackElement, StringBuilder2) -> Unit
+    ) {
+        val a = popElement(aType)
+        val b = popElement(bType)
+        if (needsNewVariable(a.names, assignments, k) ||
+            needsNewVariable(b.names, assignments, k)
+        ) {
+            beginNew(rType)
+            combine(a, b, writer)
+            writer.end()
+        } else {
+            val tmp = tmpExprBuilder
+            combine(a, b, tmp)
+            val combined = tmp.toString()
+            tmp.clear()
+            pushElements(rType, combined, listOf(a, b), isBoolean)
+        }
+    }
+
+    private fun writeGetInstruction(
+        type: String, name: String,
+        k: Int, assignments: Map<String, Int>?
+    ) {
+        if (needsNewVariable(name, assignments, k)) {
+            beginNew(type).append(name).end()
+        } else {
+            push(type, name)
+        }
+    }
+
+    private fun writeInstruction(i: Instruction, k: Int, assignments: Map<String, Int>?) {
         when (i) {
             is ParamGet -> {
                 val index = i.index
                 val type = function.params[index]
-                beginNew(type).append(i.name).end()
-            }
-            is ParamSet -> {
-                val index = i.index
-                val type = function.params[index]
-                beginSetEnd(i.name, type)
-            }
-            is GlobalGet -> {
-                val global = globals[i.name]
-                    ?: throw IllegalStateException("Missing global '${i.name}'")
-                beginNew(global.type).append(global.name).end()
-            }
-            is GlobalSet -> {
-                val global = globals[i.name]
-                    ?: throw IllegalStateException("Missing global '${i.name}'")
-                beginSetEnd(global.name, global.type)
+                writeGetInstruction(type, i.name, k, assignments)
             }
             is LocalGet -> {
                 val local = localsByName[i.name]
                     ?: throw IllegalStateException("Missing local '${i.name}'")
                 assertNotEquals("lbl", i.name)
-                beginNew(local.type).append(local.name).end()
+                writeGetInstruction(local.type, local.name, k, assignments)
+            }
+            is GlobalGet -> {
+                val global = globals[i.name]
+                    ?: throw IllegalStateException("Missing global '${i.name}'")
+                writeGetInstruction(global.type, global.name, k, assignments)
+            }
+            is ParamSet -> {
+                val index = i.index
+                val type = function.params[index]
+                beginSetEnd(i.name, type)
             }
             is LocalSet -> {
                 val local = localsByName[i.name]
@@ -235,8 +347,15 @@ class FunctionWriter(
                 if (i.name != "lbl") {
                     beginSetEnd(local.name, local.type)
                 } else {
-                    pop(i32)
+                    // unfortunately can still happen
+                    val value = pop(i32)
+                    begin().append("// skipping lbl = $value").append('\n')
                 }
+            }
+            is GlobalSet -> {
+                val global = globals[i.name]
+                    ?: throw IllegalStateException("Missing global '${i.name}'")
+                beginSetEnd(global.name, global.type)
             }
             // loading
             I32Load8S -> load(i32, "int8_t")
@@ -255,27 +374,28 @@ class FunctionWriter(
             F32Store -> store(f32)
             F64Store -> store(f64)
             // other operations
-            I32EQZ -> {
-                val i0 = pop(i32)
-                beginNew(i32).append(i0).append(" == 0 ? 1 : 0").end()
+            I32EQZ -> unaryInstr(i32, i32, k, assignments, true) { expr, dst ->
+                if (expr.isBoolean) {
+                    dst.append('!').appendExpr(expr)
+                } else {
+                    dst.appendExpr(expr).append(" == 0")
+                }
             }
-            I64EQZ -> {
-                val i0 = pop(i64)
-                beginNew(i32).append(i0).append(" == 0 ? 1 : 0").end()
+            I64EQZ -> unaryInstr(i64, i32, k, assignments, true) { expr, dst ->
+                if (expr.isBoolean) {
+                    dst.append('!').appendExpr(expr)
+                } else {
+                    dst.appendExpr(expr).append(" == 0")
+                }
             }
             is ShiftInstr -> {
-                val i0 = pop(i.type)
-                val i1 = pop(i.type)
-                beginNew(i.type)
-                writer.append(
+                binaryInstr(i.type, i.type, i.type, k, assignments, false) { i0, i1, dst ->
                     if (i.isRight && i.isU) {
-                        if (i.type == i32) "(u32) " else "(u64) "
-                    } else ""
-                )
-                writer.append(i1).append(
-                    if (i.isRight) " >> "
-                    else " << "
-                ).append(i0).end()
+                        dst.append(if (i.type == i32) "(u32) " else "(u64) ")
+                    }
+                    val operator = if (i.isRight) " >> " else " << "
+                    dst.appendExpr(i1).append(operator).appendExpr(i0)
+                }
             }
             Return -> {
                 val offset = stack.size - function.results.size
@@ -283,12 +403,12 @@ class FunctionWriter(
                 begin().append("return")
                 when (function.results.size) {
                     0 -> {}
-                    1 -> writer.append(' ').append(stack[offset].name)
+                    1 -> writer.append(' ').append(stack[offset].expr)
                     else -> {
                         writer.append(" { ")
                         for (ri in function.results.indices) {
                             if (ri > 0) writer.append(", ")
-                            writer.append(stack[ri + offset].name)
+                            writer.append(stack[ri + offset].expr)
                         }
                         writer.append(" }")
                     }
@@ -301,56 +421,63 @@ class FunctionWriter(
             }
             is Const -> {
                 when (i.type) {
-                    ConstType.F32 -> push(i.type.wasmType, i.value.toString() + "f")
-                    ConstType.F64 -> push(i.type.wasmType, i.value.toString())
+                    ConstType.F32 -> pushConstant(i.type.wasmType, i.value.toString() + "f")
+                    ConstType.F64 -> pushConstant(i.type.wasmType, i.value.toString())
                     ConstType.I32 -> {
                         val v =
                             if (i.value == Int.MIN_VALUE) "(i32)(1u << 31)"
                             else i.value.toString()
-                        push(i.type.wasmType, v)
+                        pushConstant(i.type.wasmType, v)
                     }
                     ConstType.I64 -> {
                         val v =
                             if (i.value == Long.MIN_VALUE) "(i64)(1llu << 63)"
                             else i.value.toString() + "ll"
-                        push(i.type.wasmType, v)
+                        pushConstant(i.type.wasmType, v)
                     }
                 }
             }
-            is UnaryInstruction -> {
-                val i0 = pop(i.type)
-                beginNew(i.type).append(i.call).append('(').append(i0).append(')').end()
+            is UnaryInstruction -> unaryInstr(i.type, i.type, k, assignments, false) { expr, dst ->
+                dst.append(i.call).append('(').append(expr.expr).append(')')
             }
             is NumberCastInstruction -> {
                 val i0 = pop(i.popType)
                 beginNew(i.pushType).append(i.prefix).append(i0).append(i.suffix).end()
             }
-            is BinaryInstruction -> {
-                val i0 = pop(i.type)
-                val i1 = pop(i.type)
-                if (i.operator.endsWith("(")) {
-                    if (i.operator.startsWith("std::rot")) {
-                        beginNew(i.type).append(i.operator).append( // cast to unsigned required
-                            if (i0 == i32) "(u32) " else "(u64) "
-                        ).append(i1).append(", ").append(i0).append(')').end()
+            is BinaryInstruction -> binaryInstr(
+                i.type, i.type, i.type, k, assignments, false
+            ) { i0, i1, dst ->
+                if (i.cppOperator.endsWith("(")) {
+                    if (i.cppOperator.startsWith("std::rot")) {
+                        dst.append(i.cppOperator)
+                            .append(if (i.type == i32) "(u32) " else "(u64) ") // cast to unsigned required
+                            .append(i1.expr).append(", ").append(i0.expr).append(')')
                     } else {
-                        beginNew(i.type).append(i.operator).append(i1).append(", ")
-                            .append(i0).append(')').end()
+                        dst.append(i.cppOperator) // call(i1, i0)
+                            .append(i1.expr).append(", ").append(i0.expr).append(')')
                     }
                 } else {
-                    beginNew(i.type).append(i1).append(' ')
-                        .append(i.operator)
-                        .append(' ').append(i0).end()
+                    dst.appendExpr(i1)
+                    dst.append(' ').append(i.cppOperator).append(' ')
+                    dst.appendExpr(i0)
                 }
             }
             is CompareInstr -> {
-                val i0 = pop(i.type)
-                val i1 = pop(i.type)
-                beginNew(i32)
-                if (i.castType != null) writer.append("(").append(i.castType).append(") ")
-                writer.append(i1).append(' ').append(i.operator).append(' ')
-                if (i.castType != null) writer.append("(").append(i.castType).append(") ")
-                writer.append(i0).append(" ? 1 : 0").end()
+                binaryInstr(i.type, i.type, i32, k, assignments, true) { i0, i1, dst ->
+                    // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
+                    if (isNumber(i0.expr) && !isNumber(i1.expr)) {
+                        // flipped
+                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
+                        dst.appendExpr(i1).append(' ').append(i.flipped).append(' ')
+                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
+                        dst.appendExpr(i0)
+                    } else {
+                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
+                        dst.appendExpr(i0).append(' ').append(i.operator).append(' ')
+                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
+                        dst.appendExpr(i1)
+                    }
+                }
             }
             is IfBranch -> {
 
