@@ -11,6 +11,8 @@ import static jvm.GCGapFinder.findLargestGaps;
 import static jvm.GCGapFinder.insertGapMaybe;
 import static jvm.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
+import static jvm.JVMShared.read32;
+import static jvm.JVMShared.write32;
 import static jvm.JVMValues.failedToAllocateMemory;
 import static jvm.JVMValues.reachedMemoryLimit;
 import static jvm.JavaLang.getAddr;

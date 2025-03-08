@@ -13,6 +13,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.ToIntFunction;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.read32;
+import static jvm.JVMShared.write32;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.toFixed;
 

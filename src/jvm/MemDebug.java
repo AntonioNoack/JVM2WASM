@@ -4,7 +4,8 @@ import annotations.Alias;
 import annotations.Export;
 import annotations.NoThrow;
 
-import static jvm.JVM32.*;
+import static jvm.JVM32.readClass;
+import static jvm.JVMShared.*;
 
 public class MemDebug {
 

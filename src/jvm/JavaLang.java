@@ -15,6 +15,7 @@ import java.util.Random;
 
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
+import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 
 @SuppressWarnings("unused")
@@ -317,14 +318,13 @@ public class JavaLang {
     public static native <V> V ptrTo(int addr);
 
     @NoThrow
-    @WASM(code = "global.get $L")
+    @WASM(code = "global.get $stackTraceTable")
     public static native int getStackTraceTablePtr();
 
     @NoThrow
-    @Alias(names = "resetSP")
     public static void resetStackPtr() {
         // must be called after every wasm-native error like segfaults
-        setStackPtr(getStackPtr0());
+        setStackPtr(getStackStart());
     }
 
     static class JSOutputStream extends OutputStream {

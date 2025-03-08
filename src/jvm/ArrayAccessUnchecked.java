@@ -3,7 +3,9 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 
-import static jvm.JVM32.*;
+import static jvm.JVM32.arrayOverhead;
+import static jvm.JVM32.objectOverhead;
+import static jvm.JVMShared.*;
 
 public class ArrayAccessUnchecked {
 

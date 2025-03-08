@@ -217,13 +217,13 @@ object DynIndex {
     private var numAbstract = 0
     private var numFixed = 0
 
-    var methodTablePtr = 0
+    var resolveIndirectTablePtr = 0
     private var aidtCtr = 50 // disabled
     fun appendInvokeDynamicTable(printer: StringBuilder2, startOfMethodTable: Int, numClasses: Int): Int {
         LOGGER.info("[appendInvokeDynamicTable]")
         val debugInfo = StringBuilder2()
 
-        methodTablePtr = startOfMethodTable
+        resolveIndirectTablePtr = startOfMethodTable
 
         val methodTable = ByteArrayOutputStream2(numClasses * 4)
         val dynamicIndexData = ByteArrayOutputStream2(numClasses * 4)
@@ -284,35 +284,35 @@ object DynIndex {
         // append class instanceOf-table
         val classTableData = ByteArrayOutputStream2(numClasses * 4)
         val instanceTableData = ByteArrayOutputStream2()
-        val instanceTableStart =  classTableStart + numClasses * 4
+        val instanceTableStart = classTableStart + numClasses * 4
         var ptr = instanceTableStart
         val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V"))
 
         assertEquals(objectOverhead + 8, gIndex.getFieldOffsets("java/lang/String", false).offset)
         for (classId in 0 until numClasses) {
-            if (classId == 0 || classId in 17 until 25) { // 0 is Object, 17 until 25 are the native types
+            val clazz = gIndex.classNamesByIndex[classId]
+            if (clazz in NativeTypes.nativeTypes) { // 0 is Object, 17 until 25 are the native types
                 // write 0 :), no table space used
                 classTableData.writeLE32(0)
             } else {
 
-                val clazz = gIndex.classNamesByIndex[classId]
                 var superClass = hIndex.superClass[clazz]
                 if (superClass == null) {
                     LOGGER.warn("Super class of $clazz ($classId) is unknown")
-                    superClass = "java/lang/Object"
+                    if (classId > 0) superClass = "java/lang/Object"
                 }
 
-                // filter for existing interfaces :)
-                val interfaces = getInterfaces(clazz, numClasses)
                 classTableData.writeLE32(ptr)
 
-                // super
-                // size
+                // super class index
+                // instance size
                 // #interfaces
-                // ...
+                // ... [classId]
                 // #functions
+                // ... [interfaceId, methodId]
 
-                instanceTableData.writeLE32(gIndex.getClassIndex(superClass))
+                instanceTableData.writeLE32(if (superClass != null) gIndex.getClassIndex(superClass) else -1)
+                val interfaces = getInterfaces(clazz, numClasses)
                 val fieldOffsets = gIndex.getFieldOffsets(clazz, false)
                 val clazzSize = fieldOffsets.offset
                 instanceTableData.writeLE32(clazzSize)
@@ -435,12 +435,12 @@ object DynIndex {
 
     private fun appendGeneralDebugInfo(
         debugInfo: StringBuilder2,
-        classId: Int, clazz: String, superClass: String,
+        classId: Int, clazz: String, superClass: String?,
         interfaces: Set<String>, clazzSize: Int,
         fieldOffsets: GeneratorIndex.ClassOffsets
     ) {
         debugInfo.append("[").append(classId).append("]: ").append(clazz).append("\n")
-        debugInfo.append("  extends ").append(superClass).append("\n")
+        if (superClass != null) debugInfo.append("  extends ").append(superClass).append("\n")
         for (interface1 in interfaces) {
             debugInfo.append("  implements ").append(interface1).append("\n")
         }

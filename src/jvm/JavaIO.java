@@ -10,8 +10,8 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 
-import static jvm.JVM32.read32;
 import static jvm.JVM32.throwJs;
+import static jvm.JVMShared.read32;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getFieldOffset;

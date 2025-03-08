@@ -17,7 +17,7 @@ import utils.*
 import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
-import utils.DynIndex.methodTablePtr
+import utils.DynIndex.resolveIndirectTablePtr
 import utils.NativeHelperFunctions.appendNativeHelperFunctions
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
@@ -215,6 +215,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
     clazz("engine/Engine")
 
     clazz("jvm/JVM32")
+    clazz("jvm/JVMShared")
     clazz("jvm/GarbageCollector")
     clazz("jvm/MemDebug")
 
@@ -240,6 +241,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 fun listLibrary(clazz: (String) -> Unit) {
 
     clazz("jvm/JVM32")
+    clazz("jvm/JVMShared")
     clazz("jvm/MemDebug")
 
     clazz("jvm/JavaAWT")
@@ -528,7 +530,7 @@ fun jvm2wasm() {
     // java.lang.Class, with name, fields and methods
     ptr = appendClassInstanceTable(dataPrinter, ptr, numClasses)
     // idx -> class, line for stack trace
-    ptr = appendThrowableLookup(dataPrinter, ptr)
+    ptr = appendStackTraceTable(dataPrinter, ptr)
     // length, [String, byte[]]x resources
     ptr = appendResourceTable(dataPrinter, ptr)
 
@@ -602,26 +604,25 @@ fun jvm2wasm() {
     }
 
     dataPrinter.append(";; globals:\n")
-    defineGlobal("S", ptrType, stringStart) // string table
-    defineGlobal("c", ptrType, classTableStart) // class table
-    defineGlobal("s", ptrType, staticTablePtr) // static table
-    defineGlobal("M", ptrType, methodTablePtr)
-    defineGlobal("X", ptrType, numClasses)
-    defineGlobal("Y", ptrType, classInstanceTablePtr)
-    defineGlobal("YS", ptrType, gIndex.getFieldOffsets("java/lang/Class", false).offset)
-    defineGlobal("Z", ptrType, clInitFlagTable)
-    defineGlobal("L", ptrType, throwableLookupPtr)
-    defineGlobal("R", ptrType, resourceTablePtr)
+    defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
+    defineGlobal("staticTable", ptrType, staticTablePtr) // static table
+    defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
+    defineGlobal("numClasses", ptrType, numClasses)
+    defineGlobal("classInstanceTable", ptrType, classInstanceTablePtr)
+    defineGlobal("classSize", ptrType, gIndex.getFieldOffsets("java/lang/Class", false).offset)
+    defineGlobal("staticInitTable", ptrType, staticInitFlagTablePtr)
+    defineGlobal("stackTraceTable", ptrType, stackTraceTablePtr)
+    defineGlobal("resourceTable", ptrType, resourceTablePtr)
 
-    defineGlobal("q", ptrType, ptr) // stack end ptr
+    defineGlobal("stackEndPointer", ptrType, ptr) // stack end ptr
     ptr += stackSize
-    defineGlobal("Q", ptrType, ptr, true) // stack ptr
-    defineGlobal("Q0", ptrType, ptr) // stack ptr start address
+    defineGlobal("stackPointer", ptrType, ptr, true) // stack ptr
+    defineGlobal("stackPointerStart", ptrType, ptr) // stack ptr start address
 
     ptr = align(ptr + 4, 16)
     // allocation start address
-    defineGlobal("G", ptrType, ptr, true)
-    defineGlobal("G0", ptrType, ptr) // original allocation start address
+    defineGlobal("allocationPointer", ptrType, ptr, true)
+    defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
 
     val sizeInPages = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
     headerPrinter.append("(memory (import \"js\" \"mem\") ").append(sizeInPages).append(")\n")

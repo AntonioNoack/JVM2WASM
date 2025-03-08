@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
@@ -509,7 +510,7 @@ public class JavaReflect {
     }
 
     @NoThrow
-    @WASM(code = "global.get $R")
+    @WASM(code = "global.get $resourceTable")
     static native int getResourcePtr();
 
     @Alias(names = "java_lang_ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream")

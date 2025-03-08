@@ -143,7 +143,7 @@ class MethodTranslator(
 
         private val LOGGER = LogManager.getLogger(MethodTranslator::class)
 
-        val callTable = ByteArrayOutputStream2(1024)
+        val stackTraceTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
 
         private var printOps = false
@@ -2093,11 +2093,11 @@ class MethodTranslator(
     private fun getCallIndex(): Int {
         if (line != lastLine) {
             lastLine = line
-            callTable.writeLE32(gIndex.getString(sig.clazz))
-            callTable.writeLE32(gIndex.getString(sig.name))
-            callTable.writeLE32(line)
+            stackTraceTable.writeLE32(gIndex.getString(sig.clazz))
+            stackTraceTable.writeLE32(gIndex.getString(sig.name))
+            stackTraceTable.writeLE32(line)
         }
-        return callTable.size() / 12 - 1
+        return stackTraceTable.size() / 12 - 1
     }
 
 }

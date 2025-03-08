@@ -10,6 +10,7 @@ import java.lang.reflect.Modifier;
 
 import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GarbageCollector.largestGaps;
+import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.*;
 import static jvm.NativeLog.log;
@@ -25,7 +26,7 @@ public class JVM32 {
     // public static int fieldTableOffset = getFieldTableOffset(); // for GC
 
     @NoThrow
-    @WASM(code = "global.get $c")
+    @WASM(code = "global.get $inheritanceTable")
     public static native int inheritanceTable();
 
     @Export
@@ -37,7 +38,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "global.get $s")
+    @WASM(code = "global.get $staticTable")
     public static native int staticInstancesOffset();
 
     @NoThrow
@@ -48,7 +49,7 @@ public class JVM32 {
 
     @NoThrow
     @Alias(names = "findClass2")
-    @WASM(code = "global.get $YS i32.mul global.get $Y i32.add")
+    @WASM(code = "global.get $classSize i32.mul global.get $classInstanceTable i32.add")
     public static native int findClass2(int idx);
 
     @NoThrow
@@ -60,10 +61,10 @@ public class JVM32 {
 
     // instance, class -> instance, error
     @Alias(names = "checkCast")
-    public static int checkCast(int instance, int clazz) {
+    public static int checkCast(int instance, int classId) {
         if (instance == 0) return 0;
-        if (!instanceOf(instance, clazz)) {
-            failCastCheck(instance, clazz);
+        if (!instanceOf(instance, classId)) {
+            failCastCheck(instance, classId);
         }
         return instance;
     }
@@ -151,19 +152,19 @@ public class JVM32 {
     private static native void debugArray(Object instance);
 
     @NoThrow
-    @WASM(code = "global.get $M")
-    public static native int indirectTable();
+    @WASM(code = "global.get $resolveIndirectTable")
+    public static native int resolveIndirectTable();
 
     @NoThrow
-    @WASM(code = "global.get $X")
+    @WASM(code = "global.get $numClasses")
     public static native int numClasses();
 
     @Alias(names = "resolveIndirect")
-    public static int resolveIndirect(int instance, int methodPtr) {
+    public static int resolveIndirect(int instance, int signatureId) {
         if (instance == 0) {
             throw new NullPointerException("Instance for resolveIndirect is null");
         }
-        return resolveIndirectByClass(readClass(instance), methodPtr);
+        return resolveIndirectByClass(readClass(instance), signatureId);
     }
 
     @Alias(names = "resolveIndirectFail")
@@ -177,9 +178,9 @@ public class JVM32 {
     @NoThrow
     @WASM(code = "" +
             "  local.get 0 i32.const 2 i32.shl\n" + // clazz << 2
-            "  global.get $M i32.add i32.load\n" + // memory[M + clazz << 2]
-            "  local.get 1 i32.add i32.load") // memory[methodPtr + memory[M + clazz << 2]]
-    private static native int resolveIndirectByClassUnsafe(int clazz, int methodPtr);
+            "  global.get $resolveIndirectTable i32.add i32.load\n" + // memory[resolveIndirectTable + clazz << 2]
+            "  local.get 1 i32.add i32.load") // memory[signatureId + memory[resolveIndirectTable + clazz << 2]]
+    private static native int resolveIndirectByClassUnsafe(int clazz, int signatureId);
 
     @NoThrow
     public static int resolveIndirectByClass(int clazzIdx, int methodPtr) {
@@ -257,7 +258,7 @@ public class JVM32 {
         // log("resolve2", clazz, methodId);
         // log("class:", clazz);
         validateClassIdx(clazz);
-        int tablePtr = read32(inheritanceTable() + (clazz << 2));
+        int tablePtr = getInheritanceTableEntry(clazz);
         // log("tablePtr", tablePtr);
         if (tablePtr == 0) {
             log("No class table entry was found!", clazz);
@@ -343,13 +344,13 @@ public class JVM32 {
     @Export
     @NoThrow
     @Alias(names = "instanceOf")
-    public static boolean instanceOf(int instance, int clazz) {
+    public static boolean instanceOf(int instance, int classId) {
         // log("instanceOf", instance, clazz);
         if (instance == 0) return false;
-        if (clazz == 0) return true;
+        if (classId == 0) return true;
         // checkAddress(instance);
         int testedClass = readClass(instance);
-        return isChildOrSameClass(testedClass, clazz);
+        return isChildOrSameClass(testedClass, classId);
     }
 
 
@@ -379,16 +380,27 @@ public class JVM32 {
     }
 
     @NoThrow
+    private static int getInheritanceTableEntry(int classId) {
+        return read32(inheritanceTable() + (classId << 2));
+    }
+
+    @NoThrow
+    private static int getSuperClassIdFromInheritanceTableEntry(int tableAddress) {
+        return read32(tableAddress);
+    }
+
+    @NoThrow
     public static boolean isChildOrSameClass(int childClassIdx, int parentClassIdx) {
         while (true) {
             if (childClassIdx == parentClassIdx) return true;
             // find super classes in table
             validateClassIdx(childClassIdx);
-            int tableAddress = read32(inheritanceTable() + (childClassIdx << 2));
-            if (tableAddress == 0) return false;
+            int tableAddress = getInheritanceTableEntry(childClassIdx);
+            // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
+            if (tableAddress == 0 || childClassIdx == 0) return false;
             // check for interfaces
             if (isInInterfaceTable(tableAddress, parentClassIdx)) return true;
-            childClassIdx = read32(tableAddress); // switch to parent class
+            childClassIdx = getSuperClassIdFromInheritanceTableEntry(tableAddress); // switch to parent class
         }
     }
 
@@ -397,8 +409,9 @@ public class JVM32 {
         while (true) {
             if (childClassIdx == parentClassIdx) return true;
             validateClassIdx(childClassIdx);
-            int tableAddress = read32(inheritanceTable() + (childClassIdx << 2));
-            if (tableAddress == 0) return false;
+            int tableAddress = getInheritanceTableEntry(childClassIdx);
+            // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
+            if (tableAddress == 0 || childClassIdx == 0) return false;
             childClassIdx = read32(tableAddress); // switch to parent class
         }
     }
@@ -426,30 +439,28 @@ public class JVM32 {
 
     @NoThrow
     public static int getSuperClass(int classIdx) {
-        int tableAddress = read32(inheritanceTable() + (classIdx << 2));
+        int tableAddress = getInheritanceTableEntry(classIdx);
         if (tableAddress == 0) return 0;
-        return read32(tableAddress);
+        return getSuperClassIdFromInheritanceTableEntry(tableAddress);
     }
 
     @NoThrow
     public static int getInstanceSize(int classIndex) {
         // look up class table for size
-        if (classIndex == 0 || (classIndex >= 17 && classIndex < 25)) return arrayOverhead;
-        int tableAddress = read32(inheritanceTable() + (classIndex << 2));
+        if (classIndex == 0) return objectOverhead;
+        if (isNativeArray(classIndex)) return arrayOverhead;
+        int tableAddress = getInheritanceTableEntry(classIndex);
         return read32(tableAddress + 4);
+    }
+
+    @NoThrow
+    private static boolean isNativeArray(int classIndex) {
+        return classIndex >= 17 && classIndex < 25;
     }
 
     @Alias(names = "createInstance")
     public static int createInstance(int clazz) {
         validateClassIdx(clazz);
-        // this probably can be removed, as we never used it
-        // needs to be ignored for java.lang.reflect.Constructor;
-        /*int methodTable = read32(indirectTable() + (clazz << 2));
-        if (methodTable == 0) {
-            Class instance = ptrTo(findClass(clazz));
-            log("Class to instantiate:", clazz, instance.getName());
-            throwJs("Class cannot be created");
-        }*/
         if (trackAllocations) trackCalloc(clazz);
         int instanceSize = getInstanceSize(clazz);
         if (instanceSize <= 0)
@@ -483,7 +494,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    public static int getTypeShiftNoThrow(int clazz) {
+    public static int getTypeShiftUnsafe(int clazz) {
         // 0 1 2 3 4 5 6 7 8 9
         // 2 2 2 2 0 0 1 1 3 3
         int flag0 = ge_ui(clazz, 4) & lt(clazz, 6);
@@ -505,7 +516,7 @@ public class JVM32 {
 
     public static int getTypeShift(int clazz) {
         if (clazz < 0 || clazz > 9) throw new IllegalArgumentException();
-        return getTypeShiftNoThrow(clazz);
+        return getTypeShiftUnsafe(clazz);
     }
 
     @NoThrow
@@ -516,7 +527,7 @@ public class JVM32 {
     public static int createNativeArray1(int length, int clazz) {
         // log("creating native array", length, clazz);
         if (length < 0) throw new IllegalArgumentException();
-        int typeShift = getTypeShiftNoThrow(clazz);
+        int typeShift = getTypeShiftUnsafe(clazz);
         int numDataBytes = length << typeShift;
         if ((numDataBytes >>> typeShift) != length) {
             throw new IllegalArgumentException("Length is too large for 32 bit memory");
@@ -587,11 +598,11 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "global.get $G0")
+    @WASM(code = "global.get $allocationStart")
     public static native int getAllocationStart();
 
     @NoThrow
-    @WASM(code = "global.get $G")
+    @WASM(code = "global.get $allocationPointer")
     public static native int getNextPtr();
 
     @NoThrow
@@ -605,7 +616,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "global.set $G")
+    @WASM(code = "global.set $allocationPointer")
     public static native void setNextPtr(int value);
 
     // @WASM(code = "memory.size i32.const 16 i32.shl")
@@ -891,45 +902,6 @@ public class JVM32 {
     @WASM(code = "v128.const i64x2 0 0 v128.store")
     public static native void clear128(int addr);*/
 
-    @NoThrow
-    @WASM(code = "i64.const 0 i64.store")
-    public static native void clear64(int addr);
-
-    @NoThrow
-    @WASM(code = "i64.store")
-    public static native void write64(int addr, long value);
-
-    @NoThrow
-    @WASM(code = "f64.store")
-    public static native void write64(int addr, double value);
-
-    @NoThrow
-    @WASM(code = "i32.store")
-    public static native void write32(int addr, int value);
-
-    @NoThrow
-    @WASM(code = "f32.store")
-    public static native void write32(int addr, float value);
-
-    @NoThrow
-    @WASM(code = "i32.store16")
-    public static native void write16(int addr, short value);
-
-    @NoThrow
-    @WASM(code = "i32.store16")
-    public static native void write16(int addr, char value);
-
-    @NoThrow
-    @WASM(code = "i32.store8")
-    public static native void write8(int addr, byte value);
-
-    @NoThrow
-    @WASM(code = "i64.load")
-    public static native long read64(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load")
-    public static native int read32(int addr);
 
     /**
      * returns the class index for the given instance
@@ -948,84 +920,7 @@ public class JVM32 {
     public static native int readClass(int addr);
 
     @NoThrow
-    @WASM(code = "f64.load")
-    public static native double read64f(int addr);
-
-    @NoThrow
-    @WASM(code = "f32.load")
-    public static native float read32f(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load16_s")
-    public static native short read16s(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load16_u")
-    public static native char read16u(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load8_s")
-    public static native byte read8(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.div_s")
-    public static native int div(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i64.div_s")
-    public static native long div(long a, long b);
-
-    @Alias(names = "safeDiv32")
-    public static int safeDiv32(int a, int b) {
-        if (b == 0) throw new ArithmeticException("Division by zero");
-        if ((a == Integer.MIN_VALUE) & (b == -1)) return Integer.MIN_VALUE;
-        return div(a, b);
-    }
-
-    @Alias(names = "safeDiv64")
-    public static long safeDiv64(long a, long b) {
-        if (b == 0) throw new ArithmeticException("Division by zero");
-        if ((a == Long.MIN_VALUE) & (b == -1)) return Long.MIN_VALUE;
-        return div(a, b);
-    }
-
-    @Alias(names = "checkNonZero32")
-    public static int checkNonZero32(int b) {
-        if (b == 0) throw new ArithmeticException("Division by zero");
-        return b;
-    }
-
-    @Alias(names = "checkNonZero64")
-    public static long checkNonZero64(long b) {
-        if (b == 0) throw new ArithmeticException("Division by zero");
-        return b;
-    }
-
-    private static boolean canWarnStackOverflow = true;
-
-    @NoThrow
-    @Alias(names = "stackPush")
-    public static void stackPush(int idx) {
-        printStackTraceLine(idx);
-        int stackPointer = getStackPtr() - 4;
-        int limit = getStackLimit();
-        if (unsignedGreaterThanEqual(stackPointer, limit)) {
-            write32(stackPointer, idx);
-        } else if (stackPointer == limit - 4) {
-            // stack overflow
-            // we can do different things here -> let's just keep running;
-            // just the stack is no longer tracked :)
-            if (canWarnStackOverflow) {
-                canWarnStackOverflow = false;
-                log("Warning: Exited stack space, meaning",
-                        (getStackPtr0() - getStackLimit()) >> 2, " recursive calls");
-            }
-        }
-        setStackPtr(stackPointer);
-    }
-
-    @NoThrow
-    private static void printStackTraceLine(int idx) {
+    static void printStackTraceLine(int idx) {
         int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return;
         int throwableLookup = lookupBasePtr + idx * 12;
@@ -1039,52 +934,6 @@ public class JVM32 {
     @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
     private static native void printStackTraceLine(int depth, String clazz, String method, int line);
 
-    @NoThrow
-    @Alias(names = "stackPop")
-    public static void stackPop() {
-        stackPopImpl();
-    }
-
-    @NoThrow
-    @Alias(names = "getStackDepth")
-    public static int getStackDepth() {
-        return (getStackPtr0() - getStackPtr()) >> 2;
-    }
-
-    @NoThrow
-    @WASM(code = "global.get $Q i32.const 4 i32.add global.set $Q")
-    public static native void stackPopImpl();
-
-    @NoThrow
-    @WASM(code = "global.get $Q")
-    public static native int getStackPtr();
-
-    @NoThrow
-    @WASM(code = "global.get $Q0")
-    public static native int getStackPtr0();
-
-    @NoThrow
-    @WASM(code = "global.get $q")
-    public static native int getStackLimit();
-
-    @NoThrow
-    @WASM(code = "global.set $Q")
-    public static native void setStackPtr(int addr);
-
-    @NoThrow
-    @Alias(names = "createNullptr")
-    public static Throwable createNullptr(String name) {
-        return new NullPointerException(name);
-    }
-
-    @Alias(names = "checkNotNull")
-    public static void checkNotNull(Object obj, String clazzName, String fieldName) {
-        if (obj == null) {
-            log("NullPointer@class.field:", clazzName, fieldName);
-            throw new NullPointerException("Instance must not be null");
-        }
-    }
-
     /**
      * Pseudo-Instance, which can be used to avoid allocations,
      * when no fields of a type are used; only used for lambdas, because
@@ -1094,24 +943,6 @@ public class JVM32 {
     @Alias(names = "getClassIndexPtr")
     public static <V> int getClassIndexPtr(int classIndex) {
         return findClass(classIndex) + objectOverhead + 12;
-    }
-
-    @Export
-    @NoThrow
-    @UsedIfIndexed
-    @Alias(names = "init")
-    public static void init() {
-        // access static, so it is initialized
-        getAddr(System.out);
-        // could be used to initialize classes or io
-        System.setOut(new PrintStream(new JavaLang.JSOutputStream(true)));
-        System.setErr(new PrintStream(new JavaLang.JSOutputStream(false)));
-        SharedSecrets.setJavaLangAccess(new JavaLangAccessImpl());
-    }
-
-    @Alias(names = "throwAME")
-    public static void throwAbstractMethodError() {
-        throw new AbstractMethodError();
     }
 
 }

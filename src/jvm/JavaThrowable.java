@@ -5,6 +5,7 @@ import annotations.JavaScript;
 import annotations.NoThrow;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.*;
 import static jvm.JavaLang.*;
 import static jvm.NativeLog.log;
 
@@ -14,8 +15,8 @@ public class JavaThrowable {
 
     @Alias(names = "java_lang_Throwable_getStackTraceDepth_I")
     public static int Throwable_getStackTraceDepth_I(Throwable th) {
-        // is this correct, where is it used?
-        return (getStackPtr0() - getStackPtr()) >> 2;
+        // where is this used?
+        return getStackDepth();
     }
 
     @Alias(names = "java_lang_Throwable_printStackTrace_V")
@@ -70,7 +71,7 @@ public class JavaThrowable {
         insideFIST = true;
 
         int sp = getStackPtr();
-        int stackLength = (getStackPtr0() - sp) >> 2;// each element is 4 bytes in size currently
+        int stackLength = getStackDepth(sp);// each element is 4 bytes in size currently
         final int stackLength0 = stackLength;
         // log("stack ptr", sp);
         // log("stack ptr0", getStackPtr0());
@@ -150,36 +151,11 @@ public class JavaThrowable {
         }
     }
 
-    @NoThrow
-    public static void printStackTrace() {
-
-        int sp = getStackPtr();
-        int stackLength = (getStackPtr0() - sp) >> 2;// each element is 4 bytes in size currently
-        if (stackLength >= stackReportLimit) stackLength = stackReportLimit;
-        int lookupBasePtr = getStackTraceTablePtr();
-        if (lookupBasePtr <= 0) return;
-        if (stackLength < 1) return;
-
-        int endPtr = sp + (stackLength << 2);
-        int i = 0;
-        while (unsignedLessThan(sp, endPtr)) {
-            int stackData = read32(sp);
-            int throwableLookup = lookupBasePtr + stackData * 12;
-            String className = ptrTo(read32(throwableLookup));
-            String methodName = ptrTo(read32(throwableLookup + 4));
-            int line = read32(throwableLookup + 8);
-            log(i, className, methodName, line);
-            sp += 4;
-            i++;
-        }
-
-    }
-
     @Alias(names = "java_lang_Thread_getStackTrace_AW")
     public static StackTraceElement[] Thread_getStackTrace(Thread thread) {
 
         int sp = getStackPtr();
-        int stackLength = (getStackPtr0() - sp) >> 2;// each element is 4 bytes in size currently
+        int stackLength = getStackDepth(sp);// each element is 4 bytes in size currently
         if (stackLength < 1) return new StackTraceElement[0];
         if (stackLength >= stackReportLimit) stackLength = stackReportLimit;
         int lookupBasePtr = getStackTraceTablePtr();

@@ -8,6 +8,7 @@ import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.GCTraversal.classSizes;
 import static jvm.GarbageCollector.*;
 import static jvm.JVM32.*;
+import static jvm.JVMShared.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.NativeLog.log;
 

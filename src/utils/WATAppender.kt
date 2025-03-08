@@ -250,11 +250,11 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
 }
 
-var throwableLookupPtr = 0
-fun appendThrowableLookup(printer: StringBuilder2, ptr0: Int): Int {
+var stackTraceTablePtr = 0
+fun appendStackTraceTable(printer: StringBuilder2, ptr0: Int): Int {
     LOGGER.info("[appendThrowableLookup]")
-    throwableLookupPtr = ptr0
-    return appendData(printer, ptr0, MethodTranslator.callTable)
+    stackTraceTablePtr = ptr0
+    return appendData(printer, ptr0, MethodTranslator.stackTraceTable)
 }
 
 var resourceTablePtr = 0
@@ -316,14 +316,14 @@ val functionTable = ArrayList<String>()
 var printDebug = true
 
 var staticTablePtr = -1
-var clInitFlagTable = 0
+var staticInitFlagTablePtr = 0
 val staticLookup = HashMap<String, Int>()
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     LOGGER.info("[appendStaticInstanceTable]")
     val debugInfo = StringBuilder2()
     staticTablePtr = ptr0
-    clInitFlagTable = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
-    var ptr = clInitFlagTable + numClasses // 1 byte for flag for init
+    staticInitFlagTablePtr = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
+    var ptr = staticInitFlagTablePtr + numClasses // 1 byte for flag for init
     val staticBuffer = ByteArrayOutputStream2(numClasses * 4)
     for (i in 0 until numClasses) {
         val className = gIndex.classNamesByIndex[i]

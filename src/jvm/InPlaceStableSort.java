@@ -3,6 +3,8 @@ package jvm;
 import java.util.Comparator;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.read32;
+import static jvm.JVMShared.write32;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 

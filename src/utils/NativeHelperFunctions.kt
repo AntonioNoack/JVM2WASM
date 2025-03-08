@@ -197,6 +197,7 @@ object NativeHelperFunctions {
         )
 
         // to do implement this, when we have multi-threading
+        // todo these three could be implemented in plain Java
         register("monitorEnter", listOf(ptrType), emptyList(), emptyList())
         register("monitorExit", listOf(ptrType), emptyList(), emptyList())
         register(
@@ -204,7 +205,7 @@ object NativeHelperFunctions {
                 "wasStaticInited", listOf(i32), listOf(i32),
                 listOf(LocalVariable("addr", i32)),
                 listOf(
-                    GlobalGet("Z"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address
+                    GlobalGet("staticInitTable"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address
                     LocalGet("addr"), I32Load8S, // load result (unused by next line)
                     LocalGet("addr"), i32Const1, I32Store8 // set flag
                     // return result

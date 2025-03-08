@@ -3,6 +3,7 @@ package jvm;
 import annotations.Alias;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.*;
 
 public class ArrayAccessSafe {
 
