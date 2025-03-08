@@ -7,6 +7,7 @@ import graphing.ExtractStartNodes.tryExtractStart
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
+import graphing.StructuralAnalysis.Companion.printOps
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
 import me.anno.utils.structures.lists.Lists.count2
@@ -368,15 +369,16 @@ class StructuralAnalysis(
         assertTrue(next.inputs.isEmpty())
         next.inputStack = firstNode.inputStack
 
+        val firstNodeIndex = firstNode.index
         val nextIndex = nodes.indexOf(next)
         nodes[0] = next
         nodes.removeAt(nextIndex)
-        next.index = firstNode.index
+        // next.index = firstNode.index
         firstNode.index = -1
 
         // print update
         if (printOps) {
-            printState(nodes, "Removed ${firstNode.index} via replaceSequences/first()")
+            printState(nodes, "Removed $firstNodeIndex via replaceSequences/first()")
         }
         checkState()
 
@@ -902,17 +904,17 @@ class StructuralAnalysis(
                         node1.inputs.remove(node2)
                         node1.outputStack = node2.outputStack
                         nodes.remove(node2)
-                        if (printOps) println("-${node2.index} by 7")
                         makeNodeLoop("mergeSmallCircleA", node1, i)
+                        if (printOps) printState(nodes, "-${node2.index} by mergeSmallCircles/1")
                     } else if (node1 != firstNode) {
                         // append entry1 to entry2
                         node2.printer.append(node1.printer)
                         node2.inputs.remove(node1)
                         node2.outputStack = node1.outputStack
                         nodes.remove(node1)
-                        if (printOps) println("-${node1.index} by 8")
                         val node2i = nodes.indexOf(node2)
                         makeNodeLoop("mergeSmallCircleB", node2, node2i)
+                        if (printOps) printState(nodes, "-${node1.index} by mergeSmallCircles/2")
                     }
                     checkState()
                     changed = true
@@ -922,15 +924,12 @@ class StructuralAnalysis(
         return changed
     }
 
-    var isLookingAtSpecial = false
-
     /**
      * transform all nodes into some nice if-else-tree
      * */
     fun joinNodes(): Builder {
 
-        isLookingAtSpecial = false
-        printOps = isLookingAtSpecial
+        printOps = methodTranslator.isLookingAtSpecial
 
         if (printOps) {
             println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
@@ -962,7 +961,6 @@ class StructuralAnalysis(
         checkState()
 
         if (canReturnFirstNode()) {
-            if (isLookingAtSpecial) throw IllegalStateException("Looking at $sig")
             return firstNodeForReturn()
         }
 
@@ -993,10 +991,7 @@ class StructuralAnalysis(
                         if (printOps) println("Change by [$step]")
                         checkState()
                         if (canReturnFirstNode()) {
-                            if (isLookingAtSpecial) {
-                                printState(nodes, "solved normally")
-                                throw IllegalStateException("Looking at $sig")
-                            }
+                            if (printOps) printState(nodes, "solved normally")
                             return firstNodeForReturn()
                         }
                         hadAnyChange = true
@@ -1008,10 +1003,7 @@ class StructuralAnalysis(
                 checkState()
                 if (trySolveLinearTree(nodes, methodTranslator, true, emptyMap())) {
                     assertTrue(canReturnFirstNode())
-                    if (isLookingAtSpecial) {
-                        printState(nodes, "solved linear")
-                        throw IllegalStateException("Looking at $sig")
-                    }
+                    if (printOps) printState(nodes, "solved linear")
                     return firstNodeForReturn()
                 }
             }
@@ -1027,10 +1019,7 @@ class StructuralAnalysis(
                 checkState()
                 if (tryExtractEnd(this)) {
                     assertTrue(canReturnFirstNode())
-                    if (isLookingAtSpecial) {
-                        printState(nodes, "solved extract end")
-                        throw IllegalStateException("Looking at $sig")
-                    }
+                    if (printOps) printState(nodes, "solved extract end")
                     return firstNodeForReturn()
                 }
             }
@@ -1052,10 +1041,7 @@ class StructuralAnalysis(
                 if (printOps) printState(nodes, "Before large switch statement:")
                 methodTranslator.addLocalVariable("lbl", i32, "I")
                 val switchStatement = createLargeSwitchStatement2(this)
-                if (isLookingAtSpecial) {
-                    printState(nodes, "solved large switch statement")
-                    throw IllegalStateException("Looking at $sig")
-                }
+                if (printOps) printState(nodes, "solved large switch statement")
                 return switchStatement
             }
         }

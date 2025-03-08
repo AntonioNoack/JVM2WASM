@@ -88,6 +88,7 @@ fun registerDefaultOffsets() {
     eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[java/lang/reflect/Field", false), objectOverhead + ptrSize)
     eq("java/lang/Class", "methods", "java/lang/reflect/Method", ptrSize * 2)
     eq("java/lang/Class", "index", "int", ptrSize * 3)
+    eq("java/lang/Class", "modifiers", "int", ptrSize * 3 + 4)
 
     gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "securityCheckCache", "Ljava/lang/Object", false) // 0
     gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "boolean", false) // 4

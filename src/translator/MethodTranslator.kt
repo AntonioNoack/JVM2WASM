@@ -198,12 +198,17 @@ class MethodTranslator(
     var endNodeIndex = 0
     var nextLoopIndex = 0
 
+    var isLookingAtSpecial = false
+
     private val enableStackPush = enableTracing &&
             (canThrowError || crashOnAllExceptions) &&
             sig.name !in notStackPushedMethods
 
     init {
-        printOps = false
+
+        isLookingAtSpecial = false
+
+        printOps = isLookingAtSpecial
         if (printOps) println("Method-Translating $clazz.$name.$descriptor")
 
         nodes.add(currentNode)
@@ -2074,6 +2079,9 @@ class MethodTranslator(
                     headPrinter1.locals, jointBuilder.instrs,
                     headPrinter1.isExported
                 )
+                if (isLookingAtSpecial) {
+                    throw IllegalStateException("Looking at special '$sig'")
+                }
             } catch (e: Throwable) {
                 LOGGER.warn("Error in $sig.visitEnd")
                 throw e

@@ -489,7 +489,7 @@ void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isErro
 
 i64 instrCtr = 0;
 void jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
-    if (instrCtr++ > 3297970 - 200000) {
+    if (instrCtr++ > -1) {
         std::cout << instrCtr << ":";
         printStackTraceLine(depth, clazz, method, line, false);
     }
@@ -665,11 +665,6 @@ void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstAr
 }
 
 i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
-// roid kotlin_reflect_jvm_KCallablesJvm_setAccessible_Lkotlin_reflect_KCallableZV(i32, i32) { return RET_VOID; }
-// ret32 kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
-// ret32 kotlin_reflect_full_KClasses_getMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(i32) { return RET_NULL; }
-// ret32 kotlin_reflect_jvm_ReflectJvmMapping_getJavaMethod_Lkotlin_reflect_KFunctionLjava_lang_reflect_Method(i32) { return RET_NULL; }
-ret32 kotlin_jvm_internal_MutablePropertyReference_getSetter_Lkotlin_reflect_KMutablePropertyXSetter(i32) { return RET_NULL; }
 roid me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return RET_VOID; }
 roid new_java_text_SimpleDateFormat_V(i32) { return RET_VOID; }
 roid new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
@@ -686,12 +681,6 @@ roid java_io_RandomAccessFile_close0_V(i32) { return RET_VOID; }
 roid java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return RET_VOID; }
 roid java_io_RandomAccessFile_seek0_JV(i32, i64) { return RET_VOID; }
 roid java_io_RandomAccessFile_writeBytes_ABIIV(i32, i32, i32, i32) { return RET_VOID; }
-ret32 java_lang_Class_copyConstructors_ALjava_lang_reflect_ConstructorALjava_lang_reflect_Constructor(i32) { return RET_NULL; }
-ret32 java_lang_Class_getDeclaredConstructors0_ZALjava_lang_reflect_Constructor(i32, i32) { return RET_NULL; }
-ret32 java_lang_Class_getGenericInterfaces_ALjava_lang_reflect_Type(i32) { return RET_NULL; }
-ret32 java_lang_Class_getModifiers_I(i32) { return RET_NULL; }
-ret32 java_lang_Class_getName0_Ljava_lang_String(i32) { return RET_NULL; }
-ret32 java_lang_Class_isInterface_Z(i32) { return RET_NULL; }
 ret32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return RET_NULL; }
 ret32 java_lang_reflect_Field_acquireFieldAccessor_ZLsun_reflect_FieldAccessor(i32, i32) { return RET_NULL; }
 ret32 java_text_DateFormatSymbols_getProviderInstance_Ljava_util_LocaleLjava_text_DateFormatSymbols(i32) { return RET_NULL; }

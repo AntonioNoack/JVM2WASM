@@ -37,7 +37,7 @@ object LargeSwitchStatement {
         val firstIsLinear = firstNode !is BranchNode && firstNode.inputs.isEmpty()
         val nodes = if (firstIsLinear) filterFirstIsLinear(nodes0) else nodes0
 
-        if (sa.isLookingAtSpecial) {
+        if (sa.methodTranslator.isLookingAtSpecial) {
             printState(nodes0, "Before GraphID")
         }
 
@@ -46,7 +46,7 @@ object LargeSwitchStatement {
         val graphId = graphId(sa)
         if (true) saveGraph(graphId, sa)
 
-        if (sa.isLookingAtSpecial) {
+        if (sa.methodTranslator.isLookingAtSpecial) {
             println(graphId)
         }
 

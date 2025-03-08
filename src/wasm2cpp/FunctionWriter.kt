@@ -290,20 +290,20 @@ class FunctionWriter(
         k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
         combine: (StackElement, StackElement, StringBuilder2) -> Unit
     ) {
-        val a = popElement(aType)
-        val b = popElement(bType)
-        if (needsNewVariable(a.names, assignments, k) ||
-            needsNewVariable(b.names, assignments, k)
+        val i1 = popElement(aType)
+        val i0 = popElement(bType)
+        if (needsNewVariable(i0.names, assignments, k) ||
+            needsNewVariable(i1.names, assignments, k)
         ) {
             beginNew(rType)
-            combine(a, b, writer)
+            combine(i0, i1, writer)
             writer.end()
         } else {
             val tmp = tmpExprBuilder
-            combine(a, b, tmp)
+            combine(i0, i1, tmp)
             val combined = tmp.toString()
             tmp.clear()
-            pushElements(rType, combined, listOf(a, b), isBoolean)
+            pushElements(rType, combined, listOf(i0, i1), isBoolean)
         }
     }
 
@@ -394,7 +394,7 @@ class FunctionWriter(
                         dst.append(if (i.type == i32) "(u32) " else "(u64) ")
                     }
                     val operator = if (i.isRight) " >> " else " << "
-                    dst.appendExpr(i1).append(operator).appendExpr(i0)
+                    dst.appendExpr(i0).append(operator).appendExpr(i1)
                 }
             }
             Return -> {
@@ -451,15 +451,15 @@ class FunctionWriter(
                     if (i.cppOperator.startsWith("std::rot")) {
                         dst.append(i.cppOperator)
                             .append(if (i.type == i32) "(u32) " else "(u64) ") // cast to unsigned required
-                            .append(i1.expr).append(", ").append(i0.expr).append(')')
+                            .append(i0.expr).append(", ").append(i1.expr).append(')')
                     } else {
                         dst.append(i.cppOperator) // call(i1, i0)
-                            .append(i1.expr).append(", ").append(i0.expr).append(')')
+                            .append(i0.expr).append(", ").append(i1.expr).append(')')
                     }
                 } else {
-                    dst.appendExpr(i1)
-                    dst.append(' ').append(i.cppOperator).append(' ')
                     dst.appendExpr(i0)
+                    dst.append(' ').append(i.cppOperator).append(' ')
+                    dst.appendExpr(i1)
                 }
             }
             is CompareInstr -> {

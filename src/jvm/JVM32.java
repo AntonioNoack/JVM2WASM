@@ -256,9 +256,7 @@ public class JVM32 {
     public static int resolveInterfaceByClass(int clazz, int methodId) {
         // log("resolve2", clazz, methodId);
         // log("class:", clazz);
-        if (unsignedGreaterThanEqual(clazz, numClasses())) {
-            throwJs("Class index out of bounds");
-        }
+        validateClassIdx(clazz);
         int tablePtr = read32(inheritanceTable() + (clazz << 2));
         // log("tablePtr", tablePtr);
         if (tablePtr == 0) {
@@ -443,10 +441,7 @@ public class JVM32 {
 
     @Alias(names = "createInstance")
     public static int createInstance(int clazz) {
-        if (ge_ub(clazz, numClasses())) {
-            log("class index out of bounds", clazz, numClasses());
-            throwJs();
-        }
+        validateClassIdx(clazz);
         // this probably can be removed, as we never used it
         // needs to be ignored for java.lang.reflect.Constructor;
         /*int methodTable = read32(indirectTable() + (clazz << 2));

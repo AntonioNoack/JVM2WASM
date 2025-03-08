@@ -79,6 +79,12 @@ public class JavaReflect {
         return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
     }
 
+    @Alias(names = "java_lang_Class_getName0_Ljava_lang_String")
+    public static String Class_getName0_Ljava_lang_String() {
+        // should never be called, because classes get set their name at compile-time
+        return "?";
+    }
+
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringAWLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) {
         if (name == null) return null;
@@ -482,7 +488,16 @@ public class JavaReflect {
     @NoThrow
     public static <V> int getClassIndex(Class<V> clazz) {
         if (clazz == null) return -1;
+        // todo depends on ptrSize
         return read32(getAddr(clazz) + objectOverhead + 12);
+    }
+
+    @NoThrow
+    @Alias(names = "java_lang_Class_getModifiers_I")
+    public static <V> int getClassModifiers(Class<V> clazz) {
+        if (clazz == null) return 0;
+        // todo depends on ptrSize
+        return read32(getAddr(clazz) + objectOverhead + 16);
     }
 
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")

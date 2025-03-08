@@ -108,13 +108,14 @@ object ExtractStartNodes {
 
     private fun createMergedCode(sa: StructuralAnalysis, subset: NonRecursiveSubset) {
 
-        val print = false
+        val print = sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
         val startNodes = subset.nodes
         val middle = subset.middle
 
         val firstNode = sa.nodes.first()
+        val graphInput = firstNode.inputStack
 
         // these are necessary!!!
         sa.nodes.partition1 { it in startNodes } // put startNodes first
@@ -126,7 +127,7 @@ object ExtractStartNodes {
             println()
             println("------------------------------------------------------")
             println(
-                "ExtracStart, " +
+                "ExtractStart, " +
                         "start: 0-${startNodes.size - 1}, " +
                         "middle: ${middle.index}, " +
                         "end: ${middle.index + 1}-${sa.nodes.lastIndex}"
@@ -138,7 +139,7 @@ object ExtractStartNodes {
 
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunS${mt.startNodeExtractorIndex++}"
-        val firstRunVariable = mt.addLocalVariable(firstRunLabel, i32, "I")
+        val firstRunVariable = mt.addLocalVariable("${firstRunLabel}v", i32, "I")
         val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 
@@ -204,10 +205,19 @@ object ExtractStartNodes {
         val dst = Builder()
         dst.append(i32Const1).append(firstRunVariable.setter)
         dst.append(loopInstr)
-        loadStack(middle, sa.methodTranslator)
-        middle.printer.prepend(dst)
+        loadStack(middle.inputStack, dst, sa.methodTranslator)
 
-        if (print) printState(sa.nodes, "ExtractStartNodes")
+        val newFirstNode = SequenceNode(dst, middle)
+        newFirstNode.inputStack = graphInput
+        newFirstNode.outputStack = middle.inputStack
+        middle.inputs.add(newFirstNode)
+        sa.nodes.add(0, newFirstNode)
+
+        if (print) {
+            renumber(sa.nodes)
+            printState(sa.nodes, "ExtractStartNodes")
+        }
+
         if (validate) {
             validateStack(sa.nodes, sa.methodTranslator)
         }

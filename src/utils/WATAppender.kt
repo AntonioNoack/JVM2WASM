@@ -79,6 +79,21 @@ private fun fillInClassIndices(
     }
 }
 
+private fun fillInClassModifiers(
+    numClasses: Int, classData: ByteArrayOutputStream2,
+    classSize: Int, modifierOffset: Int
+) {
+    for (clazz in 0 until numClasses) {
+        val dstPtr = clazz * classSize + modifierOffset
+        val pos = classData.position
+        val className = gIndex.classNamesByIndex[clazz]
+        val modifiers = hIndex.classFlags[className] ?: 0
+        classData.position = dstPtr
+        classData.writeLE32(modifiers)
+        classData.position = pos
+    }
+}
+
 var classInstanceTablePtr = 0
 fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
     LOGGER.info("[appendClassInstanceTable]")
@@ -102,6 +117,9 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
     val indexOffset = classFields.get("index")?.offset
     if (indexOffset != null) fillInClassIndices(numClasses, classData, classSize, indexOffset)
+
+    val modifierOffset = classFields.get("modifiers")?.offset
+    if (modifierOffset != null) fillInClassModifiers(numClasses, classData, classSize, modifierOffset)
 
     val fieldsOffset = classFields.get("fields")?.offset
     if (fieldsOffset != null) {

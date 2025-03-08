@@ -87,7 +87,7 @@ object ExtractEndNodes {
 
     private fun createMergedCode(sa: StructuralAnalysis, endNodes: Set<GraphingNode>): Builder {
 
-        val print = false
+        val print = sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
         if (print) {
@@ -112,7 +112,7 @@ object ExtractEndNodes {
 
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
-        val firstRunVariable = mt.addLocalVariable(firstRunLabel, i32, "I")
+        val firstRunVariable = mt.addLocalVariable("${firstRunLabel}v", i32, "I")
         val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 
