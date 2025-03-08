@@ -21,13 +21,14 @@ object MethodResolver {
 
     private fun checkNotConstructable(methodSig: MethodSig) {
         val clazz = methodSig.clazz
+        val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
         val isStatic = methodSig in hIndex.staticMethods
-        if (!(clazz in dIndex.constructableClasses || isStatic) &&
-            methodSig in hIndex.methodsByClass[clazz]!!
+        if (!(clazz2 in dIndex.constructableClasses || isStatic) &&
+            methodSig in hIndex.methodsByClass[clazz2]!!
         ) {
             printUsed(methodSig)
-            println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz }.map { it.key }}")
-            LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz)")
+            println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz2 }.map { it.key }}")
+            LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz2)")
         }
     }
 
@@ -38,7 +39,8 @@ object MethodResolver {
         val mapped = hIndex.getAlias(methodSig)
         if (mapped in hIndex.jvmImplementedMethods ||
             mapped in hIndex.nativeMethods ||
-            mapped in hIndex.customImplementedMethods) {
+            mapped in hIndex.customImplementedMethods
+        ) {
             if (debugFindMethod) println("found impl: $mapped")
             return mapped
         } else return null

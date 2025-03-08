@@ -14,8 +14,6 @@ import utils.MethodResolver.resolveMethod
 
 object DependencyIndex {
 
-    private val LOGGER = LogManager.getLogger(DependencyIndex::class)
-
     private const val cap = 4096
     private const val cap2 = 256
 
@@ -90,6 +88,8 @@ object DependencyIndex {
                 "java/lang/Boolean",
                 "java/lang/Class",
                 "java/lang/reflect/Field",
+                "java/lang/reflect/Method", // for getters and setters only at the moment
+                "java/lang/reflect/Executable", // super class of java.lang.reflect.Method
                 "java/lang/reflect/AccessibleObject",// super class of java.lang.reflect.Field
                 "java/lang/reflect/Constructor", // needed for Class.newInstance()
                 "[]", "[I", "[F", "[Z", "[B", "[C", "[S", "[J", "[D",

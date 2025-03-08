@@ -132,7 +132,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
                                     val isNativeArray =
                                         depth == 0 && className2 in NativeTypes.nativeArrays
                                     val anyObjectArray =
-                                        depth > 0 || (className2.startsWith("[[") && className2 !in NativeTypes.nativeArrays)
+                                        depth > 0 || NativeTypes.isObjectArray(className2)
 
                                     when {
                                         isNativeArray -> {

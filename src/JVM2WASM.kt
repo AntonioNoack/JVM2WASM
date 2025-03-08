@@ -245,6 +245,7 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("jvm/JavaConcurrent")
     clazz("jvm/JavaLang")
     clazz("jvm/JavaReflect")
+    clazz("jvm/JavaReflectMethod")
     clazz("jvm/JavaThrowable")
     clazz("jvm/Chars")
 

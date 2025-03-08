@@ -65,9 +65,9 @@ fun registerDefaultOffsets() {
     gIndex.stringClass = gIndex.getClassIndex(replaceClass("java/lang/String"))
     gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
 
-    eq(gIndex.getFieldOffset("[]", "length", "int", false), objectOverhead)
-    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "value", "[C", false), objectOverhead)
-    eq(gIndex.getFieldOffset(replaceClass("java/lang/String"), "hash", "int", false), objectOverhead + ptrSize)
+    eq("[]", "length", "int", 0)
+    eq(replaceClass("java/lang/String"), "value", if (byteStrings) "[B" else "[C", 0)
+    eq(replaceClass("java/lang/String"), "hash", "int", ptrSize)
 
     hIndex.registerSuperClass("java/lang/reflect/Field", "java/lang/reflect/AccessibleObject")
     hIndex.registerSuperClass("java/lang/reflect/Executable", "java/lang/reflect/AccessibleObject")
@@ -84,9 +84,9 @@ fun registerDefaultOffsets() {
     gIndex.getFieldOffset("java/lang/StackTraceElement", "fileName", "java/lang/String", false)
     gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "int", false)
 
-    eq(gIndex.getFieldOffset("java/lang/Class", "name", "java/lang/String", false), objectOverhead + 0)
-    eq(gIndex.getFieldOffset("java/lang/Class", "fields", "[java/lang/reflect/Field", false), objectOverhead + ptrSize)
-    eq("java/lang/Class", "methods", "java/lang/reflect/Method", ptrSize * 2)
+    eq("java/lang/Class", "name", "java/lang/String", 0)
+    eq("java/lang/Class", "fields", "[java/lang/reflect/Field", ptrSize)
+    eq("java/lang/Class", "methods", "[java/lang/reflect/Method", ptrSize * 2)
     eq("java/lang/Class", "index", "int", ptrSize * 3)
     eq("java/lang/Class", "modifiers", "int", ptrSize * 3 + 4)
 

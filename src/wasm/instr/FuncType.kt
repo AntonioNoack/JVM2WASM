@@ -23,6 +23,16 @@ data class FuncType(val params: List<String>, val results: List<String>) {
                 else -> assertFail(typeStr)
             }
         }
+
+        fun getTypeChar(type: String): Char {
+            return when (type) {
+                i32 -> 'i'
+                i64 -> 'l'
+                f32 -> 'f'
+                f64 -> 'd'
+                else -> assertFail(type)
+            }
+        }
     }
 
     fun toString(dst: StringBuilder2) {
@@ -32,16 +42,6 @@ data class FuncType(val params: List<String>, val results: List<String>) {
         dst.append('X')
         for (result in results) {
             dst.append(getTypeChar(result))
-        }
-    }
-
-    private fun getTypeChar(type: String): Char {
-        return when (type) {
-            i32 -> 'i'
-            i64 -> 'l'
-            f32 -> 'f'
-            f64 -> 'd'
-            else -> assertFail(type)
         }
     }
 }

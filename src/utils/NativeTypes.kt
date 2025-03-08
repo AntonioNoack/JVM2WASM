@@ -15,4 +15,9 @@ object NativeTypes {
     val nativeMappingInv = nativeMapping.entries.associate { it.value to it.key }
     val nativeTypes = nativeMapping.values.toList()
     val nativeArrays = nativeMapping.keys.map { symbol -> "[$symbol" }
+
+    fun isObjectArray(clazz: String): Boolean {
+        return clazz.startsWith("[") &&
+                clazz !in nativeArrays
+    }
 }

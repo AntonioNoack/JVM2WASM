@@ -9,11 +9,9 @@ import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import org.objectweb.asm.*
 import replaceClass
-import sun.security.krb5.internal.crypto.Des
-import utils.Annotations
-import utils.Descriptor
-import utils.FieldSig
-import utils.MethodSig
+import utils.*
+import wasm.instr.CallIndirect
+import wasm.instr.FuncType
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
 
@@ -311,6 +309,11 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         }
     }
 
+    private fun defineCallIndirectWASM(params: List<String>, results: List<String>) {
+        val callInstr = CallIndirect(FuncType(params, results)).toString()
+        annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
+    }
+
     override fun visitEnd() {
 
         if (methods.isNotEmpty()) dIndex.methodDependencies[sig] = methods
@@ -322,15 +325,16 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         }
 
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
-            val callInstr =
-                if (anyMethodThrows) "call_indirect (type \$iXi)"
-                else "call_indirect (type \$iX)"
-            annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
+            defineCallIndirectWASM(listOf(ptrType), if (anyMethodThrows) listOf(ptrType) else emptyList())
         } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
-            val callInstr =
-                if (anyMethodThrows) "call_indirect (type \$Xi)"
-                else "call_indirect (type \$X)"
-            annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
+            defineCallIndirectWASM(emptyList(), if (anyMethodThrows) listOf(ptrType) else emptyList())
+        } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
+            // todo confirm that the method is native???
+            val params0 = sig.descriptor.wasmParams
+            val params1 = params0.subList(0, params0.lastIndex) // cut off last parameter, this is the methodId
+            val canThrow = anyMethodThrows && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
+            val results = sig.descriptor.getResultWASMTypes(canThrow)
+            defineCallIndirectWASM(params1, results)
         }
 
         if (annotations.isNotEmpty()) {
