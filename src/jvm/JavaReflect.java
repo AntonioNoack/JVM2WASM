@@ -22,6 +22,7 @@ import static jvm.JVMShared.*;
 import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
+import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 
 public class JavaReflect {
 
@@ -84,6 +85,12 @@ public class JavaReflect {
     public static String Class_getName0_Ljava_lang_String() {
         // should never be called, because classes get set their name at compile-time
         return "?";
+    }
+
+    @Alias(names = "java_lang_Class_isInterface_Z")
+    public static boolean Class_isInterface_Z(Class<Object> self) {
+        // todo confirm this flag is saved like that
+        return (self.getModifiers() & ACC_INTERFACE) != 0;
     }
 
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringAWLjava_lang_reflect_Method")

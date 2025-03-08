@@ -153,7 +153,7 @@ class MethodTranslator(
             "stackPush", "stackPop", "printStackTraceLine",
             "createGCFieldTable", "findFieldsByClass", "setStackTrace",
             "calloc", "findGap", "allocateNewSpace", "writeClass",
-            "Throwable_printStackTrace_V"
+            "Throwable_printStackTrace_V", "getStackDepth"
         )
     }
 

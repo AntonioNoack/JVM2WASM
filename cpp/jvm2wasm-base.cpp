@@ -168,7 +168,7 @@ void jvm_JVM32_trackCalloc_IV(i32 classId) {
 
 void initClassStatistics() {
     if (countAllocations) {
-        callocStatistics = std::vector<i32>(global_X, 0);
+        callocStatistics = std::vector<i32>(global_numClasses, 0);
     }
 }
 
@@ -767,7 +767,7 @@ void unreachable(std::string msg) {
 void initMemory() {
 
     // 10 as some buffer for the first allocations
-    size_t baseSizeInBlocks = (global_G0 >> 16) + 10;
+    size_t baseSizeInBlocks = (global_allocationStart >> 16) + 10;
     allocatedSize = baseSizeInBlocks << 16;
 
     // allocate memory
