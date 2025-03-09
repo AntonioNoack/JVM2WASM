@@ -4,10 +4,10 @@ import exportHelpers
 import me.anno.utils.assertions.assertNull
 import utils.Param.Companion.toParams
 import utils.WASMTypes.*
-import wasm.instr.*
+import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const0
-import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.Const.Companion.i64Const0
+import wasm.instr.Instruction
 import wasm.instr.Instructions.F32Div
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Mul
@@ -34,8 +34,9 @@ import wasm.instr.Instructions.I64LTS
 import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.I64Sub
+import wasm.instr.Instructions.Return
+import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
-import wasm.parser.LocalVariable
 
 object NativeHelperFunctions {
 
@@ -75,16 +76,16 @@ object NativeHelperFunctions {
     fun appendNativeHelperFunctions() {
 
         forAll { v1 ->
-            register("dup$v1", listOf(v1), listOf(v1, v1), listOf(ParamGet[0], ParamGet[0]))
+            register("dup$v1", listOf(v1), listOf(v1, v1), listOf(ParamGet[0], ParamGet[0], Return))
         }
         forAll2 { v1, v2 ->
             register(
                 "dup2$v1$v2", listOf(v1, v2), listOf(v1, v2, v1, v2),
-                listOf(ParamGet[0], ParamGet[1], ParamGet[0], ParamGet[1])
+                listOf(ParamGet[0], ParamGet[1], ParamGet[0], ParamGet[1], Return)
             )
             register(
                 "swap$v1$v2", listOf(v1, v2), listOf(v2, v1),
-                listOf(ParamGet[1], ParamGet[0])
+                listOf(ParamGet[1], ParamGet[0], Return)
             )
         }
 
@@ -99,7 +100,7 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(i32, type, i32), emptyList(),
-                listOf(ParamGet[0], ParamGet[2], I32Add, ParamGet[1], storeInstr)
+                listOf(ParamGet[0], ParamGet[2], I32Add, ParamGet[1], storeInstr, Return)
             )
         }
 
@@ -114,7 +115,7 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(type, i32, i32), emptyList(),
-                listOf(ParamGet[1], ParamGet[2], I32Add, ParamGet[0], storeInstr)
+                listOf(ParamGet[1], ParamGet[2], I32Add, ParamGet[0], storeInstr, Return)
             )
         }
 
@@ -129,7 +130,7 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(type, i32), emptyList(),
-                listOf(ParamGet[1], ParamGet[0], storeInstr)
+                listOf(ParamGet[1], ParamGet[0], storeInstr, Return)
             )
         }
 
@@ -145,7 +146,7 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(i32, i32), listOf(type),
-                listOf(ParamGet[0], ParamGet[1], I32Add, loadInstr)
+                listOf(ParamGet[0], ParamGet[1], I32Add, loadInstr, Return)
             )
         }
 
@@ -161,58 +162,40 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(i32), listOf(type),
-                listOf(ParamGet[0], loadInstr)
+                listOf(ParamGet[0], loadInstr, Return)
             )
         }
 
         forAll2 { v1, v2 ->
             register(
                 "dup_x1$v1$v2", listOf(v2, v1), listOf(v1, v2, v1),
-                listOf(ParamGet[1], ParamGet[0], ParamGet[1])
+                listOf(ParamGet[1], ParamGet[0], ParamGet[1], Return)
             )
         }
 
         forAll3 { v1, v2, v3 ->
             register(
                 "dup_x2$v1$v2$v3", listOf(v3, v2, v1), listOf(v1, v3, v2, v1),
-                listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2])
+                listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2], Return)
             )
         }
 
         // a % b = a - a/b*b
         register(
             "f32rem", listOf(f32, f32), listOf(f32),
-            listOf(ParamGet[0], ParamGet[0], ParamGet[1], F32Div, ParamGet[1], F32Trunc, F32Mul, F32Sub)
+            listOf(ParamGet[0], ParamGet[0], ParamGet[1], F32Div, ParamGet[1], F32Trunc, F32Mul, F32Sub, Return)
         )
         register(
             "f64rem", listOf(f64, f64), listOf(f64),
-            listOf(ParamGet[0], ParamGet[0], ParamGet[1], F64Div, ParamGet[1], F64Trunc, F64Mul, F64Sub)
+            listOf(ParamGet[0], ParamGet[0], ParamGet[1], F64Div, ParamGet[1], F64Trunc, F64Mul, F64Sub, Return)
         )
 
-        register("i32neg", listOf(i32), listOf(i32), listOf(i32Const0, ParamGet[0], I32Sub))
-        register("i64neg", listOf(i64), listOf(i64), listOf(i64Const0, ParamGet[0], I64Sub))
+        register("i32neg", listOf(i32), listOf(i32), listOf(i32Const0, ParamGet[0], I32Sub, Return))
+        register("i64neg", listOf(i64), listOf(i64), listOf(i64Const0, ParamGet[0], I64Sub, Return))
         register(
             Call.lcmp.name, listOf(i64, i64), listOf(i32), listOf(
                 ParamGet[0], ParamGet[1], I64GTS,
-                ParamGet[0], ParamGet[1], I64LTS, I32Sub
-            )
-        )
-
-        // to do implement this, when we have multi-threading
-        // todo these three could be implemented in plain Java
-        register("monitorEnter", listOf(ptrType), emptyList(), emptyList())
-        register("monitorExit", listOf(ptrType), emptyList(), emptyList())
-        register(
-            FunctionImpl(
-                "wasStaticInited", listOf(Param(i32, 0)), listOf(i32),
-                listOf(LocalVariable("addr", i32)),
-                listOf(
-                    GlobalGet("staticInitTable"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address
-                    LocalGet("addr"), I32Load8S, // load result (unused by next line)
-                    LocalGet("addr"), i32Const1, I32Store8 // set flag
-                    // return result
-                ),
-                exportHelpers
+                ParamGet[0], ParamGet[1], I64LTS, I32Sub, Return
             )
         )
     }

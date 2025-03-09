@@ -417,7 +417,7 @@ public class JVM32 {
     }
 
     @NoThrow
-    private static void validateClassIdx(int childClassIdx) {
+    static void validateClassIdx(int childClassIdx) {
         if (ge_ub(childClassIdx, numClasses())) {
             log("class index out of bounds", childClassIdx, numClasses());
             throwJs();

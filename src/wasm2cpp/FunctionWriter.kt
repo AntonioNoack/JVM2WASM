@@ -63,19 +63,27 @@ class FunctionWriter(
         writer.append(" {\n")
 
         if (function.funcName.startsWith("static_")) {
-            writer.append("static bool wasCalled = false;\n")
-            writer.append(
-                if (function.results.isEmpty()) "if(wasCalled) return;\n"
-                else "if(wasCalled) return 0;\n"
-            )
-            writer.append("wasCalled = true;\n")
+            begin().append("static bool wasCalled = false").end()
+            begin().append(
+                if (function.results.isEmpty()) "if(wasCalled) return"
+                else "if(wasCalled) return 0"
+            ).end()
+            begin().append("wasCalled = true").end()
         }
         for (local in function.locals) {
             if (local.name == "lbl") continue
             begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
         }
-        if (!writeInstructions(function.body)) {
-            LOGGER.warn("Appended return")
+        // find first instruction worth writing:
+        // we can skip all instructions just setting local variables to zero at the start, because we do that anyway
+        var startI = 0
+        val body = function.body
+        while (startI + 1 < body.size &&
+            body[startI] is Const && (body[startI] as Const).value.toDouble() == 0.0 &&
+            body[startI + 1] is LocalSet
+        ) startI += 2
+        if (!writeInstructions(body, startI, body.size)) {
+            LOGGER.warn("Appended return to ${function.funcName}")
             writeInstruction(Return)
         }
         writer.append("}\n")
@@ -331,6 +339,64 @@ class FunctionWriter(
         }
     }
 
+    private val symbols = "+-*/:&|%<=>!"
+    private fun extractSymbolsFromExpression(expr: String): String {
+        val builder = StringBuilder2()
+        var depth = 0
+        for (char in expr) {
+            // if '(', skip until ')'
+            if (char == '(') depth++
+            if (char == ')') depth--
+            if (depth == 0) {
+                if (char in symbols) {
+                    builder.append(char)
+                }
+            }
+        }
+        return builder.toString()
+    }
+
+    private fun canAppendWithoutBrackets(expr: String, symbol: String, isLeft: Boolean): Boolean {
+        when (symbol) {
+            "+" -> {
+                val symbols = extractSymbolsFromExpression(expr)
+                return symbols.all { it in "*/+-" }
+            }
+            "-" -> {
+                val symbols = extractSymbolsFromExpression(expr)
+                return symbols.all { it in "*/" || (it == '+' && isLeft) }
+            }
+            "*" -> {
+                val symbols = extractSymbolsFromExpression(expr)
+                return symbols.all { it == '*' }
+            }
+            // / -> no symbols are supported
+            /* "^" -> {
+                 val symbols = extractSymbolsFromExpression(expr)
+                 return symbols.all { it == '^' }
+             }
+             "!" -> {
+                 val symbols = extractSymbolsFromExpression(expr)
+                 return symbols.all { it == '!' }
+             }
+             "<=", "<", ">", ">=", "!=", "==" -> {
+                 val symbols = extractSymbolsFromExpression(expr)
+                 return symbols.all { it in "+*-/" }
+             }*/
+            /*"&" -> {
+                // todo this is somehow incorrect: we're getting a segfault, when using this
+                val symbols = extractSymbolsFromExpression(expr)
+                // theoretically, '|' is supported, but I want clear code
+                return symbols.all { it == '&' }
+            }*/
+            "|" -> {
+                val symbols = extractSymbolsFromExpression(expr)
+                return symbols.all { it == '|' }
+            }
+            else -> return false
+        }
+    }
+
     private fun writeInstruction(i: Instruction, k: Int, assignments: Map<String, Int>?) {
         when (i) {
             is ParamGet -> {
@@ -472,9 +538,11 @@ class FunctionWriter(
                             .append(i0.expr).append(", ").append(i1.expr).append(')')
                     }
                 } else {
-                    dst.appendExpr(i0)
+                    if (canAppendWithoutBrackets(i0.expr, i.cppOperator, true)) dst.append(i0.expr)
+                    else dst.appendExpr(i0)
                     dst.append(' ').append(i.cppOperator).append(' ')
-                    dst.appendExpr(i1)
+                    if (canAppendWithoutBrackets(i1.expr, i.cppOperator, false)) dst.append(i1.expr)
+                    else dst.appendExpr(i1)
                 }
             }
             is CompareInstr -> {
@@ -488,9 +556,12 @@ class FunctionWriter(
                         dst.appendExpr(i0)
                     } else {
                         if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        dst.appendExpr(i0).append(' ').append(i.operator).append(' ')
+                        if (canAppendWithoutBrackets(i0.expr, i.operator, true)) dst.append(i0.expr)
+                        else dst.appendExpr(i0)
+                        dst.append(' ').append(i.operator).append(' ')
                         if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        dst.appendExpr(i1)
+                        if (canAppendWithoutBrackets(i1.expr, i.operator, false)) dst.append(i1.expr)
+                        else dst.appendExpr(i1)
                     }
                 }
             }

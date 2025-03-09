@@ -226,15 +226,18 @@ object SolveLinearTree {
                 hadCondition = true
             }
 
-            for (j in nodeInputs.indices) {
-                val nodeI = nodeInputs[j]
+            // sort them to make it look a little nicer
+            val nodeLabels = nodeInputs.map { nodeI ->
                 val isTrue = when {
                     nodeI is BranchNode && node == nodeI.ifTrue -> 1
                     nodeI is BranchNode && node == nodeI.ifFalse -> 0
                     nodeI is SequenceNode && node == nodeI.next -> 0
                     else -> assertFail("Unknown case")
                 }
-                addCondition(labels[nodeI.index * 2 + isTrue])
+                labels[nodeI.index * 2 + isTrue]
+            }.sortedByDescending { it.index }
+            for (label in nodeLabels) {
+                addCondition(label)
             }
 
             for (j in extraInputs1.indices) {

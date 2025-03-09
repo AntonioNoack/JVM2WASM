@@ -7,6 +7,7 @@ import sun.misc.SharedSecrets;
 import java.io.PrintStream;
 
 import static jvm.JVM32.unsignedGreaterThanEqual;
+import static jvm.JVM32.validateClassIdx;
 import static jvm.JavaLang.getAddr;
 import static jvm.NativeLog.log;
 
@@ -194,4 +195,27 @@ public class JVMShared {
         if (b == 0) throw new ArithmeticException("Division by zero");
         return b;
     }
+
+    // to do implement this, when we have multi-threading
+    @Alias(names = "monitorEnter")
+    public static void monitorEnter(Object lock) {
+    }
+
+    @Alias(names = "monitorExit")
+    public static void monitorExit(Object lock) {
+    }
+
+    @NoThrow
+    @WASM(code = "global.get $staticInitTable")
+    public static native int getStaticInitTable();
+
+    @Alias(names = "wasStaticInited")
+    public static boolean wasStaticInited(int index) {
+        validateClassIdx(index);
+        int address = getStaticInitTable() + index;
+        boolean answer = read8(address) != 0;
+        write8(address, (byte) 1);
+        return answer;
+    }
+
 }
