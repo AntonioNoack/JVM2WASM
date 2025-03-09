@@ -1,96 +1,129 @@
 package translator
 
+import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
-import utils.Builder
-import utils.Descriptor
-import utils.MethodSig
+import utils.*
 import utils.WASMTypes.i32
-import utils.ptrType
-import wasm.instr.Const
-import wasm.instr.Instruction
+import wasm.instr.*
+import wasm2cpp.FunctionWriter
 
 class LocalVariables {
 
     // name,type -> newName, because types can change in JVM, but they can't in WASM
-    private val localVars = HashMap<Pair<Int, String>, String>()
-    val localVariables1 = ArrayList<LocalVariableOrParam>()
-    val localVarsWithParams = ArrayList<LocalVariableOrParam>()
+    val localVars = ArrayList<LocalVariableOrParam>()
+    val localVarsAndParams = ArrayList<LocalVariableOrParam>()
     val localVarInfos = HashSet<LocalVarInfo>()
     val parameterByIndex = ArrayList<LocalVariableOrParam?>()
+    private val localVarsLookup = ListMap<LocalVariableOrParam>()
 
     val tmpI32 by lazy { defineLocalVar(i32, "?") }
+    val tmpPtr by lazy { defineLocalVar(ptrType, "java/lang/Object") }
 
     fun defineParamVariables(clazz: String, descriptor: Descriptor, isStatic: Boolean) {
         // special rules in Java:
         // double and long use two slots in localVariables
         var idx = 0
         if (!isStatic) {
-            val localVar = LocalVariableOrParam(clazz, ptrType, "self", 0, true)
-            localVarsWithParams.add(localVar)
-            parameterByIndex.add(localVar)
+            defineParamVariable(clazz, ptrType, "self", 0)
             idx++
         }
         for (i in descriptor.params.indices) {
             val jvmType = descriptor.params[i]
             val wasmType = descriptor.wasmParams[i]
             val k = idx++
-            val localVar = LocalVariableOrParam(jvmType, wasmType, "param$k", k, true)
-            localVarsWithParams.add(localVar)
-            parameterByIndex.add(localVar)
+            defineParamVariable(jvmType, wasmType, "p$k", k)
             if (jvmType == "double" || jvmType == "long") {
                 parameterByIndex.add(null) // "skip" a slot
             }
         }
     }
 
-    fun addLocalVariable(name: String, type: String, descriptor: String): LocalVariableOrParam {
-        assertTrue(localVariables1.none { it.wasmName == name }) { "Duplicate variable $name" }
-        val localVar = LocalVariableOrParam(descriptor, type, name, -1000 - localVarsWithParams.size, false)
-        localVariables1.add(localVar)
-        localVarsWithParams.add(localVar)
-        return localVar
+    private fun defineParamVariable(clazz: String, type: String, name: String, k: Int) {
+        val localVar = LocalVariableOrParam(clazz, type, name, k, true)
+        localVarsAndParams.add(localVar)
+        assertNull(localVarsLookup.set(getLookupIdx(k, type), localVar))
+        parameterByIndex.add(localVar)
     }
 
-    private val stackVariables = HashSet<String>()
-    fun getStackVarName(i: Int, type: String): String {
+    fun addLocalVariable(name: String, type: String, descriptor: String): LocalVariableOrParam {
+        return defineLocalVar(nextLocalVarIndex(), name, type, descriptor)
+    }
+
+    private val stackVariables = HashMap<String, LocalVariableOrParam>()
+    fun getStackVarName(i: Int, type: String): LocalVariableOrParam {
         val name = "s$i$type"
-        if (stackVariables.add(name)) {
+        return stackVariables.getOrPut(name) {
             addLocalVariable(name, type, "?")
         }
-        return name
     }
 
     fun initializeLocalVariables(printer: Builder) {
-        val instructions = ArrayList<Instruction>(localVariables1.size * 2)
-        for (variable in localVariables1) {
+        val instructions = ArrayList<Instruction>(localVars.size * 2)
+        for (variable in localVars) {
             instructions.add(Const.zero[variable.wasmType]!!)
             instructions.add(variable.localSet)
         }
         printer.prepend(instructions)
     }
 
+    private fun getLookupIdx(i: Int, wasmType: String): Int {
+        assertTrue(i >= 0)
+        return i * WASMTypes.numWASMTypes + WASMTypes.getWASMTypeIndex(wasmType)
+    }
+
     fun findOrDefineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
-        return localVarsWithParams.firstOrNull { it.index == i && it.wasmType == wasmType }
-            ?: defineLocalVar(i, wasmType, descriptor)
+        return localVarsLookup[getLookupIdx(i, wasmType)] ?: defineLocalVar(i, wasmType, descriptor)
     }
 
     private var nextLocalVar = -1
-    fun defineLocalVar(wasmType: String, descriptor: String): LocalVariableOrParam {
-        val i = nextLocalVar--
-        return defineLocalVar(i, wasmType, descriptor)
+    private fun nextLocalVarIndex(): Int {
+        return nextLocalVar--
     }
 
-    fun defineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
-        // todo this will always be "put"
-        val wasmName = localVars.getOrPut(Pair(i, wasmType)) {
-            // register local variable
-            val name2 = "l${localVars.size}"
-            name2
+    fun defineLocalVar(wasmType: String, descriptor: String): LocalVariableOrParam {
+        return defineLocalVar(nextLocalVarIndex(), wasmType, descriptor)
+    }
+
+    private fun defineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
+        val wasmName = "l${localVars.size}"
+        return defineLocalVar(i, wasmName, wasmType, descriptor)
+    }
+
+    private fun defineLocalVar(i: Int, name: String, wasmType: String, descriptor: String): LocalVariableOrParam {
+        assertTrue(localVars.none { it.name == name }) { "Duplicate variable $name" }
+        val variable = LocalVariableOrParam(descriptor, wasmType, name, i, false)
+        localVarsAndParams.add(variable)
+        localVars.add(variable)
+        if (i >= 0) {
+            assertNull(localVarsLookup.set(getLookupIdx(i, wasmType), variable))
         }
-        val v = LocalVariableOrParam(descriptor, wasmType, wasmName, i, false)
-        localVarsWithParams.add(v)
-        localVariables1.add(v)
-        return v
+        return variable
+    }
+
+    private fun sanitizeVariableName(name: String): String? {
+        if (name.length > 32) return null // we want it readable
+        if (name == "this") return "self"
+        if (name in FunctionWriter.cppKeywords) return "_$name"
+        // check if name is fine
+        if (name.all { it in 'A'..'Z' || it in 'a'..'z' }) {
+            return name
+        }
+        val builder = StringBuilder2()
+        if (name.startsWith("tmp")) builder.append('_')
+        if (name.startsWith("global_")) builder.append('_')
+        for (char in name) {
+            val char2 = when (char) {
+                in 'A'..'Z', in 'a'..'z' -> char
+                in '0'..'9' -> {
+                    if (builder.length == 0) builder.append('_') // really should not happen
+                    char
+                }
+                '$' -> 'X'
+                else -> '_'
+            }
+            builder.append(char2)
+        }
+        return builder.toString()
     }
 
     fun renameLocalVariables(
@@ -101,13 +134,61 @@ class LocalVariables {
         //  for that, we need the order
         //  can we assume that the TranslatorNode-order is correct???
         //  if so, label -> TranslatorNodeIndex, and that can be used for order-comparisons
+        if (localVarInfos.isEmpty()) return
         val localVarsByIndex = localVarInfos
             .groupBy { it.index }
-        if (localVarInfos.size > 1 &&
-            localVarsByIndex.any { it.value.size > 1 }
-        ) {
+
+
+        val usedNames = HashSet<String>(localVarsAndParams.size + 16)
+        for (v in localVarsAndParams) usedNames.add(v.name)
+        // we must also avoid the names of any called function
+        for (node in nodes) {
+            for (inst in node.printer.instrs) {
+                if (inst is Call) usedNames.add(inst.name)
+            }
+        }
+
+        // add labels to usedNames to prevent using them twice
+        // -> not possible here, we don't have usedNames yet
+
+        val renamedVariables = HashMap<String, String>()
+        for ((idx, group) in localVarsByIndex) {
+            if (group.size == 1) {
+                val varInfo = group.first()
+                if (varInfo.name == null) continue
+                val wasmType = varInfo.wasmType
+                val variable = localVarsLookup[getLookupIdx(idx, wasmType)]
+                if (variable != null) {
+                    val oldName = variable.name
+                    val newName = sanitizeVariableName(varInfo.name) ?: continue
+                    if (newName == oldName) continue // weird coincidence
+                    if (usedNames.add(newName)) {
+                        variable.renameTo(newName)
+                        if (!variable.isParam) {
+                            renamedVariables[oldName] = newName
+                        }
+                    } // else find alternative names???
+                } // else :/
+            }
+        }
+
+        // validate renamed variables aren't used in their original form
+        for (node in nodes) {
+            for (instr in node.printer.instrs) {
+                val name = when (instr) {
+                    is LocalGet -> instr.name
+                    is LocalSet -> instr.name
+                    else -> continue
+                }
+                assertTrue(name !in renamedVariables) {
+                    "$instr was renamed!, cannot still be used"
+                }
+            }
+        }
+
+        /*if (localVarsByIndex.any { it.value.size > 1 }) {
             println(sig)
-            println(localVariables1.map { "${it.wasmType} ${it.wasmName}" })
+            println(localVars.map { "${it.wasmType} ${it.name}" })
             println("nodes: ${nodes.size}, labels: $numLabels")
             for ((idx, group) in localVarsByIndex
                 .entries.sortedBy { it.key }) {
@@ -116,8 +197,7 @@ class LocalVariables {
                     println("  $entry")
                 }
             }
-            // TODO()
-        }
+        }*/
     }
 
 }

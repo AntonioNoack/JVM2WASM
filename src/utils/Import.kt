@@ -3,12 +3,13 @@ package utils
 import canThrowError
 import hIndex
 import useWASMExceptions
+import utils.Param.Companion.toParams
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
 import wasm.parser.Import
 
 fun StringBuilder2.import1(funcName: String, params: List<String>, results: List<String>) {
-    imports.add(Import(funcName, params, results))
+    imports.add(Import(funcName, params.toParams(), results))
     append("(import \"jvm\" \"").append(funcName).append("\" (func $").append(funcName)
     appendParams(params, this)
     appendResults(results, this)

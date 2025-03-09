@@ -30,6 +30,7 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
+import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.shorten
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
@@ -38,6 +39,7 @@ import replaceClass
 import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
+import utils.Builder.Companion.isDuplicable
 import utils.ReplaceOptimizer.optimizeUsingReplacements
 import utils.WASMTypes.*
 import wasm.instr.*
@@ -198,7 +200,7 @@ class MethodTranslator(
 
     init {
 
-        isLookingAtSpecial = false
+        isLookingAtSpecial = false // sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "put"
 
         printOps = isLookingAtSpecial
         if (printOps) println("Method-Translating $clazz.$name.$descriptor")
@@ -251,9 +253,13 @@ class MethodTranslator(
         val exported = exportAll || sig in hIndex.exportedMethods
         val results = descriptor.getResultWASMTypes(canThrowError)
         val wasmParams = descriptor.wasmParams
+        val numParams = wasmParams.size + (!isStatic).toInt()
+        val params = variables.localVarsAndParams
+            .subList(0, numParams)
+        assertTrue(params.all { it.isParam })
         return FunctionImpl(
-            name2, if (isStatic) wasmParams else listOf(ptrType) + wasmParams,
-            results, variables.localVariables1.map { LocalVariable(it.wasmName, it.wasmType) }, emptyList(), exported
+            name2, params.map { Param(it.wasmType, it.name) },
+            results, variables.localVars.map { LocalVariable(it.name, it.wasmType) }, emptyList(), exported
         )
     }
 
@@ -580,8 +586,9 @@ class MethodTranslator(
             0x59 -> {// dup
                 val type1 = stack.last()
                 printer.push(type1)
-                if (type1 == i32) {
-                    printer.dupI32()
+                val lastInstr = printer.lastOrNull()
+                if (isDuplicable(lastInstr)) {
+                    printer.append(lastInstr!!)
                 } else {
                     printer.append(Call("dup$type1"))
                 }
@@ -770,7 +777,7 @@ class MethodTranslator(
             }
             0xbf -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
-                printer.dupI32() // todo why are we duplicating the error???
+                printer.dupPtr() // todo why are we duplicating the error???
                 handleThrowable(true)
                 printer.pop(ptrType)
             }
@@ -822,7 +829,7 @@ class MethodTranslator(
         if (fields.isNotEmpty()) {
             val createdInstance = variables.defineLocalVar(ptrType, synthClassName)
             printer.pop(ptrType)
-            printer.append(createdInstance.localSet)
+            printer.append(createdInstance.setter)
 
             ///////////////////////////////
             // implement the constructor //
@@ -830,7 +837,7 @@ class MethodTranslator(
             // is this the correct order? should be :)
             for (i in fields.lastIndex downTo 0) {
                 val type = fields[i]
-                printer.append(createdInstance.localGet) // instance
+                printer.append(createdInstance.getter) // instance
                 val offset = gIndex.getFieldOffset(synthClassName, "f$i", type, false)
                 if (offset == null) {
                     printUsed(sig)
@@ -1052,7 +1059,7 @@ class MethodTranslator(
         fun getCaller(printer: Builder) {
             if (splitArgs.isNotEmpty()) {
                 printer.append(Call(gIndex.getNth(listOf(ptrType) + splitArgs)))
-            } else printer.dupI32()
+            } else printer.dupPtr()
         }
 
         when (opcode0) {
@@ -1440,7 +1447,7 @@ class MethodTranslator(
 
                         // if condition
                         // throwable -> throwable, throwable, int - instanceOf > throwable, jump-condition
-                        handler.printer.dupI32()
+                        handler.printer.dupPtr()
                         handler.printer.appendInstanceOf(catcher.type)
                         if (comments) handler.printer.comment("handler #$i/${catchers.size}/$throwable")
 
@@ -1531,7 +1538,7 @@ class MethodTranslator(
             }
             printer.append(Return)
         } else {
-            val tmp = variables.tmpI32
+            val tmp = variables.tmpPtr
             printer.append(tmp.localSet)
             printer.append(tmp.localGet)
             val ifTrue = if (retType == null) {
@@ -1847,8 +1854,8 @@ class MethodTranslator(
         visitFieldInsn2(opcode, replaceClass(owner0), name, type, true)
     }
 
-    private fun Builder.dupI32(): Builder {
-        return dupI32(variables.tmpI32)
+    private fun Builder.dupPtr(): Builder {
+        return dupIXX(variables.tmpPtr)
     }
 
     fun visitFieldInsn2(opcode: Int, owner: String, name: String, type: String, checkNull: Boolean) {
@@ -1966,7 +1973,7 @@ class MethodTranslator(
                 }
                 if (checkNull && !(!isStatic && printer.endsWith(ParamGet[0]))) {
                     checkNotNull0(owner, name) {
-                        printer.dupI32()
+                        printer.dupPtr()
                     }
                 }
                 printer.pop(ptrType).push(wasmType)
@@ -2032,18 +2039,20 @@ class MethodTranslator(
     override fun visitEnd() {
         if (!isAbstract) {
             try {
+                // must happen before GraphingNodes, because we need to be able to associate labels with nodes
                 variables.renameLocalVariables(sig, nodes, labelNames.size)
+                variables.initializeLocalVariables(nodes.first().printer)
+
                 for (i in nodes.indices) {
                     val node = nodes[i]
                     node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
                 }
+
                 val nodes = TranslatorNode.convertNodes(nodes)
                 validateInputOutputStacks(nodes, sig)
                 StackValidator.validateStack(nodes, this)
                 val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
                 optimizeUsingReplacements(jointBuilder)
-
-                variables.initializeLocalVariables(jointBuilder)
 
                 val funcHead = createFuncHead()
                 gIndex.translatedMethods[sig] = FunctionImpl(

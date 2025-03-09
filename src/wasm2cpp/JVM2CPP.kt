@@ -3,6 +3,7 @@ package wasm2cpp
 import jvm2wasm
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertEquals
+import utils.Param.Companion.toParams
 import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
@@ -15,19 +16,13 @@ import wasm.parser.LocalVariable
 import wasm.parser.WATParser
 
 fun main() {
-    // todo create nicely-readable C++
-    //  -> get access to original variable names, and use them where possible
-    //  -> inline more arguments
     val clock = Clock("JVM2CPP")
     jvm2wasm()
     val testWATParser = true
     if (testWATParser) {
-        wasm2cpp()
-    } else {
-        // todo this isn't correct yet,
-        //  probably because SwitchCase -> text -> SwitchCase is different
-        wasm2cppFromMemory()
+        validate()
     }
+    wasm2cppFromMemory()
     clock.total("JVM2CPP")
 }
 
@@ -99,7 +94,7 @@ fun testFunction(): FunctionImpl {
         Call("AfterSwitch")
     )
     return FunctionImpl(
-        "testFunc", listOf(i32, i32), listOf(i32),
+        "testFunc", listOf(i32, i32).toParams(), listOf(i32),
         listOf(LocalVariable(label, i32)),
         listOf(
             i32Const0, LocalSet(label),

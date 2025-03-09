@@ -54,14 +54,14 @@ object StackValidator {
         val localVars = HashMap<String, String>(localVarsWithParams.size)
         val params = ArrayList<String>()
         for (v in localVarsWithParams) {
-            if (v.getter is LocalGet) {
-                assertEquals(null, localVars.put(v.wasmName, v.wasmType)) {
-                    "Duplicate variable ${v.wasmName}, ${v.wasmType}, ${v.descriptor}, ${v.index}"
-                }
-            } else {
+            if (v.isParam) {
                 val index = (v.getter as ParamGet).index
                 assertEquals(params.size, index)
                 params.add(v.wasmType)
+            } else {
+                assertEquals(null, localVars.put(v.name, v.wasmType)) {
+                    "Duplicate variable ${v.name}, ${v.wasmType}, ${v.descriptor}, ${v.index}"
+                }
             }
         }
         return localVars to params
@@ -96,7 +96,7 @@ object StackValidator {
                     is BranchNode -> node.outputStack + listOf(i32) // i32 = condition
                     else -> node.outputStack
                 }, returnTypes,
-                mt.variables.localVarsWithParams
+                mt.variables.localVarsAndParams
             )
         }
     }
@@ -116,7 +116,7 @@ object StackValidator {
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        val print = false
+        val print = sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "put"
         if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
         for (i in instructions) {
@@ -251,7 +251,7 @@ object StackValidator {
 
     private fun getCallParams(func: Any): List<String> {
         return when (func) {
-            is FunctionImpl -> func.params // helper function
+            is FunctionImpl -> func.params.map { it.wasmType } // helper function
             is MethodSig -> func.descriptor.wasmParams
             else -> throw NotImplementedError()
         }

@@ -246,7 +246,7 @@ object SolveLinearTree {
 
             if (validate) StackValidator.validateStack2( // O(n²)
                 mt.sig, printer, emptyList(), emptyList(), retTypes,
-                mt.variables.localVarsWithParams
+                mt.variables.localVarsAndParams
             )
         }
 

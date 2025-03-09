@@ -16,6 +16,7 @@ import me.anno.utils.types.Booleans.toInt
 import replaceClass
 import useWASMExceptions
 import utils.*
+import utils.Param.Companion.toParams
 import utils.WASMTypes.*
 import wasm.instr.FuncType
 import wasm.instr.ParamGet
@@ -108,7 +109,7 @@ object GeneratorIndex {
             }
             val name = "getNth_$name0"
             FunctionImpl(
-                name, typeStack, typeStack + typeStack.first(),
+                name, typeStack.toParams(), typeStack + typeStack.first(),
                 emptyList(), typeStack.indices.map { ParamGet[it] } + ParamGet[0],
                 false
             )

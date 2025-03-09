@@ -1,12 +1,14 @@
 package wasm.parser
 
+import utils.Param
 import utils.StringBuilder2
 import wasm.instr.Instruction
 import wasm.instr.Instruction.Companion.appendParams
+import wasm.instr.Instruction.Companion.appendParams1
 import wasm.instr.Instruction.Companion.appendResults
 
 open class FunctionImpl(
-    val funcName: String, val params: List<String>, val results: List<String>,
+    val funcName: String, val params: List<Param>, val results: List<String>,
     val locals: List<LocalVariable>,
     var body: List<Instruction>,
     val isExported: Boolean
@@ -17,7 +19,7 @@ open class FunctionImpl(
         if (isExported) {
             builder.append(" (export \"").append(funcName).append("\")")
         }
-        appendParams(params, builder)
+        appendParams1(params, builder)
         appendResults(results, builder)
         builder.append("\n")
         for (local in locals) {

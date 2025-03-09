@@ -7,6 +7,7 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
+import utils.Param.Companion.toParams
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f64Const
@@ -143,7 +144,7 @@ class WATParser {
                             if (list.getType(i) == TokenType.OPEN_BRACKET) i =
                                 parseBlock(list, i) // params are optional
                             if (list.getType(i) == TokenType.OPEN_BRACKET) i = parseBlock(list, i)
-                            imports.add(Import(funcName, ArrayList(params), ArrayList(results)))
+                            imports.add(Import(funcName, params.toParams(), ArrayList(results)))
                             params.clear()
                             results.clear()
                             list.consume(TokenType.CLOSE_BRACKET, i++)
@@ -246,7 +247,7 @@ class WATParser {
                             // println("Function content '$funcName': ${content.toList()}")
                             functions.add(
                                 FunctionImpl(
-                                    funcName, ArrayList(params), ArrayList(results),
+                                    funcName, params.toParams(), ArrayList(results),
                                     locals, content, isExported
                                 )
                             )

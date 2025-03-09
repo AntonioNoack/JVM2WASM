@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import utils.Param
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 
@@ -7,7 +8,7 @@ fun defineFunctionHead(function: FunctionImpl, parameterNames: Boolean) {
     defineFunctionHead(function.funcName, function.params, function.results, parameterNames)
 }
 
-fun defineFunctionHead(funcName: String, params: List<String>, results: List<String>, parameterNames: Boolean) {
+fun defineFunctionHead(funcName: String, params: List<Param>, results: List<String>, parameterNames: Boolean) {
     if (results.isEmpty()) {
         writer.append("void")
     } else {
@@ -17,11 +18,11 @@ fun defineFunctionHead(funcName: String, params: List<String>, results: List<Str
     }
     writer.append(' ').append(funcName).append('(')
     for (i in params.indices) {
-        val pi = params[i]
+        val param = params[i]
         if (i > 0) writer.append(", ")
-        writer.append(pi)
+        writer.append(param.wasmType)
         if (parameterNames) {
-            writer.append(" p").append(i)
+            writer.append(' ').append(param.name)
         }
     }
     writer.append(")")

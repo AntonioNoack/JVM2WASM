@@ -6,6 +6,7 @@ import me.anno.io.files.FileReference
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import utils.*
@@ -26,6 +27,8 @@ var disableClustersForInspection = true
 val writer = StringBuilder2(1 shl 16)
 val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/cpp")
 
+val clock = Clock(LOGGER)
+
 // todo try using this on Android XD
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 
@@ -33,19 +36,31 @@ fun main() {
     wasm2cpp()
 }
 
-fun wasm2cpp() {
-
-    val clock = Clock(LOGGER)
-
-    // load wasm.wat file
+fun validate() {
+    clock.start()
     val text = wasmTextFile.readTextSync()
     clock.stop("Loading WAT")
     val parser = parseWAT(text)
     clock.stop("Parsing")
+    validate(parser)
+}
+
+fun validate(parser: WATParser) {
     validateParsedFunctionsWithOriginals(parser.functions)
     validateFunctionTable(parser.functionTable)
     validateGlobals(parser.globals)
     clock.stop("Validating")
+}
+
+fun wasm2cpp() {
+
+    // load wasm.wat file
+    clock.start()
+    val text = wasmTextFile.readTextSync()
+    clock.stop("Loading WAT")
+    val parser = parseWAT(text)
+    clock.stop("Parsing")
+    validate(parser)
 
     compactBinaryData(parser.dataSections)
     wasm2cpp(parser.functions, parser.functionTable, parser.imports, parser.globals)
@@ -92,11 +107,33 @@ fun validateEqual(original: FunctionImpl, parsed: FunctionImpl) {
     assertEquals(original.params, parsed.params)
     assertEquals(original.results, parsed.results)
     assertEquals(original.locals, parsed.locals)
-    validateEqual(original.body, parsed.body)
+    validateEqual(original.body, parsed.body, original.funcName)
 }
 
-fun validateEqual(original: List<Instruction>, parsed: List<Instruction>) {
-    assertEquals(original, parsed)
+fun validateEqual(original: List<Instruction>, parsed: List<Instruction>, funcName: String) {
+    assertTrue(original == parsed) {
+        printBodies(original, parsed)
+        "Expected equal bodies in '$funcName'"
+    }
+}
+
+fun printBodies(original: List<Instruction>, parsed: List<Instruction>) {
+    val diff = original.indices
+        .filter { original[it] != parsed[it] }
+    println("diff: $diff")
+    for (i in diff) {
+        println("[$i] ${original[i]} != ${parsed[i]}")
+    }
+}
+
+fun printBody(label: String, instructions: List<Instruction>) {
+    val builder = StringBuilder2()
+    builder.append(label).append(":\n")
+    for (instr in instructions) {
+        instr.toString(1, builder)
+        builder.append('\n')
+    }
+    println(builder)
 }
 
 fun wasm2cppFromMemory() {

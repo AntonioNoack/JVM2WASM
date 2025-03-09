@@ -16,9 +16,9 @@ fun main() {
     parser.parse(text)
 
     val typesByFunctions = parser.functions
-        .map { wasm.instr.FuncType(it.params, it.results) }
+        .map { func -> wasm.instr.FuncType(func.params.map { it.wasmType }, func.results) }
     val typesByImports = parser.imports
-        .map { wasm.instr.FuncType(it.params, it.results) }
+        .map { func -> wasm.instr.FuncType(func.params.map { it.wasmType }, func.results) }
     val functionTypes = (typesByFunctions + typesByImports)
         .toHashSet().toList()
 

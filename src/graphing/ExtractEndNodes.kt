@@ -153,7 +153,7 @@ object ExtractEndNodes {
         }
 
         assertTrue(extraInputs.isNotEmpty())
-        if (print) println(endNodesList.map { node -> "${node.index}.extra=${extraInputs[node]?.map { it.wasmName }}" })
+        if (print) println(endNodesList.map { node -> "${node.index}.extra=${extraInputs[node]?.map { it.name }}" })
         if (endNodes.size > 1) {
             assertTrue(SolveLinearTree.trySolveLinearTree(endNodesList, mt, false, extraInputs))
             assertEquals(1, endNodesList.size)

@@ -2,6 +2,7 @@ package utils
 
 import exportHelpers
 import me.anno.utils.assertions.assertNull
+import utils.Param.Companion.toParams
 import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
@@ -44,7 +45,7 @@ object NativeHelperFunctions {
     }
 
     fun register(name: String, params: List<String>, results: List<String>, instructions: List<Instruction>) {
-        register(FunctionImpl(name, params, results, emptyList(), instructions, exportHelpers))
+        register(FunctionImpl(name, params.toParams(), results, emptyList(), instructions, exportHelpers))
     }
 
     private fun forAll(callback: (String) -> Unit) {
@@ -203,7 +204,7 @@ object NativeHelperFunctions {
         register("monitorExit", listOf(ptrType), emptyList(), emptyList())
         register(
             FunctionImpl(
-                "wasStaticInited", listOf(i32), listOf(i32),
+                "wasStaticInited", listOf(Param(i32, 0)), listOf(i32),
                 listOf(LocalVariable("addr", i32)),
                 listOf(
                     GlobalGet("staticInitTable"), ParamGet[0], I32Add, LocalSet("addr"), // calculate flag address

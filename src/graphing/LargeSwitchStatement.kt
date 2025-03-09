@@ -141,7 +141,7 @@ object LargeSwitchStatement {
         if (comments) pre.comment("load stack $inputs")
         for (idx in inputs.indices) {
             val type = inputs[idx]
-            pre.append(LocalGet(mt.variables.getStackVarName(idx, type)))
+            pre.append(mt.variables.getStackVarName(idx, type).getter)
         }
         printer.prepend(pre)
     }
@@ -154,7 +154,7 @@ object LargeSwitchStatement {
         if (outputs.isEmpty()) return
         if (comments) printer.comment("store stack $outputs")
         for ((idx, type) in outputs.withIndex().reversed()) {
-            printer.append(LocalSet(mt.variables.getStackVarName(idx, type)))
+            printer.append(mt.variables.getStackVarName(idx, type).setter)
         }
     }
 }

@@ -195,7 +195,7 @@ class DelayedLambdaUpdate(
                 "double" -> 0x18
                 else -> 0x19
             }
-            mt.visitVarInsn2(opcode, mt.variables.localVarsWithParams[i + 1])
+            mt.visitVarInsn2(opcode, mt.variables.localVarsAndParams[i + 1])
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
                 boxUnbox(arg, wanted ?: "", mt, true)
             }

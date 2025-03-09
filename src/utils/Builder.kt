@@ -9,6 +9,12 @@ import wasm.instr.Instructions.Unreachable
 // typealias Builder = StringBuilder2
 class Builder(capacity: Int = 16) {
 
+    companion object {
+        fun isDuplicable(lastInstr: Instruction?): Boolean {
+            return lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is GlobalGet || lastInstr is Const
+        }
+    }
+
     constructor(instr: Instruction) : this(1) {
         append(instr)
     }
@@ -106,10 +112,10 @@ class Builder(capacity: Int = 16) {
         instrs.clear()
     }
 
-    fun dupI32(tmp: LocalVariableOrParam): Builder {
+    fun dupIXX(tmp: LocalVariableOrParam): Builder {
         val lastInstr = instrs.lastOrNull()
-        if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is GlobalGet || lastInstr is Const) {
-            append(lastInstr)
+        if (isDuplicable(lastInstr)) {
+            append(lastInstr!!)
         } else {
             append(tmp.setter)
             append(tmp.getter)

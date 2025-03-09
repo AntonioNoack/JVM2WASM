@@ -5,7 +5,7 @@ import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
-import utils.*
+import utils.StringBuilder2
 import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
@@ -37,6 +37,18 @@ class FunctionWriter(
 
     companion object {
         private val LOGGER = LogManager.getLogger(FunctionWriter::class)
+
+        val cppKeywords = (
+                "alignas,alignof,and,and_eq,asm,atomic_cancel,atomic_commit,atomic_noexcept,auto,bitand,bitor,bool,break," +
+                        "case,catch,char,char8_t,char16_t,char32_t,class,compl,concept,const,consteval,constexpr,constinit," +
+                        "const_cast,continue,contract_assert,co_await,co_return,co_yield,,decltype,default,delete,do," +
+                        "double,dynamic_cast,else,enum,explicit,export,extern,false,float,for,friend,goto,if,inline,int," +
+                        "long,mutable,namespace,new,noexcept,not,not_eq,nullptr,operator,or,or_eq,private,protected,public," +
+                        "reflexpr,register,reinterpret_cast,requires,return,short,signed,sizeof,static,static_assert," +
+                        "static_cast,struct,switch,synchronized,template,this,thread_local,throw,true,try,typedef," +
+                        "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq"
+                ).split(',').toHashSet()
+
     }
 
     private var depth = 1
@@ -144,16 +156,16 @@ class FunctionWriter(
     }
 
     private fun load(type: String, memoryType: String = type) {
-        val ptr = pop(i32)
-        beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
-            .append("))[0]").end()
+        val ptr = popElement(i32)
+        beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
+            .appendExpr(ptr).append("))[0]").end()
     }
 
     private fun store(type: String, memoryType: String = type) {
         val value = pop(type)
-        val ptr = pop(i32)
-        begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)").append(ptr)
-            .append("))[0] = ").append(value).end()
+        val ptr = popElement(i32)
+        begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
+            .appendExpr(ptr).append("))[0] = ").append(value).end()
     }
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
@@ -324,7 +336,8 @@ class FunctionWriter(
             is ParamGet -> {
                 val index = i.index
                 val type = function.params[index]
-                writeGetInstruction(type, i.name, k, assignments)
+                // assertEquals(i.name, type.name) // todo why is the name incorrect???
+                writeGetInstruction(type.wasmType, type.name, k, assignments)
             }
             is LocalGet -> {
                 val local = localsByName[i.name]
@@ -340,7 +353,8 @@ class FunctionWriter(
             is ParamSet -> {
                 val index = i.index
                 val type = function.params[index]
-                beginSetEnd(i.name, type)
+                // assertEquals(i.name, type.name) // todo why is the name incorrect???
+                beginSetEnd(type.name, type.wasmType)
             }
             is LocalSet -> {
                 val local = localsByName[i.name]
@@ -555,7 +569,7 @@ class FunctionWriter(
             is Call -> {
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
-                writeCall(func.funcName, func.params, func.results)
+                writeCall(func.funcName, func.params.map { it.wasmType }, func.results)
             }
             is CallIndirect -> {
                 val type = i.type

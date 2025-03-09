@@ -11,6 +11,8 @@ import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.*
 import utils.MethodResolver.resolveMethod
+import utils.Param.Companion.toParams
+import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
@@ -92,6 +94,9 @@ object ResolveIndirect {
         owner: String
     ): Boolean {
 
+        val tmpI32 = variables.tmpI32
+        val tmpPtr = variables.tmpPtr
+
         // find all viable children
         // group them by implementation
         val allChildren = findAllConstructableChildren(sig0.clazz)
@@ -121,7 +126,7 @@ object ResolveIndirect {
             fun createPyramidCondition(classes2: List<String>): ArrayList<Instruction> {
                 val result = ArrayList<Instruction>(classes2.size * 5)
                 for (k in classes2.indices) {
-                    result.add(variables.tmpI32.getter)
+                    result.add(tmpI32.getter)
                     result.add(i32Const(gIndex.getClassIndex(classes2[k])))
                     result.add(I32EQ)
                     if (k > 0) result.add(I32Or)
@@ -157,7 +162,7 @@ object ResolveIndirect {
                 if (groupedByClass.size > 1 || checkForInvalidClasses) {
                     getCaller(printer)
                     printer.append(Call.readClass)
-                        .append(variables.tmpI32.setter)
+                        .append(tmpI32.setter)
                 }
 
                 var lastBranch: List<Instruction> =
@@ -197,8 +202,12 @@ object ResolveIndirect {
                     printer.append(Return)
 
                     FunctionImpl(
-                        helperName, listOf(ptrType) + splitArgs,
-                        results, listOf(LocalVariable(variables.tmpI32.wasmName, ptrType)),
+                        helperName, (listOf(ptrType) + splitArgs).toParams(),
+                        results,
+                        listOf(
+                            LocalVariable(tmpI32.name, i32),
+                            LocalVariable(tmpPtr.name, ptrType)
+                        ),
                         printer.instrs, false,
                     )
                 }

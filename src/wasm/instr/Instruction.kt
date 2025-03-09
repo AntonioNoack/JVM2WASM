@@ -1,5 +1,6 @@
 package wasm.instr
 
+import utils.Param
 import utils.StringBuilder2
 
 interface Instruction {
@@ -14,7 +15,15 @@ interface Instruction {
         fun appendParams(params: List<String>, builder: StringBuilder2) {
             if (params.isNotEmpty()) {
                 builder.append(" (param")
-                for (result in params) builder.append(" ").append(result)
+                for (param in params) builder.append(" ").append(param)
+                builder.append(")")
+            }
+        }
+
+        fun appendParams1(params: List<Param>, builder: StringBuilder2) {
+            if (params.isNotEmpty()) {
+                builder.append(" (param")
+                for (param in params) builder.append(" ").append(param.wasmType)
                 builder.append(")")
             }
         }
