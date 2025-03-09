@@ -9,7 +9,7 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import translator.MethodTranslator
 import utils.Builder
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Instructions.Unreachable
@@ -141,7 +141,7 @@ object LargeSwitchStatement {
         if (comments) pre.comment("load stack $inputs")
         for (idx in inputs.indices) {
             val type = inputs[idx]
-            pre.append(LocalGet(mt.getStackVarName(idx, type)))
+            pre.append(LocalGet(mt.variables.getStackVarName(idx, type)))
         }
         printer.prepend(pre)
     }
@@ -154,7 +154,7 @@ object LargeSwitchStatement {
         if (outputs.isEmpty()) return
         if (comments) printer.comment("store stack $outputs")
         for ((idx, type) in outputs.withIndex().reversed()) {
-            printer.append(LocalSet(mt.getStackVarName(idx, type)))
+            printer.append(LocalSet(mt.variables.getStackVarName(idx, type)))
         }
     }
 }

@@ -1,12 +1,8 @@
 package utils
 
 import hIndex
+import utils.WASMTypes.*
 import wasm.instr.FuncType
-
-val f32 = "f32"
-val f64 = "f64"
-val i32 = "i32"
-val i64 = "i64"
 
 // could be changed to i64 in the future, if more browsers support 64 bit wasm
 // quite a few bits expect i32 though... hard to change now
@@ -120,7 +116,7 @@ fun methodName(clazz: String, sig: InterfaceSig): String {
 private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)
 
 fun methodName2(clazz: String, name: String, args: String): String {
-    val clazz2 = if(NativeTypes.isObjectArray(clazz)) "[]" else clazz
+    val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
     return methodName2Cache.getOrPut(Triple(clazz2, name, args)) {
         when (name) {
             STATIC_INIT -> "static|$clazz2|$args"

@@ -2,6 +2,7 @@ package utils
 
 import exportHelpers
 import me.anno.utils.assertions.assertNull
+import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1

@@ -7,14 +7,17 @@ import hierarchy.HierarchyIndex.methodAliases
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
-import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
-import translator.LocalVar
+import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import useWASMExceptions
-import utils.*
+import utils.Builder
+import utils.MethodSig
+import utils.WASMTypes.*
+import utils.helperFunctions
+import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.F32Load
@@ -46,13 +49,15 @@ object StackValidator {
         return sig.descriptor.getResultWASMTypes(hasErrorRetType)
     }
 
-    private fun validateLocalVariables(localVarsWithParams: List<LocalVar>):
+    private fun validateLocalVariables(localVarsWithParams: List<LocalVariableOrParam>):
             Pair<Map<String, String>, List<String>> {
         val localVars = HashMap<String, String>(localVarsWithParams.size)
         val params = ArrayList<String>()
         for (v in localVarsWithParams) {
             if (v.getter is LocalGet) {
-                assertNull(localVars.put(v.wasmName, v.wasmType))
+                assertEquals(null, localVars.put(v.wasmName, v.wasmType)) {
+                    "Duplicate variable ${v.wasmName}, ${v.wasmType}, ${v.descriptor}, ${v.index}"
+                }
             } else {
                 val index = (v.getter as ParamGet).index
                 assertEquals(params.size, index)
@@ -91,7 +96,7 @@ object StackValidator {
                     is BranchNode -> node.outputStack + listOf(i32) // i32 = condition
                     else -> node.outputStack
                 }, returnTypes,
-                mt.localVarsWithParams
+                mt.variables.localVarsWithParams
             )
         }
     }
@@ -99,7 +104,7 @@ object StackValidator {
     fun validateStack2(
         sig: MethodSig, printer: Builder, params: List<String>,
         normalResults: List<String>, returnResults: List<String>,
-        localVarsWithParams: List<LocalVar>
+        localVarsWithParams: List<LocalVariableOrParam>
     ) {
         val (localVarTypes, paramsTypes) = validateLocalVariables(localVarsWithParams)
         validateStack3(sig, printer.instrs, params, normalResults, returnResults, localVarTypes, paramsTypes)

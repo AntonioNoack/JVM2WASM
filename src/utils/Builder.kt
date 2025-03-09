@@ -1,6 +1,6 @@
 package utils
 
-import translator.LocalVar
+import translator.LocalVariableOrParam
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.Return
@@ -106,7 +106,7 @@ class Builder(capacity: Int = 16) {
         instrs.clear()
     }
 
-    fun dupI32(tmp: LocalVar): Builder {
+    fun dupI32(tmp: LocalVariableOrParam): Builder {
         val lastInstr = instrs.lastOrNull()
         if (lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is GlobalGet || lastInstr is Const) {
             append(lastInstr)

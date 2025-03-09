@@ -39,6 +39,7 @@ import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
 import utils.ReplaceOptimizer.optimizeUsingReplacements
+import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f32Const0
@@ -159,14 +160,11 @@ class MethodTranslator(
 
     private var isAbstract = false
     private val stack = ArrayList<String>()
-    private val argsMapping = ArrayList<LocalVar?>()
 
-    val localVariables1 = ArrayList<LocalVariable>()
-    val localVarsWithParams = ArrayList<LocalVar>()
-
-    private val startLabel = Label()
+    val variables = LocalVariables()
+    private val labelNames = HashMap<Label, Int>()
     private val nodes = ArrayList<TranslatorNode>()
-    private var currentNode = TranslatorNode(startLabel)
+    private var currentNode = TranslatorNode(createLabel())
     var printer = currentNode.printer
 
     private val isStatic = access.hasFlag(ACC_STATIC)
@@ -174,21 +172,15 @@ class MethodTranslator(
     val sig = MethodSig.c(clazz, name, descriptor, isStatic)
     val canThrowError = canThrowError(sig)
 
-    fun addLocalVariable(name: String, type: String, descriptor: String): LocalVar {
-        assertTrue(localVariables1.none { it.name == name }) { "Duplicate variable $name" }
-        localVariables1.add(LocalVariable(name, type))
-        val localVar = LocalVar(descriptor, type, name, -1000 - localVarsWithParams.size, false)
-        localVarsWithParams.add(localVar)
-        return localVar
+    private fun createLabel(): Int {
+        val label = Label()
+        val index = labelNames.size
+        labelNames[label] = index
+        return index
     }
 
-    private val stackVariables = HashSet<String>()
-    fun getStackVarName(i: Int, type: String): String {
-        val name = "s$i$type"
-        if (stackVariables.add(name)) {
-            addLocalVariable(name, type, "?")
-        }
-        return name
+    private fun getLabel(label: Label): Int {
+        return labelNames.getOrPut(label) { labelNames.size }
     }
 
     var linearTreeNodeIndex = 0
@@ -219,7 +211,7 @@ class MethodTranslator(
             val wasm = hIndex.wasmNative[sig]
             if (wasm != null) {
                 checkNotMapped()
-                defineArgsMapping()
+                variables.defineParamVariables(clazz, descriptor, isStatic)
                 printer.append(wasm).append(Return)
             } else {
                 // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
@@ -232,7 +224,7 @@ class MethodTranslator(
                 println("////////////////////////\n")
             }
             checkNotMapped()
-            defineArgsMapping()
+            variables.defineParamVariables(clazz, descriptor, isStatic)
             if (name == STATIC_INIT) {
                 // check whether this class was already inited
                 val clazz1 = gIndex.getClassIndex(clazz)
@@ -254,29 +246,6 @@ class MethodTranslator(
         assertEquals(mapped, sig) { "Must not translate $sig, because it is mapped to $mapped" }
     }
 
-    private fun defineArgsMapping() {
-        // special rules in Java:
-        // double and long use two slots in localVariables
-        var idx = 0
-        if (!isStatic) {
-            val localVar = LocalVar(clazz, ptrType, "self", 0, true)
-            localVarsWithParams.add(localVar)
-            argsMapping.add(localVar)
-            idx++
-        }
-        for (i in descriptor.params.indices) {
-            val jvmType = descriptor.params[i]
-            val wasmType = descriptor.wasmParams[i]
-            val k = idx++
-            val localVar = LocalVar(jvmType, wasmType, "param$k", k, true)
-            localVarsWithParams.add(localVar)
-            argsMapping.add(localVar)
-            if (jvmType == "double" || jvmType == "long") {
-                argsMapping.add(null) // "skip" a slot
-            }
-        }
-    }
-
     private fun createFuncHead(): FunctionImpl {
         val name2 = methodName(sig)
         val exported = exportAll || sig in hIndex.exportedMethods
@@ -284,7 +253,7 @@ class MethodTranslator(
         val wasmParams = descriptor.wasmParams
         return FunctionImpl(
             name2, if (isStatic) wasmParams else listOf(ptrType) + wasmParams,
-            results, localVariables1, emptyList(), exported
+            results, variables.localVariables1.map { LocalVariable(it.wasmName, it.wasmType) }, emptyList(), exported
         )
     }
 
@@ -368,7 +337,7 @@ class MethodTranslator(
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         // increment the variable at that index
         if (printOps) println("  [$varIndex] += $increment")
-        val type = findLocalVar(varIndex, i32)
+        val type = variables.findOrDefineLocalVar(varIndex, i32, "int")
         printer
             .append(type.localGet).append(i32Const(increment)).append(I32Add)
             .append(type.localSet)
@@ -567,7 +536,7 @@ class MethodTranslator(
                 if (currentNode.ifTrue != null) {
                     // throw IllegalStateException("Branch cannot have return afterwards")
                     // we expected a label, but didn't get any -> create out own
-                    visitLabel(Label())
+                    visitLabel(createLabel())
                 }
 
                 // pop types from stack
@@ -591,7 +560,7 @@ class MethodTranslator(
                 // marking this as the end
                 // if (printOps) println("marking $currentNode as return")
                 // if it is missing anywhere, we could call this:
-                // nextNode(Label())
+                // nextNode(createLabel())
             }
             0x101 -> {
                 assertTrue(canThrowError)
@@ -851,7 +820,7 @@ class MethodTranslator(
         }
 
         if (fields.isNotEmpty()) {
-            val createdInstance = findOrDefineLocalVar(-2, ptrType)
+            val createdInstance = variables.defineLocalVar(ptrType, synthClassName)
             printer.pop(ptrType)
             printer.append(createdInstance.localSet)
 
@@ -890,8 +859,13 @@ class MethodTranslator(
 
     }
 
-    override fun visitJumpInsn(opcode: Int, label: Label) {
-        if (printOps) println("  [jump] ${OpCode[opcode]} -> $label")
+    override fun visitJumpInsn(opcode: Int, label0: Label) {
+        val label = getLabel(label0)
+        visitJumpInsn(opcode, label)
+    }
+
+    fun visitJumpInsn(opcode: Int, label: Int) {
+        if (printOps) println("  [jump] ${OpCode[opcode]} -> [L$label]")
         when (opcode) {
             // consume two args for comparison
             0x9f -> printer.pop(i32).pop(i32).append(I32EQ)
@@ -918,18 +892,18 @@ class MethodTranslator(
             0x9e -> printer.pop(i32).append(i32Const0).append(I32LES) // <= 0
             else -> assertFail(OpCode[opcode])
         }
-        if (comments) printer.comment("jump ${OpCode[opcode]} -> $label, stack: $stack")
+        if (comments) printer.comment("jump ${OpCode[opcode]} -> [L$label], stack: $stack")
         afterJump(label, opcode == 0xa7)
     }
 
-    private fun afterJump(ifTrue: Label, alwaysTrue: Boolean) {
+    private fun afterJump(ifTrueLabel: Int, alwaysTrue: Boolean) {
         val oldNode = currentNode
-        // if (printOps) println("setting ifTrue for $oldNode to $label")
-        oldNode.ifTrue = ifTrue
+        // if (printOps) println("setting ifTrue for $oldNode to ${labelNames[label]}")
+        oldNode.ifTrue = ifTrueLabel
         oldNode.isAlwaysTrue = alwaysTrue // goto
 
         // just in case the next section is missing:
-        visitLabel(Label(), alwaysTrue)
+        visitLabel(createLabel(), alwaysTrue)
         // oldNode.defaultTarget = if (opcode == 0xa7) null else currentNode
     }
 
@@ -960,7 +934,10 @@ class MethodTranslator(
                         .append(F64_REINTERPRET_I64)
                 }
             }
-            is String -> { // pack string into constant memory, and load its address
+            is String -> {
+                // Pack string into constant memory, and load its address.
+                // Optimizing them against being dropped isn't worth it, because these are parameter names,
+                // and in most cases (99%), there is a field with that same name.
                 printer.push(ptrType)
                 val address = gIndex.getString(value)
                 printer.append(if (is32Bits) i32Const(address) else i64Const(address.toLong()))
@@ -988,53 +965,21 @@ class MethodTranslator(
 
     @Boring
     override fun visitLineNumber(line: Int, start: Label?) {
-        if (printOps) println("Line $line: ($start)")
+        if (printOps) println("Line $line: [${if (start != null) getLabel(start) else "?"}]")
         if (comments) printer.comment("line $line")
         this.line = line
     }
 
-    private fun findLocalVar(i: Int, wasmType: String): LocalVar {
-        var v = localVarsWithParams.firstOrNull { it.index == i && it.wasmType == wasmType }
-        if (v != null) return v
-        v = findOrDefineLocalVar(i, wasmType)
-        // initialize it once at the start... "synthetic local variable" in JDGui
-        nodes.first().printer
-            .prepend(listOf(Const.zero[wasmType]!!, v.localSet))
-        return v
-    }
-
-    private fun findOrDefineLocalVar(i: Int, wasmType: String): LocalVar {
-        var v = localVarsWithParams.firstOrNull { it.index == i && it.wasmType == wasmType }
-        if (v == null) {
-            val wasmName = defineLocalVar(i, wasmType)
-            v = LocalVar("", wasmType, wasmName, i, false)
-            localVarsWithParams.add(v)
-        }
-        return v
-    }
-
-    // name,type -> newName, because types can change in JVM, but they can't in WASM
-    private val localVars = HashMap<Pair<Int, String>, String>()
-
     override fun visitLocalVariable(
-        name: String?, descriptor: String, signature: String?,
-        start: Label, end: Label, index: Int
+        name: String?, descriptor0: String, signature: String?,
+        start0: Label, end0: Label, index: Int
     ) {
-        // we don't care yet
-        /*val wasmType = jvm2wasm1(descriptor)
-        val wasmName = defineLocalVar(name, wasmType)
-        localVariables.add(LocalVar(descriptor, wasmType, wasmName, start, end, index))
-        // this can help with local variables
-        if (printOps) println("  local var $name, $descriptor, $signature, $start .. $end, #$index")*/
-    }
-
-    private fun defineLocalVar(name: Int, wasmType: String): String {
-        return localVars.getOrPut(Pair(name, wasmType)) {
-            // register local variable
-            val name2 = "l${localVars.size}"
-            localVariables1.add(LocalVariable(name2, wasmType))
-            name2
-        }
+        val start = getLabel(start0)
+        val end = getLabel(end0)
+        val descriptor = Descriptor.parseType(descriptor0)
+        val wasmType = jvm2wasmTyped(descriptor)
+        val info = LocalVarInfo(name, descriptor, signature, start, end, index, wasmType)
+        variables.localVarInfos.add(info)
     }
 
     override fun visitMaxs(maxStack: Int, maxLocals: Int) {
@@ -1142,7 +1087,8 @@ class MethodTranslator(
                     stackPush()
                     getCaller(printer)
 
-                    printer.append(i32Const(gIndex.getString(methodName(sig))))
+                    printer
+                        .append(i32Const(gIndex.getString(methodName(sig))))
                         // instance, function index -> function-ptr
                         .comment("not constructable class, $sig, $owner, $name, $descriptor")
                         .append(Call.resolveIndirectFail)
@@ -1384,12 +1330,14 @@ class MethodTranslator(
         visitLookupSwitchInsn(default, IntArray(max - min + 1) { it + min }, labels)
     }
 
-    override fun visitLookupSwitchInsn(default: Label, keys: IntArray, labels: Array<out Label>) {
+    override fun visitLookupSwitchInsn(default0: Label, keys: IntArray, labels0: Array<out Label>) {
         // implement this in wasm text
         // and implement this possible to be decoded as a tree:
         // we replace it for now with standard instructions
-        if (printOps) println("  [lookup] switch $default, [${keys.joinToString()}], [${labels.joinToString()}]")
-        val helper = findOrDefineLocalVar(Int.MAX_VALUE, i32)
+        val default = getLabel(default0)
+        val labels = labels0.map { getLabel(it) }
+        if (printOps) println("  [lookup] switch [$default], [${keys.joinToString()}], [${labels.joinToString()}]")
+        val helper = variables.defineLocalVar(i32, "int")
         printer.pop(i32)
         printer.append(helper.localSet)
         for (i in keys.indices) {
@@ -1411,9 +1359,13 @@ class MethodTranslator(
 
     private val catchers = ArrayList<Catcher>()
 
-    data class Catcher(val start: Label, val end: Label, val handler: Label, val type: String?)
+    data class Catcher(val start: Int, val end: Int, val handler: Int, val type: String)
 
-    override fun visitTryCatchBlock(start: Label, end: Label, handler: Label, type: String?) {
+    override fun visitTryCatchBlock(start0: Label, end0: Label, handler0: Label, type0: String?) {
+        val start = getLabel(start0)
+        val end = getLabel(end0)
+        val handler = getLabel(handler0)
+        val type = if (type0 != null) replaceClass(type0) else "java/lang/Throwable"
         catchers.add(Catcher(start, end, handler, type))
         if (comments) printer.comment("try-catch $start .. $end, handler $handler, type $type")
         if (printOps) println("  ;; try-catch $start .. $end, handler $handler, type $type")
@@ -1452,12 +1404,12 @@ class MethodTranslator(
 
             val oldStack = ArrayList(stack)
 
-            if (catchers.size > 1 || (catchers[0].type != null && catchers[0].type != "java/lang/Throwable")) {
+            if (catchers.size > 1 || (catchers[0].type != "java/lang/Throwable")) {
 
-                val throwable = findOrDefineLocalVar(thIndex--, ptrType)
+                val throwable = variables.defineLocalVar(ptrType, "java/lang/Throwable")
                 printer.append(throwable.localSet).comment("multiple/complex catchers")
 
-                var handler = TranslatorNode(Label())
+                var handler = TranslatorNode(createLabel())
                 nodes.add(handler)
 
                 if (mustThrow) {
@@ -1479,7 +1431,7 @@ class MethodTranslator(
                         handler.printer.append(throwable.localGet)
                     }
 
-                    if (catcher.type == null) {
+                    if (catcher.type == "java/lang/Throwable") {
                         handler.ifFalse = null
                         handler.isAlwaysTrue = true
                         handler.ifTrue = catcher.handler
@@ -1493,7 +1445,7 @@ class MethodTranslator(
                         if (comments) handler.printer.comment("handler #$i/${catchers.size}/$throwable")
 
                         // actual branch
-                        val nextHandler = TranslatorNode(Label())
+                        val nextHandler = TranslatorNode(createLabel())
                         nodes.add(nextHandler)
                         handler.ifFalse = nextHandler
                         handler.ifTrue = catcher.handler
@@ -1510,6 +1462,7 @@ class MethodTranslator(
 
             } else {
 
+                val catcher = catchers.first()
                 if (mustThrow) {
 
                     if (comments) printer.comment("throwing single generic catcher")
@@ -1523,18 +1476,18 @@ class MethodTranslator(
                         }
                     }
 
-                    visitLabel(Label(), true)
+                    visitLabel(createLabel(), true)
 
                     currentNode.isAlwaysTrue = true
-                    currentNode.ifTrue = catchers[0].handler
+                    currentNode.ifTrue = catcher.handler
                     currentNode.outputStack = listOf(ptrType)
 
                 } else {
 
                     printer.comment("maybe throwing single generic catcher")
 
-                    val mainHandler = TranslatorNode(Label())
-                    val throwable = findOrDefineLocalVar(thIndex--, ptrType)
+                    val mainHandler = TranslatorNode(createLabel())
+                    val throwable = variables.defineLocalVar(ptrType, catcher.type)
 
                     if (printOps) println("--- handler: ${mainHandler.label}")
 
@@ -1548,7 +1501,7 @@ class MethodTranslator(
                     for (e in stack.indices) mainHandler.printer.drop()
                     mainHandler.printer.append(throwable.localGet)
                     mainHandler.isAlwaysTrue = true
-                    mainHandler.ifTrue = catchers[0].handler
+                    mainHandler.ifTrue = catcher.handler
                     nodes.add(mainHandler)
                 }
             }
@@ -1578,7 +1531,7 @@ class MethodTranslator(
             }
             printer.append(Return)
         } else {
-            val tmp = tmpI32
+            val tmp = variables.tmpI32
             printer.append(tmp.localSet)
             printer.append(tmp.localGet)
             val ifTrue = if (retType == null) {
@@ -1590,8 +1543,6 @@ class MethodTranslator(
             printer.append(IfBranch(ifTrue, emptyList(), emptyList(), emptyList()))
         }
     }
-
-    val tmpI32 by lazy { findOrDefineLocalVar(-3, i32) }
 
     override fun visitTypeAnnotation(
         typeRef: Int,
@@ -1672,17 +1623,19 @@ class MethodTranslator(
     }
 
     override fun visitVarInsn(opcode: Int, varIndex: Int) {
-        visitVarInsn2(opcode, varIndex, argsMapping.getOrNull(varIndex))
+        visitVarInsn2(opcode, varIndex, variables.parameterByIndex.getOrNull(varIndex))
     }
 
-    fun visitVarInsn2(opcode: Int, varIndex: Int, paramVariable: LocalVar?) {
-        if (printOps) println("  [var] local ${OpCode[opcode]}, $varIndex, $paramVariable")
-        val isPush = when (opcode) {
+    private fun getVarIsPush(opcode: Int): Boolean {
+        return when (opcode) {
             in 0x15..0x2d -> true
             in 0x36..0x4e -> false
             else -> assertFail()
         }
-        val type = when (opcode) {
+    }
+
+    private fun getVarWASMType(opcode: Int): String {
+        return when (opcode) {
             0x15, in 0x1a..0x1d -> i32 // iload
             0x16, in 0x1e..0x21 -> i64 // lload
             0x17, in 0x22..0x25 -> f32 // fload
@@ -1695,13 +1648,23 @@ class MethodTranslator(
             0x3a, in 0x4b..0x4e -> ptrType // astore
             else -> assertFail()
         }
+    }
+
+    private fun visitVarInsn2(opcode: Int, varIndex: Int, paramVariable: LocalVariableOrParam?) {
+        if (printOps) println("  [var] local ${OpCode[opcode]}, $varIndex, $paramVariable")
+        val isPush = getVarIsPush(opcode)
+        val type = getVarWASMType(opcode)
         if (isPush) printer.push(type)
         else printer.pop(type)
         val variable = paramVariable
-            ?: (if (isPush) findLocalVar(varIndex, type)
-            else findOrDefineLocalVar(varIndex, type))
+            ?: variables.findOrDefineLocalVar(varIndex, type, "?")
         assertEquals(type, variable.wasmType)
         printer.append(if (isPush) variable.localGet else variable.localSet)
+    }
+
+    fun visitVarInsn2(opcode: Int, paramVariable: LocalVariableOrParam) {
+        // varIndex=-1 is unused
+        visitVarInsn2(opcode, -1, paramVariable)
     }
 
     override fun visitIntInsn(opcode: Int, operand: Int) {
@@ -1734,10 +1697,14 @@ class MethodTranslator(
     }
 
     override fun visitLabel(label: Label) {
+        visitLabel(getLabel(label))
+    }
+
+    private fun visitLabel(label: Int) {
         visitLabel(label, false)
     }
 
-    private fun visitLabel(label: Label, findStackManually: Boolean) {
+    private fun visitLabel(label: Int, findStackManually: Boolean) {
 
         val currNode = currentNode
         val nextNode = TranslatorNode(label)
@@ -1750,14 +1717,14 @@ class MethodTranslator(
             for (node in nodes) { // O(n²) -> potentially very slow :/
                 if (node.ifTrue == label || node.ifFalse?.label == label) {
                     nextNode.inputStack = node.outputStack
-                    // println("found $label :), $stack -> ${node.outputStack}")
+                    // println("found ${labelNames[label]} :), $stack -> ${node.outputStack}")
                     stack.clear()
                     stack.addAll(node.outputStack)
                     found = true
                     break
                 }
             }
-            // if (!found) println("didn't find $label :/")
+            // if (!found) println("didn't find ${labelNames[label]} :/")
         }
 
         if (!found) {
@@ -1770,8 +1737,8 @@ class MethodTranslator(
         currentNode = nextNode
         printer = nextNode.printer
 
-        if (printOps) println(" [label] $label")
-        if (comments) printer.comment(label.toString())
+        if (printOps) println(" [L$label]")
+        if (comments) printer.comment("[L$label]")
     }
 
     private fun getLoadInstr(descriptor: String): Instruction = when (descriptor) {
@@ -1881,7 +1848,7 @@ class MethodTranslator(
     }
 
     private fun Builder.dupI32(): Builder {
-        return dupI32(tmpI32)
+        return dupI32(variables.tmpI32)
     }
 
     fun visitFieldInsn2(opcode: Int, owner: String, name: String, type: String, checkNull: Boolean) {
@@ -2065,7 +2032,9 @@ class MethodTranslator(
     override fun visitEnd() {
         if (!isAbstract) {
             try {
-                for (node in nodes) {
+                variables.renameLocalVariables(sig, nodes, labelNames.size)
+                for (i in nodes.indices) {
+                    val node = nodes[i]
                     node.isReturn = node.printer.lastOrNull()?.isReturning() ?: false
                 }
                 val nodes = TranslatorNode.convertNodes(nodes)
@@ -2073,11 +2042,14 @@ class MethodTranslator(
                 StackValidator.validateStack(nodes, this)
                 val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
                 optimizeUsingReplacements(jointBuilder)
-                val headPrinter1 = createFuncHead()
+
+                variables.initializeLocalVariables(jointBuilder)
+
+                val funcHead = createFuncHead()
                 gIndex.translatedMethods[sig] = FunctionImpl(
-                    headPrinter1.funcName, headPrinter1.params, headPrinter1.results,
-                    headPrinter1.locals, jointBuilder.instrs,
-                    headPrinter1.isExported
+                    funcHead.funcName, funcHead.params, funcHead.results,
+                    funcHead.locals, jointBuilder.instrs,
+                    funcHead.isExported
                 )
                 if (isLookingAtSpecial) {
                     throw IllegalStateException("Looking at special '$sig'")

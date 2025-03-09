@@ -7,10 +7,10 @@ import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.sortByTopology
 import me.anno.utils.structures.lists.Lists.swap
-import translator.LocalVar
+import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import utils.Builder
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.Const
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
@@ -20,10 +20,10 @@ import wasm.instr.Instructions.Unreachable
 
 object SolveLinearTree {
 
-    private val unusedLabel = LocalVar("I", i32, "lUnused", -1, false)
+    private val unusedLabel = LocalVariableOrParam("I", i32, "lUnused", -1, false)
 
-    private fun createLabels(nodes: List<GraphingNode>, mt: MethodTranslator): List<LocalVar> {
-        val labels = ArrayList<LocalVar>(nodes.size * 2)
+    private fun createLabels(nodes: List<GraphingNode>, mt: MethodTranslator): List<LocalVariableOrParam> {
+        val labels = ArrayList<LocalVariableOrParam>(nodes.size * 2)
         for (i in nodes.indices) {
             val node = nodes[i]
             when (node) {
@@ -33,12 +33,12 @@ object SolveLinearTree {
                 }
                 is BranchNode -> {
                     val k = mt.linearTreeNodeIndex++
-                    labels.add(mt.addLocalVariable("n${k}F", i32, "I"))
-                    labels.add(mt.addLocalVariable("n${k}T", i32, "I"))
+                    labels.add(mt.variables.addLocalVariable("n${k}F", i32, "I"))
+                    labels.add(mt.variables.addLocalVariable("n${k}T", i32, "I"))
                 }
                 is SequenceNode -> {
                     val k = mt.linearTreeNodeIndex++
-                    val variable = mt.addLocalVariable("n${k}", i32, "I")
+                    val variable = mt.variables.addLocalVariable("n${k}", i32, "I")
                     labels.add(variable)
                     labels.add(variable)
                 }
@@ -49,14 +49,14 @@ object SolveLinearTree {
         return labels
     }
 
-    private fun setLabelsInNodes(nodes: List<GraphingNode>, mt: MethodTranslator, labels: List<LocalVar>) {
+    private fun setLabelsInNodes(nodes: List<GraphingNode>, mt: MethodTranslator, labels: List<LocalVariableOrParam>) {
         for (i in nodes.indices) {
             val node = nodes[i]
             setLabelInNode(node, i, mt, labels)
         }
     }
 
-    private fun setLabelInNode(node: GraphingNode, i: Int, mt: MethodTranslator, labels: List<LocalVar>) {
+    private fun setLabelInNode(node: GraphingNode, i: Int, mt: MethodTranslator, labels: List<LocalVariableOrParam>) {
         // keep stack in order
         loadStack(node, mt)
         when (node) {
@@ -80,7 +80,7 @@ object SolveLinearTree {
         }
     }
 
-    private fun initializeLabels(nodes: List<GraphingNode>, labels: List<LocalVar>, printer: Builder) {
+    private fun initializeLabels(nodes: List<GraphingNode>, labels: List<LocalVariableOrParam>, printer: Builder) {
         for (i in nodes.indices) {
             val node = nodes[i]
             when (node) {
@@ -106,7 +106,7 @@ object SolveLinearTree {
 
     fun trySolveLinearTree(
         nodes: MutableList<GraphingNode>, mt: MethodTranslator,
-        firstNodeIsEntry: Boolean, extraInputs: Map<GraphingNode, List<LocalVar>>
+        firstNodeIsEntry: Boolean, extraInputs: Map<GraphingNode, List<LocalVariableOrParam>>
     ): Boolean {
         val retTypes = StackValidator.getReturnTypes(mt.sig)
         val firstNode = nodes.first()
@@ -220,7 +220,7 @@ object SolveLinearTree {
             }
 
             var hadCondition = false
-            fun addCondition(condition: LocalVar) {
+            fun addCondition(condition: LocalVariableOrParam) {
                 printer.append(condition.getter)
                 if (hadCondition) printer.append(I32Or)
                 hadCondition = true
@@ -246,7 +246,7 @@ object SolveLinearTree {
 
             if (validate) StackValidator.validateStack2( // O(n²)
                 mt.sig, printer, emptyList(), emptyList(), retTypes,
-                mt.localVarsWithParams
+                mt.variables.localVarsWithParams
             )
         }
 

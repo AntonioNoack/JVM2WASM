@@ -5,7 +5,7 @@ import wasm.instr.LocalSet
 import wasm.instr.ParamGet
 import wasm.instr.ParamSet
 
-class LocalVar(
+class LocalVariableOrParam(
     val descriptor: String,
     val wasmType: String,
     val wasmName: String,

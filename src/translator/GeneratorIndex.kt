@@ -16,6 +16,7 @@ import me.anno.utils.types.Booleans.toInt
 import replaceClass
 import useWASMExceptions
 import utils.*
+import utils.WASMTypes.*
 import wasm.instr.FuncType
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl

@@ -132,13 +132,13 @@ class DelayedLambdaUpdate(
     fun generateSyntheticMethod() {
 
         // build synthetic method code
-        val printer = MethodTranslator(0, bridgeMethod.clazz, bridgeMethod.name, bridgeMethod.descriptor)
+        val mt = MethodTranslator(0, bridgeMethod.clazz, bridgeMethod.name, bridgeMethod.descriptor)
         val wantedDescriptor = calledMethod.descriptor
         val wantedParams = wantedDescriptor.params
 
         val print = false
 
-        printer.printer.comment("synthetic lambda")
+        mt.printer.comment("synthetic lambda")
 
         if (print) {
             println()
@@ -157,11 +157,11 @@ class DelayedLambdaUpdate(
         if (needsSelf) {
             if (print) println("[0] += self")
             if (usesSelf) {
-                printer.printer.comment("[0] += self")
-                printer.visitVarInsn(0x2a, 0) // local.get this
-                printer.visitFieldInsn2(0xb4, synthClassName, "self", "java/lang/Object", false) // get field
+                mt.printer.comment("[0] += self")
+                mt.visitVarInsn(0x2a, 0) // local.get this
+                mt.visitFieldInsn2(0xb4, synthClassName, "self", "java/lang/Object", false) // get field
             } else {
-                printer.printer.append(i32Const0).comment("self, unused")
+                mt.printer.append(i32Const0).comment("self, unused")
             }
             if (!callingStatic) k--
         }
@@ -172,12 +172,12 @@ class DelayedLambdaUpdate(
             val fieldName = "f$i"
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[1] += $arg ($wanted)")
-            printer.printer.comment("[1] += $arg")
+            mt.printer.comment("[1] += $arg")
             // load self for field
-            printer.visitVarInsn(0x2a, 0) // local.get this
-            printer.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
+            mt.visitVarInsn(0x2a, 0) // local.get this
+            mt.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
-                boxUnbox(arg, wanted ?: "", printer, true)
+                boxUnbox(arg, wanted ?: "", mt, true)
             }
         }
 
@@ -187,7 +187,7 @@ class DelayedLambdaUpdate(
             val arg = fields2[i]
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[2] += $arg ($wanted)")
-            printer.printer.comment("[2] += $arg")
+            mt.printer.comment("[2] += $arg")
             val opcode = when (arg) {
                 "boolean", "char", "byte", "short", "int" -> 0x15
                 "long" -> 0x16
@@ -195,10 +195,9 @@ class DelayedLambdaUpdate(
                 "double" -> 0x18
                 else -> 0x19
             }
-            // todo validate that this is correct...
-            printer.visitVarInsn2(opcode, -1, printer.localVarsWithParams[i + 1])
+            mt.visitVarInsn2(opcode, mt.variables.localVarsWithParams[i + 1])
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
-                boxUnbox(arg, wanted ?: "", printer, true)
+                boxUnbox(arg, wanted ?: "", mt, true)
             }
         }
 
@@ -213,12 +212,12 @@ class DelayedLambdaUpdate(
         if (isConstructor) {
             // to do we have to register this potentially as creating a new class
             val clazz = calledMethod.clazz
-            printer.visitTypeInsn(0xbb, clazz)
+            mt.visitTypeInsn(0xbb, clazz)
             // if is new instance, duplicate result
-            printer.visitInsn(0x59)
+            mt.visitInsn(0x59)
         }
 
-        var couldThrow = printer.visitMethodInsn2(
+        var couldThrow = mt.visitMethodInsn2(
             if (isInterface) 0xb9 else if (callingStatic) 0xb8 else 0xb6,
             calledMethod, isInterface, false
         )
@@ -235,18 +234,18 @@ class DelayedLambdaUpdate(
         val ret0 = if (isConstructor) "java/lang/Object" else wantedDescriptor.returnType
         val ret1 = bridgeMethod.descriptor.returnType
         if (ret0 != ret1 && isNative(ret0) != isNative(ret1)) {
-            if (couldThrow) printer.handleThrowable()
-            boxUnbox(ret0, ret1, printer, false)
+            if (couldThrow) mt.handleThrowable()
+            boxUnbox(ret0, ret1, mt, false)
             couldThrow = true
         }
 
         if (!couldThrow && anyMethodThrows) {
             // calling this is easier than figuring our the return type for the correct return function
-            printer.visitLdcInsn(0)
+            mt.visitLdcInsn(0)
         }
 
-        printer.printer.append(Return)
-        printer.visitEnd()
+        mt.printer.append(Return)
+        mt.visitEnd()
     }
 
     companion object {

@@ -121,7 +121,7 @@ object ResolveIndirect {
             fun createPyramidCondition(classes2: List<String>): ArrayList<Instruction> {
                 val result = ArrayList<Instruction>(classes2.size * 5)
                 for (k in classes2.indices) {
-                    result.add(tmpI32.getter)
+                    result.add(variables.tmpI32.getter)
                     result.add(i32Const(gIndex.getClassIndex(classes2[k])))
                     result.add(I32EQ)
                     if (k > 0) result.add(I32Or)
@@ -157,7 +157,7 @@ object ResolveIndirect {
                 if (groupedByClass.size > 1 || checkForInvalidClasses) {
                     getCaller(printer)
                     printer.append(Call.readClass)
-                        .append(tmpI32.setter)
+                        .append(variables.tmpI32.setter)
                 }
 
                 var lastBranch: List<Instruction> =
@@ -198,7 +198,7 @@ object ResolveIndirect {
 
                     FunctionImpl(
                         helperName, listOf(ptrType) + splitArgs,
-                        results, listOf(LocalVariable(tmpI32.wasmName, ptrType)),
+                        results, listOf(LocalVariable(variables.tmpI32.wasmName, ptrType)),
                         printer.instrs, false,
                     )
                 }

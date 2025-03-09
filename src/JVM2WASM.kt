@@ -19,6 +19,7 @@ import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
 import utils.DynIndex.resolveIndirectTablePtr
 import utils.NativeHelperFunctions.appendNativeHelperFunctions
+import utils.WASMTypes.*
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder

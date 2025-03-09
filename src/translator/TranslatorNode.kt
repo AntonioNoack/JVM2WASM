@@ -8,13 +8,12 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.createArrayList
-import org.objectweb.asm.Label
 import utils.Builder
 import wasm.instr.Comment
 
-class TranslatorNode(val label: Label) {
+class TranslatorNode(val label: Int) {
 
-    var ifTrue: Label? = null
+    var ifTrue: Int? = null
     var ifFalse: TranslatorNode? = null
 
     var isAlwaysTrue = false
@@ -28,7 +27,7 @@ class TranslatorNode(val label: Label) {
 
     val printer = Builder()
 
-    fun toString(mapper: (Label?) -> String): String {
+    fun toString(mapper: (label: Int?) -> String): String {
         val name = mapper(label)
         return if (isAlwaysTrue) {
             "[$name -> ${mapper(ifTrue)}]"
@@ -67,8 +66,10 @@ class TranslatorNode(val label: Label) {
                 }
             }
 
-            val labelToNode = nodes.indices.associate { i ->
-                nodes[i].label to newNodes[i]
+            val maxLabel = nodes.maxOf { it.label }
+            val labelToNode = arrayOfNulls<GraphingNode>(maxLabel + 1)
+            for (i in nodes.indices) {
+                labelToNode[nodes[i].label] = newNodes[i]
             }
 
             // add input stack and output stack
@@ -84,11 +85,11 @@ class TranslatorNode(val label: Label) {
                 val node = nodes[i]
                 when (val newNode = newNodes[i]) {
                     is SequenceNode -> {
-                        newNode.next = labelToNode[node.next]!!
+                        newNode.next = labelToNode[node.next!!]!!
                     }
                     is BranchNode -> {
-                        newNode.ifTrue = labelToNode[node.ifTrue]!!
-                        newNode.ifFalse = labelToNode[node.ifFalse?.label]!!
+                        newNode.ifTrue = labelToNode[node.ifTrue!!]!!
+                        newNode.ifFalse = labelToNode[node.ifFalse!!.label]!!
                     }
                 }
             }

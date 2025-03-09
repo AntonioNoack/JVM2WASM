@@ -13,7 +13,7 @@ import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
 import me.anno.utils.structures.lists.TopologicalSort
 import utils.Builder
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
@@ -139,7 +139,7 @@ object ExtractStartNodes {
 
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunS${mt.startNodeExtractorIndex++}"
-        val firstRunVariable = mt.addLocalVariable("${firstRunLabel}v", i32, "I")
+        val firstRunVariable = mt.variables.addLocalVariable("${firstRunLabel}v", i32, "I")
         val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 

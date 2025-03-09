@@ -15,7 +15,7 @@ import me.anno.utils.structures.lists.Lists.none2
 import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
 import utils.Builder
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
@@ -1039,7 +1039,7 @@ class StructuralAnalysis(
 
             if (!hadAnyChange) {
                 if (printOps) printState(nodes, "Before large switch statement:")
-                methodTranslator.addLocalVariable("lbl", i32, "I")
+                methodTranslator.variables.addLocalVariable("lbl", i32, "I")
                 val switchStatement = createLargeSwitchStatement2(this)
                 if (printOps) printState(nodes, "solved large switch statement")
                 return switchStatement

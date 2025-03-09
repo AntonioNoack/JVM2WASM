@@ -9,9 +9,9 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.partition1
-import translator.LocalVar
+import translator.LocalVariableOrParam
 import utils.Builder
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
@@ -112,16 +112,16 @@ object ExtractEndNodes {
 
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
-        val firstRunVariable = mt.addLocalVariable("${firstRunLabel}v", i32, "I")
+        val firstRunVariable = mt.variables.addLocalVariable("${firstRunLabel}v", i32, "I")
         val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 
-        val extraInputs = HashMap<GraphingNode, List<LocalVar>>()
-        fun getInputLabel(endNode: GraphingNode): LocalVar {
+        val extraInputs = HashMap<GraphingNode, List<LocalVariableOrParam>>()
+        fun getInputLabel(endNode: GraphingNode): LocalVariableOrParam {
             assertTrue(endNode in endNodes)
             return extraInputs.getOrPut(endNode) {
                 val name = "endNode${mt.endNodeIndex++}"
-                listOf(mt.addLocalVariable(name, i32, "I"))
+                listOf(mt.variables.addLocalVariable(name, i32, "I"))
             }.first()
         }
 

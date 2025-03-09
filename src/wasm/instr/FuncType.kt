@@ -2,6 +2,7 @@ package wasm.instr
 
 import me.anno.utils.assertions.assertFail
 import utils.*
+import utils.WASMTypes.*
 
 data class FuncType(val params: List<String>, val results: List<String>) {
 

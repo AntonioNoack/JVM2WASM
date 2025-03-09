@@ -3,7 +3,7 @@ package wasm2cpp
 import jvm2wasm
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertEquals
-import utils.i32
+import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1

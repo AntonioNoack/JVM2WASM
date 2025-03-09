@@ -1,9 +1,9 @@
 package wasm.instr
 
-import utils.f32
-import utils.f64
-import utils.i32
-import utils.i64
+import utils.WASMTypes.f32
+import utils.WASMTypes.f64
+import utils.WASMTypes.i32
+import utils.WASMTypes.i64
 
 object Instructions {
 

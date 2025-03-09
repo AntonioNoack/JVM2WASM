@@ -2,6 +2,7 @@ package wasm
 
 import me.anno.utils.structures.arrays.ByteArrayList
 import utils.*
+import utils.WASMTypes.*
 import wasm.parser.WATParser
 import wasm.writer.*
 import wasm.writer.Function

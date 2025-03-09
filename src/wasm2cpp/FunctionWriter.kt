@@ -6,6 +6,7 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.*
+import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.F32Load
