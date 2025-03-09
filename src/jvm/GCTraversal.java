@@ -111,7 +111,7 @@ public class GCTraversal {
         Class<Object> parentClass = clazz.getSuperclass();
         int[] parentFields = null;
         if (parentClass != null) {
-            int parentClassIdx = getSuperClass(classIdx);
+            int parentClassIdx = getSuperClassId(classIdx);
             parentFields = fieldOffsetsByClass[parentClassIdx];
             if (parentFields != null) {
                 instanceFieldCtr += parentFields.length;

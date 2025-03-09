@@ -1,10 +1,7 @@
 package jvm;
 
 import annotations.*;
-import jvm.lang.JavaLangAccessImpl;
-import sun.misc.SharedSecrets;
 
-import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
@@ -397,7 +394,7 @@ public class JVM32 {
             validateClassIdx(childClassIdx);
             int tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
-            if (tableAddress == 0 || childClassIdx == 0) return false;
+            if (childClassIdx == 0) return false;
             // check for interfaces
             if (isInInterfaceTable(tableAddress, parentClassIdx)) return true;
             childClassIdx = getSuperClassIdFromInheritanceTableEntry(tableAddress); // switch to parent class
@@ -411,7 +408,7 @@ public class JVM32 {
             validateClassIdx(childClassIdx);
             int tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
-            if (tableAddress == 0 || childClassIdx == 0) return false;
+            if (childClassIdx == 0) return false;
             childClassIdx = read32(tableAddress); // switch to parent class
         }
     }
@@ -427,35 +424,26 @@ public class JVM32 {
     @NoThrow
     public static boolean isInInterfaceTable(int tableAddress, int interfaceClassIdx) {
         // handle interfaces
-        int length = read32(tableAddress + 8);
-        tableAddress += 12;
+        tableAddress += 8; // skip over super class and instance size
+        int length = read32(tableAddress);
         for (int i = 0; i < length; i++) {
-            if (read32(tableAddress) == interfaceClassIdx)
-                return true;
-            tableAddress += 4;
+            tableAddress += 4; // skip to next entry
+            if (read32(tableAddress) == interfaceClassIdx) return true;
         }
         return false;
     }
 
     @NoThrow
-    public static int getSuperClass(int classIdx) {
-        int tableAddress = getInheritanceTableEntry(classIdx);
-        if (tableAddress == 0) return 0;
+    public static int getSuperClassId(int classId) {
+        int tableAddress = getInheritanceTableEntry(classId);
         return getSuperClassIdFromInheritanceTableEntry(tableAddress);
     }
 
     @NoThrow
     public static int getInstanceSize(int classIndex) {
         // look up class table for size
-        if (classIndex == 0) return objectOverhead;
-        if (isNativeArray(classIndex)) return arrayOverhead;
         int tableAddress = getInheritanceTableEntry(classIndex);
         return read32(tableAddress + 4);
-    }
-
-    @NoThrow
-    private static boolean isNativeArray(int classIndex) {
-        return classIndex >= 17 && classIndex < 25;
     }
 
     @Alias(names = "createInstance")
@@ -508,7 +496,7 @@ public class JVM32 {
 
     @NoThrow
     @WASM(code = "i32.ge_u")
-    private static native boolean ge_ub(int a, int b);
+    static native boolean ge_ub(int a, int b);
 
     @NoThrow
     @WASM(code = "i32.lt_u")

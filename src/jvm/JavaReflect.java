@@ -511,8 +511,8 @@ public class JavaReflect {
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")
     public static <V> Class<V> Class_getSuperclass_Ljava_lang_Class(Class<V> clazz) {
         int idx = getClassIndex(clazz);
-        if (idx <= 0) return null;
-        int superClassIdx = getSuperClass(idx);
+        if (idx <= 0 || idx >= numClasses()) return null;
+        int superClassIdx = getSuperClassId(idx);
         return ptrTo(findClass(superClassIdx));
     }
 

@@ -288,12 +288,20 @@ object DynIndex {
         var ptr = instanceTableStart
         val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V"))
 
+        val emptyTableEntry = ptr
+        instanceTableData.writeLE32(0) // standard super class
+        instanceTableData.writeLE32(objectOverhead) // empty object, just in case somebody wants an instance of it
+        instanceTableData.writeLE32(0) // no interfaces
+        instanceTableData.writeLE32(0) // no interface signatures
+        ptr += 16
+
         assertEquals(objectOverhead + 8, gIndex.getFieldOffsets("java/lang/String", false).offset)
         for (classId in 0 until numClasses) {
             val clazz = gIndex.classNamesByIndex[classId]
-            if (clazz in NativeTypes.nativeTypes) { // 0 is Object, 17 until 25 are the native types
-                // write 0 :), no table space used
-                classTableData.writeLE32(0)
+            if (clazz in NativeTypes.nativeTypes) {
+                // link empty node, shouldn't be ever instantiated
+                // link empty instead of creating an exception for runtime speed
+                classTableData.writeLE32(emptyTableEntry)
             } else {
 
                 var superClass = hIndex.superClass[clazz]
@@ -311,7 +319,7 @@ object DynIndex {
                 // #functions
                 // ... [interfaceId, methodId]
 
-                instanceTableData.writeLE32(if (superClass != null) gIndex.getClassIndex(superClass) else -1)
+                instanceTableData.writeLE32(if (superClass != null) gIndex.getClassIndex(superClass) else 0)
                 val interfaces = getInterfaces(clazz, numClasses)
                 val fieldOffsets = gIndex.getFieldOffsets(clazz, false)
                 val clazzSize = fieldOffsets.offset
