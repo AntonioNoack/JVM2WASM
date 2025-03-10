@@ -4,10 +4,14 @@ import annotations.Alias;
 import annotations.JavaScript;
 import annotations.NoThrow;
 import annotations.RevAlias;
+import jvm.custom.GMTTimeZone;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.ToIntFunction;
@@ -32,57 +36,9 @@ public class JavaUtil {
         return TimeZone.getTimeZone("GMT");
     }
 
-    private static TimeZone gmt;
-
     @Alias(names = "java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone")
     public static TimeZone java_util_TimeZone_getTimeZone_Ljava_lang_StringZLjava_util_TimeZone(String name, boolean stuff) {
-        if (gmt == null) gmt = new TimeZone() {
-            @Override
-            public int getOffset(int era, int year, int month, int day, int dayOfWeek, int millis) {
-                return 0;
-            }
-
-            @Override
-            public void setRawOffset(int i) {
-
-            }
-
-            @Override
-            public int getRawOffset() {
-                return 0;
-            }
-
-            @Override
-            public boolean useDaylightTime() {
-                return false;
-            }
-
-            @Override
-            public boolean inDaylightTime(Date date) {
-                return false;
-            }
-
-            @Override
-            public Object clone() {
-                return this;
-            }
-        };
-        return gmt;
-    }
-
-    @Alias(names = "static_java_util_Locale_V")
-    public static void static_java_util_Locale_V() {
-        // Locale.ROOT = new Locale("");
-    }
-
-    @Alias(names = "java_util_Locale_initDefault_Ljava_util_LocaleXCategoryLjava_util_Locale")
-    public static Object Locale_initDefault(Object category) {
-        return null;
-    }
-
-    @Alias(names = "java_util_Calendar_createCalendar_Ljava_util_TimeZoneLjava_util_LocaleLjava_util_Calendar")
-    public static Object Calendar_createCalendar(Object timeZone, Object locale) {
-        return null;
+        return GMTTimeZone.INSTANCE;
     }
 
     public static Object toFixed2(Object obj, int v) {

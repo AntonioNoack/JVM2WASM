@@ -158,6 +158,11 @@ val classReplacements = hashMapOf(
     "java/awt/Dimension" to "jvm/custom/awt/Dimension",
     "java/lang/ThreadLocal" to "jvm/custom/ThreadLocal2",
     "java/lang/RuntimePermission" to "jvm/custom/RTPermission",
+    "java/util/Locale" to "jvm/custom/Locale",
+    "java/util/Calendar" to "jvm/custom/Calendar",
+    "java/text/SimpleDateFormat" to "jvm/custom/SimpleDateFormat",
+    "java/util/zip/Inflater" to "jvm/custom/Inflater",
+    "java/util/zip/Deflater" to "jvm/custom/Deflater",
 ).apply {
     if (!checkArrayAccess) {
         put("jvm/ArrayAccessSafe", "jvm/ArrayAccessUnchecked")
@@ -672,9 +677,13 @@ fun jvm2wasm() {
             .filter { it.name == STATIC_INIT }
             .sortedBy { it.name } // for a little consistency ^^
             .map { methodName(it) }
-        for (name in staticInitFunctions) {
-            val func = vm.getFunction(name)
-            vm.executeFunction(func)
+        try {
+            for (name in staticInitFunctions) {
+                val func = vm.functionByName[name]
+                vm.executeFunction(func ?: continue)
+            }
+        } catch (e: IllegalStateException) {
+            e.printStackTrace()
         }
     }
 

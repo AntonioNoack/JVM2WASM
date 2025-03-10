@@ -62,8 +62,8 @@ data class SwitchCase(
     }
 
     override fun execute(engine: WASMEngine): String? {
-        // todo get label-variable
-        // todo execute that branch
-        TODO("Not yet implemented")
+        val stackFrame = engine.stackFrames.last()
+        val labelValue = stackFrame.locals[label]!! as Int
+        return engine.executeInstructions(cases[labelValue])
     }
 }

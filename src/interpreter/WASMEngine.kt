@@ -2,6 +2,7 @@ package interpreter
 
 import interpreter.functions.*
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertSame
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
@@ -18,10 +19,7 @@ import wasm.parser.GlobalVariable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-// todo run a WASM runtime,
-//  so we can pre-initialize code, e.g. run all static_init-s at compile-time
-
-// todo replace all calls with direct links for faster speed (?)
+// a WASM runtime, so we can pre-initialize code, e.g. run all static_init-s at compile-time
 class WASMEngine(memorySize: Int) {
 
     companion object {
@@ -53,7 +51,11 @@ class WASMEngine(memorySize: Int) {
         byLabel: HashMap<String, BreakableInstruction>
     ): Instruction {
         return when (i) {
-            is Call -> ResolvedCall(getFunction(i.name))
+            is Call -> {
+                // todo singleInstr are loading to corruption results... what??
+                /*val singleInstr = singleInstrFunctions[i.name]
+                singleInstr ?: */ResolvedCall(getFunction(i.name))
+            }
             is LoopInstr -> {
                 val newInstr = LoopInstr(i.label, i.body, i.params, i.results)
                 byLabel[i.label] = newInstr
@@ -110,14 +112,51 @@ class WASMEngine(memorySize: Int) {
             "jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV",
             listOf(i32, ptrType, ptrType, i32), emptyList(), PrintStackTraceLine
         )
-        registerFunction("jvm_JVM32_trackCalloc_IV", listOf(i32), emptyList(), Return)
-        registerFunction("jvm_JVM32_getAllocatedSize_I", emptyList(), listOf(i32), GetAllocatedSize)
+        registerFunction(
+            "jvm_JavaLang_printString_Ljava_lang_StringZV",
+            listOf(ptrType, i32), emptyList(), PrintString
+        )
+        registerFunction("jvm_JVM32_trackCalloc_IV", listOf(i32), emptyList(), listOf(Return))
         registerFunction("fcmpg", listOf(f32, f32), listOf(i32), FloatCompare(+1))
         registerFunction("fcmpl", listOf(f32, f32), listOf(i32), FloatCompare(-1))
         registerFunction("dcmpg", listOf(f64, f64), listOf(i32), FloatCompare(+1))
         registerFunction("dcmpl", listOf(f64, f64), listOf(i32), FloatCompare(-1))
         registerFunction("jvm_JavaLang_fillD2S_ACDI", listOf(ptrType, f64), listOf(i32), FillDoubleToString)
-        registerFunction("jvm_NativeLog_log_DV", listOf(f64), emptyList(), NativeLogInstr("d"))
+        registerFunction("jvm_JavaX_fillDate_ACI", listOf(ptrType), listOf(i32), FillDateToString)
+        registerGetter("jvm_JVM32_getAllocatedSize_I", i32) { it.bytes.size }
+        registerGetter("java_lang_System_nanoTime_J", i64) { System.nanoTime() }
+        registerGetter("java_lang_System_currentTimeMillis_J", i64) { System.currentTimeMillis() }
+        registerLogFunction("d")
+        registerLogFunction("?ii")
+    }
+
+    private fun registerLogFunction(code: String) {
+        val signature = code.toList()
+            .joinToString("") { codeI ->
+                when (codeI) {
+                    '?' -> "Ljava_lang_String"
+                    'i' -> "I"
+                    'l' -> "J"
+                    'f' -> "F"
+                    'd' -> "D"
+                    else -> assertFail()
+                }
+            }
+        registerFunction(
+            "jvm_NativeLog_log_${signature}V",
+            code.map { codeI ->
+                when (codeI) {
+                    '?' -> ptrType
+                    'i' -> i32
+                    'l' -> i64
+                    'f' -> f32
+                    'd' -> f64
+                    else -> assertFail()
+                }
+            },
+            emptyList(),
+            NativeLogInstr(code)
+        )
     }
 
     private fun registerFunction(
@@ -130,11 +169,20 @@ class WASMEngine(memorySize: Int) {
         )
     }
 
-    private fun registerFunction(
-        name: String, params: List<String>, results: List<String>,
-        body: Instruction
-    ) {
-        registerFunction(name, params, results, listOf(body))
+    private val singleInstrFunctions = HashMap<String, Instruction>()
+    private fun registerFunction(name: String, params: List<String>, results: List<String>, code: Instruction) {
+        singleInstrFunctions[name] = code
+        val instructions = ArrayList<Instruction>(2 + params.size)
+        for (i in params.indices) {
+            instructions.add(ParamGet[i])
+        }
+        instructions.add(code)
+        instructions.add(Return)
+        registerFunction(name, params, results, instructions)
+    }
+
+    private fun registerGetter(name: String, result: String, getter: (WASMEngine) -> Number) {
+        registerFunction(name, emptyList(), listOf(result), GetterInstr(getter))
     }
 
     private fun registerEmptyFunction(name: String) {

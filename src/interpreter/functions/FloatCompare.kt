@@ -1,17 +1,15 @@
 package interpreter.functions
 
 import interpreter.WASMEngine
-import interpreter.WASMEngine.Companion.RETURN_LABEL
-import me.anno.utils.structures.lists.Lists.pop
 import wasm.instr.Instruction
 
-class FloatCompare(val ifNan: Int) : Instruction {
-    override fun execute(engine: WASMEngine): String {
+class FloatCompare(private val ifNan: Int) : Instruction {
+    override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack
-        val i0 = engine.getParam(0).toDouble()
-        val i1 = engine.getParam(1).toDouble()
+        val i1 = engine.pop().toDouble()
+        val i0 = engine.pop().toDouble()
         stack.add(compare(i0, i1))
-        return RETURN_LABEL
+        return null
     }
 
     private fun compare(i0: Double, i1: Double): Int {
