@@ -80,6 +80,10 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
             builder.append('(')
             search@ while (i < descriptor.length) {
                 when (val char0 = descriptor[i++]) {
+                    'V' -> {
+                        builder.append('V')
+                        assertTrue(i == descriptor.length) // must be last character
+                    }
                     in NativeTypes.joined -> {
                         builder.append(char0)
                         args.add(
@@ -87,10 +91,6 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
                             else descriptor.substring(i0, i)
                         )
                         i0 = i
-                    }
-                    'V' -> {
-                        builder.append('V')
-                        assertTrue(i == descriptor.length) // must be last character
                     }
                     '[', 'A' -> {
                         builder.append('A')

@@ -455,14 +455,7 @@ class FunctionWriter(
             F32Store -> store(f32)
             F64Store -> store(f64)
             // other operations
-            I32EQZ -> unaryInstr(i32, i32, k, assignments, true) { expr, dst ->
-                if (expr.isBoolean) {
-                    dst.append('!').appendExpr(expr)
-                } else {
-                    dst.appendExpr(expr).append(" == 0")
-                }
-            }
-            I64EQZ -> unaryInstr(i64, i32, k, assignments, true) { expr, dst ->
+            is EqualsZeroInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, true) { expr, dst ->
                 if (expr.isBoolean) {
                     dst.append('!').appendExpr(expr)
                 } else {
@@ -518,7 +511,7 @@ class FunctionWriter(
                     }
                 }
             }
-            is UnaryInstruction -> unaryInstr(i.type, i.type, k, assignments, false) { expr, dst ->
+            is UnaryFloatInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr, dst ->
                 dst.append(i.call).append('(').append(expr.expr).append(')')
             }
             is NumberCastInstruction -> {

@@ -1,5 +1,6 @@
 package wasm.instr
 
+import interpreter.WASMEngine
 import utils.Param
 import utils.StringBuilder2
 
@@ -10,6 +11,8 @@ interface Instruction {
     }
 
     fun isReturning(): Boolean = false
+
+    fun execute(engine: WASMEngine): String?
 
     companion object {
         fun appendParams(params: List<String>, builder: StringBuilder2) {

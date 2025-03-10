@@ -171,10 +171,6 @@ object OpCode {
             0xa4 -> "if_icmple"
             0xa5 -> "if_acmpeq"
             0xa6 -> "if_acmpne"
-            // one arg, for throwable
-            0x100 -> "if_eqz" // introduced for wasm; if null
-            0x102 -> "if_eqz" // introduced for wasm; if not null
-            0x101 -> "retexc"
             0xa7 -> "goto"
             0xa8 -> "jsr" // jump subroutine, < Java 1.6, this was used for finally{}, after that, finally was implemented using try {} catch(any) {}
             0xa9 -> "ret" // used with jsr

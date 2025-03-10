@@ -14,6 +14,9 @@ public class JavaReflectMethod {
     // if we want to support exceptions going forward, we need to double all branches 🤯
     //  -> no, we don't, or at least not with extra return arguments
 
+    // must be long enough for the longest supported combination, including 'self'
+    private static final Object[] joinedCallArguments = new Object[4];
+
     @Alias(names = "java_lang_reflect_Method_invoke_Ljava_lang_ObjectAWLjava_lang_Object")
     public static Object Method_invoke_Ljava_lang_ObjectAWLjava_lang_Object(
             Method self, Object calledOrNull, Object[] args
@@ -26,29 +29,47 @@ public class JavaReflectMethod {
             throw new IllegalArgumentException("Method must not be null");
         }
 
-        // verify static & static-flag
+        verifyCallerType(self, calledOrNull);
+        verifyArgumentTypes(self, args);
+
+        // used to simplify branching
+        joinCallArguments(calledOrNull, args);
+
+        Object result = execute(self);
+        verifyReturnType(self, result);
+        return result;
+    }
+
+    private static void verifyCallerType(Method self, Object caller) {
         boolean isStatic = (self.getModifiers() & ACC_STATIC) != 0;
-        boolean expectStatic = calledOrNull == null;
+        boolean expectStatic = caller == null;
         if (isStatic != expectStatic) {
             throw new IllegalArgumentException("Static-ness mismatch");
         }
+    }
 
-        // used to simplify branching
-        //  may be a little expensive, but we could cache the array
-        args = join(calledOrNull, args);
+    private static void verifyArgumentTypes(Method self, Object[] args) {
+        Class<?>[] types = self.getParameterTypes();
+        // todo this could prove difficult with our function overrides... we need to make sure to store the metadata of the originals
+        if (types.length != args.length) throw new IllegalArgumentException("Incorrect number of arguments for call");
 
-        String callSignature = getCallSignature(self);
-        if (callSignature.length() != args.length + 1) { // +1 for return type
-            throw new IllegalArgumentException("Incorrect number of arguments");
+    }
+
+    private static void verifyReturnType(Method self, Object returnValue) {
+        Class<?> returnType = self.getReturnType();
+        if (!returnType.isInstance(returnValue)) {
+            throw new ClassCastException("Call returned wrong object");
         }
+    }
 
-        // todo validate call types,
-        //  so check parameter types against what is given
-
+    private static Object execute(Method self)
+            throws NoSuchFieldException, IllegalAccessException {
         int methodId = getMethodId(self);
-        Object arg0 = args.length >= 1 ? args[0] : null;
-        Object arg1 = args.length >= 2 ? args[1] : null;
-
+        Object[] args = joinedCallArguments;
+        Object arg0 = args[0];
+        Object arg1 = args[1];
+        Class<?> returnType = self.getReturnType();
+        String callSignature = getCallSignature(self);
         switch (callSignature) {
             // static runnable
             case "V":
@@ -58,7 +79,7 @@ public class JavaReflectMethod {
             case "T":
                 return invokeT(methodId);
             case "I":
-                return invokeI(methodId);
+                return castToIntObject(invokeI(methodId), returnType);
             case "J":
                 return invokeJ(methodId);
             case "F":
@@ -69,7 +90,7 @@ public class JavaReflectMethod {
             case "TT":
                 return invokeTT(arg0, methodId);
             case "TI":
-                return invokeTI(arg0, methodId);
+                return castToIntObject(invokeTI(arg0, methodId), returnType);
             case "TJ":
                 return invokeTJ(arg0, methodId);
             case "TF":
@@ -81,8 +102,7 @@ public class JavaReflectMethod {
                 invokeTV(arg0, methodId);
                 return null;
             case "IV":
-                //noinspection DataFlowIssue
-                invokeIV((int) arg0, methodId);
+                invokeIV(castToIntLike(arg0), methodId);
                 return null;
             case "JV":
                 //noinspection DataFlowIssue
@@ -101,8 +121,7 @@ public class JavaReflectMethod {
                 invokeTTV(arg0, arg1, methodId);
                 return null;
             case "TIV":
-                //noinspection DataFlowIssue
-                invokeTIV(arg0, (int) arg1, methodId);
+                invokeTIV(arg0, castToIntLike(arg1), methodId);
                 return null;
             case "TJV":
                 //noinspection DataFlowIssue
@@ -121,17 +140,35 @@ public class JavaReflectMethod {
         }
     }
 
+    private static int castToIntLike(Object instance) {
+        if (instance instanceof Integer) return (int) instance;
+        if (instance instanceof Short) return (short) instance;
+        if (instance instanceof Byte) return (byte) instance;
+        if (instance instanceof Character) return (char) instance;
+        throw new ClassCastException("Object cannot be cast to int");
+    }
+
+    private static Object castToIntObject(int value, Class<?> returnType) {
+        if (returnType == int.class) return value;
+        if (returnType == short.class) return (short) value;
+        if (returnType == byte.class) return (byte) value;
+        if (returnType == char.class) return (char) value;
+        throw new ClassCastException("Object cannot be cast to int");
+    }
+
     private static int getMethodId(Method self)
             throws NoSuchFieldException, IllegalAccessException {
         return self.getClass().getDeclaredField("slot").getInt(self);
     }
 
-    private static Object[] join(Object prepended, Object[] src) {
-        if (prepended == null) return src;
-        Object[] joined = new Object[src.length + 1];
-        joined[0] = prepended;
-        System.arraycopy(src, 0, joined, 1, src.length);
-        return joined;
+    private static void joinCallArguments(Object prepended, Object[] src) {
+        Object[] joined = joinedCallArguments;
+        int dstI = 0;
+        if (prepended != null) {
+            joined[0] = prepended;
+            dstI = 1;
+        }
+        System.arraycopy(src, 0, joined, dstI, src.length);
     }
 
     // statix runnable

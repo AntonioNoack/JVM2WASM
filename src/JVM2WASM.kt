@@ -1,18 +1,23 @@
 import dependency.ActuallyUsedIndex
 import dependency.DependencyIndex
+import dependency.StaticDependencies
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
+import interpreter.WASMEngine
 import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
 import translator.GeneratorIndex.dataStart
+import translator.GeneratorIndex.nthGetterMethods
 import translator.GeneratorIndex.stringStart
+import translator.GeneratorIndex.translatedMethods
 import utils.*
 import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
@@ -87,6 +92,9 @@ var exportHelpers = exportAll
 
 var useKotlynReflect = true
 var useDefaultKotlinReflection = false
+
+var callStaticInitOnce = false
+var callStaticInitAtCompileTime = true // todo implement this
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -379,12 +387,12 @@ fun jvm2wasm() {
         "java/lang/Throwable", // #14
         "java/lang/StackTraceElement", // #15
         "java/lang/reflect/Field", // #16
-        "int", "float", "boolean", "byte",
-        "short", "char", "long", "double", // #24
+        "int", "long", "float", "double",
+        "boolean", "byte", "short", "char", "void" // #25
     )
 
     for (i in 1 until 13) {
-        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[0])
+        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[StaticClassIndices.OBJECT])
     }
 
     for (i in predefinedClasses.indices) {
@@ -392,6 +400,26 @@ fun jvm2wasm() {
         gIndex.classIndex[clazz] = i
         gIndex.classNamesByIndex.add(clazz)
     }
+
+    assertEquals(gIndex.classIndex["java/lang/Object"], StaticClassIndices.OBJECT)
+    assertEquals(gIndex.classIndex["java/lang/String"], StaticClassIndices.STRING)
+    assertEquals(gIndex.classIndex["[]"], StaticClassIndices.ARRAY)
+
+    assertEquals(gIndex.classIndex["int"], StaticClassIndices.NATIVE_INT)
+    assertEquals(gIndex.classIndex["long"], StaticClassIndices.NATIVE_LONG)
+    assertEquals(gIndex.classIndex["float"], StaticClassIndices.NATIVE_FLOAT)
+    assertEquals(gIndex.classIndex["double"], StaticClassIndices.NATIVE_DOUBLE)
+    assertEquals(gIndex.classIndex["boolean"], StaticClassIndices.NATIVE_BOOLEAN)
+    assertEquals(gIndex.classIndex["byte"], StaticClassIndices.NATIVE_BYTE)
+    assertEquals(gIndex.classIndex["short"], StaticClassIndices.NATIVE_SHORT)
+    assertEquals(gIndex.classIndex["char"], StaticClassIndices.NATIVE_CHAR)
+    assertEquals(gIndex.classIndex["void"], StaticClassIndices.NATIVE_VOID)
+
+    for (i in StaticClassIndices.FIRST_NATIVE..StaticClassIndices.LAST_NATIVE) {
+        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[StaticClassIndices.OBJECT])
+    }
+
+    // todo confirm type shift
 
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
@@ -420,6 +448,10 @@ fun jvm2wasm() {
     checkMissingClasses()
 
     resolveAll(entryClasses, entryPoints)
+
+    val staticCallOrder = if (callStaticInitOnce) {
+        StaticDependencies.calculateStaticCallOrder()
+    } else null
 
     // todo this is somehow used, not-implemented, but we don't crash
     val checked = MethodSig.c(
@@ -499,7 +531,8 @@ fun jvm2wasm() {
     }
 
     fun filterClass(clazz: String): Boolean {
-        return !clazz.startsWith("[")
+        return !clazz.startsWith("[") &&
+                clazz !in NativeTypes.nativeTypes
     }
 
     val classesToLoad = findClassesToLoad(aliasedMethods)
@@ -564,10 +597,8 @@ fun jvm2wasm() {
         ActuallyUsedIndex.add(entrySig, sig)
     })
 
-
     val usedMethods = ActuallyUsedIndex.resolve()
     usedButNotImplemented.retainAll(usedMethods)
-
 
     val nameToMethod = calculateNameToMethod()
     val usedBotNotImplementedMethods =
@@ -589,9 +620,6 @@ fun jvm2wasm() {
     if (usedButNotImplemented.isNotEmpty()) {
         printMissingFunctions(usedButNotImplemented, usedMethods)
     }
-
-    printMethodImplementations(bodyPrinter, usedMethods)
-    printInterfaceIndex()
 
     fun printGlobal(name: String, type: String, type2: String, value: Int) {
         // can be mutable...
@@ -624,6 +652,34 @@ fun jvm2wasm() {
     // allocation start address
     defineGlobal("allocationPointer", ptrType, ptr, true)
     defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
+
+    if (callStaticInitAtCompileTime) {
+        val extraMemory = 16 shl 20
+        val vm = WASMEngine(ptr + extraMemory)
+        assertTrue(globals.isNotEmpty()) // should not be empty
+        vm.registerGlobals(globals)
+        vm.registerSpecialFunctions()
+        vm.registerMemorySections(segments)
+        assertTrue(translatedMethods.isNotEmpty()) // should not be empty
+        val functions = translatedMethods.values + helperFunctions.values + nthGetterMethods.values
+        vm.registerFunctions(functions)
+        assertTrue(functionTable.isNotEmpty()) // usually should not be empty
+        vm.registerFunctionTable(functionTable)
+        // todo create vm
+        // todo initialize memory properly
+        // todo call all static init functions
+        val staticInitFunctions = dIndex.usedMethods
+            .filter { it.name == STATIC_INIT }
+            .sortedBy { it.name } // for a little consistency ^^
+            .map { methodName(it) }
+        for (name in staticInitFunctions) {
+            val func = vm.getFunction(name)
+            vm.executeFunction(func)
+        }
+    }
+
+    printMethodImplementations(bodyPrinter, usedMethods)
+    printInterfaceIndex()
 
     val sizeInPages = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
     headerPrinter.append("(memory (import \"js\" \"mem\") ").append(sizeInPages).append(")\n")

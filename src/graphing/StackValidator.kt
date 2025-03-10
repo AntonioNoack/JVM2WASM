@@ -160,12 +160,10 @@ object StackValidator {
                 }
                 is Const -> stack.push(i.type.wasmType)
                 is Comment -> {} // ignored
-                is UnaryInstruction -> stack.pop(i.type).push(i.type)
+                is UnaryInstruction -> stack.pop(i.popType).push(i.pushType)
                 is BinaryInstruction -> stack.pop(i.type).pop(i.type).push(i.type)
                 is CompareInstr -> stack.pop(i.type).pop(i.type).push(i32)
                 is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)
-                I32EQZ -> stack.pop(i32).push(i32)
-                I64EQZ -> stack.pop(i64).push(i32)
                 Drop -> stack.removeLast()
                 is NumberCastInstruction -> stack.pop(i.popType).push(i.pushType)
                 is Call -> {

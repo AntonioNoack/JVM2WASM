@@ -354,7 +354,7 @@ object DynIndex {
                     val implFunctions0 = findImplementedMethods(clazz, interfaces)
 
                     if (hIndex.isEnumClass(clazz)) {
-                        val superInit = MethodSig.c(clazz, STATIC_INIT, "()V", true)
+                        val superInit = MethodSig.staticInit(clazz)
                         val impl = resolveMethod(superInit, throwNotConstructable = true)
                         implFunctions0[staticInitIdx] = impl!!
                         addDynIndex(impl)

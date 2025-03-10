@@ -1,5 +1,3 @@
 package wasm.instr
 
-class UnaryInstruction(name: String, val call: String) : SimpleInstr(name) {
-    val type = name.substring(0, 3)
-}
+abstract class UnaryInstruction(name: String, val popType: String, val pushType: String, val call: String) : SimpleInstr(name)

@@ -14,10 +14,10 @@ import wasm.instr.FuncType
 
 class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
 
-    private val methods = HashSet<MethodSig>()
-    private val fieldsR = HashSet<FieldSig>()
-    private val fieldsW = HashSet<FieldSig>()
-    private val constructed = HashSet<String>()
+    private val calledMethods = HashSet<MethodSig>()
+    private val readFields = HashSet<FieldSig>()
+    private val writtenFields = HashSet<FieldSig>()
+    private val constructedClasses = HashSet<String>()
 
     private val annotations = ArrayList<Annota>()
     private val interfaceCalls = HashSet<MethodSig>()
@@ -115,7 +115,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // else throw IllegalStateException(sig1.toString())
             interfaceCalls.add(sig1)
         } else {
-            methods.add(sig1)
+            calledMethods.add(sig1)
         }
     }
 
@@ -207,19 +207,19 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
 
             val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc, false)
-            methods.add(bridge)
+            calledMethods.add(bridge)
             hIndex.jvmImplementedMethods.add(bridge)
 
             clazz.dep(dst.owner)
 
-            methods.add(calledMethod)
+            calledMethods.add(calledMethod)
 
             val dlu = DelayedLambdaUpdate(sig.toString(), calledMethod, descriptor, synthClassName, bridge)
             needingBridgeUpdate[synthClassName] = dlu
 
             dIndex.methodDependencies[bridge] = hashSetOf(calledMethod)
 
-            constructed.add(synthClassName)
+            constructedClasses.add(synthClassName)
 
             hIndex.registerMethod(bridge)
 
@@ -247,7 +247,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (opcode == 0xbb) {
             if (type.endsWith("[]")) throw IllegalStateException(type)
             val type2 = if (type.startsWith("[[") || type.startsWith("[L")) "[]" else type
-            constructed.add(type2)
+            constructedClasses.add(type2)
         }
     }
 
@@ -300,27 +300,31 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (sig !in hIndex.finalFields) {
             // fields are only relevant if they are both written and read
             when (opcode) {
-                0xb2 -> fieldsR.add(sig)// get static
-                0xb3 -> fieldsW.add(sig)  // put static
-                0xb4 -> fieldsR.add(sig)   // get field
-                0xb5 -> fieldsW.add(sig)  // put field
+                0xb2 -> readFields.add(sig)// get static
+                0xb3 -> writtenFields.add(sig)  // put static
+                0xb4 -> readFields.add(sig)   // get field
+                0xb5 -> writtenFields.add(sig)  // put field
             }
         }
     }
 
     private fun defineCallIndirectWASM(params: List<String>, results: List<String>) {
-        val callInstr = CallIndirect(FuncType(params, results)).toString()
+        defineCallIndirectWASM(FuncType(params, results))
+    }
+
+    private fun defineCallIndirectWASM(funcType: FuncType) {
+        val callInstr = CallIndirect(funcType).toString()
         annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
     }
 
     override fun visitEnd() {
 
-        if (methods.isNotEmpty()) dIndex.methodDependencies[sig] = methods
-        if (fieldsR.isNotEmpty()) dIndex.getterDependencies[sig] = fieldsR
-        if (fieldsW.isNotEmpty()) dIndex.setterDependencies[sig] = fieldsW
+        if (calledMethods.isNotEmpty()) dIndex.methodDependencies[sig] = calledMethods
+        if (readFields.isNotEmpty()) dIndex.getterDependencies[sig] = readFields
+        if (writtenFields.isNotEmpty()) dIndex.setterDependencies[sig] = writtenFields
 
-        if (constructed.isNotEmpty()) {
-            dIndex.constructorDependencies[sig] = constructed
+        if (constructedClasses.isNotEmpty()) {
+            dIndex.constructorDependencies[sig] = constructedClasses
         }
 
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
@@ -328,12 +332,15 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
             defineCallIndirectWASM(emptyList(), if (anyMethodThrows) listOf(ptrType) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
-            // todo confirm that the method is native???
+            // confirm that the method is native???
             val params0 = sig.descriptor.wasmParams
             val params1 = params0.subList(0, params0.lastIndex) // cut off last parameter, this is the methodId
             val canThrow = anyMethodThrows && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
             val results = sig.descriptor.getResultWASMTypes(canThrow)
-            defineCallIndirectWASM(params1, results)
+            val funcType = FuncType(params1, results)
+            // todo use descriptor to differentiate Object and i32/i64
+            hIndex.implementedMethodSignatures.add(funcType)
+            defineCallIndirectWASM(funcType)
         }
 
         if (annotations.isNotEmpty()) {

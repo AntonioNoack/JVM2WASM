@@ -220,6 +220,12 @@ public class JVM32 {
     }
 
     @NoThrow
+    public static void throwJs(String s, String a) {
+        log(s, a);
+        crash();
+    }
+
+    @NoThrow
     public static void throwJs(String s, int a, int b) {
         log(s, a, b);
         crash();

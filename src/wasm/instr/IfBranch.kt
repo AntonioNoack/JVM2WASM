@@ -1,5 +1,7 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+import me.anno.utils.structures.lists.Lists.pop
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
@@ -59,5 +61,12 @@ data class IfBranch(
     override fun hashCode(): Int {
         // todo what can we use here???
         return 0 // idk, this is bad :/
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        val condition = engine.stack.pop()!! as Int
+        val continuation = if(condition != 0) ifTrue else ifFalse
+        // todo validate params and results???
+        return engine.executeInstructions(continuation)
     }
 }

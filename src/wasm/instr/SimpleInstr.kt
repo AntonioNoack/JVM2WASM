@@ -1,6 +1,6 @@
 package wasm.instr
 
-open class SimpleInstr(val name: String) : Instruction {
+abstract class SimpleInstr(val name: String) : Instruction {
     init {
         simpleInstructions[name] = this
     }

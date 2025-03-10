@@ -382,13 +382,13 @@ object DependencyIndex {
             // only if complement function is defined as well
             val strict = fieldsRWRequired
             for (field in usedGetters1) {
-                if (field.static && (!strict || field in usedSetters)) {
-                    addRemaining(getStaticInit(field.clazz))
+                if (field.isStatic && (!strict || field in usedSetters)) {
+                    addRemaining(MethodSig.staticInit(field.clazz))
                 }
             }
             for (field in usedSetters1) {
-                if (field.static && (!strict || field in usedGetters)) {
-                    addRemaining(getStaticInit(field.clazz))
+                if (field.isStatic && (!strict || field in usedGetters)) {
+                    addRemaining(MethodSig.staticInit(field.clazz))
                 }
             }
 
@@ -415,9 +415,5 @@ object DependencyIndex {
 
     private fun isForbiddenClass(clazz: String): Boolean {
         return cannotUseClass(clazz)
-    }
-
-    private fun getStaticInit(clazz: String): MethodSig {
-        return MethodSig.c(clazz, STATIC_INIT, "()V", true)
     }
 }

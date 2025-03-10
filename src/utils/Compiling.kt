@@ -40,7 +40,6 @@ import wasm.parser.FunctionImpl
 import wasm.parser.Import
 import wasm.parser.WATParser
 import java.io.IOException
-import java.util.stream.Collectors
 
 private val LOGGER = LogManager.getLogger("Compiling")
 
@@ -457,7 +456,7 @@ fun calculateFieldOffsets() {
                     .ifSame { (a.clazz in nativeClasses).toInt().compareTo((b.clazz in nativeClasses).toInt()) }
                     .ifSame { a.name.compareTo(b.name) }
             }) { // sort by size && is-ptr | later we even could respect alignment and fill gaps where possible :)
-            gIndex.getFieldOffset(field.clazz, field.name, field.descriptor, field.static)
+            gIndex.getFieldOffset(field.clazz, field.name, field.descriptor, field.isStatic)
         }
     }
     gIndex.lockFields = true

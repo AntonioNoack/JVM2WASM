@@ -1,5 +1,7 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+
 class Jump(var owner: BreakableInstruction) : Instruction {
 
     init {
@@ -17,4 +19,7 @@ class Jump(var owner: BreakableInstruction) : Instruction {
     override fun hashCode(): Int {
         return label.hashCode()
     }
+
+    override fun execute(engine: WASMEngine) = label
+
 }

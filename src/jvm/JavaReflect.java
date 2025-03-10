@@ -23,6 +23,7 @@ import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
+import static utils.StaticClassIndices.*;
 
 public class JavaReflect {
 
@@ -469,28 +470,43 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_getPrimitiveClass_Ljava_lang_StringLjava_lang_Class")
     public static Class<?> Class_getPrimitiveClass(String name) {
+        // we need to get them by index, because the Java compiler
+        //  returns nonsense like Short.TYPE, which calls this very method to be initialized
+        int classIdx;
         switch (name) {
-            case "void":
-                return Void.class;
             case "boolean":
-                return Boolean.class;
+                classIdx = NATIVE_BOOLEAN;
+                break;
             case "byte":
-                return Byte.class;
+                classIdx = NATIVE_BYTE;
+                break;
             case "char":
-                return Character.class;
+                classIdx = NATIVE_CHAR;
+                break;
             case "short":
-                return Short.class;
+                classIdx = NATIVE_SHORT;
+                break;
             case "int":
-                return Integer.class;
+                classIdx = NATIVE_INT;
+                break;
             case "long":
-                return Long.class;
+                classIdx = NATIVE_LONG;
+                break;
             case "float":
-                return Float.class;
+                classIdx = NATIVE_FLOAT;
+                break;
             case "double":
-                return Double.class;
+                classIdx = NATIVE_DOUBLE;
+                break;
+            case "void":
+                classIdx = NATIVE_VOID;
+                break;
             default:
-                throw new IllegalArgumentException(name);
+                // avoid exceptions
+                throwJs("getPrimitiveClass", name);
+                return null;
         }
+        return ptrTo(findClass(classIdx));
     }
 
     @NoThrow
@@ -618,19 +634,19 @@ public class JavaReflect {
     private static native void callConstructor(int obj, int methodPtr);
 
     @Alias(names = "java_lang_Class_toString_Ljava_lang_String")
-    public static <V> String java_lang_Class_toString_Ljava_lang_String(Class<V> clazz) {
+    public static String java_lang_Class_toString_Ljava_lang_String(Class<?> clazz) {
         // we could have to implement isInterface() otherwise
         return clazz.getName();
     }
 
     @Alias(names = "java_lang_Class_getAnnotations_AW")
-    public static <V> Annotation[] java_lang_Class_getAnnotations_AW(Class<V> clazz) {
+    public static Annotation[] java_lang_Class_getAnnotations_AW(Class<?> clazz) {
         // todo implement this properly
         return new Annotation[0];
     }
 
     @Alias(names = "java_lang_Class_isInstance_Ljava_lang_ObjectZ")
-    public static <V> boolean java_lang_Class_isInstance_Ljava_lang_ObjectZ(Class<V> clazz, Object instance) {
+    public static boolean java_lang_Class_isInstance_Ljava_lang_ObjectZ(Class<?> clazz, Object instance) {
         if (instance == null) return false;
         if (instance.getClass() == clazz) return true;
         int classIndex = getClassIndex(clazz);
@@ -646,13 +662,26 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object")
-    public static <V> Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<V> clazz, int length) {
-        // I don't think this might happen
-        /*String name = clazz.getName();
-        if (name == "int") return new int[length];
-        else if (name == "float") return new float[length];
-        else if (name == "double") return new double[length];*/
-        return new Object[length];
+    public static Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<?> clazz, int length) {
+        String name = clazz.getName();
+        switch (name) {
+            case "int":
+                return new int[length];
+            case "long":
+                return new long[length];
+            case "byte":
+                return new byte[length];
+            case "short":
+                return new short[length];
+            case "char":
+                return new char[length];
+            case "float":
+                return new float[length];
+            case "double":
+                return new double[length];
+            default:
+                return new Object[length];
+        }
     }
 
     @Alias(names = "java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV")

@@ -19,6 +19,8 @@ import utils.*
 import utils.Param.Companion.toParams
 import utils.WASMTypes.*
 import wasm.instr.FuncType
+import wasm.instr.Instruction
+import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
 
@@ -110,7 +112,7 @@ object GeneratorIndex {
             val name = "getNth_$name0"
             FunctionImpl(
                 name, typeStack.toParams(), typeStack + typeStack.first(),
-                emptyList(), typeStack.indices.map { ParamGet[it] } + ParamGet[0],
+                emptyList(), typeStack.indices.map { ParamGet[it] } + ParamGet[0] + Return,
                 false
             )
         }.funcName

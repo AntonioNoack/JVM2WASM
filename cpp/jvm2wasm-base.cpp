@@ -669,7 +669,6 @@ roid me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functio
 roid new_java_text_SimpleDateFormat_V(i32) { return RET_VOID; }
 roid new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
 
-roid static_java_io_BufferedInputStream_V() { }
 roid static_java_lang_reflect_AccessibleObject_V() { }
 roid static_java_util_Date_V() { }
 roid static_java_util_Formatter_V() { }

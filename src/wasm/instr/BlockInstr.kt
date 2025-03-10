@@ -1,5 +1,6 @@
 package wasm.instr
 
+import interpreter.WASMEngine
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
@@ -56,5 +57,10 @@ data class BlockInstr(
 
     override fun hashCode(): Int {
         return label.hashCode()
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        val label1 = engine.executeInstructions(body)
+        return if (label1 == label) null else label1
     }
 }

@@ -9,7 +9,8 @@ object NativeTypes {
         'Z' to "boolean",
         'B' to "byte",
         'S' to "short",
-        'C' to "char"
+        'C' to "char",
+        'V' to "void"
     )
     val joined = nativeMapping.keys.joinToString("")
     val nativeMappingInv = nativeMapping.entries.associate { it.value to it.key }

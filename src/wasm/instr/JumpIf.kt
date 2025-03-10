@@ -1,5 +1,8 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+import me.anno.utils.structures.lists.Lists.pop
+
 class JumpIf(var owner: BreakableInstruction) : Instruction {
 
     init {
@@ -15,5 +18,10 @@ class JumpIf(var owner: BreakableInstruction) : Instruction {
 
     override fun hashCode(): Int {
         return label.hashCode()
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        val flag = engine.stack.pop()!! as Int
+        return if (flag != 0) label else null
     }
 }

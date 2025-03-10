@@ -1,5 +1,6 @@
 package wasm.instr
 
+import interpreter.WASMEngine
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.any2
@@ -58,5 +59,11 @@ data class SwitchCase(
 
     override fun hashCode(): Int {
         return label.hashCode()
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        // todo get label-variable
+        // todo execute that branch
+        TODO("Not yet implemented")
     }
 }

@@ -91,4 +91,9 @@ public class JavaIO {
         return null;
     }
 
+    @Alias(names = "static_java_io_BufferedInputStream_V")
+    public static void static_java_io_BufferedInputStream_V() {
+        // why is this forbidden??? only useless stuff is initialized, where we don't need the classes
+    }
+
 }

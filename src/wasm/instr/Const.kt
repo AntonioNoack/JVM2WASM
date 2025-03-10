@@ -1,8 +1,15 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+
 data class Const(val type: ConstType, val value: Number) : Instruction {
 
     override fun toString(): String = "${type.wasmType}.const $value"
+
+    override fun execute(engine: WASMEngine): String? {
+        engine.stack.add(value)
+        return null
+    }
 
     companion object {
 

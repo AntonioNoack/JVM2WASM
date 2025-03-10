@@ -7,6 +7,7 @@ import org.objectweb.asm.Opcodes.*
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
+import wasm.instr.FuncType
 import wasm.instr.Instruction
 
 object HierarchyIndex {
@@ -39,6 +40,8 @@ object HierarchyIndex {
     val annotations = HashMap<MethodSig, List<Annota>>(cap2)
 
     val methodAliases = HashMap<String, MethodSig>(cap)
+
+    val implementedMethodSignatures = HashSet<FuncType>()
 
     fun registerMethod(method: MethodSig): Boolean {
         return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)

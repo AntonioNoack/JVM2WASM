@@ -1,5 +1,6 @@
 package wasm.instr
 
+import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.createList
 
 data class Call(val name: String) : Instruction {
@@ -11,6 +12,10 @@ data class Call(val name: String) : Instruction {
     }
 
     override fun toString(): String = "call \$$name"
+
+    override fun execute(engine: WASMEngine): String? {
+        throw NotImplementedError()
+    }
 
     companion object {
         val s8ArrayLoad = Call("s8ArrayLoad")

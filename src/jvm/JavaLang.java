@@ -496,6 +496,7 @@ public class JavaLang {
         return bean;
     }
 
+    // todo we're using byte-strings for a while now, add a byte-variant, too
 
     @NoThrow
     @JavaScript(code = "let s=arg1+'';if(s.indexOf('.')<0)s+='.0';return fill(arg0,s)")

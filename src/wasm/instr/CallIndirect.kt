@@ -1,5 +1,7 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+import me.anno.utils.structures.lists.Lists.pop
 import utils.StringBuilder2
 
 data class CallIndirect(val type: FuncType) : Instruction {
@@ -14,5 +16,13 @@ data class CallIndirect(val type: FuncType) : Instruction {
         builder.append("call_indirect (type \$")
         type.toString(builder)
         builder.append(")")
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        val index = engine.stack.pop() as Int
+        val function = engine.functionTable[index]
+        // todo verify type
+        engine.executeFunction(function)
+        return null
     }
 }

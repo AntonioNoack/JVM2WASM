@@ -1,5 +1,8 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+import me.anno.utils.structures.lists.Lists.pop
+
 data class GlobalSet(val name: String) : Instruction {
 
     init {
@@ -7,4 +10,8 @@ data class GlobalSet(val name: String) : Instruction {
     }
 
     override fun toString(): String = "global.set \$$name"
+    override fun execute(engine: WASMEngine): String? {
+        engine.globals[name] = engine.stack.pop()!!
+        return null
+    }
 }

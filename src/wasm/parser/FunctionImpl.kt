@@ -3,7 +3,6 @@ package wasm.parser
 import utils.Param
 import utils.StringBuilder2
 import wasm.instr.Instruction
-import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendParams1
 import wasm.instr.Instruction.Companion.appendResults
 
@@ -31,5 +30,12 @@ open class FunctionImpl(
         }
         builder.append(")\n")
         return builder.toString()
+    }
+
+    fun withBody(newBody: List<Instruction>): FunctionImpl {
+        return FunctionImpl(
+            funcName, params, results,
+            locals, newBody, isExported
+        )
     }
 }

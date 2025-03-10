@@ -89,6 +89,7 @@ public class JVMShared {
     @UsedIfIndexed
     @Alias(names = "init")
     public static void init() {
+        staticInit();
         // access static, so it is initialized
         getAddr(System.out);
         // could be used to initialize classes or io
@@ -97,14 +98,18 @@ public class JVMShared {
         SharedSecrets.setJavaLangAccess(new JavaLangAccessImpl());
     }
 
+    /**
+     * method contents will be replaced programmatically,
+     * if the callStaticInitOnce flag is set
+     * */
+    private static void staticInit() {
+        /* !!!DO NOT PLACE CODE HERE!!! */
+    }
+
     @Alias(names = "throwAME")
     public static void throwAbstractMethodError() {
         throw new AbstractMethodError();
     }
-
-    @NoThrow
-    @WASM(code = "i64.const 0 i64.store")
-    public static native void clear64(int addr);
 
     @NoThrow
     @WASM(code = "i64.store")

@@ -1,5 +1,3 @@
 package wasm.instr
 
-class BinaryInstruction(name: String, val cppOperator: String) : SimpleInstr(name) {
-    val type = name.substring(0, 3)
-}
+abstract class BinaryInstruction(name: String, val type: String, val cppOperator: String) : SimpleInstr(name)

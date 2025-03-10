@@ -113,6 +113,7 @@ import wasm.instr.Instructions.I32_WRAP_I64
 import wasm.instr.Instructions.I64Add
 import wasm.instr.Instructions.I64And
 import wasm.instr.Instructions.I64EQ
+import wasm.instr.Instructions.I64EQZ
 import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Mul
 import wasm.instr.Instructions.I64NE
@@ -568,10 +569,6 @@ class MethodTranslator(
                 // if it is missing anywhere, we could call this:
                 // nextNode(createLabel())
             }
-            0x101 -> {
-                assertTrue(canThrowError)
-                printer.append(Return)
-            }
             0x57 -> {
                 val type1 = stack.last()
                 printer.pop(type1).drop()
@@ -883,16 +880,14 @@ class MethodTranslator(
             0xa4 -> printer.pop(i32).pop(i32).append(I32LES)
             0xa5 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32EQ else I64EQ)
             0xa6 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32NE else I64NE)
-            0x100 -> {
-                // consume one arg for == null
-                printer.pop(ptrType).append(I32EQZ)
-            }
-            0x102 -> printer.pop(ptrType) // consume one arg for != null
-            0xc6 -> printer.pop(ptrType).append(I32EQZ) // is null
-            0xc7 -> printer.pop(ptrType) // done automatically
+            0xc6 -> printer.pop(ptrType) // is null
+                .append(if (is32Bits) I32EQZ else I64EQZ)
+            0xc7 -> printer.pop(ptrType) // is not null
+                .append(if (is32Bits) I32EQZ else I64EQZ)
+                .append(I32EQZ)
             0xa7 -> {} // just goto -> stack doesn't change
             0x99 -> printer.pop(i32).append(I32EQZ) // == 0
-            0x9a -> printer.pop(i32) // != 0; done automatically
+            0x9a -> printer.pop(i32).append(i32Const0).append(I32NE) // != 0
             0x9b -> printer.pop(i32).append(i32Const0).append(I32LTS) // < 0
             0x9c -> printer.pop(i32).append(i32Const0).append(I32GES) // >= 0
             0x9d -> printer.pop(i32).append(i32Const0).append(I32GTS) // > 0
@@ -1423,7 +1418,7 @@ class MethodTranslator(
                     visitJumpInsn(0xa7, handler.label) // jump to handler
                 } else {
                     printer.push(ptrType).append(throwable.localGet)
-                    visitJumpInsn(0x102, handler.label) // if not null, jump to handler
+                    visitJumpInsn(0xc7, handler.label) // if not null, jump to handler
                 }
 
                 handler.inputStack = ArrayList(stack)
@@ -1834,7 +1829,7 @@ class MethodTranslator(
             if (comments) printer.comment("skipped <clinit>, we're inside of it")
             return
         } // it's currently being inited :)
-        val sig = MethodSig.c(clazz, STATIC_INIT, "()V", true)
+        val sig = MethodSig.staticInit(clazz)
         if (hIndex.methodsByClass[clazz]?.contains(sig) != true) {
             if (comments) printer.comment("skipped <clinit>, because empty")
             return

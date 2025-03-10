@@ -62,7 +62,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         fun dep(next0: String?, self: String) {
             when (next0) {
                 "Z", "B", "S", "C", "I", "J", "F", "D", "V",
-                "boolean", "byte", "short", "char", "int", "long", "float", "double", null -> {
+                "boolean", "byte", "short", "char", "int", "long", "float", "double", "void", null -> {
                     // class cannot be read
                 }
                 else -> {

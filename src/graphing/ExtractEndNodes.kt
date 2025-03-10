@@ -166,8 +166,12 @@ object ExtractEndNodes {
             Unreachable // should be unreachable, too
         )
 
-        val dst = Builder(3)
+        val dst = Builder(3 + extraInputs.size * 2)
         dst.append(i32Const1).append(firstRunVariable.setter)
+        // clear all labels
+        for ((input) in extraInputs.values) {
+            dst.append(i32Const0).append(input.setter)
+        }
         dst.append(loopInstr)
         return dst
     }

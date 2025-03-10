@@ -1,5 +1,16 @@
 package wasm.instr
 
-class NumberCastInstruction(name: String, val prefix: String, val suffix: String, val popType: String) : SimpleInstr(name) {
-    val pushType = name.substring(0, 3)
+import interpreter.WASMEngine
+
+class NumberCastInstruction(
+    name: String, val prefix: String, val suffix: String,
+    val popType: String,val pushType: String,
+    val impl: (Number) -> Number
+) : SimpleInstr(name) {
+
+    override fun execute(engine: WASMEngine): String? {
+        val stack = engine.stack
+        stack[stack.lastIndex] = impl(stack[stack.lastIndex])
+        return null
+    }
 }

@@ -1,6 +1,7 @@
 package wasm.instr
 
 import graphing.GraphingNode
+import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.any2
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
@@ -55,5 +56,13 @@ data class LoopInstr(
 
     override fun hashCode(): Int {
         return label.hashCode()
+    }
+
+    override fun execute(engine: WASMEngine): String? {
+        while (true) {
+            val label1 = engine.executeInstructions(body)
+            if (label1 == label) continue
+            return label1
+        }
     }
 }

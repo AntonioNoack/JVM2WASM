@@ -46,6 +46,10 @@ data class MethodSig private constructor(
             return MethodSig(clazz2, name, descriptor, isStatic)
         }
 
+        fun staticInit(clazz: String): MethodSig {
+            return c(clazz, STATIC_INIT, "()V", true)
+        }
+
         private fun validateClassName(clazz: String): String {
             val clazz2 =
                 if (clazz.startsWith("[[") || clazz.startsWith("[L")) "[]"

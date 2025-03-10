@@ -1,5 +1,7 @@
 package wasm.instr
 
+import interpreter.WASMEngine
+
 data class LocalGet(var name: String) : Instruction {
 
     init {
@@ -7,4 +9,10 @@ data class LocalGet(var name: String) : Instruction {
     }
 
     override fun toString(): String = "local.get \$$name"
+
+    override fun execute(engine: WASMEngine): String? {
+        val local = engine.stackFrames.last().locals
+        engine.stack.add(local[name] ?: throw IllegalStateException("Missing local $name"))
+        return null
+    }
 }
