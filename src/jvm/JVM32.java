@@ -10,6 +10,7 @@ import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.*;
+import static jvm.JavaThrowable.Throwable_printStackTrace_V;
 import static jvm.NativeLog.log;
 
 @SuppressWarnings("unused")
@@ -244,16 +245,11 @@ public class JVM32 {
     }
 
     @NoThrow
-    public static void throwJs(int s) {
-        log(s);
-        crash();
-    }
-
-    @NoThrow
     @Alias(names = "panic")
-    private static void panic(Object throwable) {
+    private static void panic(Throwable throwable) {
         if (throwable != null) {
-            throwJs(getAddr(throwable));
+            Throwable_printStackTrace_V(throwable);
+            throwJs();
         }
     }
 

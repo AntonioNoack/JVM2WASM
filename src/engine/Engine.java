@@ -474,7 +474,7 @@ public class Engine {
 
     // trying to save space by getting rid of TextWriter (1 MB in wasm text)
     @Alias(names = "me_anno_io_Saveable_toString_Ljava_lang_String")
-    private static String me_anno_io_Saveable_toString_Ljava_lang_String(Object self) {
+    private static String Saveable_toString_Ljava_lang_String(Object self) {
         return Object_toString(self);
     }
 
@@ -652,7 +652,7 @@ public class Engine {
             if (clazz == 10) {
                 log("found instance", idx, instance);
                 if (unsignedLessThan(idx - idx0, len)) {
-                    log(ptrTo(instance));
+                    log((String) ptrTo(instance));
                 }
                 idx++;
             } else {

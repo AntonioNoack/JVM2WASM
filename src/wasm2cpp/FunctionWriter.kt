@@ -13,16 +13,21 @@ import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
 import wasm.instr.Instructions.F64Store
+import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
+import wasm.instr.Instructions.I32GES
+import wasm.instr.Instructions.I32GTS
+import wasm.instr.Instructions.I32LES
+import wasm.instr.Instructions.I32LTS
 import wasm.instr.Instructions.I32Load
 import wasm.instr.Instructions.I32Load16S
 import wasm.instr.Instructions.I32Load16U
 import wasm.instr.Instructions.I32Load8S
 import wasm.instr.Instructions.I32Load8U
+import wasm.instr.Instructions.I32NE
 import wasm.instr.Instructions.I32Store
 import wasm.instr.Instructions.I32Store16
 import wasm.instr.Instructions.I32Store8
-import wasm.instr.Instructions.I64EQZ
 import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.Return
@@ -793,7 +798,17 @@ class FunctionWriter(
                             val targetCase = getBranchIdx(listOf(instr))
                             begin().append("goto case").append(targetCase).end()
                         }
-                        else -> throw NotImplementedError()
+                        I32EQ, I32NE, I32EQZ,
+                        I32LES, I32LTS, I32GTS, I32GES -> {
+                            writeInstruction(instr)
+                            val branch = pop(i32)
+                            begin().append("if (").append(branch).append(") {\n")
+                            begin().append("  goto case1").end()
+                            begin().append("} else {\n")
+                            begin().append("  goto case0").end()
+                            begin().append("}\n")
+                        }
+                        else -> throw NotImplementedError("Unknown symbol before switch-label: $instr")
                     }
                     hadReturn = true
                     break

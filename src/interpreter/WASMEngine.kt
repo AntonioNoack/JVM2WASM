@@ -20,6 +20,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 // a WASM runtime, so we can pre-initialize code, e.g. run all static_init-s at compile-time
+// todo we can also use this to write unit tests for our static analysis :3
+// todo when static-init-at-compile-time works, we can re-resolve all dependencies, and whether fields are written,
+//  and a) remove lots of functions (10%?), b) inline lots of fields (>50% of all static ones?)
 class WASMEngine(memorySize: Int) {
 
     companion object {
@@ -46,10 +49,7 @@ class WASMEngine(memorySize: Int) {
         return instructions.map { replaceFunction(it, byLabel) }
     }
 
-    private fun replaceFunction(
-        i: Instruction,
-        byLabel: HashMap<String, BreakableInstruction>
-    ): Instruction {
+    private fun replaceFunction(i: Instruction, byLabel: HashMap<String, BreakableInstruction>): Instruction {
         return when (i) {
             is Call -> {
                 // todo singleInstr are loading to corruption results... what??
@@ -123,10 +123,20 @@ class WASMEngine(memorySize: Int) {
         registerFunction("dcmpl", listOf(f64, f64), listOf(i32), FloatCompare(-1))
         registerFunction("jvm_JavaLang_fillD2S_ACDI", listOf(ptrType, f64), listOf(i32), FillDoubleToString)
         registerFunction("jvm_JavaX_fillDate_ACI", listOf(ptrType), listOf(i32), FillDateToString)
+        registerFunction(
+            "jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV",
+            listOf(ptrType, ptrType), emptyList(), PrintStackTraceHead
+        )
+        registerFunction(
+            "jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV",
+            listOf(ptrType, ptrType, i32), emptyList(), PrintStackTraceLine2
+        )
+        registerEmptyFunction("jvm_JavaThrowable_printStackTraceEnd_V")
         registerGetter("jvm_JVM32_getAllocatedSize_I", i32) { it.bytes.size }
         registerGetter("java_lang_System_nanoTime_J", i64) { System.nanoTime() }
         registerGetter("java_lang_System_currentTimeMillis_J", i64) { System.currentTimeMillis() }
-        registerLogFunction("d")
+        registerLogFunction("i")
+        registerLogFunction("?")
         registerLogFunction("?ii")
     }
 
@@ -251,15 +261,16 @@ class WASMEngine(memorySize: Int) {
 
     fun executeFunction(function: FunctionImpl) {
         val startStackSize = stack.size - function.params.size
-        val stackFrame = StackFrame()
+        val stackFrame = StackFrame.pool.create()
         stackFrame.stackStart = startStackSize
         stackFrames.add(stackFrame)
         val returnLabel = executeInstructions(function.body)
         assertEquals(RETURN_LABEL, returnLabel) {
             "Got $returnLabel as answer from ${function.funcName}"
         }
-        stackFrame.locals.clear()
         assertSame(stackFrame, stackFrames.removeLast())
+        stackFrame.locals.clear()
+        StackFrame.pool.sub(1)
 
         // assert correct stack size
         assertTrue(startStackSize + function.params.size + function.results.size <= stack.size)

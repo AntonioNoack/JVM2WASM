@@ -6,8 +6,12 @@ import annotations.NoThrow;
 public class NativeLog {
 
     @NoThrow
-    @JavaScript(code = "console.log(arg0, arg1); return arg1;")
-    public static native int log(int code, int v);
+    @JavaScript(code = "console.log(arg0)")
+    public static native void log(int code);
+
+    @NoThrow
+    @JavaScript(code = "console.log(arg0, arg1)")
+    public static native void log(int code, int v);
 
     @NoThrow
     @JavaScript(code = "console.log(str(arg0), arg1);")
@@ -71,7 +75,7 @@ public class NativeLog {
 
     @NoThrow
     @JavaScript(code = "console.log(arg0);")
-    public static native void log(double v);
+    public static native void log(Throwable v);
 
     @NoThrow
     @JavaScript(code = "console.log(str(arg0), str(arg1));")

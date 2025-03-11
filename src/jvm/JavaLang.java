@@ -24,97 +24,97 @@ public class JavaLang {
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_floor_DD", "java_lang_Math_floor_DD"})
     @WASM(code = "f64.floor")
-    public static native double java_lang_StrictMath_floor_DD(double x);
+    public static native double StrictMath_floor_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_ceil_DD", "java_lang_Math_ceil_DD"})
     @WASM(code = "f64.ceil")
-    public static native double java_lang_StrictMath_ceil_DD(double x);
+    public static native double StrictMath_ceil_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_rint_DD", "java_lang_Math_rint_DD"})
     @WASM(code = "f64.nearest")
-    public static native double java_lang_StrictMath_rint_DD(double x);
+    public static native double StrictMath_rint_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_sin_DD", "java_lang_Math_sin_DD"})
     @JavaScript(code = "return Math.sin(arg0);")
-    public static native double java_lang_StrictMath_sin_DD(double x);
+    public static native double StrictMath_sin_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_cos_DD", "java_lang_Math_cos_DD"})
     @JavaScript(code = "return Math.cos(arg0);")
-    public static native double java_lang_StrictMath_cos_DD(double x);
+    public static native double StrictMath_cos_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_tan_DD", "java_lang_Math_tan_DD"})
     @JavaScript(code = "return Math.tan(arg0);")
-    public static native double java_lang_StrictMath_tan_DD(double x);
+    public static native double StrictMath_tan_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_asin_DD", "java_lang_Math_asin_DD"})
     @JavaScript(code = "return Math.asin(arg0);")
-    public static native double java_lang_StrictMath_asin_DD(double x);
+    public static native double StrictMath_asin_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_acos_DD", "java_lang_Math_acos_DD"})
     @JavaScript(code = "return Math.acos(arg0);")
-    public static native double java_lang_StrictMath_acos_DD(double x);
+    public static native double StrictMath_acos_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atan_DD", "java_lang_Math_atan_DD"})
     @JavaScript(code = "return Math.atan(arg0);")
-    public static native double java_lang_StrictMath_atan_DD(double x);
+    public static native double StrictMath_atan_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_sinh_DD", "java_lang_Math_sinh_DD"})
     @JavaScript(code = "return Math.sinh(arg0);")
-    public static native double java_lang_StrictMath_sinh_DD(double x);
+    public static native double StrictMath_sinh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_cosh_DD", "java_lang_Math_cosh_DD"})
     @JavaScript(code = "return Math.cosh(arg0);")
-    public static native double java_lang_StrictMath_cosh_DD(double x);
+    public static native double StrictMath_cosh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_tanh_DD", "java_lang_Math_tanh_DD"})
     @JavaScript(code = "return Math.tanh(arg0);")
-    public static native double java_lang_StrictMath_tanh_DD(double x);
+    public static native double StrictMath_tanh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_asinh_DD", "java_lang_Math_asinh_DD"})
     @JavaScript(code = "return Math.asinh(arg0);")
-    public static native double java_lang_StrictMath_asinh_DD(double x);
+    public static native double StrictMath_asinh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_acosh_DD", "java_lang_Math_acosh_DD"})
     @JavaScript(code = "return Math.acosh(arg0);")
-    public static native double java_lang_StrictMath_acosh_DD(double x);
+    public static native double StrictMath_acosh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atanh_DD", "java_lang_Math_atanh_DD"})
     @JavaScript(code = "return Math.atanh(arg0);")
-    public static native double java_lang_StrictMath_atanh_DD(double x);
+    public static native double StrictMath_atanh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_exp_DD", "java_lang_Math_exp_DD"})
     @JavaScript(code = "return Math.exp(arg0);")
-    public static native double java_lang_StrictMath_exp_DD(double x);
+    public static native double StrictMath_exp_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_log_DD", "java_lang_Math_log_DD"})
     @JavaScript(code = "return Math.log(arg0);")
-    public static native double java_lang_StrictMath_log_DD(double x);
+    public static native double StrictMath_log_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_log10_DD", "java_lang_Math_log10_DD"})
     @JavaScript(code = "return Math.log10(arg0);")
-    public static native double java_lang_StrictMath_log10_DD(double x);
+    public static native double StrictMath_log10_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_sqrt_DD", "java_lang_Math_sqrt_DD"})
     @WASM(code = "f64.sqrt")
-    public static native double java_lang_StrictMath_sqrt_DD(double x);
+    public static native double StrictMath_sqrt_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atan2_DDD", "java_lang_Math_atan2_DDD"})
@@ -149,42 +149,42 @@ public class JavaLang {
     @NoThrow
     @Alias(names = "java_lang_Float_intBitsToFloat_IF")
     @WASM(code = "f32.reinterpret_i32")
-    public static native float java_lang_Float_intBitsToFloat(int bits);
+    public static native float Float_intBitsToFloat(int bits);
 
     @NoThrow
     @Alias(names = "java_lang_Double_longBitsToDouble_JD")
     @WASM(code = "f64.reinterpret_i64")
-    public static native double java_lang_Double_longBitsToDouble_JD(long bits);
+    public static native double Double_longBitsToDouble_JD(long bits);
 
     @NoThrow
     @Alias(names = "java_lang_Math_min_FFF")
     @WASM(code = "f32.min")
-    public static native float java_lang_Math_min(float a, float b);
+    public static native float Math_min(float a, float b);
 
     @NoThrow
     @Alias(names = "java_lang_Math_max_FFF")
     @WASM(code = "f32.max")
-    public static native float java_lang_Math_max(float a, float b);
+    public static native float Math_max(float a, float b);
 
     @NoThrow
     @Alias(names = "java_lang_Math_min_DDD")
     @WASM(code = "f64.min")
-    public static native float java_lang_Math_min(double a, double b);
+    public static native float Math_min(double a, double b);
 
     @NoThrow
     @Alias(names = "java_lang_Math_max_DDD")
     @WASM(code = "f64.max")
-    public static native float java_lang_Math_max(double a, double b);
+    public static native float Math_max(double a, double b);
 
     @NoThrow
     @Alias(names = "java_lang_Math_abs_FF")
     @WASM(code = "f32.abs")
-    public static native float java_lang_Math_abs_FF(float a);
+    public static native float Math_abs_FF(float a);
 
     @NoThrow
     @Alias(names = "java_lang_Math_abs_DD")
     @WASM(code = "f64.abs")
-    public static native double java_lang_Math_abs_DD(double a);
+    public static native double Math_abs_DD(double a);
 
     // original implementation, just no throw
     @NoThrow
@@ -388,15 +388,14 @@ public class JavaLang {
     @NoThrow
     @Alias(names = "java_lang_Thread_isAlive_Z")
     public static boolean Thread_isAlive_Z(Thread self) {
-        return Thread_currentThread() == thread;
+        return self == MAIN_THREAD;
     }
 
-    private static Thread thread;
+    private static final Thread MAIN_THREAD = new Thread("main");
 
     @Alias(names = "java_lang_Thread_currentThread_Ljava_lang_Thread")
     public static Thread Thread_currentThread() {
-        if (thread == null) thread = new Thread("main");
-        return thread;
+        return MAIN_THREAD;
     }
 
     @NoThrow
@@ -563,22 +562,30 @@ public class JavaLang {
         return null;
     }
 
+    @Alias(names = "java_lang_Character_digit_CII")
+    public static int java_lang_Character_digit_CII(char digit, int base) {
+        return java_lang_Character_digit_III(digit, base);
+    }
+
     @Alias(names = "java_lang_Character_digit_III")
     public static int java_lang_Character_digit_III(int digit, int base) {
         // much more complicated in original JVM
         if (digit >= '0' & digit <= '9') {
             int number = digit - '0';
             if (number < base) return number;
-        } else if (digit >= 'A' & digit <= 'z') {
-            int number = (digit & 0x63) - 'A' + 10; // mask is for making the char lowercase
-            if (number < base & number < 36) return number;
+        } else if (digit >= 'A' & digit <= 'Z') {
+            int number = digit - 'A' + 10;
+            if (number < base) return number;
+        } else if (digit >= 'a' & digit <= 'z') {
+            int number = digit - 'a' + 10;
+            if (number < base) return number;
         }
         return -1;
     }
 
     @SuppressWarnings("CallToThreadRun")
     @Alias(names = "java_lang_Thread_start_V")
-    public static <V> void java_lang_Thread_start_V(Thread thread) {
+    public static <V> void Thread_start_V(Thread thread) {
         log("Warning: starting threads is not yet supported!", thread.getName());
         thread.run();
     }
@@ -586,18 +593,18 @@ public class JavaLang {
     @NoThrow
     @Alias(names = "java_lang_Runtime_gc_V")
     @JavaScript(code = "gcCtr=1e9")
-    public static native void java_lang_Runtime_gc_V(Runtime rt);
+    public static native void Runtime_gc_V(Runtime rt);
 
     @NoThrow
     @Alias(names = "java_lang_System_gc_V")
     @JavaScript(code = "gcCtr=1e9")
-    public static native void java_lang_System_gc_V();
+    public static native void System_gc_V();
 
     private static byte sleepCtr = 0;
     private static long lastSleepTime;
 
     @Alias(names = "java_lang_Thread_sleep_JV")
-    public static void java_lang_Thread_sleep_JV(long delay) {
+    public static void Thread_sleep_JV(long delay) {
         if (delay > 0) {
             throwJs("Cannot sleep in web!");
         } else {
@@ -618,38 +625,38 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_ProcessBuilder_start_Ljava_lang_Process")
-    public static Process java_lang_ProcessBuilder_start_Ljava_lang_Process(ProcessBuilder self) {
+    public static Process ProcessBuilder_start_Ljava_lang_Process(ProcessBuilder self) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
     @Alias(names = "java_lang_Runtime_exec_AWLjava_lang_Process")
-    public static Process java_lang_Runtime_exec_AWLjava_lang_Process(Runtime rt, String[] args) {
+    public static Process Runtime_exec_AWLjava_lang_Process(Runtime rt, String[] args) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
     @Alias(names = "java_lang_Runtime_exec_AWAWLjava_io_FileLjava_lang_Process")
-    public static Process java_lang_Runtime_exec_AWAWLjava_io_FileLjava_lang_Process(Runtime rt, String[] args, String[] args2, File file) {
+    public static Process Runtime_exec_AWAWLjava_io_FileLjava_lang_Process(Runtime rt, String[] args, String[] args2, File file) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
     @Alias(names = "java_lang_Shutdown_exit_IV")
-    public static void java_lang_Shutdown_exit_IV(int exitCode) {
+    public static void Shutdown_exit_IV(int exitCode) {
         throw new Error("Cannot shutdown website");
     }
 
     @NoThrow // idc
     @Alias(names = "java_lang_Thread_setContextClassLoader_Ljava_lang_ClassLoaderV")
-    public static void java_lang_Thread_setContextClassLoader_Ljava_lang_ClassLoaderV(Thread th, ClassLoader cl) {
+    public static void Thread_setContextClassLoader_Ljava_lang_ClassLoaderV(Thread th, ClassLoader cl) {
     }
 
     @NoThrow // idc
     @Alias(names = "java_lang_System_checkIO_V")
-    public static void java_lang_System_checkIO_V() {
+    public static void System_checkIO_V() {
     }
 
     @NoThrow
     @Alias(names = "java_lang_Thread_join_JV")
-    public static void java_lang_Thread_join_JV(Thread self, long timeoutMillis) {
+    public static void Thread_join_JV(Thread self, long timeoutMillis) {
         // not supported, as threads cannot run
     }
 
@@ -740,30 +747,29 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Float_parseFloat_Ljava_lang_StringF")
-    public static float parseFloat(String src) {
+    public static float Float_parseFloat(String src) {
         return (float) parseDouble(src);
     }
 
-    private static Random random;
+    private static final Random RANDOM = new Random(System.currentTimeMillis());
 
     @NoThrow
     @Alias(names = "kotlin_random_jdk8_PlatformThreadLocalRandom_getImpl_Ljava_util_Random")
     public static Random PlatformThreadLocalRandom_getImplRandom(Object self) {
-        if (random == null) random = new Random(System.currentTimeMillis());
-        return random;
+        return RANDOM;
     }
 
     @NoThrow
     @Alias(names = "kotlin_random_jdk8_PlatformThreadLocalRandom_nextInt_III")
-    public static int kotlin_random_jdk8_PlatformThreadLocalRandom_nextInt_III(Object self, int min, int maxExcl) {
+    public static int PlatformThreadLocalRandom_nextInt_III(Object self, int min, int maxExcl) {
         return PlatformThreadLocalRandom_getImplRandom(null)
                 .nextInt(maxExcl - min) + min;
     }
 
     @NoThrow
     @Alias(names = "me_anno_maths_Maths_random_D")
-    public static double me_anno_maths_Maths_random_D() {
-        return PlatformThreadLocalRandom_getImplRandom(null).nextDouble();
+    public static double Maths_random_D() {
+        return RANDOM.nextDouble();
     }
 
     public static String Object_toString(Object self) {

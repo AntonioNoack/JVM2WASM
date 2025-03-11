@@ -16,7 +16,9 @@ import java.util.Set;
 
 public class NioFileSystemProvider extends FileSystemProvider {
 
-    private final FileSystem fs = new NioFileSystem(this);
+    public static final NioFileSystemProvider INSTANCE = new NioFileSystemProvider();
+
+    private final FileSystem fileSystem = new NioFileSystem(this);
 
     @Override
     public String getScheme() {
@@ -31,13 +33,13 @@ public class NioFileSystemProvider extends FileSystemProvider {
 
     @Override
     public FileSystem getFileSystem(URI uri) {
-        return fs;
+        return fileSystem;
     }
 
     @NotNull
     @Override
     public Path getPath(@NotNull URI uri) {
-        return new NioPath(uri, fs);
+        return new NioPath(uri, fileSystem);
     }
 
     @Override

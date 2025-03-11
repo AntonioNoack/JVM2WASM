@@ -7,7 +7,6 @@ import graphing.ExtractStartNodes.tryExtractStart
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
-import graphing.StructuralAnalysis.Companion.printOps
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
 import me.anno.utils.structures.lists.Lists.count2
@@ -498,16 +497,55 @@ class StructuralAnalysis(
         } else false
     }
 
-    private fun findWhileTrueLoops(): Boolean {
+    /**
+     * find while(true) loops
+     * A -> A
+     * */
+    private fun findWhileTrueLoopsA(): Boolean {
         var changed = false
         for (i in nodes.indices) {
             val node = nodes[i]
             if (node is SequenceNode && node.next == node) {
                 // replace loop with wasm loop
-                makeNodeLoop("whileTrue", node, i)
+                makeNodeLoop("whileTrueA", node, i)
                 // node.printer.append("  unreachable\n")
                 changed = true
             }
+        }
+        return changed
+    }
+
+    /**
+     * find while(true) loops
+     * A -> B|C, B -> A, C -> A
+     * */
+    private fun findWhileTrueLoopsB(): Boolean {
+        var changed = false
+        for (i in nodes.indices) {
+            val node = nodes.getOrNull(i) ?: break
+            if (node !is BranchNode) continue
+            val ifTrue = node.ifTrue
+            val ifFalse = node.ifFalse
+            if (ifTrue == ifFalse) continue
+            if (ifTrue == node || ifFalse == node) continue
+            if (ifTrue !is SequenceNode || ifTrue.next != node) continue
+            if (ifFalse !is SequenceNode || ifFalse.next != node) continue
+            if (ifTrue.inputs.size != 1 || ifFalse.inputs.size != 1) continue
+
+            if (printOps) printState(nodes, "beforeWT2, $node")
+
+            node.printer.append(
+                IfBranch(
+                    ifTrue.printer.instrs, ifFalse.printer.instrs,
+                    ifTrue.inputStack, ifTrue.outputStack
+                )
+            )
+            node.inputs.removeAll(setOf(ifTrue, ifFalse))
+            makeNodeLoop("whileTrueB", node, i)
+            nodes.removeAll(listOf(ifTrue, ifFalse))
+
+            if (printOps) printState(nodes, "afterWT2")
+            changed = true
         }
         return changed
     }
@@ -527,9 +565,11 @@ class StructuralAnalysis(
         if (printOps) printState(nodes, label)
     }
 
+    /**
+     * find while(x) loops
+     * A -> A|B
+     * */
     private fun findWhileLoops(): Boolean {
-        // find while(x) loops
-        // A -> A|B
         var changed = false
         for (i in nodes.indices) {
             val node = nodes[i] as? BranchNode ?: continue
@@ -598,10 +638,12 @@ class StructuralAnalysis(
         return changed
     }
 
+    /**
+     * general branching
+     * A -> B|C; B -> D; C -> D
+     * becomes A -> D
+     * */
     private fun mergeGeneralBranching(): Boolean {
-        // general branching
-        // A -> B|C; B -> D; C -> D
-        // becomes A -> D
         var changed = false
         for (i in nodes.indices) {
             val nodeA = nodes.getOrNull(i) ?: break
@@ -968,7 +1010,7 @@ class StructuralAnalysis(
 
         while (true) {
             var hadAnyChange = false
-            for (step in 0 until 14) {
+            for (step in 0 until 15) {
                 while (true) {
                     val hadStepChange = when (step) {
                         0 -> removeEmptyIfStatements()
@@ -977,14 +1019,15 @@ class StructuralAnalysis(
                         3 -> joinSequences()
                         4 -> removeDeadEnds()
                         5 -> findWhereBothBranchesTerminate()
-                        6 -> findWhileTrueLoops()
-                        7 -> findWhileLoops()
-                        8 -> replaceSimpleBranch()
-                        9 -> mergeGeneralBranching()
-                        10 -> mergeSmallCircles()
-                        11 -> findSmallCircleA()
-                        12 -> findSmallCircleB()
-                        13 -> removeNodesWithoutInputs()
+                        6 -> findWhileTrueLoopsA()
+                        7 -> findWhileTrueLoopsB()
+                        8 -> findWhileLoops()
+                        9 -> replaceSimpleBranch()
+                        10 -> mergeGeneralBranching()
+                        11 -> mergeSmallCircles()
+                        12 -> findSmallCircleA()
+                        13 -> findSmallCircleB()
+                        14 -> removeNodesWithoutInputs()
                         else -> false
                     }
                     if (hadStepChange) {
