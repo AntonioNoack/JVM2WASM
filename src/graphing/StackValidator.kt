@@ -24,7 +24,6 @@ import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
 import wasm.instr.Instructions.F64Store
-import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32Load
 import wasm.instr.Instructions.I32Load16S
 import wasm.instr.Instructions.I32Load16U
@@ -33,7 +32,6 @@ import wasm.instr.Instructions.I32Load8U
 import wasm.instr.Instructions.I32Store
 import wasm.instr.Instructions.I32Store16
 import wasm.instr.Instructions.I32Store8
-import wasm.instr.Instructions.I64EQZ
 import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.Return
@@ -89,15 +87,19 @@ object StackValidator {
         val returnTypes = getReturnTypes(mt.sig)
         // println("Validating stack ${mt.sig} -> $returnTypes")
         for (node in nodes) {
-            validateStack2(
-                mt.sig, node.printer, node.inputStack,
-                when (node) {
-                    is ReturnNode -> returnTypes
-                    is BranchNode -> node.outputStack + listOf(i32) // i32 = condition
-                    else -> node.outputStack
-                }, returnTypes,
-                mt.variables.localVarsAndParams
-            )
+            try {
+                validateStack2(
+                    mt.sig, node.printer, node.inputStack,
+                    when (node) {
+                        is ReturnNode -> returnTypes
+                        is BranchNode -> node.outputStack + listOf(i32) // i32 = condition
+                        else -> node.outputStack
+                    }, returnTypes,
+                    mt.variables.localVarsAndParams
+                )
+            } catch (e: IllegalStateException) {
+                throw IllegalStateException("Error in $node", e)
+            }
         }
     }
 
@@ -305,6 +307,16 @@ object StackValidator {
                 System.err.println(ill)
             }
             throw IllegalStateException("Illegal node in $sig")
+        }
+    }
+
+    fun validateInputs(nodes: List<GraphingNode>) {
+        for (node in nodes) {
+            for (output in node.outputs) {
+                assertTrue(node in output.inputs) {
+                    "Missing $node in $output.inputs"
+                }
+            }
         }
     }
 }

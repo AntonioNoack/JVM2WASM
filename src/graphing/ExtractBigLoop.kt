@@ -1,30 +1,30 @@
 package graphing
 
+import graphing.ExtractEndNodes.replaceGotoEndNode
 import graphing.ExtractEndNodes.solve
 import graphing.LargeSwitchStatement.loadStack
 import graphing.LargeSwitchStatement.storeStack
+import graphing.StackValidator.validateInputOutputStacks
+import graphing.StackValidator.validateInputs
 import graphing.StackValidator.validateStack
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
-import me.anno.utils.structures.lists.Lists.any2
+import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
-import me.anno.utils.structures.lists.TopologicalSort
 import translator.MethodTranslator
 import utils.Builder
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
 import wasm.instr.LoopInstr
+import kotlin.math.abs
 
 /**
- * Try to find a node, which has multiple inputs, is cyclic, but after cutting all connections TO it, the remainder after that node is non-cyclic.
- * todo strictly speaking, this splits the graph, and doesn't depend on cyclic/non-cyclic
- * todo therefore we could modify our validate() and findBigLoop()
- *
  * ideal: half/half-split
  * must-haves:
  * - at least one node before the graph
+ * - more than one node in the graph
  * - all startNodes terminate in loopStart
  * - no other connections between treeNodes and startNodes
  * */
@@ -46,47 +46,40 @@ object ExtractBigLoop {
     )
 
     private fun findBigLoop(sa: StructuralAnalysis): BigLoop? {
-        // maximize
-        //  start -> loop - ... > loop, such that inside loop nothing is recursive
         val nodes = sa.nodes
         return nodes.indices.mapNotNull {
             val loopStart = nodes[it]
             findBigLoopFrom(loopStart, sa)
-        }.maxByOrNull { it.inLoopNodes.size }
+        }.minByOrNull {
+            // the ideal split is in the middle
+            abs(nodes.size.shr(1) - it.inLoopNodes.size)
+        }
     }
 
-    private fun findBigLoopFrom(
-        loopStart: GraphingNode,
-        sa: StructuralAnalysis
-    ): BigLoop? {
+    private fun findBigLoopFrom(loopStart: GraphingNode, sa: StructuralAnalysis): BigLoop? {
 
-        val treeNodes = ArrayList(sa.nodes)
-        val sorter = object : TopologicalSort<GraphingNode, ArrayList<GraphingNode>>(treeNodes) {
-            override fun visitDependencies(node: GraphingNode): Boolean {
-                return node.outputs.any2 { nextNode ->
-                    if (nextNode == loopStart) false // links to start are ignored
-                    else visit(nextNode)
-                }
-            }
+        if (loopStart is ReturnNode) return null
+        if (loopStart.inputs.size < 2) return null // not a splitting node
+        // we don't want to extract a single node with this much effort
+        if (loopStart is SequenceNode && loopStart.next == loopStart) return null
+
+        val loopNodes = Recursion.collectRecursive(loopStart) { node, remaining ->
+            remaining.addAll(node.outputs)
         }
-        treeNodes.clear()
-
-        val hasCycle = sorter.visit(loopStart)
-        if (hasCycle) return null
 
         val firstNode = sa.nodes.first()
-        if (loopStart != firstNode && firstNode in treeNodes) {
-            // if everything can be a big loop,
-            // the loop must start at firstNode, otherwise we get an incorrect start...
+        if (loopStart != firstNode && firstNode in loopNodes) {
+            // if firstNode is inside the loop, it must be the start
             return null
         }
 
-        val startNodesSet = treeNodes.toHashSet()
-        val hasLinkFromEndToStart = treeNodes.any2 { treeNode ->
-            treeNode != loopStart && treeNode.inputs.any { it !in startNodesSet }
+        val loopNodesSet = loopNodes.toHashSet()
+        // loop to start is covered by recursive discovery
+        val hasLinkFromStartToLoop = loopNodes.any { loopNode ->
+            loopNode != loopStart && loopNode.inputs.any { it !in loopNodesSet }
         }
-        if (hasLinkFromEndToStart) return null
-        return BigLoop(startNodesSet, loopStart)
+        if (hasLinkFromStartToLoop) return null
+        return BigLoop(loopNodesSet, loopStart)
     }
 
     private fun shouldReplaceStartNodes(subset: BigLoop): Boolean {
@@ -117,7 +110,7 @@ object ExtractBigLoop {
 
     private fun createMergedCode(sa: StructuralAnalysis, subset: BigLoop) {
 
-        val print = sa.methodTranslator.isLookingAtSpecial
+        val print = true || sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
         val loopStart = subset.loopStart
@@ -194,7 +187,7 @@ object ExtractBigLoop {
                 }
                 else -> {
                     // replace outputs from loopNode to saveStackImpl + loadStackNode
-                    ExtractEndNodes.replaceGotoEndNode(
+                    replaceGotoEndNode(
                         sa, input, input.index, validate, print,
                         setOf(loopStart)
                     ) { node, next ->
@@ -226,6 +219,8 @@ object ExtractBigLoop {
 
         if (print) printState(sa.nodes, "After Solving Tree")
         if (validate) validateStack(sa.nodes, sa.methodTranslator)
+        validateInputOutputStacks(sa.nodes, sa.sig)
+        validateInputs(sa.nodes)
     }
 
     private fun createSaveStateNode(
@@ -233,10 +228,10 @@ object ExtractBigLoop {
         mt: MethodTranslator,
     ): GraphingNode {
         val saveStackNode = SequenceNode(Builder(), loopNode)
-        saveStackNode.printer.comment("saveStackNode")
         storeStack(stackToSave, saveStackNode.printer, mt)
         saveStackNode.inputStack = stackToSave
         saveStackNode.outputStack = emptyList()
+        loopNode.inputs.add(saveStackNode)
         return saveStackNode
     }
 }
