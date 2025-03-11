@@ -10,6 +10,7 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.partition1
 import translator.LocalVariableOrParam
+import translator.MethodTranslator
 import utils.Builder
 import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
@@ -132,7 +133,7 @@ object ExtractEndNodes {
         replaceGotoEndNodes(sa, validate, print, endNodes) { node, next ->
             val setLabel = getInputLabel(next)
             val branchPrinter = Builder()
-            storeStack(branchPrinter, node.outputStack, mt)
+            storeStack(node.outputStack, branchPrinter, mt)
             // append "label-setter"
             branchPrinter.append(i32Const1).append(setLabel.setter)
             // branch to loop start = the beginning of the end
@@ -142,7 +143,7 @@ object ExtractEndNodes {
         sa.nodes.removeIf { it in endNodes }
         if (print) printState(sa.nodes, "Removed end nodes")
 
-        val firstNodeCode = solve(sa, sa.nodes)
+        val firstNodeCode = solve(mt, sa.nodes)
         firstNodeCode.prepend(listOf(i32Const0, firstRunVariable.setter)) // don't run a second time
         firstNodeCode.append(Unreachable) // end of it should be unreachable
 
@@ -176,10 +177,9 @@ object ExtractEndNodes {
         return dst
     }
 
-    fun solve(sa: StructuralAnalysis, nodes: List<GraphingNode>): Builder {
+    fun solve(mt: MethodTranslator, nodes: List<GraphingNode>): Builder {
         // good enough???
-        return StructuralAnalysis(sa.methodTranslator, ArrayList(nodes))
-            .joinNodes()
+        return StructuralAnalysis(mt, ArrayList(nodes)).joinNodes()
     }
 
     fun replaceGotoEndNodes(
@@ -192,49 +192,59 @@ object ExtractEndNodes {
         for (i in sa.nodes.indices) {
             val node = sa.nodes[i]
             if (node in endNodes) continue
+            replaceGotoEndNode(sa, node, i, validate, print, endNodes, getJumpInstructions)
+        }
+    }
 
-            when (node) {
-                is ReturnNode -> {} // nothing to replace
-                is BranchNode -> {
-                    val endTrue = node.ifTrue in endNodes
-                    val endFalse = node.ifFalse in endNodes
-                    when {
-                        endTrue && endFalse -> {
-                            // create return node
-                            printState(sa.nodes, "Illegal node")
-                            throw IllegalStateException("Node ${node.index} should be part of endNodes")
-                        }
-                        endTrue || endFalse -> {
-                            // printState(sa.nodes, "Before if-jump $node, $endTrue, $endFalse")
-                            if (endFalse) node.printer.append(I32EQZ)
-                            val endNode = if (endTrue) node.ifTrue else node.ifFalse
-                            node.printer.append(
-                                IfBranch(
-                                    getJumpInstructions(node, endNode).instrs, emptyList(),
-                                    node.outputStack, node.outputStack
-                                )
-                            )
-                            // create sequence node
-                            val next = if (endTrue) node.ifFalse else node.ifTrue
-                            sa.replaceNode(node, SequenceNode(node.printer, next), i)
-                            if (print) printState(sa.nodes, "After if-jump [$i]")
-                            if (validate) validateStack(sa.nodes, sa.methodTranslator)
-                        }
-                        else -> {} // nothing to do
+    fun replaceGotoEndNode(
+        sa: StructuralAnalysis,
+        node: GraphingNode, i: Int,
+        validate: Boolean, print: Boolean,
+        endNodes: Set<GraphingNode>,
+        getJumpInstructions: (node: GraphingNode, next: GraphingNode) -> Builder
+    ) {
+        // replace goto-end-node to jumps to it
+        when (node) {
+            is ReturnNode -> {} // nothing to replace
+            is BranchNode -> {
+                val endTrue = node.ifTrue in endNodes
+                val endFalse = node.ifFalse in endNodes
+                when {
+                    endTrue && endFalse -> {
+                        // create return node
+                        printState(sa.nodes, "Illegal node")
+                        throw IllegalStateException("Node ${node.index} should be part of endNodes")
                     }
-                }
-                is SequenceNode -> {
-                    if (node.next in endNodes) {
-                        // convert node to return node
-                        val builder = getJumpInstructions(node, node.next)
-                        builder.prepend(node.printer)
-                        sa.replaceNode(node, ReturnNode(builder), i)
-                        if (print) printState(sa.nodes, "After next-jump [$i]")
+                    endTrue || endFalse -> {
+                        // printState(sa.nodes, "Before if-jump $node, $endTrue, $endFalse")
+                        if (endFalse) node.printer.append(I32EQZ)
+                        val endNode = if (endTrue) node.ifTrue else node.ifFalse
+                        node.printer.append(
+                            IfBranch(
+                                getJumpInstructions(node, endNode).instrs, emptyList(),
+                                node.outputStack, node.outputStack
+                            )
+                        )
+                        // create sequence node
+                        val next = if (endTrue) node.ifFalse else node.ifTrue
+                        sa.replaceNode(node, SequenceNode(node.printer, next), i)
+                        if (print) printState(sa.nodes, "After if-jump [$i]")
                         if (validate) validateStack(sa.nodes, sa.methodTranslator)
                     }
+                    else -> {} // nothing to do
                 }
-                else -> assertFail()
             }
+            is SequenceNode -> {
+                if (node.next in endNodes) {
+                    // convert node to return node
+                    val builder = getJumpInstructions(node, node.next)
+                    builder.prepend(node.printer)
+                    sa.replaceNode(node, ReturnNode(builder), i)
+                    if (print) printState(sa.nodes, "After next-jump [$i]")
+                    if (validate) validateStack(sa.nodes, sa.methodTranslator)
+                }
+            }
+            else -> assertFail()
         }
     }
 

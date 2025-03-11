@@ -1,32 +1,37 @@
 package graphing
 
+import graphing.ExtractEndNodes.solve
 import graphing.LargeSwitchStatement.loadStack
 import graphing.LargeSwitchStatement.storeStack
-import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateStack
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
-import me.anno.utils.assertions.assertEquals
-import me.anno.utils.assertions.assertTrue
+import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
 import me.anno.utils.structures.lists.TopologicalSort
+import translator.MethodTranslator
 import utils.Builder
-import wasm.instr.Const.Companion.i32Const0
-import wasm.instr.Const.Companion.i32Const1
-import wasm.instr.IfBranch
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
 import wasm.instr.LoopInstr
 
 /**
  * Try to find a node, which has multiple inputs, is cyclic, but after cutting all connections TO it, the remainder after that node is non-cyclic.
+ * todo strictly speaking, this splits the graph, and doesn't depend on cyclic/non-cyclic
+ * todo therefore we could modify our validate() and findBigLoop()
+ *
+ * ideal: half/half-split
+ * must-haves:
+ * - at least one node before the graph
+ * - all startNodes terminate in loopStart
+ * - no other connections between treeNodes and startNodes
  * */
 object ExtractBigLoop {
 
     fun tryExtractBigLoop(sa: StructuralAnalysis): Boolean {
-        return false // not yet properly implemented
+        // return false // not yet properly implemented
         val startNodes = findBigLoop(sa)
         if (startNodes != null && shouldReplaceStartNodes(startNodes)) {
             createMergedCode(sa, startNodes)
@@ -36,7 +41,7 @@ object ExtractBigLoop {
     }
 
     private class BigLoop(
-        val treeNodes: Set<GraphingNode>,
+        val inLoopNodes: Set<GraphingNode>,
         val loopStart: GraphingNode
     )
 
@@ -47,16 +52,13 @@ object ExtractBigLoop {
         return nodes.indices.mapNotNull {
             val loopStart = nodes[it]
             findBigLoopFrom(loopStart, sa)
-        }.maxByOrNull { it.treeNodes.size }
+        }.maxByOrNull { it.inLoopNodes.size }
     }
 
     private fun findBigLoopFrom(
         loopStart: GraphingNode,
         sa: StructuralAnalysis
     ): BigLoop? {
-
-        // todo support inputStacks using helper nodes
-        if (loopStart.inputStack.isNotEmpty()) return null
 
         val treeNodes = ArrayList(sa.nodes)
         val sorter = object : TopologicalSort<GraphingNode, ArrayList<GraphingNode>>(treeNodes) {
@@ -88,7 +90,7 @@ object ExtractBigLoop {
     }
 
     private fun shouldReplaceStartNodes(subset: BigLoop): Boolean {
-        return when (subset.treeNodes.size) {
+        return when (subset.inLoopNodes.size) {
             0, 1 -> false
             else -> true
         }
@@ -113,22 +115,22 @@ object ExtractBigLoop {
         }
     }
 
-    private fun createMergedCode(sa: StructuralAnalysis, bigLoop: BigLoop) {
+    private fun createMergedCode(sa: StructuralAnalysis, subset: BigLoop) {
 
-        // todo this hasn't been implemented properly!!!
-
-        val print = true
+        val print = sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
-        val treeNodes = bigLoop.treeNodes
-        val loopStart = bigLoop.loopStart
+        val loopStart = subset.loopStart
+        val inLoopNodes = subset.inLoopNodes
+        assertTrue(loopStart in inLoopNodes)
+        assertFalse(loopStart in loopStart.inputs)
 
         val firstNode = sa.nodes.first()
+        val startNodesSize = sa.nodes.size - inLoopNodes.size
 
         // these are necessary!!!
-        sa.nodes.partition1 { it !in treeNodes } // put startNodes first
-        sa.nodes.swap(sa.nodes.indexOf(loopStart), sa.nodes.size - treeNodes.size) // middle comes after that
-        assertEquals(sa.nodes.distinct().size, sa.nodes.size)
+        sa.nodes.partition1 { it !in inLoopNodes } // put startNodes first
+        sa.nodes.swap(sa.nodes.indexOf(loopStart), startNodesSize) // middle comes after that
         assertEquals(firstNode, sa.nodes.first())
         renumber(sa.nodes)
 
@@ -136,57 +138,105 @@ object ExtractBigLoop {
             println()
             println("------------------------------------------------------")
             println(
-                "BigLoop, " +
-                        "start: 0-${loopStart.index - 1}, " +
-                        "loop: ${loopStart.index}, " +
-                        "tree: ${loopStart.index + 1}-${sa.nodes.lastIndex}"
+                "ExtractStart, " +
+                        "start: 0-${startNodesSize - 1}, " +
+                        "loopStart: ${loopStart.index}, " +
+                        "inLoop: ${loopStart.index + 1}-${sa.nodes.lastIndex}"
             )
             printState(sa.nodes, "MergeCode")
         }
 
-        if (validate) validateNodes(sa, treeNodes, loopStart)
+        if (validate) validateNodes(sa, inLoopNodes, loopStart)
 
         val mt = sa.methodTranslator
         val loopLabel = "bigLoop${mt.bigLoopExtractorIndex++}"
-        // val jumpInstr = Jump(loopLabel)
+        val loopInstr = LoopInstr(loopLabel, emptyList(), emptyList(), emptyList())
+        val jumpBack = Jump(loopInstr)
 
-        if (validate) validateStack(sa.nodes, sa.methodTranslator)
+        val stackToSave = loopStart.inputStack
 
-        val needsStackHelperNodes =
-            loopStart.inputStack.isNotEmpty()
+        val loopNode = ReturnNode(Builder())
+        loopNode.printer.append(loopInstr)
+        loopNode.printer.append(Unreachable)
+        loopNode.inputStack = emptyList()
+        loopNode.outputStack = emptyList()
 
-        var stackLoadNode: SequenceNode? = null
-        var stackStoreNode: SequenceNode? = null
-        if (needsStackHelperNodes) {
-            // we need a stack-load-helper-node
-            val stackLoadBuilder = Builder()
-            loadStack(loopStart.inputStack, stackLoadBuilder, mt)
-            stackLoadNode = SequenceNode(stackLoadBuilder, loopStart)
-            stackLoadNode.inputStack = emptyList()
-            stackLoadNode.outputStack = loopStart.inputStack
-            stackLoadNode.index = sa.nodes.size
-            sa.nodes.add(stackLoadNode) // is this a good place???
+        // if stack is empty, we can skip saveStackNode
+        val saveStackNode = if (stackToSave.isNotEmpty()) {
+            createSaveStateNode(loopNode, stackToSave, mt)
+        } else loopNode // skip that extra node, if not needed
 
-            // we also need a stack-store-helper node
-            val stackStoreBuilder = Builder()
-            storeStack(stackStoreBuilder, loopStart.inputStack, mt)
-            stackStoreNode = SequenceNode(stackStoreBuilder, stackLoadNode)
-            stackStoreNode.index = sa.nodes.size
-            sa.nodes.add(stackStoreNode)
-
-            for (node in sa.nodes) {
-                // todo this is missing stackStoreNodes for all treeNodes
-                sa.replaceOutputs(loopStart, if (node in treeNodes) stackLoadNode else stackStoreNode)
-            }
-            TODO("verify link structure")
+        sa.nodes.add(loopNode)
+        if (saveStackNode != loopNode) {
+            sa.nodes.add(saveStackNode)
         }
 
-        // todo replace links to loopStart with goto loadStackNode/loopStart
-        // todo unlink tree-nodes
-        // todo remove tree-nodes from sa.nodes
-        // todo build tree-nodes into simple instructions
-        // todo replace loadStack/loopStart with actual loop (careful! loopStart is part of the tree, so no longer in sa.nodes)
+        // ensure node.index = actual index
+        renumber(sa.nodes)
 
-        TODO()
+        for (input in loopStart.inputs.toList()) {
+            when (input) {
+                loopStart -> assertFail()
+                !in inLoopNodes -> {
+                    // replace outputs from loopNode to saveStackNode
+                    when (input) {
+                        is BranchNode -> {
+                            if (input.ifTrue == loopStart) input.ifTrue = saveStackNode
+                            if (input.ifFalse == loopStart) input.ifFalse = saveStackNode
+                        }
+                        is SequenceNode -> {
+                            if (input.next == loopStart) input.next = saveStackNode
+                        }
+                        else -> assertFail()
+                    }
+                    saveStackNode.inputs.add(input)
+                    if (print) printState(sa.nodes, "After input-next $input")
+                }
+                else -> {
+                    // replace outputs from loopNode to saveStackImpl + loadStackNode
+                    ExtractEndNodes.replaceGotoEndNode(
+                        sa, input, input.index, validate, print,
+                        setOf(loopStart)
+                    ) { node, next ->
+                        assertSame(node, input)
+                        assertSame(next, loopStart)
+                        val builder = Builder()
+                        storeStack(stackToSave, builder, mt)
+                        builder.append(jumpBack)
+                        builder
+                    }
+                }
+            }
+        }
+        // treeNodes is invalid after this point, because nodes in it can be replaced
+
+        loopStart.inputs.clear()
+
+        if (print) printState(sa.nodes, "After Link Replacement")
+
+        // solve tree
+        val treeNodesList = sa.nodes.subList(startNodesSize, startNodesSize + inLoopNodes.size)
+        if (validate) assertSame(loopStart, treeNodesList.first())
+        val loopContent = solve(mt, treeNodesList)
+        val loadStackTmp = Builder()
+        loadStack(stackToSave, loadStackTmp, mt)
+        loopContent.prepend(loadStackTmp)
+        loopInstr.body = loopContent.instrs
+        treeNodesList.clear() // remove tree from the graph
+
+        if (print) printState(sa.nodes, "After Solving Tree")
+        if (validate) validateStack(sa.nodes, sa.methodTranslator)
+    }
+
+    private fun createSaveStateNode(
+        loopNode: GraphingNode, stackToSave: List<String>,
+        mt: MethodTranslator,
+    ): GraphingNode {
+        val saveStackNode = SequenceNode(Builder(), loopNode)
+        saveStackNode.printer.comment("saveStackNode")
+        storeStack(stackToSave, saveStackNode.printer, mt)
+        saveStackNode.inputStack = stackToSave
+        saveStackNode.outputStack = emptyList()
+        return saveStackNode
     }
 }

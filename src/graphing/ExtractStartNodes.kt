@@ -152,7 +152,7 @@ object ExtractStartNodes {
         }
         ExtractEndNodes.replaceGotoEndNodes(sa, validate, print, middlePlusEnd) { _, next ->
             val builder = Builder(3)
-            storeStack(builder, next.inputStack, sa.methodTranslator)
+            storeStack(next.inputStack, builder, sa.methodTranslator)
             builder.append(jumpInstr)
             builder
         }

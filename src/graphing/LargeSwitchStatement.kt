@@ -147,10 +147,10 @@ object LargeSwitchStatement {
     }
 
     fun storeStack(node: GraphingNode, mt: MethodTranslator) {
-        storeStack(node.printer, node.outputStack, mt)
+        storeStack(node.outputStack, node.printer, mt)
     }
 
-    fun storeStack(printer: Builder, outputs: List<String>, mt: MethodTranslator) {
+    fun storeStack(outputs: List<String>, printer: Builder, mt: MethodTranslator) {
         if (outputs.isEmpty()) return
         if (comments) printer.comment("store stack $outputs")
         for ((idx, type) in outputs.withIndex().reversed()) {
