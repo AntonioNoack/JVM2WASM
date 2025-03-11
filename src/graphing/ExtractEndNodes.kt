@@ -30,15 +30,20 @@ object ExtractEndNodes {
     fun tryExtractEnd(sa: StructuralAnalysis): Boolean {
         val endNodes = findEndNodes(sa)
         if (shouldReplaceEndNodes(endNodes)) {
-            val builder = createMergedCode(sa, endNodes)
-            sa.nodes.clear()
-            val endNode = ReturnNode(builder)
-            endNode.inputStack = emptyList()
-            endNode.outputStack = emptyList()
-            sa.nodes.add(endNode)
-            validateStack(sa.nodes, sa.methodTranslator)
+            extractEndNodes(sa, endNodes)
             return true
         } else return false
+    }
+
+    private fun extractEndNodes(sa: StructuralAnalysis, endNodes: Set<GraphingNode>) {
+        val builder = createMergedCode(sa, endNodes)
+        sa.nodes.clear()
+        val endNode = ReturnNode(builder)
+        endNode.inputStack = emptyList()
+        endNode.outputStack = emptyList()
+        endNode.index = 0
+        sa.nodes.add(endNode)
+        validateStack(sa.nodes, sa.methodTranslator)
     }
 
     private fun findEndNodes(sa: StructuralAnalysis): Set<GraphingNode> {
@@ -91,12 +96,10 @@ object ExtractEndNodes {
         val print = sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
-        if (print) {
-            val firstNode = sa.nodes.first()
-            sa.nodes.partition1 { it !in endNodes }
-            assertEquals(firstNode, sa.nodes.first())
-            renumber(sa.nodes)
-        }
+        val firstNode = sa.nodes.first()
+        sa.nodes.partition1 { it !in endNodes }
+        assertEquals(firstNode, sa.nodes.first())
+        renumber(sa.nodes)
 
         if (print) {
             println()

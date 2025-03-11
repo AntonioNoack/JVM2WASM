@@ -98,6 +98,7 @@ object StackValidator {
                     mt.variables.localVarsAndParams
                 )
             } catch (e: IllegalStateException) {
+                printState(nodes, e.message.toString())
                 throw IllegalStateException("Error in $node", e)
             }
         }

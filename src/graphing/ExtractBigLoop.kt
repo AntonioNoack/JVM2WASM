@@ -110,7 +110,7 @@ object ExtractBigLoop {
 
     private fun createMergedCode(sa: StructuralAnalysis, subset: BigLoop) {
 
-        val print = true || sa.methodTranslator.isLookingAtSpecial
+        val print = sa.methodTranslator.isLookingAtSpecial
         val validate = true
 
         val loopStart = subset.loopStart
