@@ -12,6 +12,7 @@ import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import translator.LocalVariableOrParam
 import translator.MethodTranslator
+import translator.MethodTranslator.Companion.isLookingAtSpecial
 import useWASMExceptions
 import utils.Builder
 import utils.MethodSig
@@ -81,6 +82,15 @@ object StackValidator {
     }
 
     /**
+     * relatively expensive validation function
+     * */
+    fun validateNodes1(nodes: List<GraphingNode>, mt: MethodTranslator) {
+        validateInputs(nodes)
+        validateInputOutputStacks(nodes, mt.sig)
+        validateStack(nodes, mt)
+    }
+
+    /**
      * relatively expensive validation function to check whether all stack-operations add up
      * */
     fun validateStack(nodes: List<GraphingNode>, mt: MethodTranslator) {
@@ -113,16 +123,36 @@ object StackValidator {
         validateStack3(sig, printer.instrs, params, normalResults, returnResults, localVarTypes, paramsTypes)
     }
 
+
     private fun validateStack3(
         sig: MethodSig,
         instructions: List<Instruction>, params: List<String>,
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        val print = sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "put"
+        try {
+            validateStack3Impl(sig, instructions, params, normalResults, returnResults, localVarTypes, paramsTypes)
+        } catch (e: IllegalStateException) {
+            val prefix = "ValidateStack3"
+            if ((e.message ?: "").startsWith(prefix)) throw e
+            throw IllegalStateException(
+                "$prefix[$params,$normalResults/$returnResults]\n" +
+                        instructions.joinToString("\n"), e
+            )
+        }
+    }
+
+    private fun validateStack3Impl(
+        sig: MethodSig,
+        instructions: List<Instruction>, params: List<String>,
+        normalResults: List<String>, returnResults: List<String>,
+        localVarTypes: Map<String, String>, paramsTypes: List<String>,
+    ) {
+        val print = isLookingAtSpecial(sig)
         if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
-        for (i in instructions) {
+        for (j in instructions.indices) {
+            val i = instructions[j]
             if (print && i !is IfBranch && i !is LoopInstr && i !is SwitchCase) {
                 println("  $stack, $i")
             }
@@ -163,7 +193,12 @@ object StackValidator {
                 }
                 is Const -> stack.push(i.type.wasmType)
                 is Comment -> {} // ignored
-                is UnaryInstruction -> stack.pop(i.popType).push(i.pushType)
+                is UnaryInstruction -> {
+                    if (stack.lastOrNull() != i.popType) {
+                        throw IllegalStateException("Cannot pop #$j $i from $stack")
+                    }
+                    stack.pop(i.popType).push(i.pushType)
+                }
                 is BinaryInstruction -> stack.pop(i.type).pop(i.type).push(i.type)
                 is CompareInstr -> stack.pop(i.type).pop(i.type).push(i32)
                 is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)

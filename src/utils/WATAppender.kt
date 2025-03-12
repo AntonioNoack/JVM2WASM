@@ -139,40 +139,10 @@ private fun fillInFields(
         val fieldPointers = IntArray(allFields.size) {
             val field = allFields[it]
             fieldCache.getOrPut(field) {
-                // create new field instance
-                val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
-                val fieldPtr = indexStartPtr + classData.size()
-                classData.writeClass(fieldClassIndex)
-                for (i in objectOverhead until fieldNameOffset) {
-                    classData.write(0)
-                }
-                classData.writeLE32(name) // name
-                classData.writeLE32(field.field.offset) // slot
-                val ci = when (val typeName = field.field.type) {
-                    in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
-                    "[]" -> gIndex.getClassIndex("[]")
-                    else -> {
-                        if (
-                            typeName.startsWith("[") &&
-                            typeName.length == 2 &&
-                            typeName[1] in NativeTypes.joined
-                        ) { // native array
-                            gIndex.getClassIndex(typeName)
-                        } else if (typeName.startsWith("[")) {
-                            gIndex.getClassIndex("[]")
-                        } else {
-                            gIndex.getClassIndexOrParents(typeName)
-                        }
-                    }
-                }
-                classData.writeLE32(indexStartPtr + classSize * ci) // type
-                classData.writeLE32(field.modifiers)
-                classData.writeLE32(classPtr) // clazz -> declaring class
-                for (i in 20 + fieldNameOffset until fieldSize) {// 20, because we wrote 5x4 bytes
-                    classData.write(0)
-                }
-                assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
-                fieldPtr
+                appendFieldInstance(
+                    field, indexStartPtr, classData,
+                    fieldClassIndex, fieldNameOffset, classSize, classPtr, fieldSize
+                )
             }
         }
 
@@ -198,6 +168,55 @@ private fun fillInFields(
         classData.position = pos
 
     }
+}
+
+private fun getTypeClassIndex(typeName: String): Int {
+    return when (typeName) {
+        in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
+        "[]" -> gIndex.getClassIndex("[]")
+        else -> {
+            if (
+                typeName.startsWith("[") &&
+                typeName.length == 2 &&
+                typeName[1] in NativeTypes.joined
+            ) { // native array
+                gIndex.getClassIndex(typeName)
+            } else if (typeName.startsWith("[")) {
+                gIndex.getClassIndex("[]")
+            } else {
+                gIndex.getClassIndexOrParents(typeName)
+            }
+        }
+    }
+}
+
+private fun getClassInstancePtr(classIndex: Int, indexStartPtr: Int, classSize: Int): Int {
+    return indexStartPtr + classIndex * classSize
+}
+
+private fun appendFieldInstance(
+    field: FieldEntry, indexStartPtr: Int, classData: ByteArrayOutputStream2,
+    fieldClassIndex: Int, fieldNameOffset: Int, classSize: Int, classPtr: Int, fieldSize: Int
+): Int {
+    // create new field instance
+    // name must be before fieldPtr, because the name might be new!!
+    val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
+    val fieldPtr = indexStartPtr + classData.size()
+    classData.writeClass(fieldClassIndex)
+    for (i in objectOverhead until fieldNameOffset) {
+        classData.write(0)
+    }
+    classData.writeLE32(name) // name
+    classData.writeLE32(field.field.offset) // slot
+    val typeClassIndex = getTypeClassIndex(field.field.type)
+    classData.writeLE32(getClassInstancePtr(typeClassIndex, indexStartPtr, classSize)) // type
+    classData.writeLE32(field.modifiers) // modifiers
+    classData.writeLE32(classPtr) // clazz -> declaring class
+    for (i in 20 + fieldNameOffset until fieldSize) {// 20, because we wrote 5x4 bytes
+        classData.write(0)
+    }
+    assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
+    return fieldPtr
 }
 
 var classInstanceTablePtr = 0
@@ -233,21 +252,71 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
     if (methodsOffset != null) {
         // insert all name pointers
         val emptyArrayPtr = indexStartPtr + classData.size()
+        val methodCache = HashMap<MethodSig, Int>()
         classData.writeClass(1)
         classData.writeLE32(0) // length
+
+        val methodClassIndex = gIndex.getClassIndex("java/lang/reflect/Method")
+        val methodSize = gIndex.getFieldOffsets("java/lang/reflect/Method", false).offset
+        val methodNameOffset = gIndex.getFieldOffset("java/lang/reflect/Method", "name", "java/lang/String", false)!!
+
         for (clazz in 0 until numClasses) {
             // todo find all methods
-            // todo append all methods
+            val methods = listOf<MethodSig>()
+            // append all methods
             val dstPtr = clazz * classSize + methodsOffset
+            val arrayToWrite = if (methods.isNotEmpty()) {
+                val methodPointers = methods.map { method ->
+                    methodCache.getOrPut(method) {
+                        appendMethodInstance(
+                            method, indexStartPtr, classData, methodClassIndex,
+                            methodNameOffset, classSize, methodSize
+                        )
+                    }
+                }
+
+                val arrayPtr = indexStartPtr + classData.size()
+                classData.writeClass(1)
+                classData.writeLE32(methodPointers.size)
+                for (methodPtr in methodPointers) {
+                    classData.writeLE32(methodPtr)
+                }
+
+                arrayPtr
+            } else emptyArrayPtr
+
             val pos = classData.position
             classData.position = dstPtr
-            classData.writeLE32(emptyArrayPtr)
+            classData.writeLE32(arrayToWrite)
             classData.position = pos
         }
     }
 
     return appendData(printer, indexStartPtr, classData)
 
+}
+
+fun appendMethodInstance(
+    sig: MethodSig, indexStartPtr: Int, classData: ByteArrayOutputStream2,
+    methodClassIndex: Int, methodNameOffset: Int, classSize: Int, methodSize: Int
+): Int {
+    val name = gIndex.getString(sig.name, indexStartPtr, classData) // might be new -> must be before ptr-calc
+    val methodPtr = indexStartPtr + classData.position
+    classData.writeClass(methodClassIndex)
+    for (i in objectOverhead until methodNameOffset) {
+        classData.write(0)
+    }
+    classData.writeLE32(name) // name
+    // todo write return type
+    // todo write parameters
+    // todo write callSignature,
+    // todo write declaredClass,
+    // todo write slot for calling it
+    for (i in 4 until methodSize) {
+        classData.write(0)
+    }
+    assertEquals(methodPtr, classData.position - methodSize)
+    return methodPtr
 }
 
 var stackTraceTablePtr = 0

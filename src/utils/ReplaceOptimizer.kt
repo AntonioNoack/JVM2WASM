@@ -44,8 +44,6 @@ object ReplaceOptimizer {
 
     private val replacements = listOf(
 
-        // todo it looks like not everything is replaced properly :/,
-        //  especially with comments in-between
         listOf(I32EQ, I32EQZ) to listOf(I32NE),
         listOf(I32NE, I32EQZ) to listOf(I32EQ),
         listOf(I32GTS, I32EQZ) to listOf(I32LES),
@@ -54,35 +52,12 @@ object ReplaceOptimizer {
         listOf(I32LES, I32EQZ) to listOf(I32GTS),
         listOf(I32EQZ, I32EQZ, I32EQZ) to listOf(I32EQZ),
 
-        listOf(
-            LocalSet("l0"),
-            LocalGet("l0"),
-            IfBranch(
-                listOf(i32Const0, LocalGet("l0"), Return),
-                emptyList(), emptyList(), emptyList()
-            ),
-            ptrConst0, Return
-        ) to listOf(Return),
-        listOf(
-            LocalSet("l0"),
-            LocalGet("l0"),
-            IfBranch(
-                listOf(LocalGet("l0"), Return),
-                emptyList(), emptyList(), emptyList()
-            ),
-            ptrConst0, Return
-        ) to listOf(Return),
-
         listOf(Call.lcmp, i32Const0, I32LES) to listOf(I64LES),
         listOf(Call.lcmp, i32Const0, I32LTS) to listOf(I64LTS),
         listOf(Call.lcmp, i32Const0, I32GES) to listOf(I64GES),
         listOf(Call.lcmp, i32Const0, I32GTS) to listOf(I64GTS),
 
-        listOf(
-            F64_PROMOTE_F32, F64_SQRT,
-            Comment("static-inlined jvm/JavaLang/java_lang_StrictMath_sqrt_DD(D)D"),
-            F32_DEMOTE_F64
-        ) to listOf(F32_SQRT),
+        listOf(F64_PROMOTE_F32, F64_SQRT, F32_DEMOTE_F64) to listOf(F32_SQRT),
 
         // NaN = -1 X <= -> would return true for NaN -> must be negated
         listOf(Call.fcmpl, i32Const0, I32LES) to listOf(F32GT, I32EQZ),
@@ -107,6 +82,16 @@ object ReplaceOptimizer {
         listOf(Call.dcmpg, i32Const0, I32GTS) to listOf(F64LE, I32EQZ),
         listOf(Call.dcmpg, i32Const0, I32LTS) to listOf(F64LT), // ok like that
         listOf(Call.dcmpg, i32Const0, I32LES) to listOf(F64LE),
+
+        // prefer I32EQZ over == 0, so we have fewer combinations in total
+        listOf(i32Const0, I32EQ) to listOf(I32EQZ),
+        listOf(i32Const0, I32NE) to listOf(I32EQZ, I32EQZ),
+
+        // NaN isn't 0, and == returns false for NaN, so this is correct
+        listOf(Call.fcmpg, I32EQZ) to listOf(F32EQ),
+        listOf(Call.fcmpl, I32EQZ) to listOf(F32EQ),
+        listOf(Call.dcmpg, I32EQZ) to listOf(F64EQ),
+        listOf(Call.dcmpl, I32EQZ) to listOf(F64EQ),
     )
 
     fun optimizeUsingReplacements(printer: Builder) {

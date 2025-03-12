@@ -2,12 +2,12 @@ package graphing
 
 import graphing.SaveGraph.graphId
 import graphing.SaveGraph.saveGraph
-import graphing.StructuralAnalysis.Companion.comments
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import translator.MethodTranslator
+import translator.MethodTranslator.Companion.comments
 import utils.Builder
 import utils.WASMTypes.i32
 import wasm.instr.*
@@ -33,11 +33,12 @@ object LargeSwitchStatement {
     fun createLargeSwitchStatement2(sa: StructuralAnalysis): Builder {
         val nodes0 = sa.nodes
 
+        val print = sa.methodTranslator.isLookingAtSpecial
         val firstNode = nodes0.first()
         val firstIsLinear = firstNode !is BranchNode && firstNode.inputs.isEmpty()
         val nodes = if (firstIsLinear) filterFirstIsLinear(nodes0) else nodes0
 
-        if (sa.methodTranslator.isLookingAtSpecial) {
+        if (print) {
             printState(nodes0, "Before GraphID")
         }
 
@@ -46,7 +47,7 @@ object LargeSwitchStatement {
         val graphId = graphId(sa)
         if (true) saveGraph(graphId, sa)
 
-        if (sa.methodTranslator.isLookingAtSpecial) {
+        if (print) {
             println(graphId)
         }
 
@@ -75,14 +76,14 @@ object LargeSwitchStatement {
                         )
                     ).append(lblSet)
                     // store stack
-                    storeStack(node, sa.methodTranslator)
+                    storeStackAppend(node, sa.methodTranslator)
                 }
                 is SequenceNode -> {
                     // set end label
                     val next = node.next.index
                     printer1.append(i32Const(next)).append(lblSet)
                     // store stack
-                    storeStack(node, sa.methodTranslator)
+                    storeStackAppend(node, sa.methodTranslator)
                 }
                 else -> assertFail()
             }
@@ -104,11 +105,11 @@ object LargeSwitchStatement {
                 .append(lblSet)
         }
 
-        printer.comment("#$graphId")
+        if (comments) printer.comment("#$graphId")
 
         fun appendBlock(node: GraphingNode) {
             // load stack
-            loadStack(node, sa.methodTranslator)
+            loadStackPrepend(node, sa.methodTranslator)
             // execute
             if (comments) node.printer.prepend(Comment("execute ${node.index}"))
             finishBlock(node)
@@ -131,11 +132,11 @@ object LargeSwitchStatement {
         return printer
     }
 
-    fun loadStack(node: GraphingNode, mt: MethodTranslator) {
-        loadStack(node.inputStack, node.printer, mt)
+    fun loadStackPrepend(node: GraphingNode, mt: MethodTranslator) {
+        loadStackPrepend(node.inputStack, node.printer, mt)
     }
 
-    fun loadStack(inputs: List<String>, printer: Builder, mt: MethodTranslator) {
+    fun loadStackPrepend(inputs: List<String>, printer: Builder, mt: MethodTranslator) {
         if (inputs.isEmpty()) return
         val pre = Builder()
         if (comments) pre.comment("load stack $inputs")
@@ -146,11 +147,11 @@ object LargeSwitchStatement {
         printer.prepend(pre)
     }
 
-    fun storeStack(node: GraphingNode, mt: MethodTranslator) {
-        storeStack(node.outputStack, node.printer, mt)
+    fun storeStackAppend(node: GraphingNode, mt: MethodTranslator) {
+        storeStackAppend(node.outputStack, node.printer, mt)
     }
 
-    fun storeStack(outputs: List<String>, printer: Builder, mt: MethodTranslator) {
+    fun storeStackAppend(outputs: List<String>, printer: Builder, mt: MethodTranslator) {
         if (outputs.isEmpty()) return
         if (comments) printer.comment("store stack $outputs")
         for ((idx, type) in outputs.withIndex().reversed()) {

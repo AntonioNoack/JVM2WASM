@@ -150,8 +150,9 @@ class MethodTranslator(
         val stackTraceTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
 
+        var comments = true
         private var printOps = false
-        private var comments = true
+        private var commentStackOps = false
 
         private val notStackPushedMethods = listOf(
             "stackPush", "stackPop", "printStackTraceLine",
@@ -159,6 +160,10 @@ class MethodTranslator(
             "calloc", "findGap", "allocateNewSpace", "writeClass",
             "Throwable_printStackTrace_V", "getStackDepth"
         )
+
+        fun isLookingAtSpecial(sig: MethodSig): Boolean {
+            return false
+        }
     }
 
     private var isAbstract = false
@@ -201,8 +206,7 @@ class MethodTranslator(
 
     init {
 
-        isLookingAtSpecial = false // sig.clazz == "me/anno/input/KeyCombination\$Companion" && sig.name == "put"
-
+        isLookingAtSpecial = isLookingAtSpecial(sig)
         printOps = isLookingAtSpecial
         if (printOps) println("Method-Translating $clazz.$name.$descriptor")
 
@@ -295,7 +299,7 @@ class MethodTranslator(
     ) {
         // describes types of stack and local variables;
         // in Java >= 1.6, always before jump, so if/else is easier to create and verify :)
-        val data = "  ;; frame ${
+        val data = "frame ${
             when (type) {
                 F_NEW -> "new"
                 F_SAME -> "same"
@@ -368,10 +372,8 @@ class MethodTranslator(
 
     private fun Builder.poppush(x: String): Builder {
         // ensure we got the correct type
-        if (printOps) {
-            println("// $stack = $x")
-            printer.comment("$stack = $x")
-        }
+        if (printOps) println("// $stack = $x")
+        if (comments && commentStackOps) printer.comment("$stack = $x")
         assertFalse(stack.isEmpty()) { "Expected $x, but stack was empty; $clazz, $name, $descriptor" }
         assertEquals(x, stack.last())
         return this
@@ -379,20 +381,16 @@ class MethodTranslator(
 
     private fun Builder.pop(x: String): Builder {
         // ensure we got the correct type
-        if (printOps) {
-            println("// $stack -= $x")
-            printer.comment("$stack -= $x")
-        }
+        if (printOps) println("// $stack -= $x")
+        if (comments && commentStackOps) printer.comment("$stack -= $x")
         assertFalse(stack.isEmpty()) { "Expected $x, but stack was empty; $clazz, $name, $descriptor" }
         assertEquals(x, stack.pop())
         return this
     }
 
     private fun Builder.push(x: String): Builder {
-        if (printOps) {
-            println("// $stack += $x")
-            printer.comment("$stack += $x")
-        }
+        if (printOps) println("// $stack += $x")
+        if (comments && commentStackOps) printer.comment("$stack += $x")
         stack.add(x)
         return this
     }
@@ -798,10 +796,12 @@ class MethodTranslator(
         // https://github.com/openjdk/jdk/blob/a445b66e58a30577dee29cacb636d4c14f0574a2/src/java.base/share/classes/java/lang/invoke/LambdaMetafactory.java
         // https://asm.ow2.io/javadoc/org/objectweb/asm/MethodVisitor.html#visitInvokeDynamicInsn(java.lang.String,java.lang.String,org.objectweb.asm.Handle,java.lang.Object...)
         // DynPrinter.print(name, descriptor, method, args)
-        if (printOps) {
-            println("  [invoke dyn by $sig] $name, $descriptor, [${method.owner}, ${method.name}, tag: ${method.tag}, desc: ${method.desc}], [${args.joinToString()}]")
-            printer.comment("invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]")
-        }
+        if (printOps) println(
+            "  [invoke dyn by $sig] $name, $descriptor, " +
+                    "[${method.owner}, ${method.name}, tag: ${method.tag}, " +
+                    "desc: ${method.desc}], [${args.joinToString()}]"
+        )
+        if (comments) printer.comment("invoke-dyn $name, $descriptor, $method, [${args.joinToString()}]")
 
         val dst = args[1] as Handle
 
@@ -1089,10 +1089,10 @@ class MethodTranslator(
                     stackPush()
                     getCaller(printer)
 
+                    if (comments) printer.comment("not constructable class, $sig, $owner, $name, $descriptor")
                     printer
                         .append(i32Const(gIndex.getString(methodName(sig))))
                         // instance, function index -> function-ptr
-                        .comment("not constructable class, $sig, $owner, $name, $descriptor")
                         .append(Call.resolveIndirectFail)
                         .append(Unreachable)
 
@@ -1185,8 +1185,8 @@ class MethodTranslator(
                         printer.append(i32Const(funcPtr))
                             // instance, function index -> function-ptr
                             .append(Call.resolveIndirect)
-                            .comment("$sig0, #${options.size}")
                             .push(i32)
+                        if (comments) printer.comment("$sig0, #${options.size}")
                         stackPop()
                         if (anyMethodThrows) handleThrowable()
                         printer.pop(i32)
@@ -1227,7 +1227,7 @@ class MethodTranslator(
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
                     printer.append(inline)
-                    printer.comment("static-inlined $sig")
+                    if (comments) printer.comment("static-inlined $sig")
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
@@ -1690,7 +1690,8 @@ class MethodTranslator(
                 printer
                     .pop(i32).push(ptrType)
                     .append(i32Const(gIndex.getClassIndex(type)))
-                    .append(Call.createNativeArray[1]).comment(type)
+                    .append(Call.createNativeArray[1])
+                if (comments) printer.comment(type)
                 stackPop()
                 if (anyMethodThrows) handleThrowable()
             }
@@ -1894,7 +1895,8 @@ class MethodTranslator(
                         .append(i32Const(clazzIndex))
                         .append(Call.findClass)
                         .append(i32Const(fieldOffset1))
-                    printer.append(I32Add).append(I32Load).comment("enum values")
+                    printer.append(I32Add).append(I32Load)
+                    if (comments) printer.comment("enum values")
                     printer.push(wasmType)
                 } else if (fieldOffset != null) {
                     callStaticInit(owner)
@@ -1933,7 +1935,7 @@ class MethodTranslator(
                         .append(Call.findClass)
                         .append(i32Const(fieldOffset1))
                     printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
-                    printer.comment("enum values")
+                    if (comments) printer.comment("enum values")
                     printer.pop(wasmType)
                 } else if (fieldOffset != null) {
                     callStaticInit(owner)

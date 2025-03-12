@@ -3,7 +3,6 @@ package graphing
 import crashOnAllExceptions
 import graphing.ExtractBigLoop.tryExtractBigLoop
 import graphing.ExtractEndNodes.tryExtractEnd
-import graphing.ExtractStartNodes.tryExtractStart
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
@@ -13,6 +12,7 @@ import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
 import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
+import translator.MethodTranslator.Companion.comments
 import utils.Builder
 import utils.WASMTypes.i32
 import wasm.instr.*
@@ -46,7 +46,6 @@ class StructuralAnalysis(
             folder.mkdir()
         }
 
-        var comments = true
         var printOps = false
 
         private val equalPairs0 = listOf(
@@ -422,7 +421,8 @@ class StructuralAnalysis(
             val node = nodes[i] as? BranchNode ?: continue
             if (node.ifTrue != node.ifFalse) continue
             // both branches are the same -> change the branch to a sequence
-            node.printer.drop().comment("ifTrue == ifFalse")
+            node.printer.drop()
+            if (comments) node.printer.comment("ifTrue == ifFalse")
             replaceNode(node, SequenceNode(node.printer, node.ifTrue), i)
             changed = true
         }
@@ -971,7 +971,7 @@ class StructuralAnalysis(
      * */
     fun joinNodes(): Builder {
 
-        printOps = methodTranslator.isLookingAtSpecial
+        printOps = false // methodTranslator.isLookingAtSpecial
 
         if (printOps) {
             println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
@@ -1053,20 +1053,12 @@ class StructuralAnalysis(
 
             if (!hadAnyChange) {
                 checkState()
-                if (tryExtractStart(this)) {
-                    hadAnyChange = true
-                }
-            }
-
-            if (!hadAnyChange) {
-                checkState()
                 if (tryExtractEnd(this)) {
                     assertTrue(canReturnFirstNode())
                     if (printOps) printState(nodes, "solved extract end")
                     return firstNodeForReturn()
                 }
             }
-
 
             if (!hadAnyChange) {
                 checkState()

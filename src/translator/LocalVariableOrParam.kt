@@ -30,4 +30,8 @@ class LocalVariableOrParam(
             (setter as LocalSet).name = newName
         }
     }
+
+    override fun toString(): String {
+        return "$wasmType $name"
+    }
 }

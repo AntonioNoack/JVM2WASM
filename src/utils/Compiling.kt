@@ -33,6 +33,7 @@ import replaceClass
 import resolvedMethods
 import translator.ClassTranslator
 import translator.FoundBetterReader
+import translator.MethodTranslator
 import utils.MethodResolver.resolveMethod
 import wasm.instr.FuncType
 import wasm.instr.Instruction
@@ -57,54 +58,73 @@ fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
  * */
 fun registerDefaultOffsets() {
 
-    eq(gIndex.getDynMethodIdx(MethodSig.c("java/lang/Object", INSTANCE_INIT, "()V", false)), 0)
+    val object0 = "java/lang/Object"
+    val string = "java/lang/String"
+    val system = "java/lang/System"
+    val clazz = "java/lang/Class"
+    val field = "java/lang/reflect/Field"
+    val method = "java/lang/reflect/Method"
+    val thread = "java/lang/Thread"
+    val throwable = "java/lang/Throwable"
+    val stackTraceElement = "java/lang/StackTraceElement"
+
+    val executable = "java/lang/reflect/Executable"
+    val constructor = "java/lang/reflect/Constructor"
+    val accessibleObject = "java/lang/reflect/AccessibleObject"
+
+    eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V", false)), 0)
     eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
 
     // prepare String properties
-    gIndex.stringClass = gIndex.getClassIndex(replaceClass("java/lang/String"))
+    gIndex.stringClass = gIndex.getClassIndex(replaceClass(string))
     gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
 
     eq("[]", "length", "int", 0)
-    eq(replaceClass("java/lang/String"), "value", if (byteStrings) "[B" else "[C", 0)
-    eq(replaceClass("java/lang/String"), "hash", "int", ptrSize)
+    eq(replaceClass(string), "value", if (byteStrings) "[B" else "[C", 0)
+    eq(replaceClass(string), "hash", "int", ptrSize)
 
-    hIndex.registerSuperClass("java/lang/reflect/Field", "java/lang/reflect/AccessibleObject")
-    hIndex.registerSuperClass("java/lang/reflect/Executable", "java/lang/reflect/AccessibleObject")
-    hIndex.registerSuperClass("java/lang/reflect/Constructor", "java/lang/reflect/Executable")
+    hIndex.registerSuperClass(field, accessibleObject)
+    hIndex.registerSuperClass(executable, accessibleObject)
+    hIndex.registerSuperClass(constructor, executable)
+    hIndex.registerSuperClass(method, executable)
 
-    gIndex.getFieldOffset("java/lang/System", "in", "java/io/InputStream", true)
-    gIndex.getFieldOffset("java/lang/System", "out", "java/io/PrintStream", true)
-    gIndex.getFieldOffset("java/lang/System", "err", "java/io/PrintStream", true)
-    eq("java/lang/Throwable", "detailMessage", "java/lang/String", 0)
-    eq("java/lang/Throwable", "stackTrace", "[java/lang/StackTraceElement", ptrSize)
+    gIndex.getFieldOffset(system, "in", "java/io/InputStream", true)
+    gIndex.getFieldOffset(system, "out", "java/io/PrintStream", true)
+    gIndex.getFieldOffset(system, "err", "java/io/PrintStream", true)
+    eq(throwable, "detailMessage", string, 0)
+    eq(throwable, "stackTrace", "[$stackTraceElement", ptrSize)
 
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "declaringClass", "java/lang/String", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "methodName", "java/lang/String", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "fileName", "java/lang/String", false)
-    gIndex.getFieldOffset("java/lang/StackTraceElement", "lineNumber", "int", false)
+    gIndex.getFieldOffset(stackTraceElement, "declaringClass", string, false)
+    gIndex.getFieldOffset(stackTraceElement, "methodName", string, false)
+    gIndex.getFieldOffset(stackTraceElement, "fileName", string, false)
+    gIndex.getFieldOffset(stackTraceElement, "lineNumber", "int", false)
 
-    eq("java/lang/Class", "name", "java/lang/String", 0)
-    eq("java/lang/Class", "fields", "[java/lang/reflect/Field", ptrSize)
-    eq("java/lang/Class", "methods", "[java/lang/reflect/Method", ptrSize * 2)
-    eq("java/lang/Class", "index", "int", ptrSize * 3)
-    eq("java/lang/Class", "modifiers", "int", ptrSize * 3 + 4)
+    eq(clazz, "name", string, 0)
+    eq(clazz, "fields", "[$field", ptrSize)
+    eq(clazz, "methods", "[$method", ptrSize * 2)
+    eq(clazz, "index", "int", ptrSize * 3)
+    eq(clazz, "modifiers", "int", ptrSize * 3 + 4)
 
-    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "securityCheckCache", "Ljava/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/AccessibleObject", "override", "boolean", false) // 4
-    gIndex.getFieldOffset("java/lang/reflect/Field", "securityCheckCache", "java/lang/Object", false) // 0
-    gIndex.getFieldOffset("java/lang/reflect/Field", "override", "boolean", false) // 4
-    eq("java/lang/reflect/Field", "name", "java/lang/String", 1 + ptrSize)
-    eq("java/lang/reflect/Field", "slot", "int", 1 + 2 * ptrSize)
-    eq("java/lang/reflect/Field", "type", "java/lang/Class", 1 + 2 * ptrSize + 4)
-    eq("java/lang/reflect/Field", "modifiers", "int", 1 + 3 * ptrSize + 4)
-    eq("java/lang/reflect/Field", "clazz", "java/lang/Class", 1 + 3 * ptrSize + 2 * 4)
+    // remove securityCheckCache and override, we don't need them
+    val accessibleObjectOverhead = 0
+    eq(field, "name", string, accessibleObjectOverhead)
+    eq(field, "slot", "int", ptrSize + accessibleObjectOverhead)
+    eq(field, "type", clazz, ptrSize + 4 + accessibleObjectOverhead)
+    eq(field, "modifiers", "int", 2 * ptrSize + 4 + accessibleObjectOverhead)
+    eq(field, "clazz", clazz, 2 * ptrSize + 2 * 4 + accessibleObjectOverhead)
+
+    eq(method, "name", string, accessibleObjectOverhead)
+    eq(method, "slot", "int", ptrSize + accessibleObjectOverhead)
+    eq(method, "returnType", clazz, ptrSize + 4 + accessibleObjectOverhead)
+    eq(method, "parameterTypes", "[$clazz", ptrSize * 2 + 4 + accessibleObjectOverhead)
+    eq(method, "callSignature", string, ptrSize * 3 + 4 + accessibleObjectOverhead)
 
     // for sun/misc
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSeed", "long", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomSecondarySeed", "long", false)
-    gIndex.getFieldOffset("java/lang/Thread", "threadLocalRandomProbe", "int", false)
+    gIndex.getFieldOffset(thread, "threadLocalRandomSeed", "long", false)
+    gIndex.getFieldOffset(thread, "threadLocalRandomSecondarySeed", "long", false)
+    gIndex.getFieldOffset(thread, "threadLocalRandomProbe", "int", false)
 
-    gIndex.getFieldOffset("java/lang/Class", "enumConstants", "[]", false)
+    gIndex.getFieldOffset(clazz, "enumConstants", "[]", false)
 
     // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
     hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "int", true)] = objectOverhead
@@ -112,7 +132,7 @@ fun registerDefaultOffsets() {
     hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "boolean", true)] = trackAllocations
 
     eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V")), 0)
-    gIndex.getFieldOffset("java/lang/reflect/Constructor", "clazz", "Ljava/lang/Class", false)
+    gIndex.getFieldOffset(constructor, "clazz", clazz, false)
 
 }
 
@@ -616,7 +636,7 @@ fun findClassesToLoad(aliasedMethods: List<MethodSig>): List<String> {
 fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     // todo we could (space-)optimize this and only create one method per call-signature
     LOGGER.info("[printAbstractMethods]")
-    bodyPrinter.append(";; not implemented, abstract\n")
+    if (MethodTranslator.comments) bodyPrinter.append(";; not implemented, abstract\n")
     for (func in dIndex.usedMethods
         .filter {
             it in hIndex.abstractMethods &&
@@ -650,7 +670,7 @@ val imports = ArrayList<Import>()
 
 fun printForbiddenMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     LOGGER.info("[printForbiddenMethods]")
-    importPrinter.append(";; forbidden\n")
+    if (MethodTranslator.comments) importPrinter.append(";; forbidden\n")
     loop@ for (sig in dIndex.methodsWithForbiddenDependencies
         .filter { it in dIndex.usedMethods }
         .sortedBy { methodName(it) }) {
@@ -673,7 +693,7 @@ fun printForbiddenMethods(importPrinter: StringBuilder2, missingMethods: HashSet
 
 fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     LOGGER.info("[printNotImplementedMethods]")
-    importPrinter.append(";; not implemented, not forbidden\n")
+    if (MethodTranslator.comments) importPrinter.append(";; not implemented, not forbidden\n")
     for (sig in dIndex.usedMethods
         .filter {
             it !in hIndex.abstractMethods &&
@@ -702,7 +722,7 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
 
 fun printNativeMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     LOGGER.info("[printNativeMethods]")
-    importPrinter.append(";; not implemented, native\n")
+    if (MethodTranslator.comments) importPrinter.append(";; not implemented, native\n")
     for (sig in dIndex.usedMethods
         .filter {
             it in hIndex.nativeMethods &&

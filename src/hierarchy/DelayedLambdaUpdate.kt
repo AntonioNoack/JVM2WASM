@@ -8,6 +8,7 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import org.objectweb.asm.Handle
 import translator.MethodTranslator
+import translator.MethodTranslator.Companion.comments
 import utils.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
@@ -138,7 +139,7 @@ class DelayedLambdaUpdate(
 
         val print = false
 
-        mt.printer.comment("synthetic lambda")
+        if (comments) mt.printer.comment("synthetic lambda")
 
         if (print) {
             println()
@@ -157,11 +158,12 @@ class DelayedLambdaUpdate(
         if (needsSelf) {
             if (print) println("[0] += self")
             if (usesSelf) {
-                mt.printer.comment("[0] += self")
+                if (comments) mt.printer.comment("[0] += self")
                 mt.visitVarInsn(0x2a, 0) // local.get this
                 mt.visitFieldInsn2(0xb4, synthClassName, "self", "java/lang/Object", false) // get field
             } else {
-                mt.printer.append(i32Const0).comment("self, unused")
+                mt.printer.append(i32Const0)
+                if (comments) mt.printer.comment("self, unused")
             }
             if (!callingStatic) k--
         }
@@ -172,7 +174,7 @@ class DelayedLambdaUpdate(
             val fieldName = "f$i"
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[1] += $arg ($wanted)")
-            mt.printer.comment("[1] += $arg")
+            if (comments) mt.printer.comment("[1] += $arg")
             // load self for field
             mt.visitVarInsn(0x2a, 0) // local.get this
             mt.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
@@ -187,7 +189,7 @@ class DelayedLambdaUpdate(
             val arg = fields2[i]
             val wanted = wantedParams.getOrNull(k++)
             if (print) println("[2] += $arg ($wanted)")
-            mt.printer.comment("[2] += $arg")
+            if (comments) mt.printer.comment("[2] += $arg")
             val opcode = when (arg) {
                 "boolean", "char", "byte", "short", "int" -> 0x15
                 "long" -> 0x16

@@ -2,7 +2,6 @@ package utils
 
 import dIndex
 import hIndex
-import me.anno.utils.assertions.*
 import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.maps.CountMap
 import org.apache.logging.log4j.LogManager
@@ -72,20 +71,8 @@ fun findMethodsWithoutChildClasses(): Int {
             }
         }
     }
-    assertFalse(invalidFinal in hIndex.finalMethods)
     return hIndex.finalMethods.size - numAlreadyFinalMethods
 }
-
-// todo remove these conditions when it works
-val invalidFinal = MethodSig.c(
-    "me/anno/utils/hpc/WorkSplitter", "processUnbalanced",
-    "(IIILme/anno/utils/hpc/WorkSplitterXTask1d;)V", false
-)
-
-val validFinal = MethodSig.c(
-    "me/anno/utils/hpc/ProcessingQueue", "processUnbalanced",
-    "(IIILme/anno/utils/hpc/WorkSplitterXTask1d;)V", false
-)
 
 /**
  * find functions with a single implementation only, and make it final
@@ -100,7 +87,6 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
     // all their methods are final
     var finalMethods = findMethodsWithoutChildClasses()
 
-    val checkedSig = InterfaceSig(invalidFinal)
     val methodCounter = CountMap<InterfaceSig>(usedMethods.size)
     for (sig in usedMethods) {
         if (
@@ -113,21 +99,11 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
         ) {
             val interfaceSig = InterfaceSig(sig)
             val count = methodCounter.incAndGet(interfaceSig)
-            if (interfaceSig == checkedSig) println("$interfaceSig++ by $sig")
             when (count) {
                 1 -> finalMethods++
                 2 -> finalMethods--
             }
-        } else {
-            assertNotSame(validFinal, sig, "Valid final ignored???")
         }
-    }
-
-    if (false) {
-        assertTrue(validFinal.clazz in dIndex.constructableClasses)
-        assertTrue(invalidFinal in usedMethods)
-        assertEquals(validFinal, hIndex.getAlias(validFinal))
-        assertTrue(validFinal in usedMethods, "Valid final is unused???")
     }
 
     val toBeMarkedAsFinal = HashSet<InterfaceSig>(finalMethods)
@@ -144,7 +120,6 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             sig !in hIndex.abstractMethods && // we can ignore that one
             InterfaceSig(sig) in toBeMarkedAsFinal
         ) {
-            assertNotEquals(invalidFinal, sig)
             hIndex.finalMethods.add(sig)
         }
     }

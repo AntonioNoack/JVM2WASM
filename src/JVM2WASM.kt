@@ -9,7 +9,6 @@ import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
 import me.anno.utils.assertions.assertEquals
-import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import org.objectweb.asm.Opcodes.ASM9
@@ -18,6 +17,7 @@ import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.nthGetterMethods
 import translator.GeneratorIndex.stringStart
 import translator.GeneratorIndex.translatedMethods
+import translator.MethodTranslator
 import utils.*
 import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
@@ -52,11 +52,14 @@ const val api = ASM9
  * }
  * */
 
-// todo calculate dependency-tree from static initialization,
+// calculate dependency-tree from static initialization,
 //  and call that once at the start, and then never again
 // alternative/improvement:
 // todo on each branch, mark which classes have been static-initialized,
 //  and remove those on all necessarily following branches
+
+// todo find pseudo-instances, which are actually created exactly once,
+//  and make all their fields static, and eliminate that instance (maybe replace it with a shared standard java/lang/Object)
 
 
 // optimizations:
@@ -424,7 +427,7 @@ fun jvm2wasm() {
         hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[StaticClassIndices.OBJECT])
     }
 
-    // todo confirm type shift
+    // todo confirm type shift using WASMEngine
 
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
@@ -457,24 +460,6 @@ fun jvm2wasm() {
     val staticCallOrder = if (callStaticInitOnce) {
         StaticDependencies.calculateStaticCallOrder()
     } else null
-
-    // todo this is somehow used, not-implemented, but we don't crash
-    val checked = MethodSig.c(
-        "kotlyn/reflect/full/KClasses", "getSuperclasses",
-        "(Lkotlin/reflect/KClass;)Ljava/util/List;", true
-    )
-    printUsed(checked)
-    println("flags: ${hIndex.classFlags[checked.clazz]}")
-    assertFalse(checked in hIndex.notImplementedMethods)
-
-    if (false) {
-        printUsed(validFinal)
-        printUsed(invalidFinal)
-        assertTrue(validFinal.clazz in dIndex.constructableClasses)
-        assertTrue(invalidFinal.clazz in dIndex.constructableClasses)
-        assertTrue(invalidFinal in dIndex.usedMethods)
-        assertTrue(validFinal in dIndex.usedMethods, "Valid final is unused??/2")
-    }
 
     indexFieldsInSyntheticMethods()
     calculateFieldOffsets()
@@ -637,7 +622,7 @@ fun jvm2wasm() {
         globals.add(GlobalVariable("global_$name", type, value, isMutable))
     }
 
-    dataPrinter.append(";; globals:\n")
+    if (MethodTranslator.comments) dataPrinter.append(";; globals:\n")
     defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
     defineGlobal("staticTable", ptrType, staticTablePtr) // static table
     defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
@@ -700,7 +685,7 @@ fun jvm2wasm() {
     headerPrinter.append(importPrinter)
     headerPrinter.append(dataPrinter)
     headerPrinter.append(bodyPrinter)
-    headerPrinter.append(") ;; end of module\n")
+    headerPrinter.append(if (MethodTranslator.comments) ") ;; end of module\n" else ")\n")
 
     println("  Total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
     println("  Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")

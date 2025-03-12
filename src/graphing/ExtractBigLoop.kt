@@ -2,10 +2,11 @@ package graphing
 
 import graphing.ExtractEndNodes.replaceGotoEndNode
 import graphing.ExtractEndNodes.solve
-import graphing.LargeSwitchStatement.loadStack
-import graphing.LargeSwitchStatement.storeStack
+import graphing.LargeSwitchStatement.loadStackPrepend
+import graphing.LargeSwitchStatement.storeStackAppend
 import graphing.StackValidator.validateInputOutputStacks
 import graphing.StackValidator.validateInputs
+import graphing.StackValidator.validateNodes1
 import graphing.StackValidator.validateStack
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
@@ -26,7 +27,7 @@ import kotlin.math.abs
  * - at least one node before the graph
  * - more than one node in the graph
  * - all startNodes terminate in loopStart
- * - no other connections between treeNodes and startNodes
+ * - no other connections between loopNodes and startNodes
  * */
 object ExtractBigLoop {
 
@@ -35,7 +36,7 @@ object ExtractBigLoop {
         val startNodes = findBigLoop(sa)
         if (startNodes != null && shouldReplaceStartNodes(startNodes)) {
             createMergedCode(sa, startNodes)
-            validateStack(sa.nodes, sa.methodTranslator)
+            validateNodes1(sa.nodes, sa.methodTranslator)
             return true
         } else return false
     }
@@ -67,6 +68,8 @@ object ExtractBigLoop {
             remaining.addAll(node.outputs)
         }
 
+        assertTrue(loopNodes.size > 1)
+
         val firstNode = sa.nodes.first()
         if (loopStart != firstNode && firstNode in loopNodes) {
             // if firstNode is inside the loop, it must be the start
@@ -89,20 +92,21 @@ object ExtractBigLoop {
         }
     }
 
-    private fun validateNodes(sa: StructuralAnalysis, treeNodes: Set<GraphingNode>, loopStart: GraphingNode) {
-        assertTrue(loopStart in treeNodes)
+    private fun validateNodes(sa: StructuralAnalysis, loopNodes: Set<GraphingNode>, loopStart: GraphingNode) {
         for (node in sa.nodes) {
             when (node) {
                 loopStart -> {
-                    // nothing to be checked
+                    assertTrue(loopStart in loopNodes)
+                    // assertTrue(loopStart.inputs.any { it in loopNodes }) // weird if that is missing...
+                    assertTrue(loopStart.inputs.any { it !in loopNodes })
                 }
-                in treeNodes -> {
-                    assertTrue(node.inputs.all { it in treeNodes })
-                    assertTrue(node.outputs.all { it in treeNodes })
+                in loopNodes -> {
+                    assertTrue(node.inputs.all { it in loopNodes })
+                    assertTrue(node.outputs.all { it in loopNodes })
                 }
                 else -> {
-                    assertTrue(node.inputs.all { it !in treeNodes }) // must not be middle
-                    assertTrue(node.outputs.all { it !in treeNodes || it == loopStart }) // can be middle
+                    assertTrue(node.inputs.all { it !in loopNodes }) // must not be middle
+                    assertTrue(node.outputs.all { it !in loopNodes || it == loopStart }) // can be middle
                 }
             }
         }
@@ -194,30 +198,28 @@ object ExtractBigLoop {
                         assertSame(node, input)
                         assertSame(next, loopStart)
                         val builder = Builder()
-                        storeStack(stackToSave, builder, mt)
+                        storeStackAppend(stackToSave, builder, mt)
                         builder.append(jumpBack)
                         builder
                     }
                 }
             }
         }
-        // treeNodes is invalid after this point, because nodes in it can be replaced
+        // loopNodes is invalid after this point, because nodes in it can be replaced
 
         loopStart.inputs.clear()
 
         if (print) printState(sa.nodes, "After Link Replacement")
 
-        // solve tree
-        val treeNodesList = sa.nodes.subList(startNodesSize, startNodesSize + inLoopNodes.size)
-        if (validate) assertSame(loopStart, treeNodesList.first())
-        val loopContent = solve(mt, treeNodesList)
-        val loadStackTmp = Builder()
-        loadStack(stackToSave, loadStackTmp, mt)
-        loopContent.prepend(loadStackTmp)
+        // solve loop insides
+        val loopNodesList = sa.nodes.subList(startNodesSize, startNodesSize + inLoopNodes.size)
+        if (validate) assertSame(loopStart, loopNodesList.first())
+        val loopContent = solve(mt, loopNodesList)
+        loadStackPrepend(stackToSave, loopContent, mt)
         loopInstr.body = loopContent.instrs
-        treeNodesList.clear() // remove tree from the graph
+        loopNodesList.clear() // remove loop from the graph
 
-        if (print) printState(sa.nodes, "After Solving Tree")
+        if (print) printState(sa.nodes, "After Solving Loop")
         if (validate) validateStack(sa.nodes, sa.methodTranslator)
         validateInputOutputStacks(sa.nodes, sa.sig)
         validateInputs(sa.nodes)
@@ -228,7 +230,7 @@ object ExtractBigLoop {
         mt: MethodTranslator,
     ): GraphingNode {
         val saveStackNode = SequenceNode(Builder(), loopNode)
-        storeStack(stackToSave, saveStackNode.printer, mt)
+        storeStackAppend(stackToSave, saveStackNode.printer, mt)
         saveStackNode.inputStack = stackToSave
         saveStackNode.outputStack = emptyList()
         loopNode.inputs.add(saveStackNode)

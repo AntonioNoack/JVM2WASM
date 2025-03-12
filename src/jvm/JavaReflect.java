@@ -848,4 +848,18 @@ public class JavaReflect {
         return empty;
     }
 
+    @Alias(names = "java_lang_reflect_AccessibleObject_setAccessible0_Ljava_lang_reflect_AccessibleObjectZV")
+    public static void AccessibleObject_setAccessible0_Ljava_lang_reflect_AccessibleObjectZV(Object self, boolean accessible) {
+        // nothing to do
+    }
+
+    @Alias(names = "java_lang_reflect_AccessibleObject_isAccessible_Z")
+    public static boolean AccessibleObject_isAccessibleZ(Object self) {
+        return true;
+    }
+
+    @Alias(names = "java_lang_reflect_AccessibleObject_setAccessible_ZV")
+    public static void java_lang_reflect_AccessibleObject_setAccessible_ZV(Object self, boolean accessible) {
+        // nothing to do
+    }
 }

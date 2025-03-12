@@ -1,7 +1,7 @@
 package graphing
 
-import graphing.LargeSwitchStatement.loadStack
-import graphing.LargeSwitchStatement.storeStack
+import graphing.LargeSwitchStatement.loadStackPrepend
+import graphing.LargeSwitchStatement.storeStackAppend
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
@@ -9,8 +9,10 @@ import me.anno.utils.structures.lists.Lists.sortByTopology
 import me.anno.utils.structures.lists.Lists.swap
 import translator.LocalVariableOrParam
 import translator.MethodTranslator
+import translator.MethodTranslator.Companion.comments
 import utils.Builder
 import utils.WASMTypes.i32
+import wasm.instr.Comment
 import wasm.instr.Const
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
@@ -49,16 +51,23 @@ object SolveLinearTree {
         return labels
     }
 
-    private fun setLabelsInNodes(nodes: List<GraphingNode>, mt: MethodTranslator, labels: List<LocalVariableOrParam>) {
+    private fun setLabelsInNodes(
+        nodes: List<GraphingNode>, mt: MethodTranslator, labels: List<LocalVariableOrParam>,
+        firstNodeIsEntry: Boolean
+    ) {
         for (i in nodes.indices) {
             val node = nodes[i]
-            setLabelInNode(node, i, mt, labels)
+            setLabelInNode(node, i, mt, labels, i > 0 || !firstNodeIsEntry)
         }
     }
 
-    private fun setLabelInNode(node: GraphingNode, i: Int, mt: MethodTranslator, labels: List<LocalVariableOrParam>) {
+    private fun setLabelInNode(
+        node: GraphingNode, i: Int, mt: MethodTranslator, labels: List<LocalVariableOrParam>,
+        shallLoadStack: Boolean
+    ) {
         // keep stack in order
-        loadStack(node, mt)
+        if (shallLoadStack) loadStackPrepend(node, mt)
+        else if (comments) node.printer.prepend(Comment("loading stack skipped"))
         when (node) {
             is ReturnNode -> {}
             is BranchNode -> {
@@ -68,13 +77,13 @@ object SolveLinearTree {
                 node.printer
                     .append(ifTrue.setter)
                     .append(ifTrue.getter).append(I32EQZ).append(ifFalse.setter)
-                storeStack(node, mt)
+                storeStackAppend(node, mt)
             }
             is SequenceNode -> {
                 // set labels to true
                 node.printer
                     .append(i32Const1).append(labels[2 * i].setter)
-                storeStack(node, mt)
+                storeStackAppend(node, mt)
             }
             else -> assertFail()
         }
@@ -108,6 +117,9 @@ object SolveLinearTree {
         nodes: MutableList<GraphingNode>, mt: MethodTranslator,
         firstNodeIsEntry: Boolean, extraInputs: Map<GraphingNode, List<LocalVariableOrParam>>
     ): Boolean {
+
+        assertEquals(firstNodeIsEntry, extraInputs.isEmpty())
+
         val retTypes = StackValidator.getReturnTypes(mt.sig)
         val firstNode = nodes.first()
         val isSorted = nodes.sortByTopology { node -> node.inputs } != null
@@ -119,7 +131,7 @@ object SolveLinearTree {
             return false
         }
 
-        val print = mt.clazz == "jvm/JVM32" && mt.name == "getInstanceSize"
+        val print = mt.isLookingAtSpecial
         if (print) println("SolveLinearTree[${mt.sig}, $firstNodeIsEntry, $extraInputs]")
 
         if (firstNodeIsEntry) {
@@ -132,10 +144,7 @@ object SolveLinearTree {
 
         val validate = true
         if (validate) {
-            if (print) {
-                println(mt.sig)
-                printState(nodes, "Validating")
-            }
+            if (print) printState(nodes, "Validating")
             StackValidator.validateStack(nodes, mt)
         }
 
@@ -144,7 +153,7 @@ object SolveLinearTree {
         val resultPrinter = Builder()
 
         // set labels to 1/0 at the end of each node
-        setLabelsInNodes(nodes, mt, labels)
+        setLabelsInNodes(nodes, mt, labels, firstNodeIsEntry)
 
         // set all labels to 0 at the start
         initializeLabels(nodes, labels, resultPrinter)
@@ -257,23 +266,22 @@ object SolveLinearTree {
         resultPrinter.append(Unreachable)
 
         nodes.clear()
-        nodes.add(createReturnNode(resultPrinter))
+        val inputStack = if (firstNodeIsEntry) firstNode.inputStack else emptyList()
+        nodes.add(createReturnNode(resultPrinter, inputStack))
 
         if (print) {
-            println()
-            println("-------------------------------------------------------------")
-            println(mt.sig)
-            println()
+            println("\n-------------------------------------------------------------")
             println(nodes.first().printer)
         }
-        StackValidator.validateStack(nodes, mt)
+
+        StackValidator.validateNodes1(nodes, mt)
 
         return true
     }
 
-    private fun createReturnNode(printer: Builder): ReturnNode {
+    private fun createReturnNode(printer: Builder, inputStack: List<String>): ReturnNode {
         val retNode = ReturnNode(printer)
-        retNode.inputStack = emptyList()
+        retNode.inputStack = inputStack
         retNode.outputStack = emptyList()
         return retNode
     }
