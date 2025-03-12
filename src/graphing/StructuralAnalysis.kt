@@ -6,6 +6,7 @@ import graphing.ExtractEndNodes.tryExtractEnd
 import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
+import graphing.StackValidator.validateNodes1
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
 import me.anno.utils.structures.lists.Lists.count2
@@ -14,6 +15,7 @@ import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
+import utils.StaticInitOptimizer.optimizeStaticInit
 import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Instructions.I32EQ
@@ -74,7 +76,7 @@ class StructuralAnalysis(
             }
         }
 
-        fun renumber2(nodes: MutableList<GraphingNode>) {
+        fun renumberForReading(nodes: MutableList<GraphingNode>) {
             // print renumbering???
             for (i in nodes.indices) {
                 nodes[i].index = -1
@@ -977,10 +979,7 @@ class StructuralAnalysis(
             println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
         }
 
-        assertFalse(nodes.isEmpty())
-        if (canReturnFirstNode()) {
-            return firstNodeForReturn()
-        }
+        assertTrue(nodes.isNotEmpty())
 
         for (node in nodes) {
             node.hasNoCode = node.printer.instrs.all { it is Comment }
@@ -1002,11 +1001,13 @@ class StructuralAnalysis(
         removeNodesWithoutCode()
         checkState()
 
+        optimizeStaticInit(nodes)
+
         if (canReturnFirstNode()) {
             return firstNodeForReturn()
         }
 
-        StackValidator.validateStack(nodes, methodTranslator)
+        validateNodes1(nodes, methodTranslator)
 
         while (true) {
             var hadAnyChange = false

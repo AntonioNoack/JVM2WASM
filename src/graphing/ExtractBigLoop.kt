@@ -4,10 +4,7 @@ import graphing.ExtractEndNodes.replaceGotoEndNode
 import graphing.ExtractEndNodes.solve
 import graphing.LargeSwitchStatement.loadStackPrepend
 import graphing.LargeSwitchStatement.storeStackAppend
-import graphing.StackValidator.validateInputOutputStacks
-import graphing.StackValidator.validateInputs
 import graphing.StackValidator.validateNodes1
-import graphing.StackValidator.validateStack
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
@@ -220,9 +217,7 @@ object ExtractBigLoop {
         loopNodesList.clear() // remove loop from the graph
 
         if (print) printState(sa.nodes, "After Solving Loop")
-        if (validate) validateStack(sa.nodes, sa.methodTranslator)
-        validateInputOutputStacks(sa.nodes, sa.sig)
-        validateInputs(sa.nodes)
+        if (validate) validateNodes1(sa.nodes, sa.methodTranslator)
     }
 
     private fun createSaveStateNode(

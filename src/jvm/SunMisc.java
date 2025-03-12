@@ -71,4 +71,8 @@ public class SunMisc {
         return null;
     }
 
+    @Alias(names = "sun_misc_VM_addFinalRefCount_IV")
+    public static void sun_misc_VM_addFinalRefCount_IV(int count) {
+    }
+
 }

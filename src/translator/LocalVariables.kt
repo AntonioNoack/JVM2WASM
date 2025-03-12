@@ -118,11 +118,17 @@ class LocalVariables {
                     if (builder.length == 0) builder.append('_') // really should not happen
                     char
                 }
-                '$' -> 'X'
+                '$' -> {
+                    // skip dollar at start
+                    if (builder.length == 0) continue
+                    'X'
+                }
+                '<', '>' -> continue // skip them
                 else -> '_'
             }
             builder.append(char2)
         }
+        if (builder.length == 0) return null
         return builder.toString()
     }
 

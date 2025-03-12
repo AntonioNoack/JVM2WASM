@@ -33,12 +33,6 @@ import kotlin.math.sin
 
 const val api = ASM9
 
-// todo Kotlin reflection is currently broken, because
-//  kotlin.reflect.jvm.internal.ReflectionFactoryImpl is missing,
-//  because its dependency is never declared explicitly, only via Class.forName().
-//  -> automatically replace all Kotlin-reflect stuff with KotlynReflect, or for now,
-//     add this dependency manually
-
 // todo replace simple bridge methods like the following with just an alias
 /**
  * i32 me_anno_engine_ui_render_RenderModeXCompanion_getNO_DEPTH_Lme_anno_engine_ui_render_RenderMode(i32 p0) {
@@ -52,14 +46,10 @@ const val api = ASM9
  * }
  * */
 
-// calculate dependency-tree from static initialization,
-//  and call that once at the start, and then never again
-// alternative/improvement:
-// todo on each branch, mark which classes have been static-initialized,
-//  and remove those on all necessarily following branches
-
 // todo find pseudo-instances, which are actually created exactly once,
 //  and make all their fields static, and eliminate that instance (maybe replace it with a shared standard java/lang/Object)
+// todo Companion-objects are unique, so make all their fields and themselves static;
+//  we don't need them to be instances
 
 
 // optimizations:
@@ -67,10 +57,6 @@ const val api = ASM9
 // todo also track, which methods theoretically can throw errors: mark them, and all their callers; -> optimization
 // call_indirect/interface is more complicated... all methods need to have the same signature
 // done if there is only a small number of implementations, make resolveDirect() use a if-else-chain instead (-> modify findUniquelyImplemented())
-
-
-// todo Companion-objects are unique, so make all their fields and themselves static;
-//  we don't need them to be instances
 
 // todo test LuaScripts -> magically not working :/
 
@@ -84,9 +70,6 @@ const val api = ASM9
 
 // to do find pure (nothrow) functions, and spread them across other methods
 // todo implement WASM throwables instead
-// todo finally fix huge switch-tables by splitting programs into sections & such
-// -> partially done already :)
-
 
 // we even could compile scene files to WASM for extremely fast load times 😄
 

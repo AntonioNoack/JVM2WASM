@@ -7,7 +7,6 @@ import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
-import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Instructions.F32EQ
 import wasm.instr.Instructions.F32GE
 import wasm.instr.Instructions.F32GT
@@ -29,18 +28,18 @@ import wasm.instr.Instructions.I32GTS
 import wasm.instr.Instructions.I32LES
 import wasm.instr.Instructions.I32LTS
 import wasm.instr.Instructions.I32NE
+import wasm.instr.Instructions.I64EQ
 import wasm.instr.Instructions.I64GES
 import wasm.instr.Instructions.I64GTS
 import wasm.instr.Instructions.I64LES
 import wasm.instr.Instructions.I64LTS
+import wasm.instr.Instructions.I64NE
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.WATParser
 import kotlin.math.min
 
 object ReplaceOptimizer {
-
-    private val ptrConst0 = if (is32Bits) i32Const0 else i64Const0
 
     private val replacements = listOf(
 
@@ -56,6 +55,8 @@ object ReplaceOptimizer {
         listOf(Call.lcmp, i32Const0, I32LTS) to listOf(I64LTS),
         listOf(Call.lcmp, i32Const0, I32GES) to listOf(I64GES),
         listOf(Call.lcmp, i32Const0, I32GTS) to listOf(I64GTS),
+        listOf(Call.lcmp, I32EQZ) to listOf(I64EQ),
+        listOf(Call.lcmp, I32EQZ, I32EQZ) to listOf(I64NE),
 
         listOf(F64_PROMOTE_F32, F64_SQRT, F32_DEMOTE_F64) to listOf(F32_SQRT),
 
@@ -87,12 +88,26 @@ object ReplaceOptimizer {
         listOf(i32Const0, I32EQ) to listOf(I32EQZ),
         listOf(i32Const0, I32NE) to listOf(I32EQZ, I32EQZ),
 
+        // simple negations cannot be removed because of NaN-handling
+        listOf(F32LE, I32EQZ, I32EQZ) to listOf(F32LE),
+        listOf(F32LT, I32EQZ, I32EQZ) to listOf(F32LT),
+        listOf(F32GE, I32EQZ, I32EQZ) to listOf(F32GE),
+        listOf(F32GT, I32EQZ, I32EQZ) to listOf(F32GT),
+        listOf(F64LE, I32EQZ, I32EQZ) to listOf(F64LE),
+        listOf(F64LT, I32EQZ, I32EQZ) to listOf(F64LT),
+        listOf(F64GE, I32EQZ, I32EQZ) to listOf(F64GE),
+        listOf(F64GT, I32EQZ, I32EQZ) to listOf(F64GT),
+
         // NaN isn't 0, and == returns false for NaN, so this is correct
         listOf(Call.fcmpg, I32EQZ) to listOf(F32EQ),
         listOf(Call.fcmpl, I32EQZ) to listOf(F32EQ),
         listOf(Call.dcmpg, I32EQZ) to listOf(F64EQ),
         listOf(Call.dcmpl, I32EQZ) to listOf(F64EQ),
     )
+
+    // todo run special replacements before if-branches and i32EQZ
+
+    private val replacementsByInstr = replacements.groupBy { it.first.first() }
 
     fun optimizeUsingReplacements(printer: Builder) {
         optimizeUsingReplacements2(printer.instrs)
@@ -112,13 +127,13 @@ object ReplaceOptimizer {
         }
 
         fun runReplacements() {
-            for ((old, new) in replacements) {
-                var offset = 0
-                while (offset <= instructions.size - old.size) {
+            for (offset in instructions.indices) {
+                val instr = instructions.getOrNull(offset) ?: break
+                val replacements = replacementsByInstr[instr]
+                    ?: continue
+                for ((old, new) in replacements) {
                     val li = instructions.startsWith(old, offset)
-                    if (li >= 0) {
-                        makeMutable().replace(new, offset, li)
-                    } else offset++
+                    if (li >= 0) makeMutable().replace(new, offset, li)
                 }
             }
         }

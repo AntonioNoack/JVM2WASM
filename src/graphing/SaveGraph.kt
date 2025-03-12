@@ -52,7 +52,7 @@ object SaveGraph {
 
     fun graphId(sa: StructuralAnalysis): String {
         // return methodName(sig).shorten(50).toString() + ".txt"
-        if (false) StructuralAnalysis.renumber2(sa.nodes)
+        if (false) StructuralAnalysis.renumberForReading(sa.nodes)
         if (false) normalizeGraph(sa.nodes)
         val nodes = sa.nodes
         val builder = StringBuilder(nodes.size * 5)
@@ -89,19 +89,20 @@ object SaveGraph {
 
     fun saveGraph(graphId: String, sa: StructuralAnalysis) {
         val fileLines = getFileLines(graphId)
+        val sig = sa.sig
         if (fileLines.isEmpty()) {
             val builder = StringBuilder()
-            builder.append(sa.sig).append('\n')
-            builder.append(methodName(sa.sig)).append('\n')
+            builder.append(sig).append('\n')
+            builder.append(methodName(sig)).append('\n')
             printState(sa.nodes) { builder.append(it).append('\n') }
             File(folder, graphId).writeText(builder.toString())
         } else {
-            val sigStr = sa.sig.toString()
+            val sigStr = sig.toString()
             if (sigStr !in fileLines) {
                 FileOutputStream(File(folder, graphId), true).use {
                     it.writeString(sigStr)
                     it.write('\n'.code)
-                    it.writeString(methodName(sa.sig))
+                    it.writeString(methodName(sig))
                     it.write('\n'.code)
                 }
             }

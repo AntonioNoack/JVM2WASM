@@ -16,8 +16,8 @@ import dependency.ActuallyUsedIndex
 import enableTracing
 import exportAll
 import gIndex
-import graphing.StackValidator
 import graphing.StackValidator.validateInputOutputStacks
+import graphing.StackValidator.validateStack
 import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
@@ -1250,9 +1250,27 @@ class MethodTranslator(
 
     fun stackPush() {
         if (enableStackPush) {
-            printer
-                .append(i32Const(getCallIndex()))
-                .append(Call.stackPush)
+            val callIndex = getCallIndex()
+            val callConst = i32Const(callIndex)
+            // if previous and before that is stackPop, and before that is call,
+            //  and before that is stackPush, and before that is same constant, drop popping and skip pushing
+            val list = printer.instrs
+            if (list.size >= 4 &&
+                list[list.size - 1] == Call.stackPop &&
+                list[list.size - 2] is Call &&
+                list[list.size - 3] == Call.stackPush &&
+                list[list.size - 4] == callConst
+            ) {
+                // saves 11581/1.6M instructions
+                // to do we could even skip over all constant stuff to optimize a little more
+                //  -> no, if we want to optimize, avoid crashing at all, and disable stackPush
+                list.removeLast()
+                // reusing it...
+            } else {
+                printer
+                    .append(callConst)
+                    .append(Call.stackPush)
+            }
         }
     }
 
@@ -2047,7 +2065,7 @@ class MethodTranslator(
 
                 val nodes = TranslatorNode.convertNodes(nodes)
                 validateInputOutputStacks(nodes, sig)
-                StackValidator.validateStack(nodes, this)
+                validateStack(nodes, this)
                 val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
                 optimizeUsingReplacements(jointBuilder)
 
