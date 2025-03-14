@@ -469,7 +469,7 @@ class FunctionWriter(
             }
             is ShiftInstr -> {
                 binaryInstr(i.type, i.type, i.type, k, assignments, false) { i0, i1, dst ->
-                    if (i.isRight && i.isU) {
+                    if (i.isRight && i.isUnsigned) {
                         dst.append(if (i.type == i32) "(u32) " else "(u64) ")
                     }
                     val operator = if (i.isRight) " >> " else " << "

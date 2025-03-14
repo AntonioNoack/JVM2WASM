@@ -12,7 +12,7 @@ data class LocalGet(var name: String) : Instruction {
 
     override fun execute(engine: WASMEngine): String? {
         val local = engine.stackFrames.last().locals
-        engine.stack.add(local[name] ?: throw IllegalStateException("Missing local $name"))
+        engine.push(local[name] ?: throw IllegalStateException("Missing local $name"))
         return null
     }
 }

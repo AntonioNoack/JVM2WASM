@@ -204,7 +204,7 @@ object Instructions {
 
     val Drop = object : SimpleInstr("drop") {
         override fun execute(engine: WASMEngine): String? {
-            engine.stack.pop()!!
+            engine.pop()
             return null
         }
     }

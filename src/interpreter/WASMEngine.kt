@@ -34,6 +34,7 @@ class WASMEngine(memorySize: Int) {
         private val LOGGER = LogManager.getLogger(WASMEngine::class)
         const val RETURN_LABEL = "return"
         var printStackPush = false
+        var removeStackPush = true // only do that, if there are no errors XD
     }
 
     var instructionCounter = 0L
@@ -67,16 +68,27 @@ class WASMEngine(memorySize: Int) {
         instructions: List<Instruction>,
         byLabel: HashMap<String, BreakableInstruction>
     ): List<Instruction> {
-        return instructions.map { resolveCalls(it, byLabel) }
+        val newInstr = ArrayList<Instruction>(instructions.size)
+        for (i in instructions.indices) {
+            val instr = instructions[i]
+            if (removeStackPush && instr is Call) {
+                when (instr.name) {
+                    "stackPush" -> assertTrue(newInstr.removeLast() is Const)
+                    "stackPop" -> {}
+                    else -> newInstr.add(resolveCall(instr))
+                }
+            } else newInstr.add(resolveCalls(instr, byLabel))
+        }
+        return newInstr
+    }
+
+    private fun resolveCall(call: Call): ResolvedCall {
+        return ResolvedCall(getFunction(call.name))
     }
 
     private fun resolveCalls(i: Instruction, byLabel: HashMap<String, BreakableInstruction>): Instruction {
         return when (i) {
-            is Call -> {
-                // todo singleInstr are loading to corruption results... what??
-                /*val singleInstr = singleInstrFunctions[i.name]
-                singleInstr ?: */ResolvedCall(getFunction(i.name))
-            }
+            is Call -> resolveCall(i)
             is LoopInstr -> {
                 val newInstr = LoopInstr(i.label, i.body, i.params, i.results)
                 byLabel[i.label] = newInstr

@@ -19,7 +19,7 @@ data class CallIndirect(val type: FuncType) : Instruction {
     }
 
     override fun execute(engine: WASMEngine): String? {
-        val index = engine.stack.pop() as Int
+        val index = engine.pop() as Int
         val function = engine.functionTable[index]
         // todo verify type
         engine.executeFunction(function)
