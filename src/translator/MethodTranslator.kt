@@ -3,7 +3,7 @@ package translator
 import alwaysUseFieldCalls
 import annotations.Boring
 import annotations.NotCalled
-import anyMethodThrows
+import useResultForThrowables
 import api
 import canThrowError
 import checkArrayAccess
@@ -40,6 +40,7 @@ import translator.ResolveIndirect.resolveIndirect
 import useWASMExceptions
 import utils.*
 import utils.Builder.Companion.isDuplicable
+import utils.PrintUsed.printUsed
 import utils.ReplaceOptimizer.optimizeUsingReplacements
 import utils.WASMTypes.*
 import wasm.instr.*
@@ -151,6 +152,8 @@ class MethodTranslator(
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
 
         var comments = true
+        var renameVariables = true
+
         private var printOps = false
         private var commentStackOps = false
 
@@ -161,6 +164,7 @@ class MethodTranslator(
             "Throwable_printStackTrace_V", "getStackDepth"
         )
 
+        @Suppress("UNUSED_PARAMETER")
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
             return false
         }
@@ -192,7 +196,6 @@ class MethodTranslator(
     }
 
     var linearTreeNodeIndex = 0
-    var startNodeExtractorIndex = 0
     var endNodeExtractorIndex = 0
     var bigLoopExtractorIndex = 0
     var endNodeIndex = 0
@@ -427,28 +430,28 @@ class MethodTranslator(
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.i32ArrayLoad else Call.i32ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x2f -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(i64)
                     .append(if (checkArrayAccess) Call.i64ArrayLoad else Call.i64ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x30 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f32)
                     .append(if (checkArrayAccess) Call.f32ArrayLoad else Call.f32ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x31 -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).push(f64)
                     .append(if (checkArrayAccess) Call.f64ArrayLoad else Call.f64ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x32 -> {
                 stackPush()
@@ -458,28 +461,28 @@ class MethodTranslator(
                         else if (is32Bits) Call.i32ArrayLoadU else Call.i64ArrayLoadU
                     )
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x33 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x34 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x35 -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             // store instructions
             0x4f -> {
@@ -487,28 +490,28 @@ class MethodTranslator(
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i32ArrayStore else Call.i32ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x50 -> {
                 stackPush()
                 printer.pop(i64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i64ArrayStore else Call.i64ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x51 -> {
                 stackPush()
                 printer.pop(f32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f32ArrayStore else Call.f32ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x52 -> {
                 stackPush()
                 printer.pop(f64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f64ArrayStore else Call.f64ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x53 -> {
                 stackPush()
@@ -518,21 +521,21 @@ class MethodTranslator(
                         else if (is32Bits) Call.i32ArrayStoreU else Call.i64ArrayStoreU
                     )
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x54 -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i8ArrayStore else Call.i8ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             0x55, 0x56 -> { // char/short-array store
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i16ArrayStore else Call.i16ArrayStoreU)
                 stackPop()
-                if (checkArrayAccess && anyMethodThrows) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
 
             // returnx is important: it shows to cancel the flow = jump to end
@@ -678,7 +681,7 @@ class MethodTranslator(
                     printer.poppush(i32).append(Call("safeDiv32"))
                     printer.pop(i32).poppush(i32)
                     stackPop()
-                    if (anyMethodThrows) handleThrowable()
+                    if (useResultForThrowables) handleThrowable()
                 } else {
                     printer.pop(i32).poppush(i32).append(I32_DIVS)
                 }
@@ -689,7 +692,7 @@ class MethodTranslator(
                     printer.poppush(i64).append(Call("safeDiv64"))
                     printer.pop(i64).poppush(i64)
                     stackPop()
-                    if (anyMethodThrows) handleThrowable()
+                    if (useResultForThrowables) handleThrowable()
                 } else {
                     printer.pop(i64).poppush(i64).append(I64_DIVS)
                 }
@@ -701,7 +704,7 @@ class MethodTranslator(
                     stackPush()
                     printer.poppush(i32).append(Call("checkNonZero32"))
                     stackPop()
-                    if (anyMethodThrows) handleThrowable()
+                    if (useResultForThrowables) handleThrowable()
                 }
                 printer.pop(i32).poppush(i32).append(I32_REM_S)
             }
@@ -710,7 +713,7 @@ class MethodTranslator(
                     stackPush()
                     printer.poppush(i64).append(Call("checkNonZero64"))
                     stackPop()
-                    if (anyMethodThrows) handleThrowable()
+                    if (useResultForThrowables) handleThrowable()
                 }
                 printer.pop(i64).poppush(i64)
                 printer.append(I64_REM_S)
@@ -812,7 +815,8 @@ class MethodTranslator(
         // register new class (not visitable)
         printer.append(i32Const(gIndex.getClassIndex(synthClassName)))
         if (fields.isEmpty() && !dlu.usesSelf) {
-            // no instance is needed 😁
+            // no instance is needed 😁:
+            //  we create a four-byte pseudo instance from just the class index value
             printer.push(ptrType).append(Call.getClassIndexPtr)
             if (comments) printer.comment(synthClassName)
         } else {
@@ -820,7 +824,7 @@ class MethodTranslator(
             printer.push(ptrType).append(Call.createInstance)
             if (comments) printer.comment(synthClassName)
             stackPop()
-            if (anyMethodThrows) handleThrowable()
+            if (useResultForThrowables) handleThrowable()
         }
 
         if (fields.isNotEmpty()) {
@@ -1006,7 +1010,7 @@ class MethodTranslator(
             printer.append(i32Const(gIndex.getString(clazz)))
             printer.append(i32Const(gIndex.getString(name)))
             printer.append(Call("checkNotNull"))
-            if (anyMethodThrows) handleThrowable()
+            if (useResultForThrowables) handleThrowable()
         }
     }
 
@@ -1059,6 +1063,11 @@ class MethodTranslator(
 
         when (opcode0) {
             0xb9 -> {
+
+                val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
+                assertEquals(sig0, sig1)
+                assertTrue(sig1 in dIndex.usedInterfaceCalls)
+                
                 val variants = findConstructableChildImplementations(sig0)
                 if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
                     // invoke interface
@@ -1070,7 +1079,7 @@ class MethodTranslator(
                     stackPush()
                     printer.push(i32).append(Call("resolveInterface"))
                     stackPop() // so we can track the call better
-                    if (anyMethodThrows) handleThrowable() // if it's not found or nullptr
+                    if (useResultForThrowables) handleThrowable() // if it's not found or nullptr
                     printer.pop(i32) // pop instance
                     pop(splitArgs, false, ret)
 
@@ -1188,7 +1197,7 @@ class MethodTranslator(
                             .push(i32)
                         if (comments) printer.comment("$sig0, #${options.size}")
                         stackPop()
-                        if (anyMethodThrows) handleThrowable()
+                        if (useResultForThrowables) handleThrowable()
                         printer.pop(i32)
                         pop(splitArgs, false, ret)
                         printer.append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
@@ -1322,7 +1331,7 @@ class MethodTranslator(
             .append(Call.createNativeArray[numDimensions])
 
         stackPop()
-        if (anyMethodThrows) handleThrowable()
+        if (useResultForThrowables) handleThrowable()
 
         if (numDimensions > 6)
             throw NotImplementedError("Multidimensional arrays with more than 5 dimensions haven't been implemented yet.")
@@ -1391,7 +1400,6 @@ class MethodTranslator(
         if (printOps) println("  ;; try-catch $start .. $end, handler $handler, type $type")
     }
 
-    private var thIndex = -10
     fun handleThrowable(mustThrow: Boolean = false) {
 
         if (useWASMExceptions) {
@@ -1586,7 +1594,7 @@ class MethodTranslator(
                     .append(Call.createInstance)
                 if (comments) printer.comment(type)
                 stackPop()
-                if (anyMethodThrows) handleThrowable()
+                if (useResultForThrowables) handleThrowable()
             }
             0xbd -> {
                 // a-new array, type doesn't matter
@@ -1595,7 +1603,7 @@ class MethodTranslator(
                 printer.append(Call.createObjectArray)
                 if (comments) printer.comment(type)
                 stackPop()
-                if (anyMethodThrows) handleThrowable()
+                if (useResultForThrowables) handleThrowable()
             }
             0xc0 -> {
                 // check cast
@@ -1605,7 +1613,7 @@ class MethodTranslator(
                     printer.printCastClass(type)
                     if (comments) printer.comment(type)
                     stackPop()
-                    if (anyMethodThrows) handleThrowable()
+                    if (useResultForThrowables) handleThrowable()
                 }
             }
             0xc1 -> {
@@ -1711,7 +1719,7 @@ class MethodTranslator(
                     .append(Call.createNativeArray[1])
                 if (comments) printer.comment(type)
                 stackPop()
-                if (anyMethodThrows) handleThrowable()
+                if (useResultForThrowables) handleThrowable()
             }
             else -> assertFail()
         }
@@ -1857,7 +1865,7 @@ class MethodTranslator(
         printer.append(Call(methodName(sig)))
         ActuallyUsedIndex.add(this.sig, sig)
         stackPop()
-        if (anyMethodThrows && canThrowError(sig)) {
+        if (useResultForThrowables && canThrowError(sig)) {
             handleThrowable()
         }
     }

@@ -1,6 +1,6 @@
 package hierarchy
 
-import anyMethodThrows
+import useResultForThrowables
 import dIndex
 import gIndex
 import hIndex
@@ -241,7 +241,7 @@ class DelayedLambdaUpdate(
             couldThrow = true
         }
 
-        if (!couldThrow && anyMethodThrows) {
+        if (!couldThrow && useResultForThrowables) {
             // calling this is easier than figuring our the return type for the correct return function
             mt.visitLdcInsn(0)
         }

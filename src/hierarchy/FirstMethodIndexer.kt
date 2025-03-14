@@ -1,6 +1,5 @@
 package hierarchy
 
-import anyMethodThrows
 import api
 import dIndex
 import hIndex
@@ -8,6 +7,7 @@ import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import org.objectweb.asm.*
 import replaceClass
+import useResultForThrowables
 import utils.*
 import wasm.instr.CallIndirect
 import wasm.instr.FuncType
@@ -99,10 +99,16 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         if (retType != null) clazz.dep(retType)
 
         val isStatic = opcode == 0xb8
+        val isInterfaceCall = opcode == 0xb9
         val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
 
         val isNewMethod = HierarchyIndex.registerMethod(sig1)
         if (isNewMethod) {
+            val access =
+                if (isStatic) Opcodes.ACC_STATIC
+                else if (isInterfaceCall) Opcodes.ACC_INTERFACE
+                else 0
+            hIndex.methodFlags[sig1] = access
             if (isStatic) hIndex.staticMethods.add(sig1)
             if (hIndex.notImplementedMethods.add(sig1)) {
                 hIndex.hasSuperMaybeMethods.add(sig1)
@@ -110,7 +116,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // may be a child method
         }
 
-        if (opcode == 0xb9) { // invoke interface
+        if (isInterfaceCall) { // invoke interface
             // if (hIndex.classFlags[owner]!!.hasFlag(ACC_INTERFACE))
             // else throw IllegalStateException(sig1.toString())
             interfaceCalls.add(sig1)
@@ -327,20 +333,17 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             dIndex.constructorDependencies[sig] = constructedClasses
         }
 
+        val throws = useResultForThrowables && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
+
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
-            defineCallIndirectWASM(listOf(ptrType), if (anyMethodThrows) listOf(ptrType) else emptyList())
+            defineCallIndirectWASM(listOf(ptrType), if (throws) listOf(ptrType) else emptyList())
         } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
-            defineCallIndirectWASM(emptyList(), if (anyMethodThrows) listOf(ptrType) else emptyList())
+            defineCallIndirectWASM(emptyList(), if (throws) listOf(ptrType) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
             // confirm that the method is native???
-            val params0 = sig.descriptor.wasmParams
-            val params1 = params0.subList(0, params0.lastIndex) // cut off last parameter, this is the methodId
-            val canThrow = anyMethodThrows && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
-            val results = sig.descriptor.getResultWASMTypes(canThrow)
-            val funcType = FuncType(params1, results)
-            // todo use descriptor to differentiate Object and i32/i64
-            hIndex.implementedMethodSignatures.add(funcType)
-            defineCallIndirectWASM(funcType)
+            val callSignature = CallSignature.c(sig, removeLastParam = true)
+            hIndex.implementedCallSignatures.add(callSignature)
+            defineCallIndirectWASM(callSignature.toFuncType())
         }
 
         if (annotations.isNotEmpty()) {

@@ -19,7 +19,6 @@ import java.util.function.Consumer;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.read32;
 import static jvm.JVMShared.write32;
-import static jvm.JavaLang.getAddr;
 import static jvm.NativeLog.log;
 import static org.lwjgl.opengl.GL46C.*;
 

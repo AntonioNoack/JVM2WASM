@@ -70,4 +70,46 @@ public class Kotlin {
         return Object_toString(lambda);
     }
 
+    @Alias(names = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toDoubleOrNull_Ljava_lang_StringLjava_lang_Double")
+    public static Double toDoubleOrNull(String str) {
+        if ("NaN".equals(str)) return Double.NaN;
+        if ("+Infinity".equals(str) || "Infinity".equals(str)) return Double.POSITIVE_INFINITY;
+        if ("-Infinity".equals(str)) return Double.NEGATIVE_INFINITY;
+        return isValidDouble(str) ? Double.parseDouble(str) : null;
+    }
+
+    private static boolean isValidDouble(String str) {
+        int length = str.length();
+        int commaIndex = indexOf2(str, '.');
+        int exponentIndex = indexOf2(str, 'e');
+        exponentIndex = Math.max(indexOf2(str, 'E'), exponentIndex);
+        commaIndex = Math.min(commaIndex, exponentIndex);
+        if (commaIndex == 0 && exponentIndex <= 1) return false; // not enough digits
+        if (!isAllDigits(str, 0, commaIndex)) return false; // invalid chars before comma
+        if (!isAllDigits(str, commaIndex + 1, exponentIndex)) return false; // invalid chars between comma and exponent
+        if (exponentIndex >= length) return true; // no exponent -> number is fine
+        // check exponent, there is an exponent
+        char sign = str.charAt(exponentIndex + 1);
+        if (sign == '+' || sign == '-') {
+            // there is a sign, skip it, and check whether there is enough space for exponent digits
+            exponentIndex++;
+            if (exponentIndex == length) {
+                return false;
+            }
+        }
+        return isAllDigits(str, exponentIndex, length);
+    }
+
+    private static boolean isAllDigits(String str, int i0, int i1) {
+        for (int i = i0; i < i1; i++) {
+            char c = str.charAt(i);
+            if (c < '0' || c > '9') return false;
+        }
+        return true;
+    }
+
+    private static int indexOf2(String str, char c) {
+        int index = str.indexOf(c);
+        return index < 0 ? str.length() : index;
+    }
 }

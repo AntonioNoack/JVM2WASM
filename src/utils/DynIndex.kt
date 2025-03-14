@@ -6,7 +6,6 @@ import gIndex
 import hIndex
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
-import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
@@ -14,6 +13,7 @@ import me.anno.utils.structures.Recursion
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import utils.MethodResolver.resolveMethod
+import utils.PrintUsed.printUsed
 
 object DynIndex {
 
@@ -48,7 +48,7 @@ object DynIndex {
 
     fun appendDynamicFunctionTable(printer: StringBuilder2, implementedMethods: Map<String, MethodSig>) {
         val nameToMethod = calculateNameToMethod()
-        val dynamicFunctions = implementedMethods.entries
+        val dynamicMethods = implementedMethods.entries
             .filter { (_, sig) -> // saving space by remove functions that cannot be invoked dynamically
                 sig.clazz != INTERFACE_CALL_NAME &&
                         sig.name != INSTANCE_INIT &&
@@ -60,7 +60,7 @@ object DynIndex {
                         hIndex.getAlias(sig) == sig
             }
             .sortedBy { (_, sig) -> SortingKey(sig) }
-        for ((name, sig) in dynamicFunctions) {
+        for ((name, sig) in dynamicMethods) {
             if (nameToMethod[name] in hIndex.abstractMethods)
                 throw IllegalStateException("$name is abstract, but also listed")
             addDynIndex(sig, name)
@@ -94,7 +94,7 @@ object DynIndex {
             ActuallyUsedIndex.add(dynIndexSig, sig)
         }
         printer.append(")\n")
-        LOGGER.info("Filtered ${dynamicFunctions.size} dynamic functions from ${implementedMethods.size} methods")
+        LOGGER.info("${dynamicMethods.size}/${implementedMethods.size} implemented methods are dynamic")
     }
 
     /**
@@ -295,7 +295,6 @@ object DynIndex {
         instanceTableData.writeLE32(0) // no interface signatures
         ptr += 16
 
-        assertEquals(objectOverhead + 8, gIndex.getFieldOffsets("java/lang/String", false).offset)
         for (classId in 0 until numClasses) {
             val clazz = gIndex.classNamesByIndex[classId]
             if (clazz in NativeTypes.nativeTypes) {
@@ -306,8 +305,10 @@ object DynIndex {
 
                 var superClass = hIndex.superClass[clazz]
                 if (superClass == null) {
-                    LOGGER.warn("Super class of $clazz ($classId) is unknown")
-                    if (classId > 0) superClass = "java/lang/Object"
+                    if (classId > 0) {
+                        LOGGER.warn("Super class of $clazz ($classId) is unknown")
+                        superClass = "java/lang/Object"
+                    }
                 }
 
                 classTableData.writeLE32(ptr)
@@ -322,7 +323,7 @@ object DynIndex {
                 instanceTableData.writeLE32(if (superClass != null) gIndex.getClassIndex(superClass) else 0)
                 val interfaces = getInterfaces(clazz, numClasses)
                 val fieldOffsets = gIndex.getFieldOffsets(clazz, false)
-                val clazzSize = fieldOffsets.offset
+                val clazzSize = gIndex.getInstanceSize(clazz)
                 instanceTableData.writeLE32(clazzSize)
                 instanceTableData.writeLE32(interfaces.size)
                 for (j in interfaces) {
@@ -351,7 +352,7 @@ object DynIndex {
                         debugInfo.append("  constructable & !abstract & !interface\n")
                     }
 
-                    val implFunctions0 = findImplementedMethods(clazz, interfaces)
+                    val implFunctions0 = findImplementedInterfaceMethods(clazz, interfaces)
 
                     if (hIndex.isEnumClass(clazz)) {
                         val superInit = MethodSig.staticInit(clazz)
@@ -391,9 +392,10 @@ object DynIndex {
         return ptr
     }
 
-    private fun findImplementedMethods(
+    private fun findImplementedInterfaceMethods(
         clazz: String, interfaces: Set<String>
     ): HashMap<Int, MethodSig> {
+        val print = gIndex.getClassIndex(clazz) == 49
         val implFunctions0 = HashMap<Int, MethodSig>()
         for (sig in dIndex.usedInterfaceCalls) {
             // only if is actually instance of interface
@@ -418,6 +420,20 @@ object DynIndex {
                 }
                 implFunctions0[gIndex.getInterfaceIndex(InterfaceSig(sig))] = impl
                 addDynIndex(impl)
+            }
+        }
+        if (print) {
+            println("class: $clazz")
+            println("interfaces: $interfaces")
+            for ((id, impl) in implFunctions0) {
+                println("  [$id]: ${impl.name}${impl.descriptor}")
+            }
+            val missingSig = MethodSig.c("kotlin/Function", "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;", false)
+            println("has sig? ${missingSig in dIndex.usedInterfaceCalls}")
+            println("used interface calls:")
+            for (call in dIndex.usedInterfaceCalls
+                .map { it.toString() }.sorted()) {
+                println("  $call")
             }
         }
         return implFunctions0

@@ -10,11 +10,9 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 
-import static jvm.JVM32.throwJs;
-import static jvm.JVMShared.read32;
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVM32.readPtrAtOffset;
 import static jvm.JavaReflect.getFieldOffset;
+import static jvm.ThrowJS.throwJs;
 
 public class JavaIO {
 
@@ -61,7 +59,7 @@ public class JavaIO {
 
     @NoThrow
     private static InputStream getInputStream(InputStreamReader reader) {
-        return ptrTo(read32(getAddr(reader) + lockFieldOffset));
+        return readPtrAtOffset(reader, lockFieldOffset);
     }
 
     @Alias(names = "java_io_InputStreamReader_ready_Z")

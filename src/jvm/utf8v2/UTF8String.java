@@ -5,10 +5,10 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.charset.Charset;
 import java.util.Locale;
 
+import static jvm.JVM32.getAddr;
 import static jvm.JVM32.getAllocationStart;
 import static jvm.JVM32.unsignedLessThan;
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVMShared.unsafeCast;
 import static jvm.JavaUtil.String_format;
 
 @SuppressWarnings("unused")
@@ -80,8 +80,8 @@ public class UTF8String implements CharSequence, Comparable<String> {
             }
             if (lc != null) lc[i] = c;
         }
-        if (lc == null) return ptrTo(getAddr(this));
-        return ptrTo(getAddr(new UTF8String(lc, false)));
+        if (lc == null) return unsafeCast(this);
+        return unsafeCast(new UTF8String(lc, false));
     }
 
     public String toUpperCase(Locale lx) {
@@ -99,8 +99,8 @@ public class UTF8String implements CharSequence, Comparable<String> {
             }
             if (lc != null) lc[i] = c;
         }
-        if (lc == null) return ptrTo(getAddr(this));
-        return ptrTo(getAddr(new UTF8String(lc, false)));
+        if (lc == null) return unsafeCast(this);
+        return unsafeCast(new UTF8String(lc, false));
     }
 
     @Override
@@ -125,12 +125,12 @@ public class UTF8String implements CharSequence, Comparable<String> {
     @NotNull
     @Override
     public String toString() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     @Override
     public int compareTo(@NotNull String other1) {
-        UTF8String other = ptrTo(getAddr(other1));
+        UTF8String other = unsafeCast(other1);
         byte[] var5 = value;
         byte[] var6 = other.value;
         int var2 = var5.length;

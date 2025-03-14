@@ -1,6 +1,6 @@
 import dependency.ActuallyUsedIndex
 import dependency.DependencyIndex
-import dependency.StaticDependencies
+import dependency.DependencyIndex.constructableClasses
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
 import interpreter.WASMEngine
@@ -8,30 +8,39 @@ import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
+import me.anno.utils.Clock
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
+import me.anno.utils.types.Floats.f1
+import me.anno.utils.types.Floats.f3
+import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
+import translator.GeneratorIndex.classNamesByIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.nthGetterMethods
 import translator.GeneratorIndex.stringStart
 import translator.GeneratorIndex.translatedMethods
-import translator.MethodTranslator
+import translator.MethodTranslator.Companion.comments
 import utils.*
+import utils.DefaultClassLayouts.registerDefaultOffsets
 import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
 import utils.DynIndex.resolveIndirectTablePtr
 import utils.NativeHelperFunctions.appendNativeHelperFunctions
+import utils.PrintUsed.printUsed
 import utils.WASMTypes.*
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder
 import java.io.FileNotFoundException
+import kotlin.math.ceil
 import kotlin.math.sin
 
 const val api = ASM9
+private val LOGGER = LogManager.getLogger("JVM2WASM")
 
 // todo replace simple bridge methods like the following with just an alias
 /**
@@ -79,13 +88,15 @@ var exportHelpers = exportAll
 var useKotlynReflect = true
 var useDefaultKotlinReflection = false
 
+var alignFieldsProperly = true
+
 var callStaticInitOnce = false
 var callStaticInitAtCompileTime = true // todo implement this
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
 var crashOnAllExceptions = true
-val anyMethodThrows = !useWASMExceptions && !crashOnAllExceptions
+val useResultForThrowables = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
@@ -218,6 +229,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
     clazz("jvm/JVMShared")
     clazz("jvm/GarbageCollector")
     clazz("jvm/MemDebug")
+    clazz("jvm/ThrowJS")
 
     if (checkArrayAccess) {
         clazz("jvm/ArrayAccessSafe")
@@ -322,7 +334,7 @@ val gIndex = GeneratorIndex
 
 val implementedMethods = HashMap<String, MethodSig>()
 
-val t0 = System.nanoTime()
+val clock = Clock("JVM2WASM")
 
 fun listSuperClasses(clazz: String, list: HashSet<String>): Collection<String> {
     val superClass = hIndex.superClass[clazz]
@@ -356,6 +368,8 @@ fun main() {
 
 fun jvm2wasm() {
 
+    val clock = Clock(LOGGER)
+
     // ok in Java, trapping in WASM
     // todo has this been fixed?
     // println(Int.MIN_VALUE/(-1)) // -> Int.MIN_VALUE
@@ -371,19 +385,20 @@ fun jvm2wasm() {
         "[Z", "[B", // 1
         "[C", "[S", // 2
         "[J", "[D", // 8
+        // do we really need to hardcode them? yes, for convenience in JavaScript
+        // todo -> use named constants in JavaScript
         "java/lang/String", // #10
         "java/lang/Class", // #11
         "java/lang/System", // #12
         "java/io/Serializable", // #13
         "java/lang/Throwable", // #14
         "java/lang/StackTraceElement", // #15
-        "java/lang/reflect/Field", // #16
         "int", "long", "float", "double",
-        "boolean", "byte", "short", "char", "void" // #25
+        "boolean", "byte", "short", "char", "void", // #24
     )
 
     for (i in 1 until 13) {
-        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[StaticClassIndices.OBJECT])
+        hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
     }
 
     for (i in predefinedClasses.indices) {
@@ -394,8 +409,15 @@ fun jvm2wasm() {
 
     assertEquals(gIndex.classIndex["java/lang/Object"], StaticClassIndices.OBJECT)
     assertEquals(gIndex.classIndex["java/lang/String"], StaticClassIndices.STRING)
-    assertEquals(gIndex.classIndex["[]"], StaticClassIndices.ARRAY)
-
+    assertEquals(gIndex.classIndex["[]"], StaticClassIndices.OBJECT_ARRAY)
+    assertEquals(gIndex.classIndex["[I"], StaticClassIndices.INT_ARRAY)
+    assertEquals(gIndex.classIndex["[F"], StaticClassIndices.FLOAT_ARRAY)
+    assertEquals(gIndex.classIndex["[Z"], StaticClassIndices.BOOLEAN_ARRAY)
+    assertEquals(gIndex.classIndex["[B"], StaticClassIndices.BYTE_ARRAY)
+    assertEquals(gIndex.classIndex["[C"], StaticClassIndices.CHAR_ARRAY)
+    assertEquals(gIndex.classIndex["[S"], StaticClassIndices.SHORT_ARRAY)
+    assertEquals(gIndex.classIndex["[J"], StaticClassIndices.LONG_ARRAY)
+    assertEquals(gIndex.classIndex["[D"], StaticClassIndices.DOUBLE_ARRAY)
     assertEquals(gIndex.classIndex["int"], StaticClassIndices.NATIVE_INT)
     assertEquals(gIndex.classIndex["long"], StaticClassIndices.NATIVE_LONG)
     assertEquals(gIndex.classIndex["float"], StaticClassIndices.NATIVE_FLOAT)
@@ -407,7 +429,7 @@ fun jvm2wasm() {
     assertEquals(gIndex.classIndex["void"], StaticClassIndices.NATIVE_VOID)
 
     for (i in StaticClassIndices.FIRST_NATIVE..StaticClassIndices.LAST_NATIVE) {
-        hIndex.registerSuperClass(predefinedClasses[i], predefinedClasses[StaticClassIndices.OBJECT])
+        hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
     }
 
     // todo confirm type shift using WASMEngine
@@ -440,9 +462,11 @@ fun jvm2wasm() {
 
     resolveAll(entryClasses, entryPoints)
 
-    val staticCallOrder = if (callStaticInitOnce) {
+    // doesn't work yet, because of java/lang-class interdependencies,
+    // and probably lots of them in our project, too
+    /*val staticCallOrder = if (callStaticInitOnce) {
         StaticDependencies.calculateStaticCallOrder()
-    } else null
+    } else null*/
 
     indexFieldsInSyntheticMethods()
     calculateFieldOffsets()
@@ -594,6 +618,8 @@ fun jvm2wasm() {
         printMissingFunctions(usedButNotImplemented, usedMethods)
     }
 
+    clock.stop("Until Globals")
+
     fun printGlobal(name: String, type: String, type2: String, value: Int) {
         // can be mutable...
         dataPrinter.append("(global $").append(name).append(" ").append(type).append(" (").append(type2)
@@ -605,13 +631,13 @@ fun jvm2wasm() {
         globals.add(GlobalVariable("global_$name", type, value, isMutable))
     }
 
-    if (MethodTranslator.comments) dataPrinter.append(";; globals:\n")
+    if (comments) dataPrinter.append(";; globals:\n")
     defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
     defineGlobal("staticTable", ptrType, staticTablePtr) // static table
     defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
     defineGlobal("numClasses", ptrType, numClasses)
     defineGlobal("classInstanceTable", ptrType, classInstanceTablePtr)
-    defineGlobal("classSize", ptrType, gIndex.getFieldOffsets("java/lang/Class", false).offset)
+    defineGlobal("classSize", ptrType, gIndex.getInstanceSize("java/lang/Class"))
     defineGlobal("staticInitTable", ptrType, staticInitFlagTablePtr)
     defineGlobal("stackTraceTable", ptrType, stackTraceTablePtr)
     defineGlobal("resourceTable", ptrType, resourceTablePtr)
@@ -626,33 +652,87 @@ fun jvm2wasm() {
     defineGlobal("allocationPointer", ptrType, ptr, true)
     defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
 
+    clock.stop("Globals")
+
+    // todo code-size optimization:
+    //  inline calls to functions, which only call
+
+    // todo code-size optimization:
+    //  1. resolve what we need by all entry points
+    //  2. resolve what we need by static-init and translate it
+    //  3. execute static init
+    //  4. resolve what we need without static-init and translate&ship it
+    //    - also optimize static field reading: many will be read-only after static-init
+
     if (callStaticInitAtCompileTime) {
-        val extraMemory = 16 shl 20
-        val vm = WASMEngine(ptr + extraMemory)
+
+        // todo partially sort these methods by dependencies
+        //  for better code-complexity and allocation measurements
+
+        // create VM
+        val originalMemory = ptr
+        val extraMemory = 17 shl 20
+        val vm = WASMEngine(originalMemory + extraMemory)
         assertTrue(globals.isNotEmpty()) // should not be empty
         vm.registerGlobals(globals)
         vm.registerSpecialFunctions()
         vm.registerMemorySections(segments)
         assertTrue(translatedMethods.isNotEmpty()) // should not be empty
-        val functions = translatedMethods.values + helperFunctions.values + nthGetterMethods.values
-        vm.registerFunctions(functions)
+        vm.registerFunctions(translatedMethods.values)
+        vm.registerFunctions(helperFunctions.values)
+        vm.registerFunctions(nthGetterMethods.values)
+        vm.resolveCalls()
         assertTrue(functionTable.isNotEmpty()) // usually should not be empty
         vm.registerFunctionTable(functionTable)
-        // todo create vm
-        // todo initialize memory properly
-        // todo call all static init functions
+        // call all static init functions
         val staticInitFunctions = dIndex.usedMethods
             .filter { it.name == STATIC_INIT }
             .sortedBy { it.name } // for a little consistency ^^
             .map { methodName(it) }
+        val time0i = System.nanoTime()
         try {
-            for (name in staticInitFunctions) {
-                val func = vm.functionByName[name]
-                vm.executeFunction(func ?: continue)
+            LOGGER.info("Total static init functions: ${staticInitFunctions.size}")
+            LOGGER.info("[-1]: init")
+            vm.executeFunction("init")
+            var instr0 = vm.instructionCounter
+            var memory0 = vm.globals["allocationPointer"]!!.toInt()
+            var time0 = time0i
+            val minLogInstructions = 2_000_000L
+            val minLogSize = 64_000
+            for (i in staticInitFunctions.indices) {
+                val name = staticInitFunctions[i]
+                LOGGER.info("[$i]: $name")
+                vm.executeFunction(name)
+                val instrI = vm.instructionCounter
+                val memory1 = vm.globals["allocationPointer"]!!.toInt()
+                val timeI = System.nanoTime()
+                if (instrI - instr0 > minLogInstructions)
+                    LOGGER.info(
+                        "[$i]     " +
+                                "${((instrI - instr0) / 1e6f).f1()} MInstr, " +
+                                "${ceil((timeI - time0) / 1e6f).toInt()} ms, " +
+                                "${((instrI - instr0) * 1e3f / (timeI - time0)).toInt()} MInstr/s"
+                    )
+                if (memory1 - memory0 > minLogSize) LOGGER.info("[$i]     +${(memory1 - memory0).formatFileSize()}")
+                instr0 = instrI
+                memory0 = memory1
+                time0 = timeI
             }
         } catch (e: IllegalStateException) {
             e.printStackTrace()
         }
+        // calculate how much new memory was used
+        val timeI = System.nanoTime()
+        val allocationStart = vm.globals["allocationStart"]!!.toInt()
+        val allocationPointer = vm.globals["allocationPointer"]!!.toInt()
+        LOGGER.info("Base Memory: ${allocationStart.formatFileSize()}")
+        LOGGER.info("Allocated ${(allocationPointer - allocationStart).formatFileSize()} during StaticInit")
+        LOGGER.info("Executed ${vm.instructionCounter} instructions for StaticInit")
+        LOGGER.info("Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
+                "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s")
+        // todo run GC
+        // todo compact memory by remapping instances (should be possible)
+        clock.stop("StaticInit WASM-VM")
     }
 
     printMethodImplementations(bodyPrinter, usedMethods)
@@ -668,14 +748,20 @@ fun jvm2wasm() {
     headerPrinter.append(importPrinter)
     headerPrinter.append(dataPrinter)
     headerPrinter.append(bodyPrinter)
-    headerPrinter.append(if (MethodTranslator.comments) ") ;; end of module\n" else ")\n")
+    headerPrinter.append(if (comments) ") ;; end of module\n" else ")\n")
 
-    println("  Total size (with comments): ${headerPrinter.length.toLong().formatFileSize(1024)}")
-    println("  Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
+    LOGGER.info(
+        "WAT size (${if (comments) "with" else "without"} comments): " +
+                headerPrinter.length.formatFileSize()
+    )
+    LOGGER.info("Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
+    LOGGER.info(
+        "Number of constant Strings: ${gIndex.stringSet.size}, " +
+                "size: ${gIndex.totalStringSize.formatFileSize()}"
+    )
+    LOGGER.info("${constructableClasses.size}/${classNamesByIndex.size} classes are constructable")
 
     compileToWASM(headerPrinter)
-
-    println("  ${dIndex.constructableClasses.size}/${gIndex.classNamesByIndex.size} classes are constructable")
 }
 
 val globals = ArrayList<GlobalVariable>()

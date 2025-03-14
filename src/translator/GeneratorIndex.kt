@@ -1,5 +1,6 @@
 package translator
 
+import alignFieldsProperly
 import byteStrings
 import crashOnAllExceptions
 import dependency.ActuallyUsedIndex
@@ -14,12 +15,13 @@ import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
 import replaceClass
+import replaceClassNullable
 import useWASMExceptions
 import utils.*
 import utils.Param.Companion.toParams
+import utils.PrintUsed.printUsed
 import utils.WASMTypes.*
 import wasm.instr.FuncType
-import wasm.instr.Instruction
 import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
@@ -51,13 +53,17 @@ object GeneratorIndex {
         return ptr
     }
 
-    private val stringInstanceSize = objectOverhead + 8 // ptr + hash
+    var stringInstanceSize = -1
     fun getString(str: String, ptr: Int, buffer: ByteArrayOutputStream2): Int {
+        val stringClassName = "java/lang/String"
+        val stringClass = getClassIndex(stringClassName)
+        val stringInstanceSize = getInstanceSize(stringClassName)
         return stringSet.getOrPut(str) {
             // append string class
             buffer.writeClass(stringClass)
-            buffer.writeLE32(ptr + stringInstanceSize) // ptr to char array
             buffer.writeLE32(str.hashCode()) // hash, precomputed for faster start times :3
+            buffer.writePointer(ptr + stringInstanceSize) // ptr to char array
+            buffer.fill(objectOverhead + 4 + ptrSize, stringInstanceSize)
             buffer.writeClass(stringArrayClass)
             val length: Int
             if (byteStrings) {
@@ -123,19 +129,29 @@ object GeneratorIndex {
 
     var lockClasses = false
 
-    fun getClassIndex(name: String): Int {
-        val name2 = replaceClass(name)
-        assertEquals(name2, name)
+    fun getClassIndex(name0: String): Int {
+        val name = replaceClass(name0)
         assertFalse('.' in name)
         if (name in classIndex) return classIndex[name]!!
         assertFalse("[]" in name)
         return if (!name.startsWith("[")) {
             if (lockClasses) throw IllegalStateException("Missing class $name")
-            classIndex.getOrPut(name) {
-                classNamesByIndex.add(name)
-                classIndex.size
+
+            val superClass = replaceClassNullable(hIndex.superClass[name])
+            if (superClass != null && superClass !in classIndex) {
+                // ensure classes are ordered
+                getClassIndex(superClass)
             }
+
+            addClassIndex(name)
         } else classIndex["[]"]!!
+    }
+
+    private fun addClassIndex(name: String): Int {
+        return classIndex.getOrPut(name) {
+            classNamesByIndex.add(name)
+            classIndex.size
+        }
     }
 
     fun getClassIndexOrNull(name: String): Int? {
@@ -217,9 +233,18 @@ object GeneratorIndex {
     }
 
     data class FieldData(val offset: Int, val type: String)
+    data class Gap(val offset: Int, val size: Int)
 
     class ClassOffsets(var offset: Int, private val parentFields: ClassOffsets?) {
+
         val fields = HashMap<String, FieldData>()
+        val fieldGaps = ArrayList<Gap>()
+
+        init {
+            if (parentFields != null) {
+                fieldGaps.addAll(parentFields.fieldGaps)
+            }
+        }
 
         val locked get() = locker != null
         var locker: String? = null
@@ -230,6 +255,50 @@ object GeneratorIndex {
 
         override fun toString(): String {
             return "+$offset, $fields"
+        }
+
+        /**
+         * finds gap and returns the offset for it;
+         * increases class size if necessary
+         * */
+        fun findAndRemoveGap(newFieldSize: Int): Int {
+            if (alignFieldsProperly) {
+                val gap = findGap(newFieldSize)
+                if (gap != null) {
+                    return removeGap(gap, newFieldSize)
+                } else {
+                    val remainder = offset % newFieldSize
+                    if (remainder != 0) {
+                        // align properly
+                        fieldGaps.add(Gap(offset, remainder))
+                        offset += remainder
+                    }
+                }
+            }
+            return findGapUnaligned(newFieldSize)
+        }
+
+        private fun findGapUnaligned(newFieldSize: Int): Int {
+            val fieldOffset = offset
+            offset += newFieldSize
+            return fieldOffset
+        }
+
+        private fun findGap(newFieldSize: Int): Gap? {
+            return fieldGaps
+                .filter { it.size >= newFieldSize }
+                .minByOrNull { it.size }
+        }
+
+        private fun removeGap(gap: Gap, newFieldSize: Int): Int {
+            assertTrue(newFieldSize <= gap.size)
+            assertTrue(fieldGaps.remove(gap))
+            if (newFieldSize < gap.size) {
+                // insert remainder back into list
+                fieldGaps.add(Gap(gap.offset, gap.size - newFieldSize))
+            }
+            // remove at the end of the gap
+            return gap.offset + gap.size - newFieldSize
         }
 
         fun allFields(): Map<String, FieldData> {
@@ -255,6 +324,10 @@ object GeneratorIndex {
             return fields[name] ?: parentFields?.get(name)
         }
 
+        fun getOffset(name: String): Int? {
+            return get(name)?.offset
+        }
+
         fun getOrPut(name: String, put: () -> FieldData): FieldData {
             val prev = get(name)
             if (prev != null) return prev
@@ -267,7 +340,23 @@ object GeneratorIndex {
     val fieldOffsets = HashMap<Int, ClassOffsets>(8192)
     var lockFields = false
 
-    fun getFieldOffsets(clazz: String, static: Boolean): ClassOffsets {
+    fun getInstanceSize(clazz: String): Int {
+        val offsets = getFieldOffsets(clazz, false)
+            .lock("getInstanceSize")
+        var instanceSize = offsets.offset
+        if (alignFieldsProperly) {
+            val maxFieldSize = 8
+            val remainder = instanceSize % maxFieldSize
+            if (remainder > 0) instanceSize += maxFieldSize - remainder
+        }
+        if (clazz == "java/lang/Class") {
+            assertEquals(32, instanceSize)
+        }
+        return instanceSize
+    }
+
+    fun getFieldOffsets(clazz0: String, static: Boolean): ClassOffsets {
+        val clazz = replaceClass(clazz0)
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
         return fieldOffsets.getOrPut(getClassIndex(clazz) * 2 + static.toInt()) {
             if (static) {
@@ -275,7 +364,6 @@ object GeneratorIndex {
             } else {
                 // get parent class offset
                 val parentClass = hIndex.superClass[clazz]
-                if ('.' in (parentClass ?: "")) throw IllegalStateException(parentClass)
                 if (parentClass != null) {
                     val parentOffset = getFieldOffsets(parentClass, false).lock(clazz)
                     ClassOffsets(parentOffset.offset, parentOffset)
@@ -287,17 +375,15 @@ object GeneratorIndex {
     }
 
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {
-        assertTrue(!descriptor.endsWith(';') && descriptor != "I", descriptor)
+        assertTrue(!descriptor.endsWith(';'), descriptor)
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
         if (lockClasses && getClassIndexOrNull(clazz) == null) return null
         val fieldOffsets = getFieldOffsets(clazz, static)
-        return if (lockFields) fieldOffsets.get(name)?.offset else {
+        return if (lockFields) fieldOffsets.getOffset(name) else {
             fieldOffsets.getOrPut(name) {
                 assertFalse(fieldOffsets.locked) { "$clazz has been locked by ${fieldOffsets.locker}" }
-                // todo align fields, and fill them into gaps, where possible
-                // if(static) println("$clazz/$name/$fieldSize")
-                val offset = fieldOffsets.offset
-                fieldOffsets.offset += storageSize(descriptor)
+                val fieldSize = storageSize(descriptor)
+                val offset = fieldOffsets.findAndRemoveGap(fieldSize)
                 FieldData(offset, descriptor)
             }.offset
         }

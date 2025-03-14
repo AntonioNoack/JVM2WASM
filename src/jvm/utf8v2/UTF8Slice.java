@@ -2,8 +2,7 @@ package jvm.utf8v2;
 
 import org.jetbrains.annotations.NotNull;
 
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVMShared.unsafeCast;
 
 public class UTF8Slice implements CharSequence {
 
@@ -45,9 +44,10 @@ public class UTF8Slice implements CharSequence {
         return base.subSequence(start + this.start, end + this.start);
     }
 
+    @NotNull
     @Override
     public String toString() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
 }

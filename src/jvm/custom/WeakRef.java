@@ -6,8 +6,8 @@ import java.lang.ref.ReferenceQueue;
 
 import static jvm.GarbageCollector.lockMallocMutex;
 import static jvm.GarbageCollector.unlockMallocMutex;
+import static jvm.JVM32.getAddr;
 import static jvm.JVM32.getAllocationStart;
-import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 
 @SuppressWarnings("rawtypes")

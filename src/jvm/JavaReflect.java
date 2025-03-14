@@ -19,11 +19,12 @@ import java.util.HashMap;
 
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
-import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
+import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 import static utils.StaticClassIndices.*;
+import static utils.StaticFieldOffsets.*;
 
 public class JavaReflect {
 
@@ -32,10 +33,14 @@ public class JavaReflect {
 
     @NoThrow
     @Nullable
-    @SuppressWarnings("rawtypes")
     @Alias(names = "java_lang_Class_getFields_AW")
-    public static Field[] getFields(Class clazz) {
-        return ptrTo(read32(getAddr(clazz) + objectOverhead + 4));
+    public static Field[] getFields(Class<?> clazz) {
+        return readPtrAtOffset(clazz, OFFSET_CLASS_FIELDS);
+    }
+
+    @Alias(names = "java_lang_Class_getDeclaredFields_AW")
+    public static Field[] Class_getDeclaredFields_AW(Class<?> clazz) {
+        return getFields(clazz);
     }
 
     @SuppressWarnings("rawtypes")
@@ -43,24 +48,22 @@ public class JavaReflect {
     public static Field Class_getField(Class clazz, String name) {
         // using class instance, find fields
         if (clazz == null || name == null) throw new NullPointerException("Class.getField()");
+        Class originalClass = clazz;
         while (true) {
             Field[] fields = getFields(clazz);
-            int length = fields == null ? 0 : fields.length;
             // log("class for fields", getAddr(clazz));
             // log("fields*, length", fields, length);
             // log("looking for field", searchedField);
-            for (int i = 0; i < length; i++) {
-                Field field = fields[i];
+            if (fields != null) for (Field field : fields) {
                 String fieldName = field.getName();
                 // log("field[i]:", fieldName);
                 // log("field[i].offset:", getFieldOffset(field));
                 if (name.equals(fieldName)) return field;
             }
             // use parent class as well, so we need fewer entries in each array
-            Class prevClass = clazz;
             clazz = clazz.getSuperclass();
             if (clazz == null) {
-                log("looked for field, but failed", prevClass.getName(), name);
+                log("looked for field, but failed", originalClass.getName(), name);
                 return null; // not really JVM-conform, but we don't want exception-throwing
             }
         }
@@ -73,13 +76,13 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_getDeclaredMethods_AW")
     public static <V> Method[] Class_getDeclaredMethods(Class<V> clazz) {
-        // should be fine, right?
-        return Class_getMethods(clazz);
+        return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
     }
 
     @Alias(names = "java_lang_Class_getMethods_AW")
     public static <V> Method[] Class_getMethods(Class<V> clazz) {
-        return ptrTo(read32(getAddr(clazz) + objectOverhead + 8));
+        // todo we probably need to join this with our parent's methods
+        return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
     }
 
     @Alias(names = "java_lang_Class_getName0_Ljava_lang_String")
@@ -130,7 +133,7 @@ public class JavaReflect {
     }
 
     public static int getFieldOffset(Field field) {
-        int offset = read32(getAddr(field) + objectOverhead + 9);// hardcoded, could be a global :)
+        int offset = readI32AtOffset(field, OFFSET_FIELD_SLOT);
         if (offset < objectOverhead && !Modifier.isStatic(field.getModifiers()))
             throwJs("Field offset must not be zero");
         return offset;
@@ -334,7 +337,7 @@ public class JavaReflect {
         if (values == null) {
             JavaReflect.classesForName = values = new HashMap<>(numClasses());
             for (int i = 0, l = numClasses(); i < l; i++) {
-                Class<Object> clazz = ptrTo(findClass(i));
+                Class<Object> clazz = findClass(i);
                 values.put(clazz.getName(), clazz);
             }
         }
@@ -432,7 +435,7 @@ public class JavaReflect {
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")
     public static int Object_getClass(int instance) {
-        return findClass2(readClass(instance));
+        return findClassPtr(readClass(instance));
     }
 
     @Alias(names = "java_lang_Object_hashCode_I")
@@ -506,30 +509,28 @@ public class JavaReflect {
                 throwJs("getPrimitiveClass", name);
                 return null;
         }
-        return ptrTo(findClass(classIdx));
+        return findClass(classIdx);
     }
 
     @NoThrow
     public static <V> int getClassIndex(Class<V> clazz) {
         if (clazz == null) return -1;
-        // todo depends on ptrSize
-        return read32(getAddr(clazz) + objectOverhead + 12);
+        return readI32AtOffset(clazz, OFFSET_CLASS_INDEX);
     }
 
     @NoThrow
     @Alias(names = "java_lang_Class_getModifiers_I")
     public static <V> int getClassModifiers(Class<V> clazz) {
         if (clazz == null) return 0;
-        // todo depends on ptrSize
-        return read32(getAddr(clazz) + objectOverhead + 16);
+        return readI32AtOffset(clazz, OFFSET_CLASS_MODIFIERS);
     }
 
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")
-    public static <V> Class<V> Class_getSuperclass_Ljava_lang_Class(Class<V> clazz) {
+    public static Class<Object> Class_getSuperclass_Ljava_lang_Class(Class<?> clazz) {
         int idx = getClassIndex(clazz);
         if (idx <= 0 || idx >= numClasses()) return null;
         int superClassIdx = getSuperClassId(idx);
-        return ptrTo(findClass(superClassIdx));
+        return findClass(superClassIdx);
     }
 
     @NoThrow
@@ -556,17 +557,6 @@ public class JavaReflect {
 
     private static final Object[] empty = new Object[0];
 
-    @Alias(names = "java_lang_Class_getDeclaredFields_AW")
-    public static <V> Object[] java_lang_Class_getDeclaredFields_AW(Class<V> clazz) {
-        // should be ok, I think...
-        // just nobody must modify our fields
-        // todo should not return fields of super class
-        if (clazz == null) throw new NullPointerException("getDeclaredFields");
-        int fields = read32(getAddr(clazz) + objectOverhead + 4);
-        if (fields == 0) return empty;
-        return ptrTo(fields);
-    }
-
     @Alias(names = "java_lang_reflect_Field_getDeclaredAnnotations_AW")
     public static Object[] Field_getDeclaredAnnotations(Field field) {
         // todo implement annotation instances
@@ -590,8 +580,8 @@ public class JavaReflect {
     }
 
     @Alias(names = "kotlin_reflect_jvm_internal_KClassImpl_getSimpleName_Ljava_lang_String")
-    public static <V> String KClassImpl_getSimpleName(ClassBasedDeclarationContainer c) {
-        return c.getJClass().getSimpleName();
+    public static String KClassImpl_getSimpleName(ClassBasedDeclarationContainer c) {
+        return Class_getSimpleName(c.getJClass());
     }
 
     @Alias(names = "kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection")
@@ -602,10 +592,7 @@ public class JavaReflect {
     @NoThrow
     @Alias(names = "java_lang_Class_getSimpleName_Ljava_lang_String")
     public static <V> String Class_getSimpleName(Class<V> c) {
-        String name = c.getName();
-        int i = name.lastIndexOf('.');
-        if (i < 0) return name;
-        else return name.substring(i + 1);
+        return readPtrAtOffset(c, OFFSET_CLASS_SIMPLE_NAME);
     }
 
     @Alias(names = "java_lang_reflect_Field_equals_Ljava_lang_ObjectZ")
@@ -624,7 +611,7 @@ public class JavaReflect {
         }
         int constructorPtr = resolveIndirectByClass(classIndex, 4); // (id+1)<<2, id = 0
         int instance = createInstance(classIndex);
-        log("Creating class instance", classIndex, constructorPtr);
+        // log("Creating class instance", classIndex, constructorPtr);
         // todo it would be good, if we have a value for stackPush/stackPop here
         callConstructor(instance, constructorPtr);
         return ptrTo(instance);
@@ -651,7 +638,7 @@ public class JavaReflect {
         if (instance.getClass() == clazz) return true;
         int classIndex = getClassIndex(clazz);
         if (classIndex >= 0) {
-            return instanceOf(getAddr(instance), classIndex);
+            return instanceOf(instance, classIndex);
         }
         return false;
     }
@@ -712,7 +699,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_privateGetDeclaredMethods_ZAW")
-    public static <V> Method[] java_lang_Class_privateGetDeclaredMethods_ZAW(Class<V> self, boolean sth) {
+    public static <V> Method[] Class_privateGetDeclaredMethods_ZAW(Class<V> self, boolean sth) {
         return Class_getDeclaredMethods(self);
     }
 

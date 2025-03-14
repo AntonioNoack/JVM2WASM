@@ -10,7 +10,7 @@ import me.anno.gpu.texture.Texture2D;
 
 import static engine.Engine.finishTexture;
 import static engine.Engine.prepareTexture;
-import static jvm.JVM32.b2i;
+import static jvm.JVMShared.b2i;
 
 public class TextGen {
 

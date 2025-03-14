@@ -149,8 +149,7 @@ fun wasm2cppFromMemory() {
     wasm2cpp(
         functions, functionTable, imports, globals
             .associateBy { it.name.substring("global_".length) })
-    clock.stop("Transpiling")
-    clock.total("WASM2CPP")
+    clock.stop("WASM2CPP")
 }
 
 fun wasm2cpp(

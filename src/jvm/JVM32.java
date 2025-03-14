@@ -2,16 +2,14 @@ package jvm;
 
 import annotations.*;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-
 import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.*;
-import static jvm.JavaThrowable.Throwable_printStackTrace_V;
 import static jvm.NativeLog.log;
+import static jvm.ThrowJS.throwJs;
+import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 
 @SuppressWarnings("unused")
 public class JVM32 {
@@ -41,14 +39,22 @@ public class JVM32 {
 
     @NoThrow
     @Alias(names = "findClass")
-    public static int findClass(int classIdx) {
-        return findClass2(classIdx);
+    public static Class<Object> findClass(int classIdx) {
+        return ptrTo(findClassPtr(classIdx));
     }
 
     @NoThrow
-    @Alias(names = "findClass2")
-    @WASM(code = "global.get $classSize i32.mul global.get $classInstanceTable i32.add")
-    public static native int findClass2(int idx);
+    @WASM(code = "global.get $classSize")
+    public static native int getClassSize();
+
+    @NoThrow
+    @WASM(code = "global.get $classInstanceTable")
+    public static native int getClassInstanceTable();
+
+    @NoThrow
+    public static int findClassPtr(int idx) {
+        return idx * getClassSize() + getClassInstanceTable();
+    }
 
     @NoThrow
     @Alias(names = "findStatic")
@@ -57,395 +63,26 @@ public class JVM32 {
         return read32(staticInstancesOffset() + (clazz << 2)) + offset;
     }
 
-    // instance, class -> instance, error
-    @Alias(names = "checkCast")
-    public static int checkCast(int instance, int classId) {
-        if (instance == 0) return 0;
-        if (!instanceOf(instance, classId)) {
-            failCastCheck(instance, classId);
-        }
-        return instance;
-    }
-
-    @Alias(names = "checkCastExact")
-    public static int checkCastExact(int instance, int clazz) {
-        if (instance == 0) return 0;
-        if (!instanceOfExact(instance, clazz)) {
-            failCastCheck(instance, clazz);
-        }
-        return instance;
-    }
-
-    private static void failCastCheck(int instance, int clazz) {
-        Class<Object> isClass = ptrTo(findClass(readClass(instance)));
-        Class<Object> checkClass = ptrTo(findClass(clazz));
-        log(isClass.getName(), "is not instance of", checkClass.getName(), instance);
+    static void failCastCheck(Object instance, int clazz) {
+        Class<Object> isClass = findClass(readClass(getAddr(instance)));
+        Class<Object> checkClass = findClass(clazz);
+        log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
         throw new ClassCastException();
     }
 
-    // can be removed in the future, just good for debugging
-    @Alias(names = "debug")
-    @SuppressWarnings("rawtypes")
-    public static void debug(Object instance, boolean staticToo) throws IllegalAccessException {
-        if (instance == null) {
-            log("null");
-        } else {
-            Class clazz = instance.getClass();
-            log("Class", clazz.getName());
-            Field[] fields = clazz.getFields();
-            //noinspection ConstantValue
-            if (fields != null) for (Field f : fields) {
-                if (f == null) continue;
-                if (staticToo || !Modifier.isStatic(f.getModifiers())) {
-                    debugField(instance, staticToo, f);
-                }
-            }
-            if (instance instanceof Object[]) {
-                debugArray(instance);
-            }
-        }
-    }
-
-    public static void debugField(Object instance, boolean staticToo, Field f) throws IllegalAccessException {
-        String name = f.getName();
-        String type = f.getType().getName();
-        switch (type) {
-            case "byte":
-                log(type, name, f.getByte(instance));
-                break;
-            case "short":
-                log(type, name, f.getShort(instance));
-                break;
-            case "char":
-                log(type, name, f.getChar(instance));
-                break;
-            case "int":
-                log(type, name, f.getInt(instance));
-                break;
-            case "long":
-                log(type, name, f.getLong(instance));
-                break;
-            case "float":
-                log(type, name, f.getFloat(instance));
-                break;
-            case "double":
-                log(type, name, f.getDouble(instance));
-                break;
-            case "boolean":
-                log(type, name, f.getBoolean(instance));
-                break;
-            default:
-                Object value = f.get(instance);
-                if (value == null) log(type, name, 0);
-                else if (value instanceof String) log(type, name, getAddr(value), value.toString());
-                else log(type, name, getAddr(value), value.getClass().getName());
-                break;
-        }
-    }
-
-    @NoThrow
-    @JavaScript(code = "let lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
-            "for(let i=0;i<len;i++) arr.push(lib.r32(arg0+arrayOverhead+(i<<2)));\n" +
-            "console.log(arr)")
-    private static native void debugArray(Object instance);
-
-    @NoThrow
-    @WASM(code = "global.get $resolveIndirectTable")
-    public static native int resolveIndirectTable();
-
-    @NoThrow
-    @WASM(code = "global.get $numClasses")
-    public static native int numClasses();
-
-    @Alias(names = "resolveIndirect")
-    public static int resolveIndirect(int instance, int signatureId) {
-        if (instance == 0) {
-            throw new NullPointerException("Instance for resolveIndirect is null");
-        }
-        return resolveIndirectByClass(readClass(instance), signatureId);
-    }
-
     @Alias(names = "resolveIndirectFail")
-    public static void resolveIndirectFail(int instance, String methodName) {
-        throwJs("Resolving non constructable method", instance, methodName);
+    public static void resolveIndirectFail(Object instance, String methodName) {
+        throwJs("Resolving non constructable method", getAddr(instance), methodName);
     }
 
     // todo mark some static fields as not needing <clinit>
     // private static int riLastClass, riLastMethod, riLastImpl;
 
     @NoThrow
-    @WASM(code = "" +
-            "  local.get 0 i32.const 2 i32.shl\n" + // clazz << 2
-            "  global.get $resolveIndirectTable i32.add i32.load\n" + // memory[resolveIndirectTable + clazz << 2]
-            "  local.get 1 i32.add i32.load") // memory[signatureId + memory[resolveIndirectTable + clazz << 2]]
-    private static native int resolveIndirectByClassUnsafe(int clazz, int signatureId);
-
-    @NoThrow
-    public static int resolveIndirectByClass(int clazzIdx, int methodPtr) {
-        // unsafe memory -> from ~8ms/frame to ~6.2ms/frame
-        // log("resolveIndirect", clazz, methodPtr);
-        int x = resolveIndirectByClassUnsafe(clazzIdx, methodPtr);
-        if (x < 0) {
-            Class<Object> class1 = ptrTo(findClass(clazzIdx));
-            log("resolveIndirectByClass", class1.getName());
-            throwJs("classIndex, methodPtr, resolved:", clazzIdx, methodPtr, x);
-        }
-        return x;
-    }
-
-    @NoThrow
-    public static int getDynamicTableSize(int classIdx) {
-        return resolveIndirectByClass(classIdx, 0);
-    }
-
-    @NoThrow
-    @WASM(code = "unreachable")
-    public static native void crash();
-
-    @NoThrow
-    public static void throwJs() {
-        log("Internal VM error!");
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s) {
-        log(s);
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s, int a) {
-        log(s, a);
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s, String a) {
-        log(s, a);
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s, int a, int b) {
-        log(s, a, b);
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s, int a, String b) {
-        log(s, a, b);
-        crash();
-    }
-
-    @NoThrow
-    public static void throwJs(String s, int a, int b, int c) {
-        log(s, a, b, c);
-        crash();
-    }
-
-    @NoThrow
-    @Alias(names = "panic")
-    private static void panic(Throwable throwable) {
-        if (throwable != null) {
-            Throwable_printStackTrace_V(throwable);
-            throwJs();
-        }
-    }
-
-    public static int resolveInterfaceByClass(int clazz, int methodId) {
-        // log("resolve2", clazz, methodId);
-        // log("class:", clazz);
-        validateClassIdx(clazz);
-        int tablePtr = getInheritanceTableEntry(clazz);
-        // log("tablePtr", tablePtr);
-        if (tablePtr == 0) {
-            log("No class table entry was found!", clazz);
-            log("method:", methodId);
-            throwJs("No class table entry was found!");
-        }
-        int numInterfaces = read32(tablePtr + 8);
-        /*log("#interfaces:", numInterfaces);
-        for (int i = 0; i < numInterfaces; i++) {
-            log("interface[i]:", read32(tablePtr + 12 + i * 4));
-        }*/
-        tablePtr += 12 + (numInterfaces << 2); // 12 for super class + instance size + numInterfaces
-        int tableLength = read32(tablePtr);
-        tablePtr += 4; // table length
-
-        int min = 0;
-        int max = tableLength - 1;
-
-        // log("resolveInterface", clazz, methodId, tableLength);
-        int id = max - min < 16 ?
-                searchInterfaceLinear(min, max, methodId, tablePtr, tableLength) :
-                searchInterfaceBinary(min, max, methodId, tablePtr, tableLength);
-
-        if (id == -1) {
-            // return -1 - min
-            reportNotFound(clazz, methodId, tableLength, tablePtr);
-        }
-
-        return id;
-    }
-
-    private static int searchInterfaceBinary(int min, int max, int methodId, int tablePtr, int tableLength) {
-        while (max >= min) {
-            int mid = (min + max) >> 1;
-            int addr = tablePtr + (mid << 3);
-            int cmp = read32(addr) - methodId;
-            if (cmp == 0) {
-                return read32(addr + 4);
-            }
-            if (cmp < 0) {
-                // search right
-                min = mid + 1;
-            } else {
-                // search left
-                max = mid - 1;
-            }
-        }
-        return -1;
-    }
-
-    private static int searchInterfaceLinear(int min, int max, int methodId, int tablePtr, int tableLength) {
-        max = (max << 3) + tablePtr;
-        min = (min << 3) + tablePtr;
-        while (max >= min) {
-            if (read32(min) == methodId) {
-                return read32(min + 4);
-            }
-            min += 8;
-        }
-        return -1;
-    }
-
-    private static void reportNotFound(int clazz, int methodId, int tableLength, int tablePtr) {
-        // return -1 - min
-        log("Method could not be found", clazz);
-        log("  id, length:", methodId, tableLength);
-        for (int i = 0; i < tableLength; i++) {
-            int addr = tablePtr + (i << 3);
-            log("  ", read32(addr), read32(addr + 4));
-        }
-        throwJs("Method could not be found");
-    }
-
-    @Alias(names = "resolveInterface")
-    public static int resolveInterface(int instance, int methodId) {
-        if (instance == 0) {
-            throw new NullPointerException("Instance for resolveInterface is null");
-        } else {
-            return resolveInterfaceByClass(readClass(instance), methodId);
-        }
-    }
-
-    @Export
-    @NoThrow
-    @Alias(names = "instanceOf")
-    public static boolean instanceOf(int instance, int classId) {
-        // log("instanceOf", instance, clazz);
-        if (instance == 0) return false;
-        if (classId == 0) return true;
-        // checkAddress(instance);
-        int testedClass = readClass(instance);
-        return isChildOrSameClass(testedClass, classId);
-    }
-
-
-    @Export
-    @NoThrow
-    @Alias(names = "instanceOfNonInterface")
-    public static boolean instanceOfNonInterface(int instance, int clazz) {
-        // log("instanceOf", instance, clazz);
-        if (instance == 0) return false;
-        if (clazz == 0) return true;
-        // checkAddress(instance);
-        int testedClass = readClass(instance);
-        return isChildOrSameClassNonInterface(testedClass, clazz);
-    }
-
-    @NoThrow
-    @Alias(names = "instanceOfExact")
-    public static boolean instanceOfExact(int instance, int clazz) {
-        return (instance != 0) & (readClass(instance) == clazz);
-    }
-
-    @NoThrow
     private static void checkAddress(int instance) {
         if (ge_ub(instance, getAllocatedSize())) {
             throwJs("Not a valid address!", instance);
         }
-    }
-
-    @NoThrow
-    private static int getInheritanceTableEntry(int classId) {
-        return read32(inheritanceTable() + (classId << 2));
-    }
-
-    @NoThrow
-    private static int getSuperClassIdFromInheritanceTableEntry(int tableAddress) {
-        return read32(tableAddress);
-    }
-
-    @NoThrow
-    public static boolean isChildOrSameClass(int childClassIdx, int parentClassIdx) {
-        while (true) {
-            if (childClassIdx == parentClassIdx) return true;
-            // find super classes in table
-            validateClassIdx(childClassIdx);
-            int tableAddress = getInheritanceTableEntry(childClassIdx);
-            // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
-            if (childClassIdx == 0) return false;
-            // check for interfaces
-            if (isInInterfaceTable(tableAddress, parentClassIdx)) return true;
-            childClassIdx = getSuperClassIdFromInheritanceTableEntry(tableAddress); // switch to parent class
-        }
-    }
-
-    @NoThrow
-    public static boolean isChildOrSameClassNonInterface(int childClassIdx, int parentClassIdx) {
-        while (true) {
-            if (childClassIdx == parentClassIdx) return true;
-            validateClassIdx(childClassIdx);
-            int tableAddress = getInheritanceTableEntry(childClassIdx);
-            // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
-            if (childClassIdx == 0) return false;
-            childClassIdx = read32(tableAddress); // switch to parent class
-        }
-    }
-
-    @NoThrow
-    static void validateClassIdx(int childClassIdx) {
-        if (ge_ub(childClassIdx, numClasses())) {
-            log("class index out of bounds", childClassIdx, numClasses());
-            throwJs();
-        }
-    }
-
-    @NoThrow
-    public static boolean isInInterfaceTable(int tableAddress, int interfaceClassIdx) {
-        // handle interfaces
-        tableAddress += 8; // skip over super class and instance size
-        int length = read32(tableAddress);
-        for (int i = 0; i < length; i++) {
-            tableAddress += 4; // skip to next entry
-            if (read32(tableAddress) == interfaceClassIdx) return true;
-        }
-        return false;
-    }
-
-    @NoThrow
-    public static int getSuperClassId(int classId) {
-        int tableAddress = getInheritanceTableEntry(classId);
-        return getSuperClassIdFromInheritanceTableEntry(tableAddress);
-    }
-
-    @NoThrow
-    public static int getInstanceSize(int classIndex) {
-        // look up class table for size
-        int tableAddress = getInheritanceTableEntry(classIndex);
-        return read32(tableAddress + 4);
     }
 
     @Alias(names = "createInstance")
@@ -482,36 +119,6 @@ public class JVM32 {
         // log("creating array", length);
         return createNativeArray1(length, 1);
     }
-
-    @NoThrow
-    public static int getTypeShiftUnsafe(int clazz) {
-        // 0 1 2 3 4 5 6 7 8 9
-        // 2 2 2 2 0 0 1 1 3 3
-        int flag0 = ge_ui(clazz, 4) & lt(clazz, 6);
-        int flag1 = ge_ui(clazz, 8);
-        return 2 - flag0 - flag0 - ge_ui(clazz, 6) + flag1 + flag1;
-    }
-
-    @NoThrow
-    @WASM(code = "i32.ge_u")
-    private static native int ge_ui(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.ge_u")
-    static native boolean ge_ub(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.lt_u")
-    private static native int lt(int a, int b);
-
-    public static int getTypeShift(int clazz) {
-        if (clazz < 0 || clazz > 9) throw new IllegalArgumentException();
-        return getTypeShiftUnsafe(clazz);
-    }
-
-    @NoThrow
-    @WASM(code = "") // automatically done
-    public static native int b2i(boolean flag);
 
     @Alias(names = "createNativeArray1")
     public static int createNativeArray1(int length, int clazz) {
@@ -888,13 +495,9 @@ public class JVM32 {
     @WASM(code = "i64.trunc_f64_s")
     public static native long _d2l(double v);
 
-    /*@NoThrow
-    @WASM(code = "v128.const i64x2 0 0 v128.store")
-    public static native void clear128(int addr);*/
-
-
     /**
-     * returns the class index for the given instance
+     * returns the class index for the given instance;
+     * preventing inlining, so we can call it from JS
      */
     @NoThrow
     @Alias(names = "readClass")
@@ -909,11 +512,19 @@ public class JVM32 {
     @WASM(code = "i32.load i32.const 16777215 i32.and")
     public static native int readClass(int addr);
 
+    /**
+     * returns the class index for the given instance
+     */
     @NoThrow
-    static void printStackTraceLine(int idx) {
+    public static int readClassI(Object instance) {
+        return readClass(getAddr(instance));
+    }
+
+    @NoThrow
+    static void printStackTraceLine(int index) {
         int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return;
-        int throwableLookup = lookupBasePtr + idx * 12;
+        int throwableLookup = lookupBasePtr + index * 12;
         String className = ptrTo(read32(throwableLookup));
         String methodName = ptrTo(read32(throwableLookup + 4));
         int line = read32(throwableLookup + 8);
@@ -921,18 +532,46 @@ public class JVM32 {
     }
 
     @NoThrow
+    public static int readI32AtOffset(Object instance, int offset) {
+        return read32(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static <V> V readPtrAtOffset(Object instance, int offset) {
+        return ptrTo(readI32AtOffset(instance, offset));
+    }
+
+    @NoThrow
+    public static void writeI32AtOffset(Object instance, int offset, int value) {
+        write32(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static void writePtrAtOffset(Object instance, int offset, Object value) {
+        writeI32AtOffset(instance, offset, getAddr(value));
+    }
+
+    @NoThrow
     @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
     private static native void printStackTraceLine(int depth, String clazz, String method, int line);
 
-    /**
-     * Pseudo-Instance, which can be used to avoid allocations,
-     * when no fields of a type are used; only used for lambdas, because
-     * identity checks might cause trouble otherwise
-     */
     @NoThrow
     @Alias(names = "getClassIndexPtr")
     public static <V> int getClassIndexPtr(int classIndex) {
-        return findClass(classIndex) + objectOverhead + 12;
+        validateClassIdx(classIndex);
+        int addr = findClassPtr(classIndex) + OFFSET_CLASS_INDEX;
+        int actualIndex = read32(addr);
+        // log("getClassIndexPtr", classIndex, addr, actualIndex);
+        if (actualIndex != classIndex) {
+            log("addr = {} * {}", classIndex, getClassSize());
+            log("+ {} + {}", getClassInstanceTable(), OFFSET_CLASS_INDEX);
+            throwJs("Expected {} at {}, got {}", classIndex, addr, actualIndex);
+        }
+        return addr;
     }
+
+    @NoThrow
+    @WASM(code = "") // auto
+    public static native int getAddr(Object obj);
 
 }

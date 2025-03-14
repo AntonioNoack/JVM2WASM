@@ -7,10 +7,12 @@ import java.nio.charset.Charset;
 import java.util.Locale;
 
 import static jvm.JVM32.*;
-import static jvm.JVMShared.*;
-import static jvm.JavaLang.getAddr;
+import static jvm.JVMShared.read32;
+import static jvm.JVMShared.read8;
 import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getClassIndex;
+import static utils.StaticFieldOffsets.OFFSET_STRING_HASH;
+import static utils.StaticFieldOffsets.OFFSET_STRING_VALUE;
 
 public class StringsUTF8 {
 
@@ -258,18 +260,18 @@ public class StringsUTF8 {
 
     @NoThrow
     private static byte[] getValue(String s) {
-        return ptrTo(read32(getAddr(s) + objectOverhead));
+        return readPtrAtOffset(s, OFFSET_STRING_VALUE);
     }
 
+    @NoThrow
     private static void setValue(String s, byte[] value) {
-        write32(getAddr(s) + objectOverhead, getAddr(value));
+        writePtrAtOffset(s, OFFSET_STRING_VALUE, value);
     }
 
     // most critical, will break switch-case statements, if not ascii
     @Alias(names = "java_lang_String_hashCode_I")
     public static int String_hashCode_I(String str) {
-        int hashPtr = getAddr(str) + objectOverhead + 4;
-        int hash = read32(hashPtr);
+        int hash = readI32AtOffset(str, OFFSET_STRING_HASH);
         byte[] chars = getValue(str);
         int startPtr = getAddr(chars) + arrayOverhead;
         int endPtr = startPtr + chars.length;
@@ -278,7 +280,7 @@ public class StringsUTF8 {
                 hash = hash * 31 + (read8(startPtr) & 255);
                 startPtr++;
             }
-            write32(hashPtr, hash);
+            writeI32AtOffset(str, OFFSET_STRING_HASH, hash);
         }
         return hash;
     }
@@ -290,7 +292,10 @@ public class StringsUTF8 {
         return value;
     }
 
-    @Alias(names = "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = {
+            "java_lang_String_toLowerCase_Ljava_util_LocaleLjava_lang_String",
+            "java_lang_String_toLowerCase_Ljvm_custom_LocaleLjava_lang_String"
+    })
     public static String String_toLowerCase(String s, Locale lx) {
         if (s == null) return null;
         byte[] output = null;
@@ -311,7 +316,10 @@ public class StringsUTF8 {
         return newString(output);
     }
 
-    @Alias(names = "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String")
+    @Alias(names = {
+            "java_lang_String_toUpperCase_Ljava_util_LocaleLjava_lang_String",
+            "java_lang_String_toUpperCase_Ljvm_custom_LocaleLjava_lang_String"
+    })
     public static String String_toUpperCase(String s, Locale lx) {
         if (s == null) return null;
         byte[] output = null;

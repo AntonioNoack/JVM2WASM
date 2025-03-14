@@ -1,13 +1,12 @@
 package hierarchy
 
-import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.Opcodes.*
+import utils.CallSignature
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
-import wasm.instr.FuncType
 import wasm.instr.Instruction
 
 object HierarchyIndex {
@@ -22,6 +21,7 @@ object HierarchyIndex {
 
     val methodsByClass = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
+    val methodFlags = HashMap<MethodSig, Int>(cap)
 
     val genericsByClass = HashMap<String, List<GenericSig>>(cap) // name, superType
     val genericSuperTypes = HashMap<String, List<String>>(cap)
@@ -41,7 +41,11 @@ object HierarchyIndex {
 
     val methodAliases = HashMap<String, MethodSig>(cap)
 
-    val implementedMethodSignatures = HashSet<FuncType>()
+    val implementedCallSignatures = HashSet<CallSignature>()
+
+    fun isStatic(method: MethodSig): Boolean {
+        return method in staticMethods
+    }
 
     fun registerMethod(method: MethodSig): Boolean {
         return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)
@@ -56,7 +60,7 @@ object HierarchyIndex {
     }
 
     fun hasAnnotation(sig: MethodSig, clazz: String): Boolean {
-        return getAnnotation(sig,clazz) != null
+        return getAnnotation(sig, clazz) != null
     }
 
     fun getAlias(sig: MethodSig): MethodSig {

@@ -5,7 +5,7 @@ import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.i32
 
 class BinaryI32Instruction(name: String, cppOperator: String, val impl: (Int, Int) -> Int) :
-    BinaryInstruction(name, i32, cppOperator) {
+    BinaryInstruction(name, i32, i32, cppOperator) {
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack
         val i1 = stack.pop() as Int

@@ -10,7 +10,7 @@ import java.lang.reflect.Executable;
 import java.security.AccessControlContext;
 import java.util.Map;
 
-import static jvm.JVM32.resolveInterfaceByClass;
+import static jvm.JVMShared.resolveInterfaceByClass;
 import static jvm.JavaReflect.getClassIndex;
 
 public class JavaLangAccessImpl implements JavaLangAccess {

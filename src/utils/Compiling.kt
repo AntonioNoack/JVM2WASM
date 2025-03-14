@@ -14,6 +14,7 @@ import hierarchy.FirstClassIndexer
 import hierarchy.FirstClassIndexer.Companion.readType
 import implementedMethods
 import jvm.JVM32.*
+import jvm.JVMShared.intSize
 import listEntryPoints
 import listLibrary
 import listSuperClasses
@@ -44,97 +45,6 @@ import java.io.IOException
 
 private val LOGGER = LogManager.getLogger("Compiling")
 
-fun <V> eq(a: V, b: V) {
-    if (a != b) throw IllegalStateException("$a != $b")
-}
-
-fun eq(clazz: String, name: String, descriptor: String, offset: Int) {
-    eq(gIndex.getFieldOffset(clazz, name, descriptor, false), objectOverhead + offset)
-}
-
-/**
- * checks and registers offsets to be what we expect:
- * they might be used elsewhere in the project hardcoded to certain addresses - we should clean that up in the future
- * */
-fun registerDefaultOffsets() {
-
-    val object0 = "java/lang/Object"
-    val string = "java/lang/String"
-    val system = "java/lang/System"
-    val clazz = "java/lang/Class"
-    val field = "java/lang/reflect/Field"
-    val method = "java/lang/reflect/Method"
-    val thread = "java/lang/Thread"
-    val throwable = "java/lang/Throwable"
-    val stackTraceElement = "java/lang/StackTraceElement"
-
-    val executable = "java/lang/reflect/Executable"
-    val constructor = "java/lang/reflect/Constructor"
-    val accessibleObject = "java/lang/reflect/AccessibleObject"
-
-    eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V", false)), 0)
-    eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
-
-    // prepare String properties
-    gIndex.stringClass = gIndex.getClassIndex(replaceClass(string))
-    gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
-
-    eq("[]", "length", "int", 0)
-    eq(replaceClass(string), "value", if (byteStrings) "[B" else "[C", 0)
-    eq(replaceClass(string), "hash", "int", ptrSize)
-
-    hIndex.registerSuperClass(field, accessibleObject)
-    hIndex.registerSuperClass(executable, accessibleObject)
-    hIndex.registerSuperClass(constructor, executable)
-    hIndex.registerSuperClass(method, executable)
-
-    gIndex.getFieldOffset(system, "in", "java/io/InputStream", true)
-    gIndex.getFieldOffset(system, "out", "java/io/PrintStream", true)
-    gIndex.getFieldOffset(system, "err", "java/io/PrintStream", true)
-    eq(throwable, "detailMessage", string, 0)
-    eq(throwable, "stackTrace", "[$stackTraceElement", ptrSize)
-
-    gIndex.getFieldOffset(stackTraceElement, "declaringClass", string, false)
-    gIndex.getFieldOffset(stackTraceElement, "methodName", string, false)
-    gIndex.getFieldOffset(stackTraceElement, "fileName", string, false)
-    gIndex.getFieldOffset(stackTraceElement, "lineNumber", "int", false)
-
-    eq(clazz, "name", string, 0)
-    eq(clazz, "fields", "[$field", ptrSize)
-    eq(clazz, "methods", "[$method", ptrSize * 2)
-    eq(clazz, "index", "int", ptrSize * 3)
-    eq(clazz, "modifiers", "int", ptrSize * 3 + 4)
-
-    // remove securityCheckCache and override, we don't need them
-    val accessibleObjectOverhead = 0
-    eq(field, "name", string, accessibleObjectOverhead)
-    eq(field, "slot", "int", ptrSize + accessibleObjectOverhead)
-    eq(field, "type", clazz, ptrSize + 4 + accessibleObjectOverhead)
-    eq(field, "modifiers", "int", 2 * ptrSize + 4 + accessibleObjectOverhead)
-    eq(field, "clazz", clazz, 2 * ptrSize + 2 * 4 + accessibleObjectOverhead)
-
-    eq(method, "name", string, accessibleObjectOverhead)
-    eq(method, "slot", "int", ptrSize + accessibleObjectOverhead)
-    eq(method, "returnType", clazz, ptrSize + 4 + accessibleObjectOverhead)
-    eq(method, "parameterTypes", "[$clazz", ptrSize * 2 + 4 + accessibleObjectOverhead)
-    eq(method, "callSignature", string, ptrSize * 3 + 4 + accessibleObjectOverhead)
-
-    // for sun/misc
-    gIndex.getFieldOffset(thread, "threadLocalRandomSeed", "long", false)
-    gIndex.getFieldOffset(thread, "threadLocalRandomSecondarySeed", "long", false)
-    gIndex.getFieldOffset(thread, "threadLocalRandomProbe", "int", false)
-
-    gIndex.getFieldOffset(clazz, "enumConstants", "[]", false)
-
-    // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
-    hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "int", true)] = objectOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "int", true)] = arrayOverhead
-    hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "boolean", true)] = trackAllocations
-
-    eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V")), 0)
-    gIndex.getFieldOffset(constructor, "clazz", clazz, false)
-
-}
 
 fun indexHierarchyFromEntryPoints() {
     listEntryPoints { clazz ->
@@ -307,13 +217,15 @@ fun resolveGenericTypes() {
                         assertNotEquals(sig2, implMethod)
                         hIndex.setAlias(sig2, implMethod)
                     } else {
-                        LOGGER.info("Missing mapping for $method") // twice, so it doesn't get mixed
-                        LOGGER.info("  class: $clazz")
-                        LOGGER.info("  generics: $genericsMap")
-                        LOGGER.info("  superType: $superType")
-                        LOGGER.info("  params: $params")
-                        LOGGER.info("  candidates: $candidates")
-                        LOGGER.info("  newDesc: $newDesc")
+                        LOGGER.warn(
+                            "Missing mapping for $method\n" +
+                                    "  class: $clazz\n" +
+                                    "  generics: $genericsMap\n" +
+                                    "  superType: $superType\n" +
+                                    "  params: $params\n" +
+                                    "  candidates: $candidates\n" +
+                                    "  newDesc: $newDesc"
+                        )
                     }
                 }
             }
@@ -861,6 +773,7 @@ val helperFunctions = HashMap<String, FunctionImpl>()
 
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
     LOGGER.info("[printMethodImplementations]")
+    val notActuallyUsed = ArrayList<String>()
     for ((sig, impl) in gIndex.translatedMethods
         .entries.sortedBy { it.value.funcName }) {
         val name = methodName(sig)
@@ -870,8 +783,11 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
         } else if (!name.startsWith("new_") && !name.startsWith("static_") &&
             sig !in hIndex.getterMethods && sig !in hIndex.setterMethods
         ) {
-            LOGGER.warn("Not actually used: $name")
+            notActuallyUsed.add(name)
         }// else we don't care we didn't use it
+    }
+    if (notActuallyUsed.isNotEmpty()) {
+        LOGGER.warn("Not actually used, #${notActuallyUsed.size}: ${notActuallyUsed.joinToString(", ")}")
     }
     for (impl in helperFunctions
         .values.sortedBy { it.funcName }) {

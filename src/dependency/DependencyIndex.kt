@@ -11,6 +11,7 @@ import org.apache.logging.log4j.LogManager
 import resolvedMethods
 import utils.*
 import utils.MethodResolver.resolveMethod
+import utils.PrintUsed.printUsed
 
 object DependencyIndex {
 

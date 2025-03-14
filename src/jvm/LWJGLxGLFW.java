@@ -9,7 +9,7 @@ import java.nio.Buffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
-import static jvm.JavaLang.getAddr;
+import static jvm.JVM32.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
 

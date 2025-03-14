@@ -3,7 +3,7 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 
-import static jvm.JVM32.throwJs;
+import static jvm.ThrowJS.throwJs;
 
 public class SunMisc {
 

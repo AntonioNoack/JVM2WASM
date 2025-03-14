@@ -11,11 +11,10 @@ import static jvm.GCGapFinder.findLargestGaps;
 import static jvm.GCGapFinder.insertGapMaybe;
 import static jvm.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
-import static jvm.JVMShared.read32;
-import static jvm.JVMShared.write32;
+import static jvm.JVMShared.*;
 import static jvm.JVMValues.failedToAllocateMemory;
 import static jvm.JVMValues.reachedMemoryLimit;
-import static jvm.JavaLang.getAddr;
+import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
 
 public class GarbageCollector {
@@ -128,7 +127,7 @@ public class GarbageCollector {
     @NoThrow
     private static void mergeGaps() {
         for (int gap : largestGapsTmp) {
-            if (instanceOf(gap, BYTE_ARRAY_CLASS)) {
+            if (instanceOf(ptrTo(gap), BYTE_ARRAY_CLASS)) {
                 int available = arrayLength(gap) + arrayOverhead;
                 insertGapMaybe(gap, available, largestGaps);
             }
@@ -138,7 +137,7 @@ public class GarbageCollector {
     @NoThrow
     private static boolean hasGaps() {
         for (int gap : largestGaps) {
-            if (instanceOf(gap, BYTE_ARRAY_CLASS)) {
+            if (instanceOf(ptrTo(gap), BYTE_ARRAY_CLASS)) {
                 return true;
             }
         }

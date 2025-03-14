@@ -8,8 +8,8 @@ object PrintStackTraceLine : Instruction {
     override fun execute(engine: WASMEngine): String? {
         // depth, class, method, line
         val line = engine.pop() as Int
-        val method = engine.str(engine.pop().toInt())
-        val clazz = engine.str(engine.pop().toInt())
+        val method = engine.readString(engine.pop())
+        val clazz = engine.readString(engine.pop())
         val depth = engine.pop() as Int
         println("${++ctr}:${"  ".repeat(depth)}$clazz.$method:$line")
         return null

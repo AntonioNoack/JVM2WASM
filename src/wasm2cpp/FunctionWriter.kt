@@ -523,26 +523,6 @@ class FunctionWriter(
                 val i0 = pop(i.popType)
                 beginNew(i.pushType).append(i.prefix).append(i0).append(i.suffix).end()
             }
-            is BinaryInstruction -> binaryInstr(
-                i.type, i.type, i.type, k, assignments, false
-            ) { i0, i1, dst ->
-                if (i.cppOperator.endsWith("(")) {
-                    if (i.cppOperator.startsWith("std::rot")) {
-                        dst.append(i.cppOperator)
-                            .append(if (i.type == i32) "(u32) " else "(u64) ") // cast to unsigned required
-                            .append(i0.expr).append(", ").append(i1.expr).append(')')
-                    } else {
-                        dst.append(i.cppOperator) // call(i1, i0)
-                            .append(i0.expr).append(", ").append(i1.expr).append(')')
-                    }
-                } else {
-                    if (canAppendWithoutBrackets(i0.expr, i.cppOperator, true)) dst.append(i0.expr)
-                    else dst.appendExpr(i0)
-                    dst.append(' ').append(i.cppOperator).append(' ')
-                    if (canAppendWithoutBrackets(i1.expr, i.cppOperator, false)) dst.append(i1.expr)
-                    else dst.appendExpr(i1)
-                }
-            }
             is CompareInstr -> {
                 binaryInstr(i.type, i.type, i32, k, assignments, true) { i0, i1, dst ->
                     // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
@@ -561,6 +541,26 @@ class FunctionWriter(
                         if (canAppendWithoutBrackets(i1.expr, i.operator, false)) dst.append(i1.expr)
                         else dst.appendExpr(i1)
                     }
+                }
+            }
+            is BinaryInstruction -> binaryInstr(
+                i.popType, i.popType, i.pushType, k, assignments, false
+            ) { i0, i1, dst ->
+                if (i.cppOperator.endsWith("(")) {
+                    if (i.cppOperator.startsWith("std::rot")) {
+                        dst.append(i.cppOperator)
+                            .append(if (i.popType == i32) "(u32) " else "(u64) ") // cast to unsigned required
+                            .append(i0.expr).append(", ").append(i1.expr).append(')')
+                    } else {
+                        dst.append(i.cppOperator) // call(i1, i0)
+                            .append(i0.expr).append(", ").append(i1.expr).append(')')
+                    }
+                } else {
+                    if (canAppendWithoutBrackets(i0.expr, i.cppOperator, true)) dst.append(i0.expr)
+                    else dst.appendExpr(i0)
+                    dst.append(' ').append(i.cppOperator).append(' ')
+                    if (canAppendWithoutBrackets(i1.expr, i.cppOperator, false)) dst.append(i1.expr)
+                    else dst.appendExpr(i1)
                 }
             }
             is IfBranch -> {

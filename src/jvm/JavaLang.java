@@ -17,6 +17,7 @@ import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
+import static jvm.ThrowJS.throwJs;
 
 @SuppressWarnings("unused")
 public class JavaLang {
@@ -251,10 +252,6 @@ public class JavaLang {
     }
 
     @NoThrow
-    @WASM(code = "") // auto
-    public static native int getAddr(Object obj);
-
-    @NoThrow
     public static void copyForwards(int src, int dst, int length) {
         int endPtr = dst + length;
         int end8 = endPtr - 7;
@@ -349,7 +346,7 @@ public class JavaLang {
     }
 
     @NoThrow
-    @Alias(names = "java_lang_System_registerNatives_V")
+    @Alias(names = {"java_lang_System_registerNatives_V", "java_lang_Object_registerNatives_V"})
     public static void registerNatives() {
     }
 
@@ -764,6 +761,11 @@ public class JavaLang {
     public static int PlatformThreadLocalRandom_nextInt_III(Object self, int min, int maxExcl) {
         return PlatformThreadLocalRandom_getImplRandom(null)
                 .nextInt(maxExcl - min) + min;
+    }
+
+    @Alias(names = "static_kotlin_internal_jdk8_JDK8PlatformImplementationsXReflectSdkVersion_V")
+    public static void JDK8PlatformImplementationsXReflectSdkVersion_V() {
+        // uses reflection with throwables -> nah, we don't want that
     }
 
     @NoThrow

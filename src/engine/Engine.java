@@ -55,10 +55,13 @@ import java.util.Objects;
 import static engine.GFXBase2Kt.renderFrame2;
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
+import static jvm.JVMShared.getTypeShift;
+import static jvm.JVMShared.numClasses;
 import static jvm.JavaLang.Object_toString;
 import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
+import static jvm.ThrowJS.throwJs;
 
 @SuppressWarnings("unused")
 public class Engine {
@@ -82,17 +85,15 @@ public class Engine {
     @JavaScript(code = "return 1;")
     public static native boolean runsInBrowser();
 
-    static {
-        if (!runsInBrowser()) {
-            OS.isWeb = false;
-            OS.isLinux = true;
-        }
-    }
-
     @Export
     @NoThrow
     @SuppressWarnings("ConfusingMainMethod")
     public static void main(String clazzName) {
+
+        if (!runsInBrowser()) {
+            OS.isWeb = false;
+            OS.isLinux = true;
+        }
 
         // Build.setShipped(true);
 

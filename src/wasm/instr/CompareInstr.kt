@@ -1,7 +1,10 @@
 package wasm.instr
 
-abstract class CompareInstr(name: String, val operator: String, val type: String, val castType: String?) :
-    SimpleInstr(name) {
+import utils.WASMTypes.i32
+
+abstract class CompareInstr(
+    name: String, val operator: String, val type: String, val castType: String?
+) : BinaryInstruction(name, type, i32, operator) {
 
     val impl = comparators[operator]!!
 

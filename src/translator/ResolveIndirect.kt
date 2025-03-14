@@ -43,11 +43,7 @@ object ResolveIndirect {
 
     private fun Builder.fixThrowable(calledCanThrow: Boolean, sigJ: MethodSig) {
         if (calledCanThrow != canThrowError(sigJ)) {
-            if (calledCanThrow) {
-                append(i32Const0)
-            } else {
-                append(Call.panic)
-            }
+            append( if (calledCanThrow) i32Const0 else Call.panic)
         }
     }
 
@@ -122,6 +118,11 @@ object ResolveIndirect {
             clazz to resolveMethod(sig0.withClass(clazz), true)!!
         }
 
+        if (allChildren.isEmpty()) {
+            // not constructable
+            return null
+        }
+
         val groupedByClass = allChildren
             .groupBy { it.second }
             .map { (impl, classes) ->
@@ -131,6 +132,7 @@ object ResolveIndirect {
         if (groupedByClass.isEmpty()) {
             // printUsed(sig0)
             LOGGER.warn("$sig0 has no implementations? By $sig, children: $allChildren")
+            // else ignore warning, because we don't support annotation classes yet
             return null
         }
         return groupedByClass

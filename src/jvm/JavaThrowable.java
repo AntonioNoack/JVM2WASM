@@ -8,6 +8,7 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaLang.*;
 import static jvm.NativeLog.log;
+import static utils.StaticFieldOffsets.*;
 
 public class JavaThrowable {
 
@@ -54,6 +55,14 @@ public class JavaThrowable {
 
     private static boolean insideFIST = false;
 
+    private static StackTraceElement[] getStackTrace(Throwable th) {
+        return readPtrAtOffset(th, OFFSET_THROWABLE_STACKTRACE);
+    }
+
+    private static void setStackTrace(Throwable th, StackTraceElement[] value) {
+        writePtrAtOffset(th, OFFSET_THROWABLE_STACKTRACE, value);
+    }
+
     @NoThrow
     public static Throwable Throwable_fillInStackTraceI(Throwable th) throws NoSuchFieldException, IllegalAccessException {
 
@@ -96,8 +105,9 @@ public class JavaThrowable {
 
         criticalAlloc = true;
 
-        StackTraceElement[] array0 = th != null ? ptrTo(read32(getAddr(th) + objectOverhead + 4)) : null;
-        StackTraceElement[] array1 = array0 != null && array0.length == stackLength ? array0 : new StackTraceElement[stackLength];
+        StackTraceElement[] array0 = th != null ? getStackTrace(th) : null;
+        StackTraceElement[] array1 = array0 != null && array0.length == stackLength ?
+                array0 : new StackTraceElement[stackLength];
         /*if (array1 == null) {
             // how? branch generation was broken
             throwJs("Array1 is null somehow...", getAddr(array0), getAddr(array1), stackLength);
@@ -105,7 +115,7 @@ public class JavaThrowable {
             return th;
         }*/
         // assign stackTrace; detailMessage, then stackTrace -> 4 offset
-        if (th != null) write32(getAddr(th) + objectOverhead + 4, getAddr(array1));
+        if (th != null) setStackTrace(th, array1);
 
         for (int i = 0; i < stackLength; i++) {
             int stackData = read32(sp);
@@ -133,7 +143,6 @@ public class JavaThrowable {
     }
 
     @NoThrow
-    @SuppressWarnings("JavaReflectionMemberAccess")
     private static void fillInElement(String className, String methodName, int line, StackTraceElement[] array1, int i) throws NoSuchFieldException, IllegalAccessException {
         // log("Fill In Element", className, methodName);
         // log("Fill In Element", line, getAddr(array1), i);
@@ -143,11 +152,10 @@ public class JavaThrowable {
             array1[i] = new StackTraceElement(className, methodName, className, line);
         } else {
             // if element was already defined, reuse it :)
-            Class<StackTraceElement> clazz = StackTraceElement.class;
-            if (!className.equals(element.getClassName())) clazz.getField("declaringClass").set(element, className);
-            if (!methodName.equals(element.getMethodName())) clazz.getField("methodName").set(element, methodName);
-            if (!className.equals(element.getFileName())) clazz.getField("fileName").set(element, className);
-            if (element.getLineNumber() != line) clazz.getField("lineNumber").setInt(element, line);
+            writePtrAtOffset(element, OFFSET_STE_CLASS, className);
+            writePtrAtOffset(element, OFFSET_STE_METHOD, methodName);
+            writePtrAtOffset(element, OFFSET_STE_FILE, className);
+            writeI32AtOffset(element, OFFSET_STE_LINE, line);
         }
     }
 

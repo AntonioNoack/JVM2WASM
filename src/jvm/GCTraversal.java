@@ -11,11 +11,11 @@ import static jvm.GarbageCollector.GC_OFFSET;
 import static jvm.GarbageCollector.iteration;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
-import static jvm.JavaLang.getAddr;
 import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.JavaReflect.getFields;
 import static jvm.NativeLog.log;
+import static utils.StaticClassIndices.OBJECT_ARRAY;
 
 /**
  * "Mark" of mark-and-sweep
@@ -49,8 +49,8 @@ public class GCTraversal {
             if (state != iter) {
                 write8(statePtr, iter);
                 int clazz = readClass(instance);
-                if (clazz == 1) {
-                    traverseObjectArray(instance);
+                if (clazz == OBJECT_ARRAY) {
+                    traverseObjectArray(ptrTo(instance));
                 } else {
                     traverseInstance(instance, clazz);
                 }
@@ -59,27 +59,18 @@ public class GCTraversal {
     }
 
     @NoThrow
-    private static void traverseObjectArray(int instance) {
-        int length = arrayLength(instance);
-        int ptr = instance + arrayOverhead;
-        int endPtr = ptr + (length << 2);
-        while (unsignedLessThan(ptr, endPtr)) {
-            traverse(read32(ptr));
-            ptr += 4;
+    private static void traverseObjectArray(Object[] array) {
+        for (Object instance : array) {
+            traverse(getAddr(instance));
         }
     }
 
     @NoThrow
     private static void traverseInstance(int instance, int clazz) {
-        int fields = read32(getAddr(fieldOffsetsByClass) + arrayOverhead + (clazz << 2));// fieldsByClass[clazz]
-        if (fields == 0) return; // no fields to process
-        int size = arrayLength(fields);
-        fields += arrayOverhead;
-        int endPtr = fields + (size << 2);
-        while (fields < endPtr) {
-            int offset = read32(fields);
+        int[] fields = fieldOffsetsByClass[clazz];
+        if (fields == null) return;
+        for (int offset : fields) {
             traverse(read32(instance + offset));
-            fields += 4;
         }
     }
 
@@ -148,15 +139,15 @@ public class GCTraversal {
         int[] classSizes = GCTraversal.classSizes = new int[numClasses];
         int staticFieldCtr = 0;
         for (int classIdx = 0; classIdx < numClasses; classIdx++) {
-            classSizes[classIdx] = JVM32.getInstanceSize(classIdx);
-            Class<Object> clazz = ptrTo(findClass(classIdx));
+            classSizes[classIdx] = JVMShared.getInstanceSize(classIdx);
+            Class<Object> clazz = findClass(classIdx);
             staticFieldCtr += findFieldsByClass(clazz, classIdx);
         }
         int ctr = 0;
         int[] staticFields = GCTraversal.staticFields = new int[staticFieldCtr];
         // log("Counted {} static fields", staticFieldCtr);
         for (int i = 0; i < numClasses; i++) {
-            Class<Object> clazz = ptrTo(findClass(i));
+            Class<Object> clazz = findClass(i);
             Field[] fields = getFields(clazz);
             if (fields == null) continue;
             // count fields

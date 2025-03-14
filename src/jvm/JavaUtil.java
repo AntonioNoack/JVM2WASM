@@ -12,24 +12,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.TimeZone;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.ToIntFunction;
 
 import static jvm.JVM32.*;
-import static jvm.JVMShared.read32;
-import static jvm.JVMShared.write32;
-import static jvm.JavaLang.getAddr;
+import static jvm.JVMShared.*;
 import static jvm.JavaLang.toFixed;
 
 public class JavaUtil {
-
-    @Alias(names = "java_util_concurrent_atomic_AtomicInteger_getAndAdd_II")
-    public static int java_util_concurrent_atomic_AtomicInteger_getAndAdd_II(AtomicInteger v, int added) {
-        int value = read32(getAddr(v) + objectOverhead) + added;
-        write32(getAddr(v) + objectOverhead, value);
-        return value;
-    }
 
     @Alias(names = "java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone")
     public static TimeZone java_util_TimeZone_setDefaultZone_Ljava_util_TimeZone() {
@@ -90,7 +80,10 @@ public class JavaUtil {
         return String_format(null, format, args);
     }
 
-    @Alias(names = "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringAWLjava_lang_String")
+    @Alias(names = {
+            "java_lang_String_format_Ljava_util_LocaleLjava_lang_StringAWLjava_lang_String",
+            "java_lang_String_format_Ljvm_custom_LocaleLjava_lang_StringAWLjava_lang_String"
+    })
     public static String String_format(Locale locale, String format, Object[] args) {
         int idx = 0;
         StringBuilder result = new StringBuilder(format.length());

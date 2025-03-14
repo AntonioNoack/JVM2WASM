@@ -4,7 +4,9 @@ import annotations.Alias;
 
 import java.lang.reflect.Method;
 
+import static jvm.JVM32.readPtrAtOffset;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static utils.StaticFieldOffsets.OFFSET_METHOD_CALL_SIGNATURE;
 
 /**
  * Implements java.lang.reflect.Method.invoke, which is quite a complicated process
@@ -105,15 +107,12 @@ public class JavaReflectMethod {
                 invokeIV(castToIntLike(arg0), methodId);
                 return null;
             case "JV":
-                //noinspection DataFlowIssue
                 invokeJV((long) arg0, methodId);
                 return null;
             case "FV":
-                //noinspection DataFlowIssue
                 invokeFV((float) arg0, methodId);
                 return null;
             case "DV":
-                //noinspection DataFlowIssue
                 invokeDV((double) arg0, methodId);
                 return null;
             // setters
@@ -124,15 +123,12 @@ public class JavaReflectMethod {
                 invokeTIV(arg0, castToIntLike(arg1), methodId);
                 return null;
             case "TJV":
-                //noinspection DataFlowIssue
                 invokeTJV(arg0, (long) arg1, methodId);
                 return null;
             case "TFV":
-                //noinspection DataFlowIssue
                 invokeTFV(arg0, (float) arg1, methodId);
                 return null;
             case "TDV":
-                //noinspection DataFlowIssue
                 invokeTDV(arg0, (double) arg1, methodId);
                 return null;
             default:
@@ -218,12 +214,8 @@ public class JavaReflectMethod {
 
     private static native void invokeTDV(Object arg0, double arg1, int methodId);
 
-    private static String getSignature(Method self) throws NoSuchFieldException, IllegalAccessException {
-        return (String) self.getClass().getDeclaredField("signature").get(self);
-    }
-
-    private static String getCallSignature(Method self) throws NoSuchFieldException, IllegalAccessException {
-        return (String) self.getClass().getDeclaredField("callSignature").get(self);
+    private static String getCallSignature(Method self) {
+        return readPtrAtOffset(self, OFFSET_METHOD_CALL_SIGNATURE);
     }
 
 }

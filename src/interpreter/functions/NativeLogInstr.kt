@@ -11,7 +11,7 @@ class NativeLogInstr(val types: String) : Instruction {
             if (i > 0) builder.append(", ")
             val value = engine.getParam(i)
             if (types[i] == '?') {
-                builder.append(engine.str(value.toInt()))
+                builder.append(engine.readString(value))
             } else {
                 builder.append(value)
             }

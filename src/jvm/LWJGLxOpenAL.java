@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
 import java.util.function.IntFunction;
 
-import static jvm.JavaLang.getAddr;
+import static jvm.JVM32.getAddr;
 import static jvm.JavaLang.ptrTo;
 
 public class LWJGLxOpenAL {

@@ -10,4 +10,8 @@ public class Locale {
     public static Locale getDefault(Object category) {
         return INSTANCE;
     }
+
+    public String getLanguage() {
+        return "US";
+    }
 }

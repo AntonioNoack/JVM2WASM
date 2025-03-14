@@ -1,10 +1,12 @@
 package utils
 
+import dIndex
 import gIndex
 import hIndex
-import jvm.JVM32.arrayOverhead
-import jvm.JVM32.objectOverhead
+import jvm.JVM32.*
+import jvm.JVMShared.intSize
 import me.anno.io.Streams.writeLE32
+import me.anno.io.Streams.writeLE64
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
@@ -17,6 +19,10 @@ import resources
 import translator.GeneratorIndex
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
+import utils.StaticClassIndices.BYTE_ARRAY
+import utils.StaticClassIndices.OBJECT_ARRAY
+import utils.StaticFieldOffsets.OFFSET_CLASS_METHODS
+import utils.StaticFieldOffsets.OFFSET_METHOD_SLOT
 import wasm.parser.DataSection
 import java.io.OutputStream
 import kotlin.math.abs
@@ -24,19 +30,23 @@ import kotlin.math.abs
 private val LOGGER = LogManager.getLogger("WATAppender")
 
 fun OutputStream.writeClass(clazz: Int) {
-    if (clazz < 0 || clazz > 0xffffff) throw IllegalArgumentException()
+    assertTrue(clazz in 0 until gIndex.classIndex.size)
+    assertTrue(clazz < 0xffffff) // else there is GC issues
     writeLE32(clazz) // class
-    for (i in 4 until objectOverhead) write(0)
+    fill(4, objectOverhead)
+}
+
+fun OutputStream.writePointer(value: Int) {
+    if (is32Bits) writeLE32(value)
+    else writeLE64(value.toLong())
+}
+
+fun OutputStream.fill(from: Int, to: Int) {
+    assertTrue(from <= to)
+    for (i in from until to) write(0)
 }
 
 data class FieldEntry(val name: String, val field: GeneratorIndex.FieldData, val modifiers: Int)
-
-fun OutputStream.writeEmptyClass(clazzIndex: Int, classSize: Int) {
-    writeClass(clazzIndex)
-    for (j in objectOverhead until classSize) { // nulls for the start
-        write(0)
-    }
-}
 
 /**
  * returns whether a type is native;
@@ -48,48 +58,46 @@ fun isNativeType(type: String) = when (type) {
     else -> false
 }
 
-/**
- * insert all name pointers
- * */
-private fun fillInClassNames(
-    numClasses: Int, classData: ByteArrayOutputStream2,
-    classSize: Int, nameOffset: Int, indexStartPtr: Int
-) {
+private fun fillInClassNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
         val name = gIndex.classNamesByIndex[clazz].replace('/', '.') // getName() returns name with dots
-        val strPtr = gIndex.getString(name, indexStartPtr + classData.size(), classData)
-        val dstPtr = clazz * classSize + nameOffset
+        val strPtr = gIndex.getString(name, classInstanceTablePtr + classData.size(), classData)
         val pos = classData.position
-        classData.position = dstPtr
-        classData.writeLE32(strPtr)
+        classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_NAME
+        classData.writePointer(strPtr)
         classData.position = pos
     }
 }
 
-private fun fillInClassIndices(
-    numClasses: Int, classData: ByteArrayOutputStream2,
-    classSize: Int, indexOffset: Int
-) {
+private fun fillInClassSimpleNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val dstPtr = clazz * classSize + indexOffset
+        val fullName = gIndex.classNamesByIndex[clazz]
+        val simpleName = fullName.split('/', '.').last()
+        val strPtr = gIndex.getString(simpleName, classInstanceTablePtr + classData.size(), classData)
         val pos = classData.position
-        classData.position = dstPtr
-        classData.writeLE32(clazz)
+        classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_SIMPLE_NAME
+        classData.writePointer(strPtr)
         classData.position = pos
     }
 }
 
-private fun fillInClassModifiers(
-    numClasses: Int, classData: ByteArrayOutputStream2,
-    classSize: Int, modifierOffset: Int
-) {
+private fun fillInClassIndices(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
+    for (classIndex in 0 until numClasses) {
+        val pos = classData.position
+        classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_INDEX
+        classData.writeLE32(classIndex)
+        classData.position = pos
+    }
+}
+
+private fun fillInClassModifiers(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val dstPtr = clazz * classSize + modifierOffset
+        val dstPtr = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_MODIFIERS
         val pos = classData.position
         val className = gIndex.classNamesByIndex[clazz]
         val modifiers = hIndex.classFlags[className] ?: 0
         classData.position = dstPtr
-        classData.writeLE32(modifiers)
+        classData.writePointer(modifiers)
         classData.position = pos
     }
 }
@@ -97,18 +105,18 @@ private fun fillInClassModifiers(
 private fun fillInFields(
     numClasses: Int, classData: ByteArrayOutputStream2,
     classSize: Int, indexStartPtr: Int,
-    fieldsOffset: Int,
 ) {
-    val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
-    val fieldCache = HashMap<FieldEntry, Int>()
-    val fieldOffsets0 = gIndex.getFieldOffsets("java/lang/reflect/Field", false)
-    val fieldNameOffset = fieldOffsets0.get("name")!!.offset
-    val fieldSize = fieldOffsets0.offset
-    for (clazz in 0 until numClasses) {
 
-        val className = gIndex.classNamesByIndex[clazz]
-        val classPtr = indexStartPtr + clazz * classSize
-        // if (className !in dIndex.constructableClasses) continue
+    val emptyFieldPtr = indexStartPtr + classData.position
+    classData.writeClass(OBJECT_ARRAY)
+    classData.writeLE32(0)
+
+    val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
+    val fieldSize = gIndex.getInstanceSize("java/lang/reflect/Field")
+    val fieldCache = HashMap<FieldEntry, Int>()
+    for (classIndex in 0 until numClasses) {
+
+        val className = gIndex.classNamesByIndex[classIndex]
 
         val instanceModifier = 0
         val staticModifier = ACC_STATIC
@@ -132,7 +140,10 @@ private fun fillInFields(
             }
 
         if (allFields.isEmpty()) {
-            // let the field-array pointer be null
+            val pos = classData.position
+            classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
+            classData.writePointer(emptyFieldPtr)
+            classData.position = pos
             continue
         }
 
@@ -141,30 +152,29 @@ private fun fillInFields(
             fieldCache.getOrPut(field) {
                 appendFieldInstance(
                     field, indexStartPtr, classData,
-                    fieldClassIndex, fieldNameOffset, classSize, classPtr, fieldSize
+                    classIndex, fieldClassIndex,
+                    classSize, fieldSize
                 )
             }
         }
 
-        if (clazz < 10) {
+        if (classIndex < 10) {
             LOGGER.info(
-                "Fields for $clazz [${indexStartPtr + clazz * classSize}]: $className -> $allFields, " +
+                "Fields for $classIndex [${indexStartPtr + classIndex * classSize}]: $className -> $allFields, " +
                         allFields.joinToString { "${gIndex.getString(it.name)}" })
-        } else if (clazz == 10 && numClasses > 11) LOGGER.info("...")
+        } else if (classIndex == 10 && numClasses > 11) LOGGER.info("...")
 
         // create new fields array
         val arrayPtr = indexStartPtr + classData.size()
-        classData.writeClass(1) // object array
+        classData.writeClass(OBJECT_ARRAY) // object array
         classData.writeLE32(allFields.size) // array length
-
         for (fieldPtr in fieldPointers) {
-            classData.writeLE32(fieldPtr)
+            classData.writePointer(fieldPtr)
         }
 
-        val dstPtr = clazz * classSize + fieldsOffset
         val pos = classData.position
-        classData.position = dstPtr
-        classData.writeLE32(arrayPtr)
+        classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
+        classData.writePointer(arrayPtr)
         classData.position = pos
 
     }
@@ -196,25 +206,21 @@ private fun getClassInstancePtr(classIndex: Int, indexStartPtr: Int, classSize: 
 
 private fun appendFieldInstance(
     field: FieldEntry, indexStartPtr: Int, classData: ByteArrayOutputStream2,
-    fieldClassIndex: Int, fieldNameOffset: Int, classSize: Int, classPtr: Int, fieldSize: Int
+    declaringClassIndex: Int, fieldClassIndex: Int,
+    classSize: Int, fieldSize: Int
 ): Int {
     // create new field instance
     // name must be before fieldPtr, because the name might be new!!
     val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
     val fieldPtr = indexStartPtr + classData.size()
     classData.writeClass(fieldClassIndex)
-    for (i in objectOverhead until fieldNameOffset) {
-        classData.write(0)
-    }
-    classData.writeLE32(name) // name
     classData.writeLE32(field.field.offset) // slot
+    classData.writePointer(name) // name
     val typeClassIndex = getTypeClassIndex(field.field.type)
-    classData.writeLE32(getClassInstancePtr(typeClassIndex, indexStartPtr, classSize)) // type
+    classData.writePointer(getClassInstancePtr(typeClassIndex, indexStartPtr, classSize)) // type
+    classData.writePointer(getClassInstancePtr(declaringClassIndex, indexStartPtr, classSize)) // declaring class
     classData.writeLE32(field.modifiers) // modifiers
-    classData.writeLE32(classPtr) // clazz -> declaring class
-    for (i in 20 + fieldNameOffset until fieldSize) {// 20, because we wrote 5x4 bytes
-        classData.write(0)
-    }
+    classData.fill(objectOverhead + 2 * intSize + 3 * ptrSize, fieldSize)
     assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
     return fieldPtr
 }
@@ -227,95 +233,143 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
 
     val classFields = gIndex.getFieldOffsets("java/lang/Class", false)
     val classClassIndex = gIndex.getClassIndex("java/lang/Class")
-    val classSize = classFields.offset
+    val classSize = gIndex.getInstanceSize("java/lang/Class")
 
     LOGGER.info("java/lang/Class.fields: ${classFields.fields.entries.sortedBy { it.value.offset }}, total size: $classSize")
 
     val classData = ByteArrayOutputStream2(classSize * numClasses)
     for (i in 0 until numClasses) {
-        classData.writeEmptyClass(classClassIndex, classSize)
+        classData.writeClass(classClassIndex)
+        classData.fill(objectOverhead, classSize)
     }
 
-    val nameOffset = classFields.get("name")?.offset
-    if (nameOffset != null) fillInClassNames(numClasses, classData, classSize, nameOffset, indexStartPtr)
+    fillInClassNames(numClasses, classData, classSize)
+    fillInClassSimpleNames(numClasses, classData, classSize)
+    fillInClassIndices(numClasses, classData, classSize)
+    fillInClassModifiers(numClasses, classData, classSize)
 
-    val indexOffset = classFields.get("index")?.offset
-    if (indexOffset != null) fillInClassIndices(numClasses, classData, classSize, indexOffset)
+    val fieldsOffset = classFields.getOffset("fields")
+    if (fieldsOffset != null) fillInFields(numClasses, classData, classSize, indexStartPtr)
 
-    val modifierOffset = classFields.get("modifiers")?.offset
-    if (modifierOffset != null) fillInClassModifiers(numClasses, classData, classSize, modifierOffset)
-
-    val fieldsOffset = classFields.get("fields")?.offset
-    if (fieldsOffset != null) fillInFields(numClasses, classData, classSize, indexStartPtr, fieldsOffset)
-
-    val methodsOffset = classFields.get("methods")?.offset
+    val methodsOffset = classFields.getOffset("methods")
     if (methodsOffset != null) {
         // insert all name pointers
-        val emptyArrayPtr = indexStartPtr + classData.size()
         val methodCache = HashMap<MethodSig, Int>()
-        classData.writeClass(1)
+        val emptyArrayPtr = indexStartPtr + classData.size()
+        classData.writeClass(OBJECT_ARRAY)
         classData.writeLE32(0) // length
 
         val methodClassIndex = gIndex.getClassIndex("java/lang/reflect/Method")
-        val methodSize = gIndex.getFieldOffsets("java/lang/reflect/Method", false).offset
-        val methodNameOffset = gIndex.getFieldOffset("java/lang/reflect/Method", "name", "java/lang/String", false)!!
+        val methodSize = gIndex.getInstanceSize("java/lang/reflect/Method")
 
-        for (clazz in 0 until numClasses) {
-            // todo find all methods
-            val methods = listOf<MethodSig>()
+        val methodsByClass = dIndex.usedMethods
+            .filter { isCallable(it) }.groupBy { it.clazz }
+        val methodsForClass = ArrayList<Set<MethodSig>>(numClasses)
+        for (declaringClassIndex in 0 until numClasses) {
+            // find all methods with valid call signature
+            val clazzName = gIndex.classNamesByIndex[declaringClassIndex]
+            val superClass = hIndex.superClass[clazzName]
+            val superClassIdx = if (superClass != null) gIndex.getClassIndex(superClass) else -1
+            val superMethods =
+                if (superClass != null) methodsForClass.getOrNull(superClassIdx)
+                    ?: throw IllegalStateException(
+                        "Classes must be ordered for GC-Init! " +
+                                "$clazzName[${declaringClassIndex}] >= $superClass[$superClassIdx]"
+                    )
+                else emptySet()
+            val superMethods1 = methodsByClass[clazzName] ?: emptyList()
+            val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods).toHashSet()
+            methodsForClass.add(methods)
             // append all methods
-            val dstPtr = clazz * classSize + methodsOffset
             val arrayToWrite = if (methods.isNotEmpty()) {
                 val methodPointers = methods.map { method ->
+                    assertTrue(CallSignature.c(method) in hIndex.implementedCallSignatures)
                     methodCache.getOrPut(method) {
                         appendMethodInstance(
-                            method, indexStartPtr, classData, methodClassIndex,
-                            methodNameOffset, classSize, methodSize
+                            method, indexStartPtr, classData, declaringClassIndex,
+                            methodClassIndex, classSize, methodSize
                         )
                     }
                 }
 
                 val arrayPtr = indexStartPtr + classData.size()
-                classData.writeClass(1)
+                classData.writeClass(OBJECT_ARRAY)
                 classData.writeLE32(methodPointers.size)
                 for (methodPtr in methodPointers) {
-                    classData.writeLE32(methodPtr)
+                    classData.writePointer(methodPtr)
                 }
 
                 arrayPtr
             } else emptyArrayPtr
 
             val pos = classData.position
-            classData.position = dstPtr
-            classData.writeLE32(arrayToWrite)
+            classData.position = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
+            classData.writePointer(arrayToWrite)
             classData.position = pos
         }
     }
 
     return appendData(printer, indexStartPtr, classData)
+}
 
+fun isCallable(sig: MethodSig): Boolean {
+    return CallSignature.c(sig) in hIndex.implementedCallSignatures
+}
+
+val parameterArrays = HashMap<List<String>, Int>()
+
+fun appendParamsArray(
+    indexStartPtr: Int, classData: ByteArrayOutputStream2,
+    params: List<String>, classSize: Int,
+): Int {
+    val ptr = indexStartPtr + classData.position
+    classData.writeClass(OBJECT_ARRAY)
+    classData.writeLE32(params.size)
+    for (i in params.indices) {
+        val typeIndex = gIndex.getClassIndexOrParents(params[i])
+        classData.writePointer(getClassInstancePtr(typeIndex, indexStartPtr, classSize))
+    }
+    // ensure alignment? done
+    return ptr
+}
+
+private fun getReturnTypePtr(returnType: String?, indexStartPtr: Int, classSize: Int): Int {
+    return if (returnType != null) {
+        // return type; if unknown = not constructable, just return java/lang/Object
+        // that isn't really wrong, null is java/lang/Object
+        val returnTypeClass = gIndex.getClassIndexOrNull(returnType) ?: 0
+        getClassInstancePtr(returnTypeClass, indexStartPtr, classSize)
+    } else 0
 }
 
 fun appendMethodInstance(
     sig: MethodSig, indexStartPtr: Int, classData: ByteArrayOutputStream2,
-    methodClassIndex: Int, methodNameOffset: Int, classSize: Int, methodSize: Int
+    declaringClassIndex: Int, methodClassIndex: Int, classSize: Int, methodSize: Int
 ): Int {
-    val name = gIndex.getString(sig.name, indexStartPtr, classData) // might be new -> must be before ptr-calc
+    val namePtr = gIndex.getString(sig.name, indexStartPtr, classData) // might be new -> must be before ptr-calc
+    val callSignature = CallSignature.c(sig).format()
+    val callSignaturePtr = gIndex.getString(callSignature, indexStartPtr, classData)
+
+    val params = sig.descriptor.params
+    val parameterTypeArrayPtr = parameterArrays.getOrPut(params) {
+        appendParamsArray(indexStartPtr, classData, params, classSize)
+    }
+    // todo prepare parameters array
+    // todo this array could be cached
+
     val methodPtr = indexStartPtr + classData.position
     classData.writeClass(methodClassIndex)
-    for (i in objectOverhead until methodNameOffset) {
-        classData.write(0)
-    }
-    classData.writeLE32(name) // name
-    // todo write return type
-    // todo write parameters
-    // todo write callSignature,
-    // todo write declaredClass,
-    // todo write slot for calling it
-    for (i in 4 until methodSize) {
-        classData.write(0)
-    }
-    assertEquals(methodPtr, classData.position - methodSize)
+    assertEquals(objectOverhead, OFFSET_METHOD_SLOT)
+    classData.writeLE32(-1) // slot; todo find the slot in the dynamic table
+    classData.writePointer(namePtr) // name
+    classData.writePointer(getReturnTypePtr(sig.descriptor.returnType, indexStartPtr, classSize)) // return type
+    classData.writePointer(parameterTypeArrayPtr) // parameters
+    classData.writePointer(callSignaturePtr) // callSignature
+    classData.writePointer(getClassInstancePtr(declaringClassIndex, indexStartPtr, classSize)) // declaredClass
+    val modifiers = hIndex.methodFlags[sig] ?: 0
+    classData.writeLE32(modifiers) // e.g., static flag
+    classData.fill(objectOverhead + 2 * intSize + 5 * ptrSize, methodSize)
+    assertEquals(methodPtr + methodSize, indexStartPtr + classData.position)
     return methodPtr
 }
 
@@ -345,7 +399,7 @@ fun appendResourceTable(printer: StringBuilder2, ptr0: Int): Int {
         val keyPtr = gIndex.getString(resource.first, ptr0 + table.position, table)
         val valuePtr = ptr0 + table.position
         val value = resource.second
-        table.writeClass(5) // byte[]
+        table.writeClass(BYTE_ARRAY)
         table.writeLE32(value.size)
         table.write(value)
         val pos = table.position

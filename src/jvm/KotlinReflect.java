@@ -2,7 +2,6 @@ package jvm;
 
 import annotations.Alias;
 import annotations.NoThrow;
-import annotations.WASM;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
 import kotlin.reflect.*;
 import org.jetbrains.annotations.NotNull;
@@ -16,9 +15,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static jvm.JVM32.findClass;
-import static jvm.JVM32.numClasses;
-import static jvm.JavaLang.Object_toString;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVMShared.numClasses;
 import static jvm.JavaReflect.getClassIndex;
 
 @SuppressWarnings("rawtypes")
@@ -128,9 +125,9 @@ public class KotlinReflect {
         @NotNull
         @Override
         public List<KType> getSupertypes() {
-            Class supa = jClass.getSuperclass();
-            if (supa == null) return Collections.emptyList();
-            return Collections.singletonList((KType) Reflection_getOrCreateKotlinClass(supa));
+            Class<?> superclass = jClass.getSuperclass();
+            if (superclass == null) return Collections.emptyList();
+            return Collections.singletonList((KType) Reflection_getOrCreateKotlinClass(superclass));
         }
 
         @NotNull
@@ -197,7 +194,7 @@ public class KotlinReflect {
         int l = numClasses();
         KClass<Object>[] c = classes = new KClass[l];
         for (int i = 0; i < l; i++) { // a few reflection methods expect this class to be used
-            Class<Object> z = ptrTo(findClass(i));
+            Class<Object> z = findClass(i);
             c[i] = new WASMKotlin<>(z);
             // c[i] = new KClassImpl<>(z);
             // c[i] = new ClassReference(z);

@@ -2,6 +2,7 @@ package hierarchy
 
 import api
 import hIndex
+import hierarchy.HierarchyIndex.methodFlags
 import me.anno.utils.types.Booleans.hasFlag
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.ClassReader
@@ -11,7 +12,10 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
 import replaceClass
 import replaceClassNullable
-import utils.*
+import utils.Descriptor
+import utils.FieldSig
+import utils.MethodSig
+import utils.STATIC_INIT
 import java.io.IOException
 
 /**
@@ -210,6 +214,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
         }
 
         HierarchyIndex.registerMethod(sig)
+        methodFlags[sig] = access
 
         if (isStatic) {
             index.staticMethods.add(sig)

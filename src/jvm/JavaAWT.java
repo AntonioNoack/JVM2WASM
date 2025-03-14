@@ -72,7 +72,10 @@ public class JavaAWT {
 		return new Font(self.getFontName(), flags, (int) size);
 	}
 
-	@Alias(names = "java_awt_Font_getFontName_Ljava_util_LocaleLjava_lang_String")
+	@Alias(names = {
+			"java_awt_Font_getFontName_Ljava_util_LocaleLjava_lang_String",
+			"java_awt_Font_getFontName_Ljvm_custom_LocaleLjava_lang_String"
+	})
 	public static String java_awt_Font_getFontName_Ljava_util_LocaleLjava_lang_String(Font font, Locale locale) {
 		return font.getName();
 	}

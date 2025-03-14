@@ -1,5 +1,7 @@
 package jvm.custom;
 
+import java.util.Date;
+
 public class SimpleDateFormat {
     private final String format;
 
@@ -10,5 +12,9 @@ public class SimpleDateFormat {
     @Override
     public String toString() {
         return format;
+    }
+
+    public String format(Date date) {
+        return Long.toString(date.getTime());
     }
 }

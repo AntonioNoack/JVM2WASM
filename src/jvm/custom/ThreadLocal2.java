@@ -4,8 +4,8 @@ import annotations.NoThrow;
 
 import java.util.function.Supplier;
 
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVM32.getAddr;
+import static jvm.JVMShared.unsafeCast;
 import static jvm.NativeLog.log;
 
 // in theory, we could replace all instances of this with the immediate result...
@@ -18,7 +18,7 @@ public class ThreadLocal2<V> {
     }
 
     public static <V> ThreadLocal<V> withInitial(Supplier<V> supplier) {
-        return ptrTo(getAddr(new ThreadLocal2<>(supplier)));
+        return unsafeCast(new ThreadLocal2<>(supplier));
     }
 
     private V object;

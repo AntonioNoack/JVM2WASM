@@ -199,8 +199,7 @@ object StackValidator {
                     }
                     stack.pop(i.popType).push(i.pushType)
                 }
-                is BinaryInstruction -> stack.pop(i.type).pop(i.type).push(i.type)
-                is CompareInstr -> stack.pop(i.type).pop(i.type).push(i32)
+                is BinaryInstruction -> stack.pop(i.popType).pop(i.popType).push(i.pushType)
                 is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)
                 Drop -> stack.removeLast()
                 is NumberCastInstruction -> stack.pop(i.popType).push(i.pushType)
@@ -231,10 +230,10 @@ object StackValidator {
                     stack.addAll(retTypes)
                 }
                 is CallIndirect -> {
-                    stack.pop(i32) // method pointer
+                    stack.pop(i32) // pop method pointer
                     val params1 = i.type.params
-                    for (j in params1.lastIndex downTo 0) {
-                        stack.pop(params1[j])
+                    for (k in params1.lastIndex downTo 0) {
+                        stack.pop(params1[k])
                     }
                     stack.addAll(i.type.results)
                 }

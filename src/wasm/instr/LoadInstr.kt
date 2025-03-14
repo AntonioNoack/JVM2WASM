@@ -9,6 +9,9 @@ class LoadInstr(name: String, val impl: (ByteBuffer) -> Number) : SimpleInstr(na
         val stack = engine.stack
         val addr = stack.pop()!! as Int
         val data = engine.buffer
+        if (addr !in 0 until data.capacity()) {
+            throw IllegalStateException("Segfault! Tried to $name at $addr, capacity: ${data.capacity()}")
+        }
         data.position(addr)
         stack.add(impl(data))
         return null

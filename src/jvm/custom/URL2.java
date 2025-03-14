@@ -4,8 +4,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVMShared.unsafeCast;
 
 @SuppressWarnings("unused")
 public class URL2 {
@@ -25,11 +24,11 @@ public class URL2 {
     }
 
     public URL toURL() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     public URI toURI() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     public InputStream openStream() {

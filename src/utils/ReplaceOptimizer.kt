@@ -3,10 +3,12 @@ package utils
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.none2
+import utils.Builder.Companion.canBeDropped
 import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
+import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.F32EQ
 import wasm.instr.Instructions.F32GE
 import wasm.instr.Instructions.F32GT
@@ -103,6 +105,9 @@ object ReplaceOptimizer {
         listOf(Call.fcmpl, I32EQZ) to listOf(F32EQ),
         listOf(Call.dcmpg, I32EQZ) to listOf(F64EQ),
         listOf(Call.dcmpl, I32EQZ) to listOf(F64EQ),
+
+        listOf(Call.getStaticFieldI32, Drop) to listOf(Drop),
+        listOf(Call.getStaticFieldI64, Drop) to listOf(Drop),
     )
 
     // todo run special replacements before if-branches and i32EQZ
@@ -127,24 +132,23 @@ object ReplaceOptimizer {
         }
 
         fun runReplacements() {
-            for (offset in instructions.indices) {
-                val instr = instructions.getOrNull(offset) ?: break
-                val replacements = replacementsByInstr[instr]
-                    ?: continue
-                for ((old, new) in replacements) {
-                    val li = instructions.startsWith(old, offset)
-                    if (li >= 0) makeMutable().replace(new, offset, li)
-                }
-            }
-        }
-
-        do {
-            changed = false
-            runReplacements()
-            var i = 0
-            while (i < instructions.size) {
-                when (val instr = instructions[i]) {
+            for (offset in instructions.lastIndex downTo 0) {
+                val instr = instructions.getOrNull(offset) ?: continue
+                when(instr) {
+                    Drop -> {
+                        val prevIdx = instructions.prevIndex(offset)
+                        val prev = instructions.getOrNull(prevIdx)
+                        if (canBeDropped(prev)) {
+                            val list = makeMutable()
+                            val remainder = ArrayList(list.subList(offset + 1, list.size))
+                            list.subList(offset, list.size).clear() // clear remainder including "drop"
+                            val tmp = Builder(list)
+                            tmp.drop()
+                            list.addAll(remainder)
+                        }
+                    }
                     is IfBranch -> {
+                        var i = offset
                         if (instr.ifFalse.isNotEmpty()) {
                             val prevIdx = instructions.prevIndex(i)
                             val prevInstr = instructions.getOrNull(prevIdx)
@@ -183,7 +187,7 @@ object ReplaceOptimizer {
                                 val mutable = makeMutable()
                                 mutable[i] = I32EQZ
                                 mutable.add(i, I32EQZ)
-                                i--
+                                // i--
                             } else if (
                                 matchContents(instr.ifTrue, listOf(i32Const0, Return)) &&
                                 matchContents(instr.ifFalse, listOf(i32Const1, Return))
@@ -192,7 +196,7 @@ object ReplaceOptimizer {
                                 val mutable = makeMutable()
                                 mutable[i] = Return
                                 mutable.add(i, I32EQZ)
-                                i--
+                                // i--
                             }
                         }
                         instr.ifTrue = optimizeUsingReplacements2(instr.ifTrue)
@@ -206,9 +210,21 @@ object ReplaceOptimizer {
                             optimizeUsingReplacements2(instructions1)
                         }
                     }
+                    else -> {
+                        val replacements = replacementsByInstr[instr]
+                            ?: continue
+                        for ((old, new) in replacements) {
+                            val li = instructions.startsWith(old, offset)
+                            if (li >= 0) makeMutable().replace(new, offset, li)
+                        }
+                    }
                 }
-                i++
             }
+        }
+
+        do {
+            changed = false
+            runReplacements()
         } while (changed)
 
         return instructions

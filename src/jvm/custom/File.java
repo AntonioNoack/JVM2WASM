@@ -13,8 +13,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttribute;
 
-import static jvm.JavaLang.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVMShared.unsafeCast;
 
 // 9.88 MB -> 9.82 MB -> not really worth it...
 @SuppressWarnings("unused")
@@ -77,7 +76,7 @@ public class File {
 
     @NoThrow
     public Path toPath() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     @NoThrow
@@ -91,7 +90,7 @@ public class File {
 
     @NoThrow
     public java.io.File toFile() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     public void deleteOnExit() {
@@ -139,15 +138,15 @@ public class File {
     }
 
     public static URI create(String path) {
-        return ptrTo(getAddr(new File(path)));
+        return unsafeCast(new File(path));
     }
 
     public URL toURL() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     public URI toURI() {
-        return ptrTo(getAddr(this));
+        return unsafeCast(this);
     }
 
     public boolean isInvalid() {

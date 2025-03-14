@@ -1,11 +1,15 @@
 package utils
 
+import org.apache.logging.log4j.LogManager
+
+private val LOGGER = LogManager.getLogger("JSCreator")
+
 fun createJSImports(
     jsImplemented: Map<String, Pair<MethodSig, String>>,
     jsPseudoImplemented: Map<String, MethodSig>,
     numPages: Int
 ) {
-    println("[createJSImports]")
+    LOGGER.info("[createJSImports]")
     val jsFileText = StringBuilder2(256)
     fun jsHeader(name: String, sig: MethodSig) {
         jsFileText.append("  ").append(name).append("(")

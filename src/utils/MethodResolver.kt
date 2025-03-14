@@ -3,6 +3,7 @@ package utils
 import dIndex
 import hIndex
 import org.apache.logging.log4j.LogManager
+import utils.PrintUsed.printUsed
 
 /**
  * given a class hierarchy, finds which implementation should be used for a specific called class

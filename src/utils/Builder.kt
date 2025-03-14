@@ -7,19 +7,28 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 
 // typealias Builder = StringBuilder2
-class Builder(capacity: Int = 16) {
+class Builder(val instrs: MutableList<Instruction>) {
 
     companion object {
         fun isDuplicable(lastInstr: Instruction?): Boolean {
             return lastInstr is LocalGet || lastInstr is ParamGet || lastInstr is GlobalGet || lastInstr is Const
         }
+
+        fun canBeDropped(instr: Instruction?): Boolean {
+            return when (instr) {
+                is Const, is UnaryInstruction, is BinaryInstruction,
+                is LocalGet, is ParamGet, is GlobalGet -> true
+                else -> false
+            }
+        }
     }
 
+    constructor() : this(ArrayList())
+    constructor(capacity: Int) : this(ArrayList(capacity))
     constructor(instr: Instruction) : this(1) {
         append(instr)
     }
 
-    val instrs = ArrayList<Instruction>(capacity)
     val length get() = instrs.size
 
     fun append(instr: Instruction): Builder {
@@ -31,7 +40,7 @@ class Builder(capacity: Int = 16) {
     }
 
     fun append(builder: List<Instruction>): Builder {
-        instrs.ensureCapacity(instrs.size + builder.size)
+        (instrs as? ArrayList)?.ensureCapacity(instrs.size + builder.size)
         for (instr in builder) append(instr)
         return this
     }
@@ -92,18 +101,21 @@ class Builder(capacity: Int = 16) {
 
     fun drop(): Builder {
         val last = lastOrNull()
-        val numDrop = when (last) {
-            is Const -> 1
-            is BinaryInstruction -> 2
+        when (last) {
             Return, Unreachable -> return this
-            else -> -1
-        }
-        if (numDrop >= 0) {
-            for (i in 0 until numDrop) {
+            is Const, is LocalGet, is ParamGet, is GlobalGet -> {
                 removeLast()
             }
-        } else {
-            append(Drop)
+            is UnaryInstruction -> {
+                removeLast()
+                drop()
+            }
+            is BinaryInstruction -> {
+                removeLast()
+                drop()
+                drop()
+            }
+            else -> append(Drop)
         }
         return this
     }

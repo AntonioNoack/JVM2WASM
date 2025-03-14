@@ -2,6 +2,7 @@ package translator
 
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
+import translator.MethodTranslator.Companion.renameVariables
 import utils.*
 import utils.WASMTypes.i32
 import wasm.instr.*
@@ -132,10 +133,28 @@ class LocalVariables {
         return builder.toString()
     }
 
+    private fun validateRenamedVariablesAreNotUsed(nodes: List<TranslatorNode>, renamedVariables: Set<String>) {
+        for (node in nodes) {
+            for (instr in node.printer.instrs) {
+                val name = when (instr) {
+                    is LocalGet -> instr.name
+                    is LocalSet -> instr.name
+                    else -> continue
+                }
+                assertTrue(name !in renamedVariables) {
+                    "$instr was renamed!, cannot still be used"
+                }
+            }
+        }
+    }
+
     fun renameLocalVariables(
         sig: MethodSig, nodes: List<TranslatorNode>,
         numLabels: Int
     ) {
+
+        if (!renameVariables) return
+
         // todo if a slot is used multiple times, we can replace a variable partially:
         //  for that, we need the order
         //  can we assume that the TranslatorNode-order is correct???
@@ -143,7 +162,6 @@ class LocalVariables {
         if (localVarInfos.isEmpty()) return
         val localVarsByIndex = localVarInfos
             .groupBy { it.index }
-
 
         val usedNames = HashSet<String>(localVarsAndParams.size + 16)
         for (v in localVarsAndParams) usedNames.add(v.name)
@@ -179,18 +197,7 @@ class LocalVariables {
         }
 
         // validate renamed variables aren't used in their original form
-        for (node in nodes) {
-            for (instr in node.printer.instrs) {
-                val name = when (instr) {
-                    is LocalGet -> instr.name
-                    is LocalSet -> instr.name
-                    else -> continue
-                }
-                assertTrue(name !in renamedVariables) {
-                    "$instr was renamed!, cannot still be used"
-                }
-            }
-        }
+        validateRenamedVariablesAreNotUsed(nodes, renamedVariables.keys)
 
         /*if (localVarsByIndex.any { it.value.size > 1 }) {
             println(sig)
