@@ -40,7 +40,7 @@ try {
         // convert Java string into JavaScript string
         if(x == 0) return null
         if(lib.rCl(x) == 10) {
-            let chars = lib.r32(x + objectOverhead)
+            let chars = lib.r32(x + objectOverhead + 4)
             if(chars == 0) return null
             let cl = lib.rCl(chars)
             if(cl == 6) {

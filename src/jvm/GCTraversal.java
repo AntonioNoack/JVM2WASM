@@ -90,7 +90,6 @@ public class GCTraversal {
                 // check if type is relevant
                 if (!Modifier.isNative(mods)) {
                     if (Modifier.isStatic(mods)) {
-                        log("Static Field/1:", classId, getFieldOffset(field), mods);
                         staticFieldCtr++;
                     } else {
                         instanceFieldCtr++;
@@ -145,7 +144,6 @@ public class GCTraversal {
         }
         int ctr = 0;
         int[] staticFields = GCTraversal.staticFields = new int[staticFieldCtr];
-        // log("Counted {} static fields", staticFieldCtr);
         for (int classId = 0; classId < numClasses; classId++) {
             Class<Object> clazz = findClass(classId);
             Field[] fields = getFields(clazz);
@@ -156,7 +154,6 @@ public class GCTraversal {
                 int mods = field.getModifiers();
                 // check if type is relevant
                 if (!Modifier.isNative(mods) && Modifier.isStatic(mods)) {
-                    log("Static Field/2:", classId, getFieldOffset(field), mods);
                     staticFields[ctr++] = staticOffset + getFieldOffset(field);
                 }
             }

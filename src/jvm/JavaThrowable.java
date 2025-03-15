@@ -33,14 +33,12 @@ public class JavaThrowable {
         printStackTraceEnd();
     }
 
-    // std::cerr << name << ": " << msg << std::endl;
     @NoThrow
-    @JavaScript(code = "trace(arg0)")
+    @JavaScript(code = "console.log(str(arg0)+': '+str(arg1))")
     public static native void printStackTraceHead(String name, String message);
 
-    // std::cerr << "  " << clazz << "." << name << ":" << line << std::endl;
     @NoThrow
-    @JavaScript(code = "console.log('  '+arg0+'.'+arg1+':'+arg2)")
+    @JavaScript(code = "console.log('  '+str(arg0)+'.'+str(arg1)+':'+arg2)")
     public static native void printStackTraceLine(String clazzName, String methodName, int lineNumber);
 
     @NoThrow

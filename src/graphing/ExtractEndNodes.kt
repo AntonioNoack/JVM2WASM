@@ -176,6 +176,7 @@ object ExtractEndNodes {
             dst.append(i32Const0).append(input.setter)
         }
         dst.append(loopInstr)
+        dst.append(Unreachable) // WASM is retarded sometimes, not being able to check unreachability
 
         sa.nodes.clear()
         val endNode = ReturnNode(dst)

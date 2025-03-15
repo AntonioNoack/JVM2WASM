@@ -181,6 +181,10 @@ class WATParser {
                                 }
                             }
                             dataSections.add(DataSection(startIndex, content.toByteArray()))
+                            val memorySize = memorySizeInBlocks shl 16
+                            assertTrue(startIndex + content.size <= memorySize) {
+                                "Memory ($memorySize) too small to fit $startIndex + ${content.size}"
+                            }
                         }
                         "table" -> {
                             // ???
@@ -259,7 +263,7 @@ class WATParser {
                         "global" -> {
                             // (global $S i32 (i32.const 33875))
                             // (global $Q (mut i32) (i32.const 2798408))
-                            val globalName = list.consume(TokenType.DOLLAR, i++)
+                            val shortName = list.consume(TokenType.DOLLAR, i++)
                             val isMutable = list.getType(i) == TokenType.OPEN_BRACKET
                             if (isMutable) {
                                 i++ // skip '('
@@ -270,7 +274,7 @@ class WATParser {
                             list.consume(TokenType.OPEN_BRACKET, i++)
                             list.consume(TokenType.NAME, "i32.const", i++)
                             val initialValue = list.consume(TokenType.NUMBER, i++).toInt()
-                            globals[globalName] = GlobalVariable("global_$globalName", "i32", initialValue, isMutable)
+                            globals[shortName] = GlobalVariable(shortName, "i32", initialValue, isMutable)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                         }
                         else -> assertFail("Unknown name: $name at " + list.subList(i, min(i + 20, list.size)))

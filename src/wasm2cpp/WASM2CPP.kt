@@ -71,7 +71,6 @@ fun wasm2cpp() {
 
 fun validateGlobals(parsed1: Map<String, GlobalVariable>) {
     if (globals.isEmpty()) return
-    val globals = globals.associateBy { it.name.substring("global_".length) }
     var passed = 0
     for ((name, parsed) in parsed1) {
         val original = globals[name] ?: continue
@@ -146,9 +145,7 @@ fun wasm2cppFromMemory() {
     functions.addAll(normalMethods)
     functions.addAll(helperMethods)
     functions.addAll(getNthMethods)
-    wasm2cpp(
-        functions, functionTable, imports, globals
-            .associateBy { it.name.substring("global_".length) })
+    wasm2cpp(functions, functionTable, imports, globals)
     clock.stop("WASM2CPP")
 }
 
@@ -208,21 +205,21 @@ fun defineGlobals(globals: Map<String, GlobalVariable>) {
         .sortedBy { it.key }.map { it.value }
     for (global in sortedGlobals) {
         if (!global.isMutable) {
-            writer.append("constexpr ").append(global.type).append(' ').append(global.name)
+            writer.append("constexpr ").append(global.type).append(' ').append(global.fullName)
                 .append(" = ").append(global.initialValue).append(";\n")
         }
     }
     writer.append("#ifdef MAIN_CPP\n")
     for (global in sortedGlobals) {
         if (global.isMutable) {
-            writer.append(global.type).append(' ').append(global.name)
+            writer.append(global.type).append(' ').append(global.fullName)
                 .append(" = ").append(global.initialValue).append(";\n")
         }
     }
     writer.append("#else\n")
     for (global in sortedGlobals) {
         if (global.isMutable) {
-            writer.append("extern ").append(global.type).append(' ').append(global.name).append(";\n")
+            writer.append("extern ").append(global.type).append(' ').append(global.fullName).append(";\n")
         }
     }
     writer.append("#endif\n")

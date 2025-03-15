@@ -2,6 +2,7 @@ package hierarchy
 
 import api
 import dIndex
+import gIndex
 import hIndex
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
@@ -321,6 +322,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     private fun defineCallIndirectWASM(funcType: FuncType) {
         val callInstr = CallIndirect(funcType).toString()
         annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
+        gIndex.types.add(funcType)
     }
 
     override fun visitEnd() {

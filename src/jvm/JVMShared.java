@@ -62,7 +62,7 @@ public class JVMShared {
     @NoThrow
     @Alias(names = "stackPush")
     public static void stackPush(int idx) {
-        JVM32.printStackTraceLine(idx);
+        if (false) JVM32.printStackTraceLine(idx);
         int stackPointer = getStackPtr() - 4;
         int limit = getStackLimit();
         if (unsignedGreaterThanEqual(stackPointer, limit)) {

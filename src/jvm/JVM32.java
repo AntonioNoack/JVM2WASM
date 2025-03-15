@@ -532,7 +532,6 @@ public class JVM32 {
 
     @NoThrow
     static void printStackTraceLine(int index) {
-        log("stackPush", index);
         int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return;
         int throwableLookup = lookupBasePtr + index * 12;

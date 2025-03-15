@@ -101,15 +101,19 @@ i32 concurrentGCStage = 0;
 int width = 800, height = 600;
 double mouseX = width * 0.5, mouseY = height * 0.5;
 
+constexpr int ptrSize = 4;
+constexpr int objectOverhead = 4;
+constexpr int arrayOverhead = objectOverhead + 4;
+
 #include <sstream>
 #include <iostream>
 std::string strToCpp(i32 addr) {
     if(!addr) return "null";
-    i32 chars = r32(addr + 4);
-    i32 charLen = r32(chars + 4);
+    i32 chars = r32(addr + objectOverhead + 4); // for hash
+    i32 charLen = r32(chars + objectOverhead);
     std::ostringstream os;
     for(i32 i = 0;i<charLen;i++) {
-        os << (char) r8(chars + 8 + i);
+        os << (char) r8(chars + arrayOverhead + i);
     }
     return os.str();
 }

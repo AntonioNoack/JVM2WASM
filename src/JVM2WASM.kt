@@ -7,6 +7,7 @@ import hierarchy.HierarchyIndex
 import interpreter.WASMEngine
 import interpreter.functions.TrackCallocInstr
 import interpreter.memory.MemoryOptimizer
+import interpreter.memory.StaticInitRemover
 import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
@@ -20,7 +21,6 @@ import me.anno.utils.types.Floats.f3
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
-import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.classNamesByIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.nthGetterMethods
@@ -76,7 +76,8 @@ private val LOGGER = LogManager.getLogger("JVM2WASM")
 // todo combine non-exported functions with the same content :3
 
 // do we already replace dependencies before resolving them? probably could save us tons of space (and wabt compile time 😁)
-// todo mark empty functions as such, and skip them; e.g. new_java_lang_Object_V, new_java_lang_Number_V
+// done mark empty functions as such, and skip them; e.g. new_java_lang_Object_V, new_java_lang_Number_V
+//  doesn't work recursively yet though
 
 // todo loading bar for library loading
 
@@ -95,7 +96,7 @@ var useDefaultKotlinReflection = false
 var alignFieldsProperly = true
 
 var callStaticInitOnce = false // not supported, because there is lots of cyclic dependencies (24 cycles)
-var callStaticInitAtCompileTime = true // todo implement this
+var callStaticInitAtCompileTime = false // todo implement this
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -602,7 +603,7 @@ fun jvm2wasm() {
     }
 
     fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
-        globals.add(GlobalVariable("global_$name", type, value, isMutable))
+        globals[name] = GlobalVariable(name, type, value, isMutable)
     }
 
     defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
@@ -725,7 +726,8 @@ fun jvm2wasm() {
             "Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
                     "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s"
         )
-        MemoryOptimizer.optimizeMemory(vm, dataPrinter)
+        ptr = MemoryOptimizer.optimizeMemory(vm, dataPrinter)
+        StaticInitRemover.removeStaticInit()
         LOGGER.info("New Base Memory: $allocationStart (${allocationStart.formatFileSize()})")
         clock.stop("StaticInit WASM-VM")
     }
@@ -738,12 +740,11 @@ fun jvm2wasm() {
             .append(".const ").append(value).append("))\n")
     }
 
-    for (global in globals) {
-        val name = global.name.substring("global_".length)
+    for (global in globals.values.sortedBy { it.name }) {
         val isMutable = global.isMutable
         val type = global.type
         val value = global.initialValue
-        printGlobal(name, if (isMutable) "(mut $type)" else type, type, value)
+        printGlobal(global.name, if (isMutable) "(mut $type)" else type, type, value)
     }
 
     printMethodImplementations(bodyPrinter, usedMethods)
@@ -775,7 +776,7 @@ fun jvm2wasm() {
     compileToWASM(headerPrinter)
 }
 
-val globals = ArrayList<GlobalVariable>()
+val globals = HashMap<String, GlobalVariable>()
 
 fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
     println("\nMissing functions:")

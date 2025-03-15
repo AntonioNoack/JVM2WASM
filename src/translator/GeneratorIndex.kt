@@ -111,9 +111,9 @@ object GeneratorIndex {
         return wasmType
     }
 
-    val translatedMethods = HashMap<MethodSig, FunctionImpl>()
+    val translatedMethods = HashMap<MethodSig, FunctionImpl>(8192)
 
-    val nthGetterMethods = HashMap<List<String>, FunctionImpl>()
+    val nthGetterMethods = HashMap<List<String>, FunctionImpl>(64)
     fun getNth(typeStack: List<String>): String {
         return nthGetterMethods.getOrPut(typeStack) {
             val name0 = typeStack.joinToString("") {
@@ -134,8 +134,8 @@ object GeneratorIndex {
         }.funcName
     }
 
-    val classNamesByIndex = ArrayList<String>()
-    val classIndex = HashMap<String, Int>()
+    val classNamesByIndex = ArrayList<String>(4096)
+    val classIndex = HashMap<String, Int>(4096)
 
     var lockClasses = false
 

@@ -116,12 +116,9 @@ class WASMEngine(memorySize: Int) {
             ?: customFunctions.getOrPut(name) { createMissingFunction(name) }
     }
 
-    fun registerGlobals(globalVariables: List<GlobalVariable>) {
-        val prefix = "global_"
-        for (global in globalVariables) {
-            val name = global.name
-            assertTrue(name.startsWith(prefix))
-            globals[name.substring(prefix.length)] = global.initialValue
+    fun registerGlobals(globalVariables: Map<String, GlobalVariable>) {
+        for ((name, global) in globalVariables) {
+            globals[name] = global.initialValue
         }
     }
 
@@ -276,8 +273,10 @@ class WASMEngine(memorySize: Int) {
     }
 
     fun resolveCalls() {
+        val byLabel = HashMap<String, BreakableInstruction>()
         for (func in functionByName.values) {
-            func.body = resolveCalls(func.body, HashMap())
+            func.body = resolveCalls(func.body, byLabel)
+            byLabel.clear()
         }
     }
 

@@ -81,7 +81,7 @@ object MemoryOptimizer {
     private lateinit var staticFields: IntArray
     private lateinit var classSizes: IntArray
 
-    fun optimizeMemory(engine: WASMEngine, printer: StringBuilder2) {
+    fun optimizeMemory(engine: WASMEngine, printer: StringBuilder2): Int {
 
         val memory = engine.buffer
         // access baked data from GCTraversal
@@ -136,7 +136,7 @@ object MemoryOptimizer {
         //  we need our new code for that,
         //  use new special const for that(?)
 
-        finishMemoryReplacement(printer, newBytes)
+        return finishMemoryReplacement(printer, newBytes)
     }
 
     private fun collectUsedAddresses(
@@ -272,12 +272,18 @@ object MemoryOptimizer {
         }
     }
 
-    private fun finishMemoryReplacement(printer: StringBuilder2, newBytes: ByteArray) {
+    private fun finishMemoryReplacement(printer: StringBuilder2, newBytes: ByteArray): Int {
         appendData(printer, allocationStart, newBytes)
         // increase allocation start after everything that was static-inited:
         //  that way we can decrease our GC efforts
         allocationStart += newBytes.size
-        globals.first { it.name == "global_allocationStart" }.initialValue = allocationStart
+        setGlobal("allocationStart", allocationStart)
+        setGlobal("allocationPointer", allocationStart)
+        return allocationStart
+    }
+
+    private fun setGlobal(name: String, value: Int) {
+        globals[name]!!.initialValue = value
     }
 
     private fun isDynamicInstance(addr: Int, allocationPtr: Int): Boolean {

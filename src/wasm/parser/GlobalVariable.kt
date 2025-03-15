@@ -1,12 +1,15 @@
 package wasm.parser
 
-import me.anno.utils.assertions.assertTrue
+import me.anno.utils.assertions.assertFalse
 
 class GlobalVariable(
     val name: String, val type: String, var initialValue: Int,
     val isMutable: Boolean
 ) {
+
+    val fullName = "global_$name"
+
     init {
-        assertTrue(name.startsWith("global_"))
+        assertFalse(name.startsWith("global_"))
     }
 }

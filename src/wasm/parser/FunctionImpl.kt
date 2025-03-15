@@ -8,7 +8,7 @@ import wasm.instr.Instruction.Companion.appendResults
 
 open class FunctionImpl(
     val funcName: String, val params: List<Param>, val results: List<String>,
-    val locals: List<LocalVariable>,
+    var locals: List<LocalVariable>,
     var body: List<Instruction>,
     val isExported: Boolean
 ) {
