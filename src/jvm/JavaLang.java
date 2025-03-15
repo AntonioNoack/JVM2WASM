@@ -311,10 +311,6 @@ public class JavaLang {
     public static native long java_lang_System_nanoTime_J();
 
     @NoThrow
-    @WASM(code = "")
-    public static native <V> V ptrTo(int addr);
-
-    @NoThrow
     @WASM(code = "global.get $stackTraceTable")
     public static native int getStackTraceTablePtr();
 

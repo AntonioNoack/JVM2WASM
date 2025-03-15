@@ -11,7 +11,6 @@ import static jvm.GarbageCollector.GC_OFFSET;
 import static jvm.GarbageCollector.iteration;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
-import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.JavaReflect.getFields;
 import static jvm.NativeLog.log;

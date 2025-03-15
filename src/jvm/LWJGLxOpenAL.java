@@ -11,7 +11,7 @@ import java.nio.ShortBuffer;
 import java.util.function.IntFunction;
 
 import static jvm.JVM32.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVM32.ptrTo;
 
 public class LWJGLxOpenAL {
 

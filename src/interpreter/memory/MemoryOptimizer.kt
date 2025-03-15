@@ -2,8 +2,8 @@ package interpreter.memory
 
 import allocationStart
 import gIndex
+import globals
 import interpreter.WASMEngine
-import jvm.JVM32
 import jvm.JVM32.*
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals
@@ -13,9 +13,12 @@ import me.anno.utils.structures.Recursion.processRecursive2
 import me.anno.utils.structures.lists.Lists.createList
 import org.apache.logging.log4j.LogManager
 import utils.StaticClassIndices.*
+import utils.StringBuilder2
+import utils.appendData
 import utils.is32Bits
 import utils.lookupStaticVariable
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 object MemoryOptimizer {
 
@@ -24,37 +27,32 @@ object MemoryOptimizer {
     // todo we could use a flag in GC, whether an instance once was tracked by WeakRef,
     //  which saves us tons of IntHashMap.remove()-calls
 
-    fun readClassId(memory: ByteBuffer, addr: Int): Int {
+    private fun readClassId(memory: ByteBuffer, addr: Int): Int {
         return memory.getInt(addr) and 0xffffff
     }
 
-    fun readGCIteration(memory: ByteBuffer, addr: Int): Int {
+    private fun readGCIteration(memory: ByteBuffer, addr: Int): Int {
         return memory.getInt(addr).ushr(24)
     }
 
-    fun writeGCIteration(memory: ByteBuffer, addr: Int, iteration: Int) {
+    private fun writeGCIteration(memory: ByteBuffer, addr: Int, iteration: Int) {
         val classId = readClassId(memory, addr)
         val newValue = classId or iteration.shl(24)
         memory.putInt(addr, newValue)
     }
 
-    fun readArrayLength(memory: ByteBuffer, addr: Int): Int {
+    private fun readArrayLength(memory: ByteBuffer, addr: Int): Int {
         return memory.getInt(addr + objectOverhead)
     }
 
-    fun getArray0(addr: Int): Int {
-        return addr + arrayOverhead
-    }
-
-    fun readIntArray(memory: ByteBuffer, addr: Int): IntArray {
+    private fun readIntArray(memory: ByteBuffer, addr: Int): IntArray {
         assertNotEquals(0, addr)
         assertEquals(INT_ARRAY, readClassId(memory, addr))
         val size = readArrayLength(memory, addr)
-        val addr0 = getArray0(addr)
-        return IntArray(size) { memory.getInt(addr0 + it.shl(2)) }
+        return IntArray(size) { memory.getInt(addr + arrayOverhead + it.shl(2)) }
     }
 
-    fun readPointer(memory: ByteBuffer, addr: Int): Int {
+    private fun readPointer(memory: ByteBuffer, addr: Int): Int {
         return if (is32Bits) {
             memory.getInt(addr)
         } else {
@@ -62,22 +60,28 @@ object MemoryOptimizer {
         }
     }
 
-    fun readArrayOfIntArrays(memory: ByteBuffer, addr: Int): List<IntArray?> {
+    private fun writePointer(memory: ByteBuffer, addr: Int, value: Int) {
+        if (is32Bits) {
+            memory.putInt(addr, value)
+        } else {
+            memory.putLong(addr, value.toLong())
+        }
+    }
+
+    private fun readArrayOfIntArrays(memory: ByteBuffer, addr: Int): List<IntArray?> {
         assertNotEquals(0, addr)
         assertEquals(OBJECT_ARRAY, readClassId(memory, addr))
         val size = readArrayLength(memory, addr)
-        val addr0 = getArray0(addr)
         return createList(size) {
-            val addrI = readPointer(memory, addr0 + it * JVM32.ptrSize)
+            val addrI = readPointer(memory, addr + arrayOverhead + it * ptrSize)
             if (addrI != 0) readIntArray(memory, addrI) else null
         }
     }
 
-    lateinit var staticFields: IntArray
-    lateinit var classSizes: IntArray
+    private lateinit var staticFields: IntArray
+    private lateinit var classSizes: IntArray
 
-    fun optimizeMemory(engine: WASMEngine) {
-        // todo find all used instances...
+    fun optimizeMemory(engine: WASMEngine, printer: StringBuilder2) {
 
         val memory = engine.buffer
         // access baked data from GCTraversal
@@ -92,16 +96,56 @@ object MemoryOptimizer {
 
         val instanceFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "fieldOffsetsByClass", "[I", true)!!
         val instanceFields1 = lookupStaticVariable("jvm/GCTraversal", instanceFields0)
-        val instanceFields2 = readArrayOfIntArrays(memory, memory.getInt(instanceFields1))
+        val instanceFields = readArrayOfIntArrays(memory, memory.getInt(instanceFields1))
 
-        // todo run on all dynamically allocated memory after a WASMEngine ran
+        // run on all dynamically allocated memory after a WASMEngine ran
         //  - collect which instances are in use
         //  - collect how much space we can save
         //  - remap instances, and all references to them (!!! WeakRef, too)
 
+        val makeMemoryNonGCAble = true
+        // todo since we want to make all space non-GC-able,
+        //  clear WeakRef.weakRefInstances before collecting memory (free those instances, too)
+        //  -> set WeakRef.weakRefInstances.count to zero
+        //  -> clear WeakRef.weakRefInstances.table
+        //  -> set WeakRef.next to null
+
+        val allocationPtr = getAllocationPointer(engine)
+        // we counted 52k instances to be kept...
+        val usedAddresses = ArrayList<Int>(1 shl 16)
+        val usedMemorySize = collectUsedAddresses(
+            engine, memory, instanceFields,
+            allocationPtr, usedAddresses
+        )
+
+        val totalDynamicMemory = getAllocationPointer(engine) - allocationStart
+        LOGGER.info(
+            "Used memory: ${usedMemorySize.formatFileSize()} / ${totalDynamicMemory.formatFileSize()}, " +
+                    "#instances: ${usedAddresses.size}"
+        )
+
+        // (un??)fortunately, compacting the memory is really worth it, as only 43% are actually used
+        //  we could save 2.7 MiB by implementing this
+
+        val newBytes = ByteArray(usedMemorySize)
+        remapMemory(memory, usedAddresses, newBytes, allocationPtr, instanceFields)
+
+        // todo if we're not writing certain fields after static-init, we could remove them here, too
+
+        // todo compact strings, too:
+        //  we need our new code for that,
+        //  use new special const for that(?)
+
+        finishMemoryReplacement(printer, newBytes)
+    }
+
+    private fun collectUsedAddresses(
+        engine: WASMEngine, memory: ByteBuffer, instanceFields: List<IntArray?>,
+        allocationPtr: Int, usedAddresses: ArrayList<Int>
+    ): Int {
+
         // verify our generation hasn't been used yet
         val thisIteration = 16
-        val allocationPtr = getAllocationPointer(engine)
         forAllDynamicInstances(engine) { addr ->
             assertTrue(readClassId(memory, addr) in 0 until gIndex.classIndex.size)
             assertNotEquals(thisIteration, readGCIteration(memory, addr))
@@ -112,19 +156,21 @@ object MemoryOptimizer {
             if (isDynamicInstance(addr, allocationPtr)) staticValues.add(addr)
         }
 
-        var usedMemory = 0
+
+        var usedMemorySize = 0
         processRecursive2(staticValues) { addr, remaining ->
             assertTrue(isDynamicInstance(addr, allocationPtr))
             if (readGCIteration(memory, addr) != thisIteration) {
                 writeGCIteration(memory, addr, thisIteration)
 
-                usedMemory += getInstanceSize(memory, addr)
+                usedMemorySize += getInstanceSize(memory, addr)
+                usedAddresses += addr
 
                 val classId = readClassId(memory, addr)
                 assertTrue(classId in gIndex.classNamesByIndex.indices)
                 // println("Checking $addr, ${gIndex.classNamesByIndex[classId]}")
                 if (classId !in FIRST_ARRAY..LAST_ARRAY) {
-                    val offsets = instanceFields2[classId]
+                    val offsets = instanceFields[classId]
                     if (offsets != null) {
                         // iterate over all fields, which are not native
                         for (i in offsets.indices) {
@@ -145,25 +191,100 @@ object MemoryOptimizer {
             }
         }
 
-        val totalDynamicMemory = getAllocationPointer(engine) - allocationStart
-        LOGGER.info("Used memory: ${usedMemory.formatFileSize()} / ${totalDynamicMemory.formatFileSize()}")
-
-        // todo (un??)fortunately, compacting the memory is really worth it, as only 43% are actually used
-        //  we could save 2.7 MiB by implementing this
-
+        return usedMemorySize
     }
 
-    fun isDynamicInstance(addr: Int, allocationPtr: Int): Boolean {
+    private fun remapMemory(
+        memory: ByteBuffer, usedAddresses: ArrayList<Int>,
+        newBytes: ByteArray, allocationPtr: Int,
+        instanceFields: List<IntArray?>
+    ) {
+        // when we compact things, we could as well sort them by class or size 🤔
+        var newAllocationPointer = allocationStart
+        usedAddresses.sort() // not necessary, probably just nice for consistent memory locality
+        val memoryMap = usedAddresses.associateWith { addr ->
+            val size = getInstanceSize(memory, addr)
+            val newAddr = newAllocationPointer
+            newAllocationPointer += size
+            newAddr
+        }
+
+        val newMemory = ByteBuffer.wrap(newBytes)
+            .order(ByteOrder.LITTLE_ENDIAN)
+
+        fun mapAddress(oldAddr: Int): Int {
+            return if (isDynamicInstance(oldAddr, allocationPtr)) {
+                memoryMap[oldAddr]!!
+            } else oldAddr
+        }
+
+        forAllStaticInstanceFields { fieldAddr ->
+            val oldAddr = readPointer(memory, fieldAddr)
+            writePointer(memory, fieldAddr, mapAddress(oldAddr))
+        }
+
+        val weakRefClassId = gIndex.getClassIndexOrNull("jvm/custom/WeakRef")
+        val weakRefAddressOffset = gIndex.getFieldOffset("jvm/custom/WeakRef", "address", "I", false)
+        val dstOffset = allocationStart
+        for (k in usedAddresses.indices) {
+            val oldAddr = usedAddresses[k]
+            val newAddr = memoryMap[oldAddr]!!
+            val classId = readClassId(memory, oldAddr)
+            val instanceSize = getInstanceSize(memory, oldAddr)
+
+            // copy over all fields
+            newMemory.position(newAddr - dstOffset) // copy over memory
+            memory.position(oldAddr).limit(oldAddr + instanceSize)
+            newMemory.put(memory).putInt(newAddr - dstOffset, classId) // set classId without bogus GC marker
+            memory.position(0).limit(memory.capacity()) // reset array for further reading
+
+            fun replaceReferenceAtOffset(offset: Int) {
+                val oldAddrI = readPointer(memory, oldAddr + offset)
+                val newAddrI = mapAddress(oldAddrI)
+                writePointer(newMemory, newAddr + offset - dstOffset, newAddrI)
+            }
+
+            when (classId) {
+                OBJECT_ARRAY -> {
+                    // copy over all instances
+                    val length = readArrayLength(memory, oldAddr)
+                    for (i in 0 until length) {
+                        replaceReferenceAtOffset(arrayOverhead + ptrSize * i)
+                    }
+                }
+                in FIRST_ARRAY..LAST_ARRAY -> {
+                    // no references need to be replaced
+                }
+                else -> {
+                    // replace all addresses
+                    val offsets = instanceFields[classId]
+                    if (offsets != null) for (offset in offsets) {
+                        replaceReferenceAtOffset(offset)
+                    }
+
+                    if (classId == weakRefClassId && weakRefAddressOffset != null) {
+                        val oldAddrI = memory.getLong(oldAddr + weakRefAddressOffset).toInt()
+                        val newAddrI = mapAddress(oldAddrI).toLong()
+                        newMemory.putLong(newAddr + weakRefAddressOffset - dstOffset, newAddrI)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun finishMemoryReplacement(printer: StringBuilder2, newBytes: ByteArray) {
+        appendData(printer, allocationStart, newBytes)
+        // increase allocation start after everything that was static-inited:
+        //  that way we can decrease our GC efforts
+        allocationStart += newBytes.size
+        globals.first { it.name == "global_allocationStart" }.initialValue = allocationStart
+    }
+
+    private fun isDynamicInstance(addr: Int, allocationPtr: Int): Boolean {
         assertTrue(addr in 0 until allocationPtr) {
             "Illegal address $addr !in 0 until $allocationPtr"
         }
         return addr >= allocationStart
-    }
-
-    fun forAllInstances(engine: WASMEngine, callback: (addr: Int) -> Unit) {
-        forAllStaticInstances(engine.buffer, callback)
-        // todo iterate over class, method and field instances
-        forAllDynamicInstances(engine, callback)
     }
 
     private fun getArraySize(memory: ByteBuffer, addr: Int): Int {

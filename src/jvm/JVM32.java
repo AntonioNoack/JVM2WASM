@@ -44,6 +44,15 @@ public class JVM32 {
     }
 
     @NoThrow
+    @WASM(code = "") // todo this method shall only be used by JVM32
+    public static native <V> V ptrTo(int addr);
+
+    @NoThrow
+    public static <V> V ptrTo(long addr) {
+        return ptrTo((int) addr);
+    }
+
+    @NoThrow
     @WASM(code = "global.get $classSize")
     public static native int getClassSize();
 
@@ -523,6 +532,7 @@ public class JVM32 {
 
     @NoThrow
     static void printStackTraceLine(int index) {
+        log("stackPush", index);
         int lookupBasePtr = getStackTraceTablePtr();
         if (lookupBasePtr <= 0) return;
         int throwableLookup = lookupBasePtr + index * 12;

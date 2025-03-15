@@ -1,30 +1,32 @@
 package jvm.custom;
 
-import jvm.JVM32;
-
 import java.lang.ref.ReferenceQueue;
 
 import static jvm.GarbageCollector.lockMallocMutex;
 import static jvm.GarbageCollector.unlockMallocMutex;
-import static jvm.JVM32.getAddr;
-import static jvm.JVM32.getAllocationStart;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVM32.*;
 
 @SuppressWarnings("rawtypes")
 public class WeakRef<V> {
 
-    public static final IntHashMap<WeakRef> weakRefInstances = new IntHashMap<>(256);
+    public static final LongHashMap<WeakRef> weakRefInstances = new LongHashMap<>(256);
 
-    public int address;
+    // todo this address needs to become a long for 64-bit support...
+    public long address;
     public WeakRef next; // linked-list of references to that instance
 
     public WeakRef(V instance) {
         address = getAddr(instance);
-        if (JVM32.unsignedGreaterThanEqual(address, getAllocationStart())) {
+        if (isAfterAllocationStart()) {
             lockMallocMutex();
             next = weakRefInstances.put(address, this);
             unlockMallocMutex();
         } // else don't register, because instance isn't tracked
+    }
+
+    private boolean isAfterAllocationStart() {
+        if (ptrSize == 4) return unsignedGreaterThanEqual((int) address, getAllocationStart());
+        else return address >= getAllocationStart();
     }
 
     @SuppressWarnings("unused")

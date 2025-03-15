@@ -58,7 +58,6 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.getTypeShift;
 import static jvm.JVMShared.numClasses;
 import static jvm.JavaLang.Object_toString;
-import static jvm.JavaLang.ptrTo;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;

@@ -9,7 +9,6 @@ import java.util.Locale;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.read32;
 import static jvm.JVMShared.read8;
-import static jvm.JavaLang.ptrTo;
 import static jvm.JavaReflect.getClassIndex;
 import static utils.StaticFieldOffsets.OFFSET_STRING_HASH;
 import static utils.StaticFieldOffsets.OFFSET_STRING_VALUE;

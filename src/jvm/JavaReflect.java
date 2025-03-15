@@ -19,7 +19,6 @@ import java.util.HashMap;
 
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
-import static jvm.JavaLang.ptrTo;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;

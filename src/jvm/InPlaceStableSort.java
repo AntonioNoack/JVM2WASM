@@ -5,7 +5,6 @@ import java.util.Comparator;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.read32;
 import static jvm.JVMShared.write32;
-import static jvm.JavaLang.ptrTo;
 
 // https://www.codeproject.com/Articles/26048/Fastest-In-Place-Stable-Sort
 // http://thomas.baudel.name/Visualisation/VisuTri/inplacestablesort.html

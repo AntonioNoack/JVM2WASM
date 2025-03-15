@@ -5,8 +5,7 @@ import me.anno.utils.structures.arrays.IntArrayList;
 
 import java.util.Objects;
 
-import static jvm.LWJGLxOpenGL.rgba2argb;
-import static jvm.NativeLog.log;
+import static jvm.JVM32.ptrSize;
 
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This
@@ -73,7 +72,7 @@ import static jvm.NativeLog.log;
  *
  * @author Based on Sun's java.util.HashMap (modified by koliver)
  */
-public class IntHashMap<V> {
+public class LongHashMap<V> {
 
     /**
      * The hash table data.
@@ -105,7 +104,7 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero, or if the load factor is nonpositive.
      */
-    public IntHashMap(int initialCapacity, float loadFactor) {
+    public LongHashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException("Illegal Initial Capacity: " + initialCapacity);
         if (!(loadFactor > 0.1f && loadFactor < 1f))
@@ -128,7 +127,7 @@ public class IntHashMap<V> {
      * @throws IllegalArgumentException if the initial capacity is less
      *                                  than zero.
      */
-    public IntHashMap(int initialCapacity) {
+    public LongHashMap(int initialCapacity) {
         this(initialCapacity, 0.5f);
     }
 
@@ -166,7 +165,7 @@ public class IntHashMap<V> {
      * @param key key whose presence in this Map is to be tested.
      */
     @NoThrow
-    public boolean containsKey(int key) {
+    public boolean containsKey(long key) {
         IEntry[] tab = this.table;
         int index = hashKey(key, tab.length);
         for (IEntry e = tab[index]; e != null; e = e.next) {
@@ -230,8 +229,8 @@ public class IntHashMap<V> {
     }
 
     @NoThrow
-    private int hashKey(int key, int capacity) {
-        return ((key ^ rgba2argb(key)) & 0x7fffffff) & (capacity - 1);
+    private int hashKey(long key, int capacity) {
+        return (int) (key & 0x7fffffff) & (capacity - 1);
     }
 
     /**
@@ -247,7 +246,7 @@ public class IntHashMap<V> {
      * {@code null} with the specified key.
      */
     @NoThrow
-    public V put(int key, V value) {
+    public V put(long key, V value) {
         // Makes sure the key is not already in the HashMap.
         IEntry[] tab = table;
         int index = hashKey(key, tab.length);
@@ -286,13 +285,11 @@ public class IntHashMap<V> {
      * with the specified key.
      */
     @NoThrow
-    public V remove(int key) {
+    public V remove(long key) {
         IEntry[] tab = this.table;
 
         int index = hashKey(key, tab.length);
-        int steps = 0;
         for (IEntry e = tab[index], prev = null; e != null; prev = e, e = e.next) {
-            steps++;
             if (key == e.key) {
                 if (prev != null)
                     prev.next = e.next;
@@ -302,13 +299,11 @@ public class IntHashMap<V> {
                 count--;
                 Object result = e.value;
                 e.value = null;
-                log("Removed X using Y steps, size", key, steps, size());
                 //noinspection unchecked
                 return (V) result;
             }
         }
 
-        log("Searched X using Y steps, size", key, steps, size());
         return null;
     }
 
@@ -325,12 +320,12 @@ public class IntHashMap<V> {
 
     @NoThrow
     private static class IEntry {
-        final int key;
+        final long key;
         Object value;
         IEntry next;
 
         @NoThrow
-        IEntry(int key, Object value, IEntry next) {
+        IEntry(long key, Object value, IEntry next) {
             this.key = key;
             this.value = value;
             this.next = next;
@@ -346,18 +341,20 @@ public class IntHashMap<V> {
 
         @Override
         public int hashCode() {
-            return key ^ Objects.hashCode(value);
+            return Long.hashCode(key);
         }
 
     }
 
     @NoThrow
     public void collectKeys(IntArrayList dst) {
+        if (ptrSize == 8) throw new IllegalStateException("Please implement GC for 64-bits");
+
         dst.clear();
         dst.ensureCapacity(size() + 1);
         for (IEntry entry : table) {
             if (entry != null) {
-                dst.addUnsafe(entry.key);
+                dst.addUnsafe((int) entry.key);
             }
         }
     }

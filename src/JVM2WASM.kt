@@ -94,7 +94,7 @@ var useDefaultKotlinReflection = false
 
 var alignFieldsProperly = true
 
-var callStaticInitOnce = false
+var callStaticInitOnce = false // not supported, because there is lots of cyclic dependencies (24 cycles)
 var callStaticInitAtCompileTime = true // todo implement this
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
@@ -601,20 +601,10 @@ fun jvm2wasm() {
         printMissingFunctions(usedButNotImplemented, usedMethods)
     }
 
-    clock.stop("Until Globals")
-
-    fun printGlobal(name: String, type: String, type2: String, value: Int) {
-        // can be mutable...
-        dataPrinter.append("(global $").append(name).append(" ").append(type).append(" (").append(type2)
-            .append(".const ").append(value).append("))\n")
-    }
-
     fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
-        printGlobal(name, if (isMutable) "(mut $type)" else type, type, value)
         globals.add(GlobalVariable("global_$name", type, value, isMutable))
     }
 
-    if (comments) dataPrinter.append(";; globals:\n")
     defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
     defineGlobal("staticTable", ptrType, staticTablePtr) // static table
     defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
@@ -636,8 +626,6 @@ fun jvm2wasm() {
     defineGlobal("allocationPointer", ptrType, ptr, true)
     defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
 
-    clock.stop("Globals")
-
     // todo code-size optimization:
     //  inline calls to functions, which only call
 
@@ -645,13 +633,10 @@ fun jvm2wasm() {
     //  1. resolve what we need by all entry points
     //  2. resolve what we need by static-init and translate it
     //  3. execute static init
-    //  4. resolve what we need without static-init and translate&ship it
+    //  4. resolve what we need without static-init and re-translate/optimize&ship it
     //    - also optimize static field reading: many will be read-only after static-init
 
     if (callStaticInitAtCompileTime) {
-
-        // todo partially sort these methods by dependencies
-        //  for better code-complexity and allocation measurements
 
         // create VM
         val originalMemory = ptr
@@ -668,7 +653,9 @@ fun jvm2wasm() {
         vm.resolveCalls()
         assertTrue(functionTable.isNotEmpty()) // usually should not be empty
         vm.registerFunctionTable(functionTable)
-        // call all static init functions
+        // call all static init functions;
+        // partially sort these methods by dependencies
+        //  for better code-complexity and allocation measurements
         val staticInitFunctions = staticCallOrder
         val time0i = System.nanoTime()
         try {
@@ -731,17 +718,32 @@ fun jvm2wasm() {
         val timeI = System.nanoTime()
         val allocationStart = vm.globals["allocationStart"]!!.toInt()
         val allocationPointer = vm.globals["allocationPointer"]!!.toInt()
-        LOGGER.info("Base Memory: ${allocationStart.formatFileSize()}")
+        LOGGER.info("Base Memory: ($allocationStart) ${allocationStart.formatFileSize()}")
         LOGGER.info("Allocated ${(allocationPointer - allocationStart).formatFileSize()} during StaticInit")
         LOGGER.info("Executed ${vm.instructionCounter} instructions for StaticInit")
         LOGGER.info(
             "Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
                     "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s"
         )
-        MemoryOptimizer.optimizeMemory(vm)
-        // todo run GC
-        // todo compact memory by remapping instances (should be possible)
+        MemoryOptimizer.optimizeMemory(vm, dataPrinter)
+        LOGGER.info("New Base Memory: $allocationStart (${allocationStart.formatFileSize()})")
         clock.stop("StaticInit WASM-VM")
+    }
+
+    if (comments) dataPrinter.append(";; globals:\n")
+
+    fun printGlobal(name: String, type: String, type2: String, value: Int) {
+        // can be mutable...
+        dataPrinter.append("(global $").append(name).append(" ").append(type).append(" (").append(type2)
+            .append(".const ").append(value).append("))\n")
+    }
+
+    for (global in globals) {
+        val name = global.name.substring("global_".length)
+        val isMutable = global.isMutable
+        val type = global.type
+        val value = global.initialValue
+        printGlobal(name, if (isMutable) "(mut $type)" else type, type, value)
     }
 
     printMethodImplementations(bodyPrinter, usedMethods)

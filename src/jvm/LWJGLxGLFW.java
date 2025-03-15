@@ -10,7 +10,7 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 import static jvm.JVM32.getAddr;
-import static jvm.JavaLang.ptrTo;
+import static jvm.JVM32.ptrTo;
 import static jvm.NativeLog.log;
 
 public class LWJGLxGLFW {
