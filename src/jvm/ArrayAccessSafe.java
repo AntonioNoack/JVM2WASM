@@ -17,7 +17,7 @@ public class ArrayAccessSafe {
     @Alias(names = "i32ArrayStore")
     public static void arrayStore(int instance, int index, int value) {
         checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
+        int clazz = readClassId(instance);
         if (clazz != 1 && clazz != 2) throwJs("Incorrect clazz! i32", instance, clazz);
         write32(instance + arrayOverhead + (index << 2), value);
     }
@@ -37,7 +37,7 @@ public class ArrayAccessSafe {
     @Alias(names = "i16ArrayStore")
     public static void arrayStore(int instance, int index, short value) {
         checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
+        int clazz = readClassId(instance);
         if (clazz != 6 && clazz != 7) throwJs("Incorrect clazz! i16", instance, clazz);
         write16(instance + arrayOverhead + (index << 1), value);
     }
@@ -45,7 +45,7 @@ public class ArrayAccessSafe {
     @Alias(names = "i8ArrayStore")
     public static void arrayStore(int instance, int index, byte value) {
         checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
+        int clazz = readClassId(instance);
         if (clazz != 4 && clazz != 5) throw new ClassCastException("Incorrect clazz!");
         write8(instance + arrayOverhead + index, value);
     }
@@ -59,7 +59,7 @@ public class ArrayAccessSafe {
     @Alias(names = "i32ArrayLoad")
     public static int arrayLoad32(int instance, int index) {
         checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
+        int clazz = readClassId(instance);
         if (clazz != 1 && clazz != 2) throw new ClassCastException("Incorrect clazz!");
         return read32(instance + arrayOverhead + (index << 2));
     }
@@ -91,7 +91,7 @@ public class ArrayAccessSafe {
     @Alias(names = "s8ArrayLoad")
     public static byte arrayLoad8(int instance, int index) {
         checkOutOfBounds(instance, index);
-        int clazz = readClass(instance);
+        int clazz = readClassId(instance);
         if (clazz != 4 && clazz != 5) throw new ClassCastException("Incorrect clazz!");
         return read8(instance + arrayOverhead + index);
     }

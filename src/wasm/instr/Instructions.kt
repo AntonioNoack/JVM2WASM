@@ -202,11 +202,4 @@ object Instructions {
     val I32_ROTR = BinaryI32Instruction("i32.rotr", "std::rotr(", Int::rotateRight)
     val I64_ROTR = BinaryI64Instruction("i64.rotr", "std::rotr(") { a, b -> a.rotateRight(b.toInt()) }
 
-    val Drop = object : SimpleInstr("drop") {
-        override fun execute(engine: WASMEngine): String? {
-            engine.pop()
-            return null
-        }
-    }
-
 }

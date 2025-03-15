@@ -232,7 +232,7 @@ public class JavaLang {
         if ((src == dst && srcIndex == dstIndex) || length == 0) return; // done :)
         int src1 = getAddr(src), dst1 = getAddr(dst);
 
-        int clazz1 = readClass(src1), clazz2 = readClass(dst1);
+        int clazz1 = readClassId(src1), clazz2 = readClassId(dst1);
         if (clazz1 != clazz2) {
             log("Mismatched classes:", clazz1, clazz2);
             throw new RuntimeException("Mismatched types");

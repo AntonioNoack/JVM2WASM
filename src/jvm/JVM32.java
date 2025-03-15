@@ -52,8 +52,8 @@ public class JVM32 {
     public static native int getClassInstanceTable();
 
     @NoThrow
-    public static int findClassPtr(int idx) {
-        return idx * getClassSize() + getClassInstanceTable();
+    public static int findClassPtr(int classId) {
+        return classId * getClassSize() + getClassInstanceTable();
     }
 
     @NoThrow
@@ -64,7 +64,7 @@ public class JVM32 {
     }
 
     static void failCastCheck(Object instance, int clazz) {
-        Class<Object> isClass = findClass(readClass(getAddr(instance)));
+        Class<Object> isClass = findClass(readClassIdI(instance));
         Class<Object> checkClass = findClass(clazz);
         log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
         throw new ClassCastException();
@@ -89,7 +89,7 @@ public class JVM32 {
     public static int createInstance(int clazz) {
         validateClassIdx(clazz);
         if (trackAllocations) trackCalloc(clazz);
-        int instanceSize = getInstanceSize(clazz);
+        int instanceSize = getInstanceSizeNonArray(clazz);
         if (instanceSize <= 0)
             throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
         int newInstance = calloc(instanceSize);
@@ -229,7 +229,8 @@ public class JVM32 {
 
     public static int adjustCallocSize(int size) {
         // 4 is needed for GPU stuff, or we'd have to reallocate it on the JS side
-        return ((size + 3) >>> 2) << 2;
+        // 8 is needed for x86
+        return ((size + 7) >>> 3) << 3;
     }
 
     public static boolean criticalAlloc = false;
@@ -436,7 +437,7 @@ public class JVM32 {
     public static void checkOutOfBounds(int instance, int index, int clazz) {
         if (instance == 0) throw new NullPointerException("isOOB2");
         // checkAddress(instance);
-        if (readClass(instance) != clazz) throwJs("Incorrect clazz!", instance, readClass(instance), clazz);
+        if (readClassId(instance) != clazz) throwJs("Incorrect clazz!", instance, readClassId(instance), clazz);
         int length = read32(instance + objectOverhead);
         if (ge_ub(index, length)) {
             throw new IndexOutOfBoundsException();
@@ -502,7 +503,7 @@ public class JVM32 {
     @NoThrow
     @Alias(names = "readClass")
     public static int readClass1(int addr) {
-        return readClass(addr);
+        return readClassId(addr);
     }
 
     /**
@@ -510,14 +511,14 @@ public class JVM32 {
      */
     @NoThrow
     @WASM(code = "i32.load i32.const 16777215 i32.and")
-    public static native int readClass(int addr);
+    public static native int readClassId(int addr);
 
     /**
      * returns the class index for the given instance
      */
     @NoThrow
-    public static int readClassI(Object instance) {
-        return readClass(getAddr(instance));
+    public static int readClassIdI(Object instance) {
+        return readClassId(getAddr(instance));
     }
 
     @NoThrow

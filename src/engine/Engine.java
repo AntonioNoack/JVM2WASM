@@ -632,7 +632,7 @@ public class Engine {
         while (unsignedLessThan(instance, endPtr) && idx < endIdx) {
 
             // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
-            final int clazz = readClass(instance);
+            final int clazz = readClassId(instance);
             if (unsignedGreaterThanEqual(clazz, nc)) {
                 log("Handling", instance, clazz);
                 log("Illegal class index {} >= {} at {}!", clazz, nc, instance);

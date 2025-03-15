@@ -9,6 +9,8 @@ import java.io.PrintStream;
 import static jvm.JVM32.*;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
+import static utils.StaticClassIndices.FIRST_ARRAY;
+import static utils.StaticClassIndices.LAST_ARRAY;
 
 /**
  * Things that are shared between JVM32 and JVM64: stuff, that is independent of pointerSize/is32Bits/ptrType
@@ -239,16 +241,21 @@ public class JVMShared {
 
     @NoThrow
     public static int getTypeShiftUnsafe(int clazz) {
-        // 0 1 2 3 4 5 6 7 8 9
-        // 2 2 2 2 0 0 1 1 3 3
+        // todo this is actually incorrect for !is32Bits, 0
+        // 0 1   2 3 4 5 6 7 8 9
+        // ? 2/3 2 2 0 0 1 1 3 3
         int flag0 = ge_ui(clazz, 4) & lt(clazz, 6);
         int flag1 = ge_ui(clazz, 8);
         return 2 - flag0 - flag0 - ge_ui(clazz, 6) + flag1 + flag1;
     }
 
-    public static int getTypeShift(int clazz) {
-        if (clazz < 0 || clazz > 9) throw new IllegalArgumentException();
-        return getTypeShiftUnsafe(clazz);
+    public static boolean isArrayClassId(int classId) {
+        return classId >= FIRST_ARRAY && classId <= LAST_ARRAY;
+    }
+
+    public static int getTypeShift(int classId) {
+        if (!isArrayClassId(classId)) throw new IllegalArgumentException();
+        return getTypeShiftUnsafe(classId);
     }
 
     @NoThrow
@@ -262,7 +269,7 @@ public class JVMShared {
     }
 
     @NoThrow
-    public static int getInstanceSize(int classId) {
+    public static int getInstanceSizeNonArray(int classId) {
         // look up class table for size
         int tableAddress = getInheritanceTableEntry(classId);
         return read32(tableAddress + 4);
@@ -412,7 +419,7 @@ public class JVMShared {
         if (instance == null) {
             throw new NullPointerException("Instance for resolveInterface is null");
         } else {
-            return resolveInterfaceByClass(readClassI(instance), methodId);
+            return resolveInterfaceByClass(readClassIdI(instance), methodId);
         }
     }
 
@@ -424,7 +431,7 @@ public class JVMShared {
         if (instance == null) return false;
         if (classId == 0) return true;
         // checkAddress(instance);
-        int testedClass = readClassI(instance);
+        int testedClass = readClassIdI(instance);
         return isChildOrSameClass(testedClass, classId);
     }
 
@@ -436,14 +443,14 @@ public class JVMShared {
         if (instance == null) return false;
         if (clazz == 0) return true;
         // checkAddress(instance);
-        int testedClass = readClassI(instance);
+        int testedClass = readClassIdI(instance);
         return isChildOrSameClassNonInterface(testedClass, clazz);
     }
 
     @NoThrow
     @Alias(names = "instanceOfExact")
     public static boolean instanceOfExact(Object instance, int clazz) {
-        return (instance != null) & (readClassI(instance) == clazz);
+        return (instance != null) & (readClassIdI(instance) == clazz);
     }
 
     @NoThrow
@@ -504,7 +511,7 @@ public class JVMShared {
         if (instance == null) {
             throw new NullPointerException("Instance for resolveIndirect is null");
         }
-        return resolveIndirectByClass(readClassI(instance), signatureId);
+        return resolveIndirectByClass(readClassIdI(instance), signatureId);
     }
 
     @NoThrow

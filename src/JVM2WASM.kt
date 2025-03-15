@@ -1,15 +1,18 @@
 import dependency.ActuallyUsedIndex
 import dependency.DependencyIndex
 import dependency.DependencyIndex.constructableClasses
+import dependency.StaticDependencies
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
 import interpreter.WASMEngine
+import interpreter.functions.TrackCallocInstr
+import interpreter.memory.MemoryOptimizer
 import jvm.JVM32
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
+import me.anno.maths.Maths.min
 import me.anno.utils.Clock
-import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.types.Floats.f1
@@ -17,6 +20,7 @@ import me.anno.utils.types.Floats.f3
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
+import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.classNamesByIndex
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.nthGetterMethods
@@ -237,7 +241,6 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
         clazz("jvm/ArrayAccessUnchecked")
     }
 
-    // todo support KotlinReflect
     if (useDefaultKotlinReflection) {
         clazz("kotlin/reflect/jvm/internal/ReflectionFactoryImpl")
     }
@@ -360,6 +363,7 @@ fun isRootType(clazz: String): Boolean {
     }
 }
 
+var allocationStart = -1
 val entrySig = MethodSig.c("", "entry", "()V", false)
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
@@ -407,26 +411,7 @@ fun jvm2wasm() {
         gIndex.classNamesByIndex.add(clazz)
     }
 
-    assertEquals(gIndex.classIndex["java/lang/Object"], StaticClassIndices.OBJECT)
-    assertEquals(gIndex.classIndex["java/lang/String"], StaticClassIndices.STRING)
-    assertEquals(gIndex.classIndex["[]"], StaticClassIndices.OBJECT_ARRAY)
-    assertEquals(gIndex.classIndex["[I"], StaticClassIndices.INT_ARRAY)
-    assertEquals(gIndex.classIndex["[F"], StaticClassIndices.FLOAT_ARRAY)
-    assertEquals(gIndex.classIndex["[Z"], StaticClassIndices.BOOLEAN_ARRAY)
-    assertEquals(gIndex.classIndex["[B"], StaticClassIndices.BYTE_ARRAY)
-    assertEquals(gIndex.classIndex["[C"], StaticClassIndices.CHAR_ARRAY)
-    assertEquals(gIndex.classIndex["[S"], StaticClassIndices.SHORT_ARRAY)
-    assertEquals(gIndex.classIndex["[J"], StaticClassIndices.LONG_ARRAY)
-    assertEquals(gIndex.classIndex["[D"], StaticClassIndices.DOUBLE_ARRAY)
-    assertEquals(gIndex.classIndex["int"], StaticClassIndices.NATIVE_INT)
-    assertEquals(gIndex.classIndex["long"], StaticClassIndices.NATIVE_LONG)
-    assertEquals(gIndex.classIndex["float"], StaticClassIndices.NATIVE_FLOAT)
-    assertEquals(gIndex.classIndex["double"], StaticClassIndices.NATIVE_DOUBLE)
-    assertEquals(gIndex.classIndex["boolean"], StaticClassIndices.NATIVE_BOOLEAN)
-    assertEquals(gIndex.classIndex["byte"], StaticClassIndices.NATIVE_BYTE)
-    assertEquals(gIndex.classIndex["short"], StaticClassIndices.NATIVE_SHORT)
-    assertEquals(gIndex.classIndex["char"], StaticClassIndices.NATIVE_CHAR)
-    assertEquals(gIndex.classIndex["void"], StaticClassIndices.NATIVE_VOID)
+    StaticClassIndices.validateClassIndices()
 
     for (i in StaticClassIndices.FIRST_NATIVE..StaticClassIndices.LAST_NATIVE) {
         hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
@@ -464,9 +449,7 @@ fun jvm2wasm() {
 
     // doesn't work yet, because of java/lang-class interdependencies,
     // and probably lots of them in our project, too
-    /*val staticCallOrder = if (callStaticInitOnce) {
-        StaticDependencies.calculateStaticCallOrder()
-    } else null*/
+    val staticCallOrder = StaticDependencies.calculatePartialStaticCallOrder()
 
     indexFieldsInSyntheticMethods()
     calculateFieldOffsets()
@@ -648,6 +631,7 @@ fun jvm2wasm() {
     defineGlobal("stackPointerStart", ptrType, ptr) // stack ptr start address
 
     ptr = align(ptr + 4, 16)
+    allocationStart = ptr
     // allocation start address
     defineGlobal("allocationPointer", ptrType, ptr, true)
     defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
@@ -685,38 +669,60 @@ fun jvm2wasm() {
         assertTrue(functionTable.isNotEmpty()) // usually should not be empty
         vm.registerFunctionTable(functionTable)
         // call all static init functions
-        val staticInitFunctions = dIndex.usedMethods
-            .filter { it.name == STATIC_INIT }
-            .sortedBy { it.name } // for a little consistency ^^
-            .map { methodName(it) }
+        val staticInitFunctions = staticCallOrder
         val time0i = System.nanoTime()
         try {
-            LOGGER.info("Total static init functions: ${staticInitFunctions.size}")
-            LOGGER.info("[-1]: init")
-            vm.executeFunction("init")
             var instr0 = vm.instructionCounter
             var memory0 = vm.globals["allocationPointer"]!!.toInt()
             var time0 = time0i
             val minLogInstructions = 2_000_000L
             val minLogSize = 64_000
-            for (i in staticInitFunctions.indices) {
-                val name = staticInitFunctions[i]
-                LOGGER.info("[$i]: $name")
-                vm.executeFunction(name)
+            LOGGER.info("Total static init functions: ${staticInitFunctions.size}")
+            LOGGER.info("[-1] init")
+            vm.executeFunction("init")
+            fun printStats() {
+                val minPrintedCount = 0
+                val maxPrintedClasses = 10
+                if (WASMEngine.printCallocSummary) {
+                    val allocations = TrackCallocInstr.counters.entries
+                        .filter { it.value >= minPrintedCount }
+                        .sortedByDescending { it.value }
+                    if (allocations.isNotEmpty()) {
+                        LOGGER.info("   Allocations:")
+                        for (k in 0 until min(allocations.size, maxPrintedClasses)) {
+                            val (classId, count) = allocations[k]
+                            val className = gIndex.classNamesByIndex[classId]
+                            LOGGER.info("   - ${count}x $className")
+                        }
+                        if (allocations.size > maxPrintedClasses) {
+                            val more = allocations.size - maxPrintedClasses
+                            val total = allocations.sumOf { it.value }
+                            LOGGER.info("     ... ($more more, $total total)")
+                        }
+                    }
+                    TrackCallocInstr.counters.clear()
+                }
                 val instrI = vm.instructionCounter
                 val memory1 = vm.globals["allocationPointer"]!!.toInt()
                 val timeI = System.nanoTime()
                 if (instrI - instr0 > minLogInstructions)
                     LOGGER.info(
-                        "[$i]     " +
+                        "   " +
                                 "${((instrI - instr0) / 1e6f).f1()} MInstr, " +
                                 "${ceil((timeI - time0) / 1e6f).toInt()} ms, " +
                                 "${((instrI - instr0) * 1e3f / (timeI - time0)).toInt()} MInstr/s"
                     )
-                if (memory1 - memory0 > minLogSize) LOGGER.info("[$i]     +${(memory1 - memory0).formatFileSize()}")
+                if (memory1 - memory0 > minLogSize) LOGGER.info("   +${(memory1 - memory0).formatFileSize()}")
                 instr0 = instrI
                 memory0 = memory1
                 time0 = timeI
+            }
+            printStats()
+            for (i in staticInitFunctions.indices) {
+                val name = staticInitFunctions[i]
+                LOGGER.info("[$i] $name")
+                vm.executeFunction(methodName(name))
+                printStats()
             }
         } catch (e: IllegalStateException) {
             e.printStackTrace()
@@ -728,8 +734,11 @@ fun jvm2wasm() {
         LOGGER.info("Base Memory: ${allocationStart.formatFileSize()}")
         LOGGER.info("Allocated ${(allocationPointer - allocationStart).formatFileSize()} during StaticInit")
         LOGGER.info("Executed ${vm.instructionCounter} instructions for StaticInit")
-        LOGGER.info("Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
-                "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s")
+        LOGGER.info(
+            "Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
+                    "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s"
+        )
+        MemoryOptimizer.optimizeMemory(vm)
         // todo run GC
         // todo compact memory by remapping instances (should be possible)
         clock.stop("StaticInit WASM-VM")

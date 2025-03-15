@@ -48,7 +48,7 @@ public class GCTraversal {
             // log("Traversal", addr, iter, state);
             if (state != iter) {
                 write8(statePtr, iter);
-                int clazz = readClass(instance);
+                int clazz = readClassId(instance);
                 if (clazz == OBJECT_ARRAY) {
                     traverseObjectArray(ptrTo(instance));
                 } else {
@@ -79,7 +79,7 @@ public class GCTraversal {
     public static int[] classSizes;
 
     @NoThrow
-    private static int findFieldsByClass(Class<Object> clazz, int classIdx) {
+    private static int findFieldsByClass(Class<Object> clazz, int classId) {
 
         Field[] fields = getFields(clazz);
         int instanceFieldCtr = 0;
@@ -91,6 +91,7 @@ public class GCTraversal {
                 // check if type is relevant
                 if (!Modifier.isNative(mods)) {
                     if (Modifier.isStatic(mods)) {
+                        log("Static Field/1:", classId, getFieldOffset(field), mods);
                         staticFieldCtr++;
                     } else {
                         instanceFieldCtr++;
@@ -102,7 +103,7 @@ public class GCTraversal {
         Class<Object> parentClass = clazz.getSuperclass();
         int[] parentFields = null;
         if (parentClass != null) {
-            int parentClassIdx = getSuperClassId(classIdx);
+            int parentClassIdx = getSuperClassId(classId);
             parentFields = fieldOffsetsByClass[parentClassIdx];
             if (parentFields != null) {
                 instanceFieldCtr += parentFields.length;
@@ -110,7 +111,7 @@ public class GCTraversal {
         }
 
         if (instanceFieldCtr > 0) {
-            int[] fieldOffsets = fieldOffsetsByClass[classIdx] = new int[instanceFieldCtr];
+            int[] fieldOffsets = fieldOffsetsByClass[classId] = new int[instanceFieldCtr];
             instanceFieldCtr = 0;
             if (parentFields != null) {
                 int parentFieldsLength = parentFields.length;
@@ -139,23 +140,24 @@ public class GCTraversal {
         int[] classSizes = GCTraversal.classSizes = new int[numClasses];
         int staticFieldCtr = 0;
         for (int classIdx = 0; classIdx < numClasses; classIdx++) {
-            classSizes[classIdx] = JVMShared.getInstanceSize(classIdx);
+            classSizes[classIdx] = getInstanceSizeNonArray(classIdx);
             Class<Object> clazz = findClass(classIdx);
             staticFieldCtr += findFieldsByClass(clazz, classIdx);
         }
         int ctr = 0;
         int[] staticFields = GCTraversal.staticFields = new int[staticFieldCtr];
         // log("Counted {} static fields", staticFieldCtr);
-        for (int i = 0; i < numClasses; i++) {
-            Class<Object> clazz = findClass(i);
+        for (int classId = 0; classId < numClasses; classId++) {
+            Class<Object> clazz = findClass(classId);
             Field[] fields = getFields(clazz);
             if (fields == null) continue;
             // count fields
-            int staticOffset = findStatic(i, 0);
+            int staticOffset = findStatic(classId, 0);
             for (Field field : fields) {
                 int mods = field.getModifiers();
                 // check if type is relevant
                 if (!Modifier.isNative(mods) && Modifier.isStatic(mods)) {
+                    log("Static Field/2:", classId, getFieldOffset(field), mods);
                     staticFields[ctr++] = staticOffset + getFieldOffset(field);
                 }
             }

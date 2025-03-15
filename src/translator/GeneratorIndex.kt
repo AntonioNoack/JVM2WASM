@@ -7,6 +7,7 @@ import dependency.ActuallyUsedIndex
 import hIndex
 import isRootType
 import jvm.JVM32.*
+import jvm.JVMShared.intSize
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -14,6 +15,7 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Ints.isPowerOf2
 import replaceClass
 import replaceClassNullable
 import useWASMExceptions
@@ -48,17 +50,22 @@ object GeneratorIndex {
     val stringOutput = ByteArrayOutputStream2()
     fun getString(str: String): Int {
         if (stringStart < 0) throw IllegalStateException("Strings must not be requested before the start is defined")
-        val ptr = getString(str, stringStart + stringOutput.size(), stringOutput)
+        val ptr = getString(str, stringStart, stringOutput)
         stringOffset = stringStart + stringOutput.size()
         return ptr
     }
 
     var stringInstanceSize = -1
-    fun getString(str: String, ptr: Int, buffer: ByteArrayOutputStream2): Int {
+    fun getString(str: String, ptr0: Int, buffer: ByteArrayOutputStream2): Int {
         val stringClassName = "java/lang/String"
         val stringClass = getClassIndex(stringClassName)
         val stringInstanceSize = getInstanceSize(stringClassName)
         return stringSet.getOrPut(str) {
+
+            val alignment = ptrSize
+            alignBuffer(buffer, alignment)
+            val ptr = ptr0 + buffer.position
+
             // append string class
             buffer.writeClass(stringClass)
             buffer.writeLE32(str.hashCode()) // hash, precomputed for faster start times :3
@@ -79,7 +86,10 @@ object GeneratorIndex {
                     buffer.writeLE16(chr.code)
                 }
             }
-            totalStringSize += objectOverhead + ptrSize + 4 + // String
+
+            alignBuffer(buffer)
+
+            totalStringSize += objectOverhead + ptrSize + intSize + // String
                     arrayOverhead + length * (if (byteStrings) 1 else 2) // char[]
             ptr
         }
@@ -240,6 +250,8 @@ object GeneratorIndex {
         val fields = HashMap<String, FieldData>()
         val fieldGaps = ArrayList<Gap>()
 
+        var staticOffsetPtr = -1
+
         init {
             if (parentFields != null) {
                 fieldGaps.addAll(parentFields.fieldGaps)
@@ -343,16 +355,26 @@ object GeneratorIndex {
     fun getInstanceSize(clazz: String): Int {
         val offsets = getFieldOffsets(clazz, false)
             .lock("getInstanceSize")
-        var instanceSize = offsets.offset
-        if (alignFieldsProperly) {
-            val maxFieldSize = 8
-            val remainder = instanceSize % maxFieldSize
-            if (remainder > 0) instanceSize += maxFieldSize - remainder
-        }
-        if (clazz == "java/lang/Class") {
-            assertEquals(32, instanceSize)
-        }
-        return instanceSize
+        return alignPointer(offsets.offset)
+    }
+
+    fun alignPointer(ptr: Int, alignment1: Int = alignment): Int {
+        assertTrue(alignment1.isPowerOf2())
+        val remainder = ptr and (alignment1 - 1)
+        return if (remainder > 0) ptr + alignment1 - remainder else ptr
+    }
+
+    fun alignBuffer(buffer: ByteArrayOutputStream2, alignment1: Int = alignment) {
+        buffer.fill(buffer.position, alignPointer(buffer.position, alignment1))
+    }
+
+    // alignment of 4 is needed for Float[] in WebGL anyway
+    // if we want proper alignment of everything, we need to account for longs and doubles,
+    // and therefore must use 8-byte alignment
+    val alignment = if (is32Bits && !alignFieldsProperly) 4 else 8
+
+    fun checkAlignment(ptr: Int, alignment1: Int = alignment) {
+        assertEquals(ptr, alignPointer(ptr, alignment1))
     }
 
     fun getFieldOffsets(clazz0: String, static: Boolean): ClassOffsets {

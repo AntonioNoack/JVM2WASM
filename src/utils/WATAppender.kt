@@ -17,6 +17,10 @@ import org.objectweb.asm.Opcodes.ACC_NATIVE
 import org.objectweb.asm.Opcodes.ACC_STATIC
 import resources
 import translator.GeneratorIndex
+import translator.GeneratorIndex.alignBuffer
+import translator.GeneratorIndex.alignPointer
+import translator.GeneratorIndex.alignment
+import translator.GeneratorIndex.checkAlignment
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
 import utils.StaticClassIndices.BYTE_ARRAY
@@ -54,14 +58,16 @@ data class FieldEntry(val name: String, val field: GeneratorIndex.FieldData, val
  * all integers, chars and floats are native
  * */
 fun isNativeType(type: String) = when (type) {
-    "I", "F", "J", "D", "Z", "B", "S", "C" -> true
-    else -> false
+    "I", "F", "J", "D", "Z", "B", "S", "C" -> throw IllegalArgumentException()
+    else -> type in NativeTypes.nativeTypes
 }
 
 private fun fillInClassNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
         val name = gIndex.classNamesByIndex[clazz].replace('/', '.') // getName() returns name with dots
-        val strPtr = gIndex.getString(name, classInstanceTablePtr + classData.size(), classData)
+        checkAlignment(classData.position)
+        val strPtr = gIndex.getString(name, classInstanceTablePtr, classData)
+        checkAlignment(classData.position)
         val pos = classData.position
         classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_NAME
         classData.writePointer(strPtr)
@@ -73,7 +79,7 @@ private fun fillInClassSimpleNames(numClasses: Int, classData: ByteArrayOutputSt
     for (clazz in 0 until numClasses) {
         val fullName = gIndex.classNamesByIndex[clazz]
         val simpleName = fullName.split('/', '.').last()
-        val strPtr = gIndex.getString(simpleName, classInstanceTablePtr + classData.size(), classData)
+        val strPtr = gIndex.getString(simpleName, classInstanceTablePtr, classData)
         val pos = classData.position
         classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_SIMPLE_NAME
         classData.writePointer(strPtr)
@@ -107,6 +113,8 @@ private fun fillInFields(
     classSize: Int, indexStartPtr: Int,
 ) {
 
+    checkAlignment(indexStartPtr)
+
     val emptyFieldPtr = indexStartPtr + classData.position
     classData.writeClass(OBJECT_ARRAY)
     classData.writeLE32(0)
@@ -118,16 +126,14 @@ private fun fillInFields(
 
         val className = gIndex.classNamesByIndex[classIndex]
 
-        val instanceModifier = 0
-        val staticModifier = ACC_STATIC
         val instanceFields = gIndex.getFieldOffsets(className, false).fields
             .entries.map { (name, field) ->
-                FieldEntry(name, field, instanceModifier + isNativeType(field.type).toInt(ACC_NATIVE))
+                FieldEntry(name, field, isNativeType(field.type).toInt(ACC_NATIVE))
             }
 
         val staticFields = gIndex.getFieldOffsets(className, true).fields
             .entries.map { (name, field) ->
-                FieldEntry(name, field, staticModifier + isNativeType(field.type).toInt(ACC_NATIVE))
+                FieldEntry(name, field, ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE))
             }
 
         val allFields = (instanceFields + staticFields)
@@ -165,6 +171,7 @@ private fun fillInFields(
         } else if (classIndex == 10 && numClasses > 11) LOGGER.info("...")
 
         // create new fields array
+        alignBuffer(classData, ptrSize)
         val arrayPtr = indexStartPtr + classData.size()
         classData.writeClass(OBJECT_ARRAY) // object array
         classData.writeLE32(allFields.size) // array length
@@ -211,7 +218,8 @@ private fun appendFieldInstance(
 ): Int {
     // create new field instance
     // name must be before fieldPtr, because the name might be new!!
-    val name = gIndex.getString(field.name, indexStartPtr + classData.size(), classData)
+    val name = gIndex.getString(field.name, indexStartPtr, classData)
+    alignBuffer(classData)
     val fieldPtr = indexStartPtr + classData.size()
     classData.writeClass(fieldClassIndex)
     classData.writeLE32(field.field.offset) // slot
@@ -222,6 +230,7 @@ private fun appendFieldInstance(
     classData.writeLE32(field.modifiers) // modifiers
     classData.fill(objectOverhead + 2 * intSize + 3 * ptrSize, fieldSize)
     assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
+    checkAlignment(classData.position)
     return fieldPtr
 }
 
@@ -229,6 +238,7 @@ var classInstanceTablePtr = 0
 fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
     LOGGER.info("[appendClassInstanceTable]")
 
+    checkAlignment(indexStartPtr)
     classInstanceTablePtr = indexStartPtr
 
     val classFields = gIndex.getFieldOffsets("java/lang/Class", false)
@@ -242,6 +252,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
         classData.writeClass(classClassIndex)
         classData.fill(objectOverhead, classSize)
     }
+    checkAlignment(classData.position)
 
     fillInClassNames(numClasses, classData, classSize)
     fillInClassSimpleNames(numClasses, classData, classSize)
@@ -252,64 +263,69 @@ fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numCla
     if (fieldsOffset != null) fillInFields(numClasses, classData, classSize, indexStartPtr)
 
     val methodsOffset = classFields.getOffset("methods")
-    if (methodsOffset != null) {
-        // insert all name pointers
-        val methodCache = HashMap<MethodSig, Int>()
-        val emptyArrayPtr = indexStartPtr + classData.size()
-        classData.writeClass(OBJECT_ARRAY)
-        classData.writeLE32(0) // length
-
-        val methodClassIndex = gIndex.getClassIndex("java/lang/reflect/Method")
-        val methodSize = gIndex.getInstanceSize("java/lang/reflect/Method")
-
-        val methodsByClass = dIndex.usedMethods
-            .filter { isCallable(it) }.groupBy { it.clazz }
-        val methodsForClass = ArrayList<Set<MethodSig>>(numClasses)
-        for (declaringClassIndex in 0 until numClasses) {
-            // find all methods with valid call signature
-            val clazzName = gIndex.classNamesByIndex[declaringClassIndex]
-            val superClass = hIndex.superClass[clazzName]
-            val superClassIdx = if (superClass != null) gIndex.getClassIndex(superClass) else -1
-            val superMethods =
-                if (superClass != null) methodsForClass.getOrNull(superClassIdx)
-                    ?: throw IllegalStateException(
-                        "Classes must be ordered for GC-Init! " +
-                                "$clazzName[${declaringClassIndex}] >= $superClass[$superClassIdx]"
-                    )
-                else emptySet()
-            val superMethods1 = methodsByClass[clazzName] ?: emptyList()
-            val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods).toHashSet()
-            methodsForClass.add(methods)
-            // append all methods
-            val arrayToWrite = if (methods.isNotEmpty()) {
-                val methodPointers = methods.map { method ->
-                    assertTrue(CallSignature.c(method) in hIndex.implementedCallSignatures)
-                    methodCache.getOrPut(method) {
-                        appendMethodInstance(
-                            method, indexStartPtr, classData, declaringClassIndex,
-                            methodClassIndex, classSize, methodSize
-                        )
-                    }
-                }
-
-                val arrayPtr = indexStartPtr + classData.size()
-                classData.writeClass(OBJECT_ARRAY)
-                classData.writeLE32(methodPointers.size)
-                for (methodPtr in methodPointers) {
-                    classData.writePointer(methodPtr)
-                }
-
-                arrayPtr
-            } else emptyArrayPtr
-
-            val pos = classData.position
-            classData.position = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
-            classData.writePointer(arrayToWrite)
-            classData.position = pos
-        }
-    }
+    if (methodsOffset != null) fillInMethods(numClasses, classData, classSize, indexStartPtr)
 
     return appendData(printer, indexStartPtr, classData)
+}
+
+private fun fillInMethods(
+    numClasses: Int, classData: ByteArrayOutputStream2,
+    classSize: Int, indexStartPtr: Int,
+) {
+    // insert all name pointers
+    val methodCache = HashMap<MethodSig, Int>()
+    val emptyArrayPtr = indexStartPtr + classData.size()
+    classData.writeClass(OBJECT_ARRAY)
+    classData.writeLE32(0) // length
+
+    val methodClassIndex = gIndex.getClassIndex("java/lang/reflect/Method")
+    val methodSize = gIndex.getInstanceSize("java/lang/reflect/Method")
+
+    val methodsByClass = dIndex.usedMethods
+        .filter { isCallable(it) }.groupBy { it.clazz }
+    val methodsForClass = ArrayList<Set<MethodSig>>(numClasses)
+    for (declaringClassIndex in 0 until numClasses) {
+        // find all methods with valid call signature
+        val clazzName = gIndex.classNamesByIndex[declaringClassIndex]
+        val superClass = hIndex.superClass[clazzName]
+        val superClassIdx = if (superClass != null) gIndex.getClassIndex(superClass) else -1
+        val superMethods =
+            if (superClass != null) methodsForClass.getOrNull(superClassIdx)
+                ?: throw IllegalStateException(
+                    "Classes must be ordered for GC-Init! " +
+                            "$clazzName[${declaringClassIndex}] >= $superClass[$superClassIdx]"
+                )
+            else emptySet()
+        val superMethods1 = methodsByClass[clazzName] ?: emptyList()
+        val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods).toHashSet()
+        methodsForClass.add(methods)
+        // append all methods
+        val arrayToWrite = if (methods.isNotEmpty()) {
+            val methodPointers = methods.map { method ->
+                assertTrue(CallSignature.c(method) in hIndex.implementedCallSignatures)
+                methodCache.getOrPut(method) {
+                    appendMethodInstance(
+                        method, indexStartPtr, classData, declaringClassIndex,
+                        methodClassIndex, classSize, methodSize
+                    )
+                }
+            }
+
+            val arrayPtr = indexStartPtr + classData.size()
+            classData.writeClass(OBJECT_ARRAY)
+            classData.writeLE32(methodPointers.size)
+            for (methodPtr in methodPointers) {
+                classData.writePointer(methodPtr)
+            } // this is always aligned :)
+
+            arrayPtr
+        } else emptyArrayPtr
+
+        val pos = classData.position
+        classData.position = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
+        classData.writePointer(arrayToWrite)
+        classData.position = pos
+    }
 }
 
 fun isCallable(sig: MethodSig): Boolean {
@@ -385,27 +401,31 @@ fun appendResourceTable(printer: StringBuilder2, ptr0: Int): Int {
     LOGGER.info("[appendResourceTable]")
     resourceTablePtr = ptr0
     val resources = resources
-    val table = ByteArrayOutputStream2(
-        resources.size * 8 + 4 +
-                resources.sumOf { it.first.length + it.second.size }
-                + resources.size * arrayOverhead * 2
-    )
+    val elementSize = 2 * ptrSize
+    val stringOverhead = objectOverhead + arrayOverhead
+    val tableSizeGuess = resources.size * elementSize + intSize +
+            resources.sumOf { (path, data) ->
+                path.length + data.size
+            } + resources.size * (arrayOverhead + stringOverhead)
+    val table = ByteArrayOutputStream2(tableSizeGuess)
     table.writeLE32(resources.size)
-    for (i in 0 until resources.size * 8) { // fill pointers with data :)
-        table.write(0)
+    table.fill(0, resources.size * elementSize)
+    // append names without stride for better cache locality:
+    val names = resources.map { (path, _) ->
+        gIndex.getString(path, ptr0, table)
     }
     for (i in resources.indices) {
         val resource = resources[i]
-        val keyPtr = gIndex.getString(resource.first, ptr0 + table.position, table)
+        val keyPtr = names[i]
         val valuePtr = ptr0 + table.position
         val value = resource.second
         table.writeClass(BYTE_ARRAY)
         table.writeLE32(value.size)
         table.write(value)
         val pos = table.position
-        table.position = i * 8 + 4
-        table.writeLE32(keyPtr)
-        table.writeLE32(valuePtr)
+        table.position = i * elementSize + intSize
+        table.writePointer(keyPtr)
+        table.writePointer(valuePtr)
         table.position = pos
     }
     return appendData(printer, ptr0, table)
@@ -440,7 +460,13 @@ var printDebug = true
 
 var staticTablePtr = -1
 var staticInitFlagTablePtr = 0
-val staticLookup = HashMap<String, Int>()
+
+fun lookupStaticVariable(className: String, offset: Int): Int {
+    val offsets = gIndex.getFieldOffsets(className, true)
+    assertTrue(offsets.staticOffsetPtr != -1)
+    return offsets.staticOffsetPtr + offset
+}
+
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     LOGGER.info("[appendStaticInstanceTable]")
     val debugInfo = StringBuilder2()
@@ -452,27 +478,26 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
         val className = gIndex.classNamesByIndex[i]
         val fieldOffsets = gIndex.getFieldOffsets(className, true)
         val size = fieldOffsets.offset
-        if (size == 0) {
-            staticBuffer.writeLE32(0)
-        } else {
-            // println("writing $i static $className to $ptr, size: $size")
-            staticBuffer.writeLE32(ptr)
-            staticLookup[className] = ptr
-            if (printDebug) {
-                debugInfo.append("[").append(i).append("] ")
-                    .append(className).append(": *").append(ptr).append("\n")
-                fieldOffsets.allFields().entries.sortedBy { it.value.offset }.forEach { (name, data) ->
-                    debugInfo.append("  *").append(data.offset).append(": ").append(name)
-                        .append(": ").append(data.type).append("\n")
-                }
+
+        // todo we could be less strict, if there is only smaller-sized fields
+        ptr = alignPointer(ptr)
+        staticBuffer.writeLE32(if (size == 0) 0 else ptr)
+        fieldOffsets.staticOffsetPtr = ptr
+        if (printDebug && size > 0) {
+            debugInfo.append("[").append(i).append("] ")
+                .append(className).append(": *").append(ptr).append("\n")
+            fieldOffsets.allFields().entries.sortedBy { it.value.offset }.forEach { (name, data) ->
+                debugInfo.append("  *").append(data.offset).append(": ").append(name)
+                    .append(": ").append(data.type).append("\n")
             }
-            ptr += size
         }
+        ptr += size
     }
     if (printDebug) {
         debugFolder.getChild("staticInstances.txt")
             .writeBytes(debugInfo.values, 0, debugInfo.size)
     }
+
     val ptr2 = appendData(printer, staticTablePtr, staticBuffer)
     assertTrue(ptr >= ptr2)
     return ptr
@@ -481,10 +506,15 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
 val segments = ArrayList<DataSection>()
 
 fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArrayOutputStream2): Int {
+    alignBuffer(data)
     return appendData(printer, startIndex, data.toByteArray())
 }
 
 fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
+
+    checkAlignment(startIndex)
+    checkAlignment(data.size)
+
     val segment = startIndex until (startIndex + data.size)
     val mid1 = segment.first + segment.last
     val length1 = segment.last - segment.first

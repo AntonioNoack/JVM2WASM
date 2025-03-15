@@ -11,6 +11,8 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
+import static utils.StaticClassIndices.FIRST_ARRAY;
+import static utils.StaticClassIndices.NUM_ARRAYS;
 
 /**
  * "Sweep" of mark-and-sweep
@@ -221,22 +223,22 @@ public class GCGapFinder {
 
 
     @NoThrow
-    static int getInstanceSizeI(int instance) {
-        return getInstanceSizeIC(instance, readClass(instance));
+    static int getInstanceSizeI(int addr) {
+        return getInstanceSizeIC(addr, readClassId(addr));
     }
 
     @NoThrow
-    private static int getInstanceSizeIC(int instance, int classIndex) {
+    private static int getInstanceSizeIC(int addr, int classIndex) {
         int size;
-        if (unsignedLessThan(classIndex - 1, 9)) { // clazz > 0 && clazz < 10
+        if (unsignedLessThan(classIndex - FIRST_ARRAY, NUM_ARRAYS)) { // clazz > 0 && clazz < 10
             // handle arrays by size
-            size = arrayOverhead + (arrayLength(instance) << getTypeShift(classIndex));
+            size = arrayOverhead + (arrayLength(addr) << getTypeShiftUnsafe(classIndex));
+            size = adjustCallocSize(size);
         } else {
             // handle class instance
             int sizesPtr = getAddr(classSizes) + arrayOverhead;
             size = read32(sizesPtr + (classIndex << 2));
         }
-        size = adjustCallocSize(size);
         return size;
     }
 

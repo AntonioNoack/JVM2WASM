@@ -3,7 +3,6 @@ package translator
 import alwaysUseFieldCalls
 import annotations.Boring
 import annotations.NotCalled
-import useResultForThrowables
 import api
 import canThrowError
 import checkArrayAccess
@@ -37,6 +36,7 @@ import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass
 import translator.ResolveIndirect.resolveIndirect
+import useResultForThrowables
 import useWASMExceptions
 import utils.*
 import utils.Builder.Companion.isDuplicable
@@ -62,7 +62,6 @@ import wasm.instr.Const.Companion.i32ConstM1
 import wasm.instr.Const.Companion.i64Const
 import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Const.Companion.i64Const1
-import wasm.instr.Instructions.Drop
 import wasm.instr.Instructions.F32Add
 import wasm.instr.Instructions.F32Div
 import wasm.instr.Instructions.F32Load
@@ -1067,7 +1066,7 @@ class MethodTranslator(
                 val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
                 assertEquals(sig0, sig1)
                 assertTrue(sig1 in dIndex.usedInterfaceCalls)
-                
+
                 val variants = findConstructableChildImplementations(sig0)
                 if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
                     // invoke interface
@@ -1929,7 +1928,7 @@ class MethodTranslator(
                     printer.push(wasmType)
                     // load class index
                     if (precalculateStaticFields) {
-                        val staticPtr = staticLookup[owner]!! + fieldOffset
+                        val staticPtr = lookupStaticVariable(owner, fieldOffset)
                         printer.append(i32Const(staticPtr))
                     } else {
                         printer
@@ -1967,7 +1966,7 @@ class MethodTranslator(
                     callStaticInit(owner)
                     printer.pop(wasmType)
                     if (precalculateStaticFields) {
-                        val staticPtr = staticLookup[owner]!! + fieldOffset
+                        val staticPtr = lookupStaticVariable(owner, fieldOffset)
                         printer.append(i32Const(staticPtr))
                     } else {
                         printer

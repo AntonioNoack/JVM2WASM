@@ -6,6 +6,7 @@ import dependency.DependencyIndex.interfaceDependencies
 import dependency.DependencyIndex.methodDependencies
 import dependency.DependencyIndex.setterDependencies
 import hIndex
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.TopologicalSort
 import org.apache.logging.log4j.LogManager
@@ -16,6 +17,112 @@ import utils.STATIC_INIT
 object StaticDependencies {
 
     private val LOGGER = LogManager.getLogger(StaticDependencies::class)
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val graph = mapOf(
+            0 to setOf(),
+            1 to setOf(0),
+            2 to setOf(1),
+            3 to setOf(2, 3), // a pseudo-cycle,
+            4 to setOf(1, 2, 3),
+            5 to setOf(4, 7), // actual cycle, should come last
+            6 to setOf(5),
+            7 to setOf(6),
+            8 to setOf(8), // independent pseudo-cycle
+        )
+        println(partiallySortByDependencies(graph.keys.shuffled(), graph, true))
+    }
+
+    fun calculatePartialStaticCallOrder(): List<MethodSig> {
+        val staticMethods = findAllUsedStaticMethods()
+        val dependencies = staticMethods.associateWith(::findAllStaticDependencies)
+        return partiallySortByDependencies(staticMethods, dependencies, true)
+    }
+
+    fun <K, V, DstK : MutableCollection<K>> Map<K, Collection<V>>.transpose(createDstK: () -> DstK): Map<V, DstK> {
+        val result = HashMap<V, DstK>(size)
+        for ((key, values) in this) {
+            for (value in values) {
+                result
+                    .getOrPut(value, createDstK)
+                    .add(key)
+            }
+        }
+        return result
+    }
+
+    fun <V> partiallySortByDependencies(
+        nodes: List<V>, dependencies: Map<V, Set<V>>,
+        minimizeNumCycleBreaks: Boolean
+    ): List<V> {
+
+        val mutableDependencies = dependencies
+            .mapValues { (node, dependenciesI) ->
+                HashSet(dependenciesI).apply { remove(node) }
+            }
+
+        val reverseDependencies = mutableDependencies
+            .transpose(::HashSet)
+
+        fun hasNoDependencies(node: V): Boolean {
+            return mutableDependencies[node]?.isEmpty() ?: true
+        }
+
+        val sortedList = ArrayList<V>(nodes.size)
+        val unsortedNodes = HashSet<V>(nodes)
+
+        val nodesWithoutDependencies = ArrayDeque<V>()
+        fun removeNodeFromGraph(dependency: V) {
+
+            if (!unsortedNodes.remove(dependency)) {
+                // todo this really should not happen...
+                //  how can a node enter this function twice???
+                return
+            }
+            sortedList.add(dependency)
+
+            val revDependencies = reverseDependencies[dependency] ?: return
+            for (node in revDependencies) {
+                val dependencies1 = mutableDependencies[node]!!
+                assertTrue(dependencies1.remove(dependency))
+                if (dependencies1.isEmpty()) {
+                    nodesWithoutDependencies.add(node)
+                }
+            }
+        }
+
+        for (node in nodes) {
+            if (hasNoDependencies(node)) {
+                removeNodeFromGraph(node)
+            }
+        }
+
+        fun numRevDependencies(node: V): Int {
+            return reverseDependencies[node]?.size ?: 0
+        }
+
+        var numCycles = 0
+        while (unsortedNodes.isNotEmpty()) {
+            if (nodesWithoutDependencies.isNotEmpty()) {
+                val node = nodesWithoutDependencies.removeFirst()
+                assertTrue(hasNoDependencies(node))
+                removeNodeFromGraph(node)
+            } else {
+                // the remainder has cycles... break them arbitrarily
+                val cycleNode = if (minimizeNumCycleBreaks) {
+                    unsortedNodes.maxBy(::numRevDependencies)
+                } else unsortedNodes.first()
+                println("Breaking cycle on $cycleNode (${numRevDependencies(cycleNode)})")
+                removeNodeFromGraph(cycleNode)
+                numCycles++
+            }
+        }
+
+        println("Partially sorted, found $numCycles cycle(s)")
+
+        return sortedList
+    }
 
     fun calculateStaticCallOrder(): List<MethodSig> {
 

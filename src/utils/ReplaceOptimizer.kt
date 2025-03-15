@@ -8,7 +8,7 @@ import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
-import wasm.instr.Instructions.Drop
+import wasm.instr.Drop
 import wasm.instr.Instructions.F32EQ
 import wasm.instr.Instructions.F32GE
 import wasm.instr.Instructions.F32GT

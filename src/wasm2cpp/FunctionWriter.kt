@@ -8,7 +8,7 @@ import org.apache.logging.log4j.LogManager
 import utils.StringBuilder2
 import utils.WASMTypes.*
 import wasm.instr.*
-import wasm.instr.Instructions.Drop
+import wasm.instr.Drop
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load

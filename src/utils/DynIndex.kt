@@ -395,7 +395,7 @@ object DynIndex {
     private fun findImplementedInterfaceMethods(
         clazz: String, interfaces: Set<String>
     ): HashMap<Int, MethodSig> {
-        val print = gIndex.getClassIndex(clazz) == 49
+        val print = false
         val implFunctions0 = HashMap<Int, MethodSig>()
         for (sig in dIndex.usedInterfaceCalls) {
             // only if is actually instance of interface

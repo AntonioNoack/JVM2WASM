@@ -4,7 +4,7 @@ import annotations.Alias;
 import annotations.Export;
 import annotations.NoThrow;
 
-import static jvm.JVM32.readClass;
+import static jvm.JVM32.readClassId;
 import static jvm.JVMShared.*;
 
 public class MemDebug {
@@ -41,7 +41,7 @@ public class MemDebug {
     @NoThrow
     @Alias(names = "rCl")
     public static int rCl(int addr) {
-        return readClass(addr);
+        return readClassId(addr);
     }
 
     @Export

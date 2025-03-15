@@ -20,7 +20,7 @@ import utils.WASMTypes.*
 import utils.helperFunctions
 import utils.ptrType
 import wasm.instr.*
-import wasm.instr.Instructions.Drop
+import wasm.instr.Drop
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load

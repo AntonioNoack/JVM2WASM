@@ -48,19 +48,6 @@ data class SwitchCase(
         }
     }
 
-    override fun equals(other: Any?): Boolean {
-        return other === this ||
-                other is SwitchCase &&
-                other.label == label &&
-                other.params == params &&
-                other.results == results &&
-                other.cases == cases
-    }
-
-    override fun hashCode(): Int {
-        return label.hashCode()
-    }
-
     override fun execute(engine: WASMEngine): String? {
         val stackFrame = engine.stackFrames.last()
         val labelValue = stackFrame.locals[label]!! as Int

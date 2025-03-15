@@ -1,5 +1,8 @@
 package utils;
 
+import me.anno.utils.assertions.AssertionsKt;
+import translator.GeneratorIndex;
+
 public class StaticClassIndices {
     public static final int OBJECT = 0;
     public static final int OBJECT_ARRAY = 1;
@@ -25,4 +28,39 @@ public class StaticClassIndices {
 
     public static final int FIRST_NATIVE = NATIVE_INT;
     public static final int LAST_NATIVE = NATIVE_VOID;
+
+    public static final int FIRST_ARRAY = OBJECT_ARRAY;
+    public static final int LAST_ARRAY = DOUBLE_ARRAY;
+    public static final int NUM_ARRAYS = LAST_ARRAY - FIRST_ARRAY + 1;
+
+    private static int getClassIndex(String className) {
+        return GeneratorIndex.INSTANCE.getClassIndex(className);
+    }
+
+    public static void validateClassIndices() {
+        assertEquals(getClassIndex("java/lang/Object"), OBJECT);
+        assertEquals(getClassIndex("java/lang/String"), STRING);
+        assertEquals(getClassIndex("[]"), OBJECT_ARRAY);
+        assertEquals(getClassIndex("[I"), INT_ARRAY);
+        assertEquals(getClassIndex("[F"), FLOAT_ARRAY);
+        assertEquals(getClassIndex("[Z"), BOOLEAN_ARRAY);
+        assertEquals(getClassIndex("[B"), BYTE_ARRAY);
+        assertEquals(getClassIndex("[C"), CHAR_ARRAY);
+        assertEquals(getClassIndex("[S"), SHORT_ARRAY);
+        assertEquals(getClassIndex("[J"), LONG_ARRAY);
+        assertEquals(getClassIndex("[D"), DOUBLE_ARRAY);
+        assertEquals(getClassIndex("int"), NATIVE_INT);
+        assertEquals(getClassIndex("long"), NATIVE_LONG);
+        assertEquals(getClassIndex("float"), NATIVE_FLOAT);
+        assertEquals(getClassIndex("double"), NATIVE_DOUBLE);
+        assertEquals(getClassIndex("boolean"), NATIVE_BOOLEAN);
+        assertEquals(getClassIndex("byte"), NATIVE_BYTE);
+        assertEquals(getClassIndex("short"), NATIVE_SHORT);
+        assertEquals(getClassIndex("char"), NATIVE_CHAR);
+        assertEquals(getClassIndex("void"), NATIVE_VOID);
+    }
+
+    private static void assertEquals(int expected, int actual) {
+        AssertionsKt.assertEquals(expected, actual, "Expected same value");
+    }
 }

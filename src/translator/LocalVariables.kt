@@ -130,7 +130,13 @@ class LocalVariables {
             builder.append(char2)
         }
         if (builder.length == 0) return null
-        return builder.toString()
+        val name1 = builder.toString()
+        if (name1 == "this") return "self"
+        if (name1 in FunctionWriter.cppKeywords ||
+            name1.startsWith("tmp") ||
+            name1.startsWith("global_")
+        ) return "_$name1"
+        return name1
     }
 
     private fun validateRenamedVariablesAreNotUsed(nodes: List<TranslatorNode>, renamedVariables: Set<String>) {

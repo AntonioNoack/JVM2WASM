@@ -2,7 +2,7 @@ package utils
 
 import translator.LocalVariableOrParam
 import wasm.instr.*
-import wasm.instr.Instructions.Drop
+import wasm.instr.Drop
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 

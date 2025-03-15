@@ -435,7 +435,7 @@ public class JavaReflect {
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")
     public static int Object_getClass(int instance) {
-        return findClassPtr(readClass(instance));
+        return findClassPtr(readClassId(instance));
     }
 
     @Alias(names = "java_lang_Object_hashCode_I")
@@ -444,7 +444,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getComponentType_Ljava_lang_Class")
-    public static <V> Class<?> java_lang_Class_getComponentType_Ljava_lang_Class(Class<V> clazz) {
+    public static Class<?> Class_getComponentType_Ljava_lang_Class(Class<?> clazz) {
         switch (clazz.getName()) {
             case "[Z":
                 return Boolean.class;
@@ -538,16 +538,17 @@ public class JavaReflect {
     static native int getResourcePtr();
 
     @Alias(names = "java_lang_ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream")
-    public static InputStream java_lang_ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream(ClassLoader cl, String name) {
+    public static InputStream ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream(ClassLoader cl, String name) {
         if (name == null) return null;
         int ptr = getResourcePtr();
         int length = read32(ptr);
+        // todo if we have more than 16 resources, use a HashMap
         ptr += 4;
         int endPtr = ptr + (length << 3);
         while (ptr < endPtr) {
-            String key = ptrTo(read32(ptr));
+            String key = readPtrAtOffset(null, ptr);
             if (name.equals(key)) {
-                byte[] bytes = ptrTo(read32(ptr + 4));
+                byte[] bytes = readPtrAtOffset(null, ptr + 4);
                 return new ByteArrayInputStream(bytes);
             }
             ptr += 8;

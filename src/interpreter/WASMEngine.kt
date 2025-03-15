@@ -34,6 +34,7 @@ class WASMEngine(memorySize: Int) {
         private val LOGGER = LogManager.getLogger(WASMEngine::class)
         const val RETURN_LABEL = "return"
         var printStackPush = false
+        var printCallocSummary = true
         var removeStackPush = true // only do that, if there are no errors XD
     }
 
@@ -161,7 +162,10 @@ class WASMEngine(memorySize: Int) {
             "jvm_JavaLang_printString_Ljava_lang_StringZV",
             listOf(ptrType, i32), emptyList(), PrintString
         )
-        registerFunction("jvm_JVM32_trackCalloc_IV", listOf(i32), emptyList(), listOf(Return))
+        registerFunction(
+            "jvm_JVM32_trackCalloc_IV", listOf(i32), emptyList(),
+            if (printCallocSummary) TrackCallocInstr else Drop
+        )
         registerFunction("fcmpg", listOf(f32, f32), listOf(i32), FloatCompare(+1))
         registerFunction("fcmpl", listOf(f32, f32), listOf(i32), FloatCompare(-1))
         registerFunction("dcmpg", listOf(f64, f64), listOf(i32), FloatCompare(+1))
@@ -183,7 +187,7 @@ class WASMEngine(memorySize: Int) {
         registerGetter("jvm_JVM32_getAllocatedSize_I", i32) { it.bytes.size }
         registerGetter("java_lang_System_nanoTime_J", i64) { System.nanoTime() }
         registerGetter("java_lang_System_currentTimeMillis_J", i64) { System.currentTimeMillis() }
-        for (code in "i,?,??,?i,???,?i?,?ii,?iii".split(',')) {
+        for (code in "i,?,??,?i,???,?i?,?ii,?iii,???i".split(',')) {
             registerLogFunction(code)
         }
         registerUnaryMathFunction("java_lang_StrictMath_log_DD", StrictMath::log)
