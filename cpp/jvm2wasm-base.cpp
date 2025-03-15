@@ -74,8 +74,9 @@ roid init();
 
 // memory stuff
 i32 gcCtr = 0;
-i32 objectOverhead = 4;
-i32 arrayOverhead = 4 + 4;
+constexpr i32 ptrSize = 4;
+constexpr i32 objectOverhead = 4;
+constexpr i32 arrayOverhead = 4 + 4;
 constexpr bool countAllocations = false;
 
 enum GarbageCollector {
@@ -100,10 +101,6 @@ i32 concurrentGCStage = 0;
 // GLFW-stuff
 int width = 800, height = 600;
 double mouseX = width * 0.5, mouseY = height * 0.5;
-
-constexpr int ptrSize = 4;
-constexpr int objectOverhead = 4;
-constexpr int arrayOverhead = objectOverhead + 4;
 
 #include <sstream>
 #include <iostream>
