@@ -6,7 +6,7 @@ import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
-import static jvm.JavaLang.*;
+import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
@@ -117,6 +117,10 @@ public class JVM32 {
     @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
     private static native void trackCalloc(int clazz);
 
+    @NoThrow
+    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
+    private static native void trackCalloc(int clazz, int size);
+
     @Alias(names = "createObjectArray")
     public static int createObjectArray(int length) {
         // probably a bit illegal; should be fine for us, saving allocations :)
@@ -133,6 +137,7 @@ public class JVM32 {
     public static int createNativeArray1(int length, int clazz) {
         // log("creating native array", length, clazz);
         if (length < 0) throw new IllegalArgumentException();
+        if (trackAllocations) trackCalloc(clazz, length);
         int typeShift = getTypeShiftUnsafe(clazz);
         int numDataBytes = length << typeShift;
         if ((numDataBytes >>> typeShift) != length) {

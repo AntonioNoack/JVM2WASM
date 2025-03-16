@@ -4,8 +4,7 @@ import replaceClass
 
 @Suppress("DataClassPrivateConstructor")
 data class MethodSig private constructor(
-    val clazz: String,
-    val name: String,
+    val clazz: String, val name: String,
     val descriptor: Descriptor
 ) {
 

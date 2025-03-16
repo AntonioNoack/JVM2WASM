@@ -606,6 +606,8 @@ fun jvm2wasm() {
         printMissingFunctions(usedButNotImplemented, usedMethods)
     }
 
+    clock.stop("Before Globals")
+
     fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
         globals[name] = GlobalVariable(name, type, value, isMutable)
     }
@@ -642,98 +644,7 @@ fun jvm2wasm() {
     //    - also optimize static field reading: many will be read-only after static-init
 
     if (callStaticInitAtCompileTime) {
-
-        // create VM
-        val originalMemory = ptr
-        val extraMemory = 17 shl 20
-        val vm = WASMEngine(originalMemory + extraMemory)
-        assertTrue(globals.isNotEmpty()) // should not be empty
-        vm.registerGlobals(globals)
-        vm.registerSpecialFunctions()
-        vm.registerMemorySections(segments)
-        assertTrue(translatedMethods.isNotEmpty()) // should not be empty
-        vm.registerFunctions(translatedMethods.values)
-        vm.registerFunctions(helperFunctions.values)
-        vm.registerFunctions(nthGetterMethods.values)
-        vm.resolveCalls()
-        assertTrue(functionTable.isNotEmpty()) // usually should not be empty
-        vm.registerFunctionTable(functionTable)
-        // call all static init functions;
-        // partially sort these methods by dependencies
-        //  for better code-complexity and allocation measurements
-        val staticInitFunctions = staticCallOrder
-        val time0i = System.nanoTime()
-        try {
-            var instr0 = vm.instructionCounter
-            var memory0 = vm.globals["allocationPointer"]!!.toInt()
-            var time0 = time0i
-            val minLogInstructions = 2_000_000L
-            val minLogSize = 64_000
-            LOGGER.info("Total static init functions: ${staticInitFunctions.size}")
-            LOGGER.info("[-1] init")
-            vm.executeFunction("init")
-            fun printStats() {
-                val minPrintedCount = 0
-                val maxPrintedClasses = 10
-                if (WASMEngine.printCallocSummary) {
-                    val allocations = TrackCallocInstr.counters.entries
-                        .filter { it.value >= minPrintedCount }
-                        .sortedByDescending { it.value }
-                    if (allocations.isNotEmpty()) {
-                        LOGGER.info("   Allocations:")
-                        for (k in 0 until min(allocations.size, maxPrintedClasses)) {
-                            val (classId, count) = allocations[k]
-                            val className = gIndex.classNamesByIndex[classId]
-                            LOGGER.info("   - ${count}x $className")
-                        }
-                        if (allocations.size > maxPrintedClasses) {
-                            val more = allocations.size - maxPrintedClasses
-                            val total = allocations.sumOf { it.value }
-                            LOGGER.info("     ... ($more more, $total total)")
-                        }
-                    }
-                    TrackCallocInstr.counters.clear()
-                }
-                val instrI = vm.instructionCounter
-                val memory1 = vm.globals["allocationPointer"]!!.toInt()
-                val timeI = System.nanoTime()
-                if (instrI - instr0 > minLogInstructions)
-                    LOGGER.info(
-                        "   " +
-                                "${((instrI - instr0) / 1e6f).f1()} MInstr, " +
-                                "${ceil((timeI - time0) / 1e6f).toInt()} ms, " +
-                                "${((instrI - instr0) * 1e3f / (timeI - time0)).toInt()} MInstr/s"
-                    )
-                if (memory1 - memory0 > minLogSize) LOGGER.info("   +${(memory1 - memory0).formatFileSize()}")
-                instr0 = instrI
-                memory0 = memory1
-                time0 = timeI
-            }
-            printStats()
-            for (i in staticInitFunctions.indices) {
-                val name = staticInitFunctions[i]
-                LOGGER.info("[$i] $name")
-                vm.executeFunction(methodName(name))
-                printStats()
-            }
-        } catch (e: IllegalStateException) {
-            e.printStackTrace()
-        }
-        // calculate how much new memory was used
-        val timeI = System.nanoTime()
-        val allocationStart = vm.globals["allocationStart"]!!.toInt()
-        val allocationPointer = vm.globals["allocationPointer"]!!.toInt()
-        LOGGER.info("Base Memory: ($allocationStart) ${allocationStart.formatFileSize()}")
-        LOGGER.info("Allocated ${(allocationPointer - allocationStart).formatFileSize()} during StaticInit")
-        LOGGER.info("Executed ${vm.instructionCounter} instructions for StaticInit")
-        LOGGER.info(
-            "Took ${((timeI - time0i) / 1e6f).f3()} s for that, " +
-                    "${(vm.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s"
-        )
-        ptr = MemoryOptimizer.optimizeMemory(vm, dataPrinter)
-        StaticInitRemover.removeStaticInit()
-        LOGGER.info("New Base Memory: $allocationStart (${allocationStart.formatFileSize()})")
-        clock.stop("StaticInit WASM-VM")
+        ptr = CallStaticInit.callStaticInitAtCompileTime(ptr, staticCallOrder, dataPrinter)
     }
 
     appendDynamicFunctionTable2(dataPrinter)

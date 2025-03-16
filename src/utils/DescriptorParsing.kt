@@ -96,16 +96,16 @@ private fun getAliases(sig: MethodSig): List<String> {
 fun methodName(sig: MethodSig): String {
     val aliases = getAliases(sig)
     return if (aliases.isNotEmpty()) aliases.first()
-    else methodName2(sig.clazz, sig.name, sig.descriptor.raw)
+    else methodName2(sig)
 }
 
 fun methodNames(sig: MethodSig): List<String> {
     return getAliases(sig).ifEmpty {
-        listOf(methodName2(sig.clazz, sig.name, sig.descriptor.raw))
+        listOf(methodName2(sig))
     }
 }
 
-fun methodName(clazz: String, name: String, descriptor: String, isStatic: Boolean): String {
+fun methodName(clazz: String, name: String, descriptor: String): String {
     return methodName(MethodSig.c(clazz, name, descriptor))
 }
 
@@ -113,7 +113,11 @@ fun methodName(clazz: String, sig: InterfaceSig): String {
     return methodName(MethodSig.c(clazz, sig.name, sig.descriptor.raw))
 }
 
-private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)
+private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1 shl 14)
+
+fun methodName2(sig: MethodSig): String {
+    return methodName2(sig.clazz, sig.name, sig.descriptor.raw)
+}
 
 fun methodName2(clazz: String, name: String, args: String): String {
     val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz

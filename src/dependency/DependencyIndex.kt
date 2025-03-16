@@ -22,7 +22,7 @@ object DependencyIndex {
     val setterDependencies = HashMap<MethodSig, Set<FieldSig>>(cap)
     var methodDependencies = HashMap<MethodSig, HashSet<MethodSig>>(cap)
     val constructorDependencies = HashMap<MethodSig, Set<String>>(cap)
-    var methodsWithForbiddenDependencies = HashSet<MethodSig>(cap2)
+    val methodsWithForbiddenDependencies = HashSet<MethodSig>(cap)
     val interfaceDependencies = HashMap<MethodSig, HashSet<MethodSig>>(cap2) // pseudo-signature
     val knownInterfaceDependencies = HashSet<MethodSig>(cap2)
 
@@ -127,7 +127,6 @@ object DependencyIndex {
             }
         }
 
-        methodsWithForbiddenDependencies = HashSet(size)
         val depsIfConstructable = HashMap<String, HashSet<MethodSig>>(size)
 
         usedMethods.clear()

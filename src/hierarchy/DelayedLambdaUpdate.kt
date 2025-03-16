@@ -259,7 +259,7 @@ class DelayedLambdaUpdate(
 
         fun getSynthClassName(sig: MethodSig, dst: Handle): String { // should be as unique as possible
             return methodName2(dst.owner, dst.name, dst.desc) + "x" +
-                    methodName2(sig.clazz, sig.name, sig.descriptor.raw).hashCode().toString(16)
+                    methodName2(sig).hashCode().toString(16)
         }
     }
 }

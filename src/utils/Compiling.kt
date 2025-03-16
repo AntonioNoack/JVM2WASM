@@ -310,34 +310,46 @@ fun findExportedMethods() {
 }
 
 fun replaceRenamedDependencies() {
+    val clock = Clock(LOGGER)
     LOGGER.info("[replaceRenamedDependencies]")
-    // replace dependencies to get rid of things
-    val methodNameToSig = HashMap<String, MethodSig>()
-    for (sig in hIndex.methodsByClass.map { it.value }.flatten()) {
-        methodNameToSig[methodName2(sig.clazz, sig.name, sig.descriptor.raw)] = sig
-    }
-    for ((src, dst) in hIndex.methodAliases) {
-        val src1 = methodNameToSig[src] ?: continue
-        dIndex.methodDependencies[src1] = dIndex.methodDependencies[dst] ?: HashSet()
-        dIndex.getterDependencies[src1] = dIndex.getterDependencies[dst] ?: HashSet()
-        dIndex.setterDependencies[src1] = dIndex.setterDependencies[dst] ?: HashSet()
-        dIndex.constructorDependencies[src1] = dIndex.constructorDependencies[dst] ?: HashSet()
-        dIndex.interfaceDependencies[src1] = dIndex.interfaceDependencies[dst] ?: HashSet()
-    }
+    fillInDependenciesForAliases()
+    clock.stop("fillInDependenciesForAliases")
+    optimizeDependenciesUsingResolvedMethods()
+    clock.stop("optimizeDependenciesUsingResolvedMethods")
+}
 
+fun fillInDependenciesForAliases() {
+    // replace dependencies to get rid of things
+    val methodNameToSig = hIndex.methodsByClass
+        .map { it.value }.flatten()
+        .associateBy(::methodName2)
+    for ((methodName, newImpl) in hIndex.methodAliases) {
+        val originalImpl = methodNameToSig[methodName] ?: continue
+        copyProperty(originalImpl, newImpl, dIndex.methodDependencies)
+        copyProperty(originalImpl, newImpl, dIndex.getterDependencies)
+        copyProperty(originalImpl, newImpl, dIndex.setterDependencies)
+        copyProperty(originalImpl, newImpl, dIndex.constructorDependencies)
+        copyProperty(originalImpl, newImpl, dIndex.interfaceDependencies)
+    }
+}
+
+private fun <V> copyProperty(dst: MethodSig, src: MethodSig, map: HashMap<MethodSig, V>) {
+    map[dst] = map[src] ?: return
+}
+
+fun optimizeDependenciesUsingResolvedMethods() {
     // resolve a lot of methods for better dependencies
-    dIndex.methodDependencies = HashMap(
-        dIndex.methodDependencies
-            .mapValues { (_, dependencies) ->
-                dependencies.map { sig ->
-                    resolvedMethods.getOrPut(sig) {
-                        val found = resolveMethod(sig, false) ?: sig
-                        if (found != sig) hIndex.setAlias(sig, found)
-                        if (hIndex.isStatic(found) == hIndex.isStatic(sig)) found else sig
-                    }
-                }.toHashSet()
+    for (dependencies in dIndex.methodDependencies.values) {
+        val newDependencies = dependencies.map { sig ->
+            resolvedMethods.getOrPut(sig) {
+                val found = resolveMethod(sig, false) ?: sig
+                if (found != sig) hIndex.setAlias(sig, found)
+                if (hIndex.isStatic(found) == hIndex.isStatic(sig)) found else sig
             }
-    )
+        }
+        dependencies.clear()
+        dependencies.addAll(newDependencies)
+    }
 }
 
 fun checkMissingClasses() {
