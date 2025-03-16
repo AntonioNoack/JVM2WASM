@@ -57,7 +57,7 @@ class ClassTranslator(val clazz: String) : ClassVisitor(api) {
         val writer = writer
         return if (writer == null) {
             val isStatic = access.hasFlag(ACC_STATIC)
-            val sig = MethodSig.c(clazz, name, descriptor, isStatic)
+            val sig = MethodSig.c(clazz, name, descriptor)
             val alias = hIndex.getAlias(sig)
             if (sig !in dIndex.methodsWithForbiddenDependencies && sig in dIndex.usedMethods && alias == sig) {
                 MethodTranslator(access, clazz, name, sig.descriptor)

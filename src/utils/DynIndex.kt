@@ -23,7 +23,7 @@ object DynIndex {
 
     private val dynIndex = HashMap<String, DynIndexEntry>(4096)
     private val dynIndexSorted = ArrayList<DynIndexEntry>(4096)
-    val dynIndexSig = MethodSig.c("", "dynIndex", "()V", false)
+    val dynIndexSig = MethodSig.c("", "dynIndex", "()V")
 
     private fun addDynIndex(sig: MethodSig, name: String = methodName(sig)): Int {
         return dynIndex.getOrPut(name) {
@@ -54,14 +54,15 @@ object DynIndex {
                         sig.name != INSTANCE_INIT &&
                         sig.name != STATIC_INIT &&
                         sig.name !in dynIndex &&
-                        sig !in hIndex.staticMethods &&
-                        sig !in hIndex.finalMethods &&
-                        sig !in hIndex.abstractMethods &&
+                        !hIndex.isStatic(sig) &&
+                        !hIndex.isFinal(sig) &&
+                        !hIndex.isAbstract(sig) &&
                         hIndex.getAlias(sig) == sig
             }
             .sortedBy { (_, sig) -> SortingKey(sig) }
         for ((name, sig) in dynamicMethods) {
-            if (nameToMethod[name] in hIndex.abstractMethods)
+            val sig1 = nameToMethod[name]
+            if (sig1 != null && hIndex.isAbstract(sig1))
                 throw IllegalStateException("$name is abstract, but also listed")
             addDynIndex(sig, name)
         }
@@ -84,10 +85,11 @@ object DynIndex {
                 name2 = name3
             }
 
-            assertFalse(nameToMethod[name2] in hIndex.abstractMethods) { "$name is abstract, but also listed" }
+            val sig2 = nameToMethod[name2]
+            assertFalse(sig2 != null && hIndex.isAbstract(sig2)) { "$name is abstract, but also listed" }
 
             val sig = nameToMethod[name2] ?: sig0
-            assertFalse(sig in hIndex.abstractMethods) { "$name2 is abstract, but also listed" }
+            assertFalse(hIndex.isAbstract(sig)) { "$name2 is abstract, but also listed" }
 
             printer.append("  $").append(name2).append('\n')
             functionTable.add(name2)
@@ -118,7 +120,7 @@ object DynIndex {
     }
 
     private fun methodIsAbstract(sig: MethodSig): Boolean {
-        if (sig in hIndex.abstractMethods) return true
+        if (hIndex.isAbstract(sig)) return true
         if (sig.clazz == "java/lang/Object") return false
         if (sig in hIndex.jvmImplementedMethods) return false
         val superClass = hIndex.superClass[sig.clazz] ?: throw NullPointerException(sig.clazz)
@@ -159,7 +161,7 @@ object DynIndex {
         } else {
             if (mapped in dIndex.usedMethods) {
                 numFixed++
-                if (mapped in hIndex.abstractMethods) {
+                if (hIndex.isAbstract(mapped)) {
                     printUsed(mapped)
                     throw IllegalStateException("$name, $mapped is abstract, but also listed")
                 }
@@ -402,7 +404,7 @@ object DynIndex {
             if (sig.clazz in interfaces) {
                 val impl = resolveMethod(sig.withClass(clazz), true)
                     ?: continue
-                if (impl in hIndex.abstractMethods) {
+                if (hIndex.isAbstract(impl)) {
                     continue
                 }
                 // printUsed(impl)
@@ -428,7 +430,7 @@ object DynIndex {
             for ((id, impl) in implFunctions0) {
                 println("  [$id]: ${impl.name}${impl.descriptor}")
             }
-            val missingSig = MethodSig.c("kotlin/Function", "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;", false)
+            val missingSig = MethodSig.c("kotlin/Function", "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;")
             println("has sig? ${missingSig in dIndex.usedInterfaceCalls}")
             println("used interface calls:")
             for (call in dIndex.usedInterfaceCalls

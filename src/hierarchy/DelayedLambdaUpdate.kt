@@ -10,6 +10,11 @@ import org.objectweb.asm.Handle
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.*
+import utils.CommonInstructions.DUP_INSTR
+import utils.CommonInstructions.INVOKE_INTERFACE
+import utils.CommonInstructions.INVOKE_STATIC
+import utils.CommonInstructions.INVOKE_VIRTUAL
+import utils.CommonInstructions.NEW_INSTR
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
 
@@ -32,38 +37,37 @@ class DelayedLambdaUpdate(
 
     private fun box(arg: String?, arg2: String?, printer: MethodTranslator, checkThrowable: Boolean) {
         assertTrue(isNative(arg))
-        val invokeStatic = 0xb8
         when (arg) {
             "byte" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
+                INVOKE_STATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
                 false, checkThrowable
             )
             "short" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
+                INVOKE_STATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
                 false, checkThrowable
             )
             "char" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
+                INVOKE_STATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
                 false, checkThrowable
             )
             "int" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
+                INVOKE_STATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
                 false, checkThrowable
             )
             "long" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
+                INVOKE_STATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
                 false, checkThrowable
             )
             "float" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
+                INVOKE_STATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
                 false, checkThrowable
             )
             "double" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
+                INVOKE_STATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
                 false, checkThrowable
             )
             "boolean" -> printer.visitMethodInsn2(
-                invokeStatic, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
+                INVOKE_STATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
                 false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
@@ -72,38 +76,37 @@ class DelayedLambdaUpdate(
 
     private fun unbox(arg: String?, arg2: String?, printer: MethodTranslator, checkThrowable: Boolean) {
         assertFalse(isNative(arg))
-        val invokeVirtual = 0xb6
         when (arg2) {
             "byte" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Byte", "byteValue", "()B",
+                INVOKE_VIRTUAL, "java/lang/Byte", "byteValue", "()B",
                 false, checkThrowable
             )
             "short" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Short", "shortValue", "()S",
+                INVOKE_VIRTUAL, "java/lang/Short", "shortValue", "()S",
                 false, checkThrowable
             )
             "char" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Character", "charValue", "()C",
+                INVOKE_VIRTUAL, "java/lang/Character", "charValue", "()C",
                 false, checkThrowable
             )
             "int" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Integer", "intValue", "()I",
+                INVOKE_VIRTUAL, "java/lang/Integer", "intValue", "()I",
                 false, checkThrowable
             )
             "long" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Long", "longValue", "()J",
+                INVOKE_VIRTUAL, "java/lang/Long", "longValue", "()J",
                 false, checkThrowable
             )
             "float" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Float", "floatValue", "()F",
+                INVOKE_VIRTUAL, "java/lang/Float", "floatValue", "()F",
                 false, checkThrowable
             )
             "double" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Double", "doubleValue", "()D",
+                INVOKE_VIRTUAL, "java/lang/Double", "doubleValue", "()D",
                 false, checkThrowable
             )
             "boolean" -> printer.visitMethodInsn2(
-                invokeVirtual, "java/lang/Boolean", "booleanValue", "()Z",
+                INVOKE_VIRTUAL, "java/lang/Boolean", "booleanValue", "()Z",
                 false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
@@ -125,8 +128,8 @@ class DelayedLambdaUpdate(
 
     private val isInterface
         get() = hIndex.isInterfaceClass(calledMethod.clazz) &&
-                calledMethod in hIndex.abstractMethods
-    private val callingStatic get() = calledMethod in hIndex.staticMethods
+                hIndex.isAbstract(calledMethod)
+    private val callingStatic get() = hIndex.isStatic(calledMethod)
     private val needsSelf get() = (!callingStatic || !isInterface)
     val usesSelf get() = hIndex.usesSelf[calledMethod] == true
 
@@ -214,13 +217,13 @@ class DelayedLambdaUpdate(
         if (isConstructor) {
             // to do we have to register this potentially as creating a new class
             val clazz = calledMethod.clazz
-            mt.visitTypeInsn(0xbb, clazz)
+            mt.visitTypeInsn(NEW_INSTR, clazz)
             // if is new instance, duplicate result
-            mt.visitInsn(0x59)
+            mt.visitInsn(DUP_INSTR)
         }
 
         var couldThrow = mt.visitMethodInsn2(
-            if (isInterface) 0xb9 else if (callingStatic) 0xb8 else 0xb6,
+            if (isInterface) INVOKE_INTERFACE else if (callingStatic) INVOKE_STATIC else INVOKE_VIRTUAL,
             calledMethod, isInterface, false
         )
 

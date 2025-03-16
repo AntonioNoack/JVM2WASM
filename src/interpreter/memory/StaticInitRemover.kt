@@ -9,7 +9,7 @@ import wasm.parser.FunctionImpl
 
 object StaticInitRemover {
 
-    private val initSig = MethodSig.c("jvm/JVMShared", "init", "()V", true)
+    private val initSig = MethodSig.c("jvm/JVMShared", "init", "()V")
     private val emptyInitBody = listOf(Return)
 
     fun removeStaticInit() {

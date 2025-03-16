@@ -1,8 +1,13 @@
 package utils
 
+import utils.CommonInstructions.ANEW_ARRAY_INSTR
+import utils.CommonInstructions.ARRAY_LENGTH_INSTR
+import utils.CommonInstructions.NEW_ARRAY_INSTR
+import utils.CommonInstructions.NEW_INSTR
+
 object OpCode {
     operator fun get(opcode: Int): String {
-        return when(opcode){
+        return when (opcode) {
             0x00 -> "nop"
             0x01 -> "aconst_null"
             0x02 -> "iconst_m1"
@@ -191,10 +196,10 @@ object OpCode {
             0xb8 -> "invokestatic"
             0xb9 -> "invokeinterface"
             0xba -> "invokedynamic"
-            0xbb -> "new"
-            0xbc -> "newarray"
-            0xbd -> "anewarray"
-            0xbe -> "arraylength"
+            NEW_INSTR -> "new"
+            NEW_ARRAY_INSTR -> "newarray"
+            ANEW_ARRAY_INSTR -> "anewarray"
+            ARRAY_LENGTH_INSTR -> "arraylength"
             0xbf -> "athrow"
             0xc0 -> "checkcast"
             0xc1 -> "instanceof"
@@ -209,7 +214,7 @@ object OpCode {
             0xca -> "breakpoint"
             0xfe -> "impdep1"
             0xff -> "impdep2"
-            in 0xcb .. 0xfd -> "(no name)"
+            in 0xcb..0xfd -> "(no name)"
             else -> "#$opcode"
         }
     }

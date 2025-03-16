@@ -4,6 +4,7 @@ import api
 import hIndex
 import hierarchy.HierarchyIndex.methodFlags
 import me.anno.utils.types.Booleans.hasFlag
+import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
@@ -21,11 +22,13 @@ import java.io.IOException
 /**
  * find super classes, interfaces and annotations for all types
  * */
-class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVisitor(api) {
+class FirstClassIndexer(val clazz: String) : ClassVisitor(api) {
 
     init {
         if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
+
+    val index get() = hIndex
 
     companion object {
 
@@ -74,7 +77,7 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
                     if (!next.startsWith("[") && hIndex.doneClasses.add(next)) {
                         try {
                             ClassReader(next)
-                                .accept(FirstClassIndexer(hIndex, next), 0)
+                                .accept(FirstClassIndexer(next), 0)
                         } catch (e: IOException) {
                             LOGGER.warn("Missing $next by $self")
                             hIndex.missingClasses.add(next)
@@ -205,32 +208,22 @@ class FirstClassIndexer(val index: HierarchyIndex, val clazz: String) : ClassVis
 
         val isAbstract = access.hasFlag(ACC_ABSTRACT)
         val isNative = access.hasFlag(ACC_NATIVE)
-        val isFinal = access.hasFlag(ACC_FINAL) or this.isFinal
         val isStatic = access.hasFlag(ACC_STATIC)
+        val isFinal = access.hasFlag(ACC_FINAL) or this.isFinal or isStatic
 
-        val sig = MethodSig.c(clazz, name, descriptor, isStatic)
+        val sig = MethodSig.c(clazz, name, descriptor)
         if (signature != null) {
             hIndex.genericMethodSignatures[sig] = signature
         }
 
         HierarchyIndex.registerMethod(sig)
-        methodFlags[sig] = access
-
-        if (isStatic) {
-            index.staticMethods.add(sig)
-        }
-
-        if (isFinal || isStatic) {
-            index.finalMethods.add(sig)
-        }
+        methodFlags[sig] = access or isFinal.toInt(ACC_FINAL)
 
         when {
             isAbstract -> {
-                index.abstractMethods.add(sig)
                 index.notImplementedMethods.add(sig)
             }
             isNative -> {
-                index.nativeMethods.add(sig)
             }
             else -> {
                 index.jvmImplementedMethods.add(sig)

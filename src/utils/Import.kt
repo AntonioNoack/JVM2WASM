@@ -19,9 +19,9 @@ fun StringBuilder2.import1(funcName: String, params: List<String>, results: List
 fun StringBuilder2.import2(sig: MethodSig) {
     val desc = sig.descriptor
     if (hIndex.hasAnnotation(sig, Annotations.WASM)) return
-    if (sig in hIndex.abstractMethods) return
+    if (hIndex.isAbstract(sig)) return
     if (hIndex.getAlias(sig) == sig || hIndex.hasAnnotation(sig, Annotations.ALIAS)) {
-        val self = if (sig in hIndex.staticMethods) emptyList() else listOf(ptrType)
+        val self = if (hIndex.isStatic(sig)) emptyList() else listOf(ptrType)
         val params = desc.wasmParams
         val canThrowError1 = canThrowError(sig) && !useWASMExceptions
         val returned = desc.getResultWASMTypes(canThrowError1)

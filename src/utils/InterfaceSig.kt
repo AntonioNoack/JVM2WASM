@@ -7,7 +7,7 @@ data class InterfaceSig private constructor(val name: String, val descriptor: De
     override fun toString() = "$name/$descriptor"
 
     fun withClass(clazz: String): MethodSig {
-        return MethodSig.c(clazz, name, descriptor, false)
+        return MethodSig.c(clazz, name, descriptor)
     }
 
     companion object {

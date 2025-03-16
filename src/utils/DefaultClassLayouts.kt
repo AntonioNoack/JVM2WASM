@@ -39,7 +39,7 @@ object DefaultClassLayouts {
         val constructor = "java/lang/reflect/Constructor"
         val accessibleObject = "java/lang/reflect/AccessibleObject"
 
-        eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V", false)), 0)
+        eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V")), 0)
         eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
 
         // prepare String properties

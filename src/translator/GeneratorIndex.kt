@@ -224,11 +224,11 @@ object GeneratorIndex {
         return if (lockedDynIndex) {
             clazzMap[InterfaceSig.c(name, descriptor)]
                 ?: kotlin.run {
-                    val mapped = hIndex.getAlias(MethodSig.c(clazz, name, descriptor, false))
+                    val mapped = hIndex.getAlias(MethodSig.c(clazz, name, descriptor))
                     if (mapped.clazz != clazz || mapped.name != name || mapped.descriptor != descriptor) {
                         getDynMethodIdx(mapped.clazz, mapped.name, mapped.descriptor)
                     } else {
-                        printUsed(MethodSig.c(clazz, name, descriptor, false))
+                        printUsed(MethodSig.c(clazz, name, descriptor))
                         throw IllegalStateException("Missed $clazz/$name/$descriptor, only found $clazzMap")
                     }
                 }

@@ -123,7 +123,7 @@ object DependencyIndex {
 
         for ((index, offsets) in gIndex.fieldOffsets) {
             if (index.hasFlag(1) && offsets.hasFields()) { // static
-                remaining.add(MethodSig.c(gIndex.classNamesByIndex[index shr 1], STATIC_INIT, "()V", false))
+                remaining.add(MethodSig.c(gIndex.classNamesByIndex[index shr 1], STATIC_INIT, "()V"))
             }
         }
 
@@ -166,7 +166,7 @@ object DependencyIndex {
                         val methods = hIndex.methodsByClass[interface1] ?: continue
                         for (method2 in methods) {
                             if (used(method2)) {
-                                newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor, false))
+                                newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor))
                             }
                         }
                     }
@@ -208,7 +208,7 @@ object DependencyIndex {
         }
 
         fun processDependency(method: MethodSig) {
-            if (method.name == INSTANCE_INIT || method in hIndex.staticMethods || method.clazz in constructableClasses) {
+            if (method.name == INSTANCE_INIT || hIndex.isStatic(method) || method.clazz in constructableClasses) {
                 addRemaining(method)
             } else {
                 depsIfConstructable.getOrPut(method.clazz, ::HashSet).add(method)
@@ -261,7 +261,7 @@ object DependencyIndex {
 
             checkState(1)
 
-            val isStatic = sig in hIndex.staticMethods
+            val isStatic = hIndex.isStatic(sig)
             val resolved = resolveMethod(sig, true)
             if (!isStatic) {
                 usedByClass.getOrPut(sig.clazz, ::HashSet).add(sig)

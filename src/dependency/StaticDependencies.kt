@@ -31,7 +31,7 @@ object StaticDependencies {
             7 to setOf(6),
             8 to setOf(8), // independent pseudo-cycle
         )
-        println(partiallySortByDependencies(graph.keys.shuffled(), graph, true))
+        LOGGER.info(partiallySortByDependencies(graph.keys.shuffled(), graph, true))
     }
 
     fun calculatePartialStaticCallOrder(): List<MethodSig> {
@@ -113,34 +113,39 @@ object StaticDependencies {
                 val cycleNode = if (minimizeNumCycleBreaks) {
                     unsortedNodes.maxBy(::numRevDependencies)
                 } else unsortedNodes.first()
-                println("Breaking cycle on $cycleNode (${numRevDependencies(cycleNode)})")
+                LOGGER.info("Breaking cycle on $cycleNode (${numRevDependencies(cycleNode)})")
                 removeNodeFromGraph(cycleNode)
                 numCycles++
             }
         }
 
-        println("Partially sorted, found $numCycles cycle(s)")
+        LOGGER.info("Partially sorted, found $numCycles cycle(s)")
 
         return sortedList
     }
 
     fun calculateStaticCallOrder(): List<MethodSig> {
 
-        // todo given all used static-init methods,
+        // given all used static-init methods,
         //  find a valid order of initialization, so we can initialize it once, and
         //  just assume it was initialized later.
+        // -> impossible right now, there are 24 cycles
 
         val staticMethods = findAllUsedStaticMethods()
         val dependencies = staticMethods.associateWith(::findAllStaticDependencies)
 
         val sortResult = sortByDependency(staticMethods, dependencies)
-        if (sortResult.solution != null) {
+        if (sortResult.isSolution) {
             LOGGER.info("Found valid static sorting!")
-            return sortResult.solution
+            return sortResult.result
         }
 
         LOGGER.error("Cycle:")
-        val cycle = sortResult.cycle!!
+        printFirstCycle(sortResult.result)
+        return emptyList()
+    }
+
+    private fun printFirstCycle(cycle: List<MethodSig>) {
         for (i in cycle.indices) {
             val from = cycle[i]
             val to = cycle[(i + 1) % cycle.size]
@@ -156,11 +161,9 @@ object StaticDependencies {
                 LOGGER.error(if (pathI != pathIAlias) "  -> $pathI ($pathIAlias)" else "  -> $pathI")
             }
         }
-        //throw IllegalStateException("Static-Init isn't sortable")
-        return emptyList()
     }
 
-    class SortResult<V>(val solution: List<V>?, val cycle: List<V>?)
+    class SortResult<V>(val result: List<V>, val isSolution: Boolean)
 
     private fun <V : Any> sortByDependency(list: List<V>, dependencies: Map<V, Set<V>>): SortResult<V> {
         val sorter = object : TopologicalSort<V, ArrayList<V>>(ArrayList(list)) {
@@ -169,8 +172,8 @@ object StaticDependencies {
             }
         }
         val solution = sorter.finish(false)
-        if (solution != null) return SortResult(solution, null)
-        return SortResult(null, sorter.findCycle())
+        if (solution != null) return SortResult(solution, true)
+        return SortResult(sorter.findCycle(), false)
     }
 
     private fun isStaticInit(sig: MethodSig): Boolean {

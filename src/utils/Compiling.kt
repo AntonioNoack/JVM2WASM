@@ -1,7 +1,6 @@
 package utils
 
 import api
-import byteStrings
 import canThrowError
 import cannotThrow
 import dIndex
@@ -13,8 +12,6 @@ import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
 import hierarchy.FirstClassIndexer.Companion.readType
 import implementedMethods
-import jvm.JVM32.*
-import jvm.JVMShared.intSize
 import listEntryPoints
 import listLibrary
 import listSuperClasses
@@ -35,8 +32,8 @@ import resolvedMethods
 import translator.ClassTranslator
 import translator.FoundBetterReader
 import translator.MethodTranslator
+import utils.CommonInstructions.INVOKE_VIRTUAL
 import utils.MethodResolver.resolveMethod
-import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
 import wasm.parser.Import
@@ -50,7 +47,7 @@ fun indexHierarchyFromEntryPoints() {
     listEntryPoints { clazz ->
         if (hIndex.doneClasses.add(clazz)) {
             ClassReader(clazz)
-                .accept(FirstClassIndexer(hIndex, clazz), 0)
+                .accept(FirstClassIndexer(clazz), 0)
         }
     }
 
@@ -58,7 +55,7 @@ fun indexHierarchyFromEntryPoints() {
         if (hIndex.doneClasses.add(clazz)) {
             try {
                 ClassReader(clazz)
-                    .accept(FirstClassIndexer(hIndex, clazz), 0)
+                    .accept(FirstClassIndexer(clazz), 0)
             } catch (e: Exception) {
                 throw RuntimeException(clazz, e)
             }
@@ -97,7 +94,7 @@ fun resolveGenericTypes() {
             // to do find all abstract methods in superType to be mapped
             // to do all parent classes as well (?)
             val abstractMethods = hIndex.methodsByClass[clearSuperType]
-                ?.filter { it in hIndex.abstractMethods && it in hIndex.genericMethodSignatures }
+                ?.filter { hIndex.isAbstract(it) && it in hIndex.genericMethodSignatures }
                 ?: continue
 
             for (method in abstractMethods) {
@@ -108,7 +105,7 @@ fun resolveGenericTypes() {
                 val candidates = baseMethods.filter {
                     it.name == method.name &&
                             it.descriptor != method.descriptor &&
-                            it !in hIndex.abstractMethods &&
+                            !hIndex.isAbstract(it) &&
                             // test for same number of arguments & same-typy return type
                             genericsTypes(it) == types
                 }
@@ -336,7 +333,7 @@ fun replaceRenamedDependencies() {
                     resolvedMethods.getOrPut(sig) {
                         val found = resolveMethod(sig, false) ?: sig
                         if (found != sig) hIndex.setAlias(sig, found)
-                        if ((found in hIndex.staticMethods) == (sig in hIndex.staticMethods)) found else sig
+                        if (hIndex.isStatic(found) == hIndex.isStatic(sig)) found else sig
                     }
                 }.toHashSet()
             }
@@ -551,7 +548,7 @@ fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<Me
     if (MethodTranslator.comments) bodyPrinter.append(";; not implemented, abstract\n")
     for (func in dIndex.usedMethods
         .filter {
-            it in hIndex.abstractMethods &&
+            hIndex.isAbstract(it) &&
                     !hIndex.isInterfaceClass(it.clazz) &&
                     it !in missingMethods
         }
@@ -608,7 +605,7 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
     if (MethodTranslator.comments) importPrinter.append(";; not implemented, not forbidden\n")
     for (sig in dIndex.usedMethods
         .filter {
-            it !in hIndex.abstractMethods &&
+            !hIndex.isAbstract(it) &&
                     // it in hIndex.hasSuperMaybeMethods && // ???
                     it !in dIndex.methodsWithForbiddenDependencies &&
                     it !in hIndex.jvmImplementedMethods
@@ -637,7 +634,7 @@ fun printNativeMethods(importPrinter: StringBuilder2, missingMethods: HashSet<Me
     if (MethodTranslator.comments) importPrinter.append(";; not implemented, native\n")
     for (sig in dIndex.usedMethods
         .filter {
-            it in hIndex.nativeMethods &&
+            hIndex.isNative(it) &&
                     it !in missingMethods &&
                     it !in hIndex.jvmImplementedMethods
         }
@@ -685,7 +682,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                         exceptions: Array<out String>?
                     ): MethodVisitor? {
                         val isStatic = access.hasFlag(ACC_STATIC)
-                        val sig1 = MethodSig.c(clazz, name, descriptor, isStatic)
+                        val sig1 = MethodSig.c(clazz, name, descriptor)
                         val map = hIndex.getAlias(sig1)
                         return if (sig1 !in dIndex.methodsWithForbiddenDependencies &&
                             sig1 in dIndex.usedMethods &&
@@ -703,7 +700,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     val synthClassName = getSynthClassName(sig1, dst)
                                     // println("lambda: $sig1 -> $synthClassName")
                                     gIndex.getClassIndex(synthClassName) // add class to index
-                                    val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
+                                    val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
                                     dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
                                 }
 
@@ -735,17 +732,17 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     descriptor: String,
                                     isInterface: Boolean
                                 ) {
-                                    if (opcode == 0xb6) { // invoke virtual
+                                    if (opcode == INVOKE_VIRTUAL) { // invoke virtual
                                         val owner = Descriptor.parseTypeMixed(owner0)
-                                        val sig0 = MethodSig.c(owner, name, descriptor, false)
+                                        val sig0 = MethodSig.c(owner, name, descriptor)
                                         // just for checking if abstract
-                                        if (sig0 !in hIndex.finalMethods) {
+                                        if (!hIndex.isFinal(sig0)) {
                                             // check if method is defined in parent class
                                             fun add(clazz: String) {
                                                 val superClass = hIndex.superClass[clazz]
                                                 if (superClass != null &&
                                                     MethodSig.c(
-                                                        superClass, name, descriptor, false
+                                                        superClass, name, descriptor
                                                     ) in hIndex.methodsByClass[superClass]!!
                                                 ) {
                                                     add(superClass)

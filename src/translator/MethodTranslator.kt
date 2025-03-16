@@ -40,6 +40,13 @@ import useResultForThrowables
 import useWASMExceptions
 import utils.*
 import utils.Builder.Companion.isDuplicable
+import utils.CommonInstructions.ARRAY_LENGTH_INSTR
+import utils.CommonInstructions.ATHROW_INSTR
+import utils.CommonInstructions.INVOKE_INTERFACE
+import utils.CommonInstructions.INVOKE_SPECIAL
+import utils.CommonInstructions.INVOKE_STATIC
+import utils.CommonInstructions.INVOKE_VIRTUAL
+import utils.CommonInstructions.NEW_INSTR
 import utils.PrintUsed.printUsed
 import utils.ReplaceOptimizer.optimizeUsingReplacements
 import utils.WASMTypes.*
@@ -180,7 +187,7 @@ class MethodTranslator(
 
     private val isStatic = access.hasFlag(ACC_STATIC)
 
-    val sig = MethodSig.c(clazz, name, descriptor, isStatic)
+    val sig = MethodSig.c(clazz, name, descriptor)
     val canThrowError = canThrowError(sig)
 
     private fun createLabel(): Int {
@@ -764,7 +771,7 @@ class MethodTranslator(
             0x97 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpl) // -1 if NaN
             0x98 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpg) // +1 if NaN
 
-            0xbe -> {
+            ARRAY_LENGTH_INSTR -> {
                 // array length
                 stackPush()
                 printer.pop(ptrType).push(i32)
@@ -772,7 +779,7 @@ class MethodTranslator(
                 stackPop()
                 if (checkArrayAccess) handleThrowable()
             }
-            0xbf -> {// athrow, easy :3
+            ATHROW_INSTR -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
                 printer.dupPtr() // todo why are we duplicating the error???
                 handleThrowable(true)
@@ -1027,7 +1034,7 @@ class MethodTranslator(
         isInterface: Boolean, checkThrowable: Boolean
     ): Boolean {
         val isStatic = opcode0 == 0xb8
-        val sig0 = MethodSig.c(owner0, name, descriptor, isStatic)
+        val sig0 = MethodSig.c(owner0, name, descriptor)
         return visitMethodInsn2(opcode0, sig0, isInterface, checkThrowable)
     }
 
@@ -1042,16 +1049,10 @@ class MethodTranslator(
 
         val ret = descriptor.returnType
         val splitArgs = descriptor.wasmParams
-        if (isStatic != (sig0 in hIndex.staticMethods))
+        if (isStatic != hIndex.isStatic(sig0))
             throw RuntimeException("Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)")
 
         val sig = hIndex.getAlias(sig0)
-
-        val methodsByOwner = hIndex.methodsByClass.getOrPut(owner) { HashSet() }
-        if (sig == sig0 && methodsByOwner.add(sig0) && isStatic) {
-            hIndex.staticMethods.add(sig0)
-        }
-
         var calledCanThrow = canThrowError(sig)
 
         fun getCaller(printer: Builder) {
@@ -1061,15 +1062,12 @@ class MethodTranslator(
         }
 
         when (opcode0) {
-            0xb9 -> {
+            INVOKE_INTERFACE -> {
 
-                val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
-                assertEquals(sig0, sig1)
-                assertTrue(sig1 in dIndex.usedInterfaceCalls)
+                assertTrue(sig0 in dIndex.usedInterfaceCalls)
 
                 val variants = findConstructableChildImplementations(sig0)
                 if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
-                    // invoke interface
                     // load interface/function index
                     getCaller(printer)
                     printer.append(i32Const(gIndex.getInterfaceIndex(InterfaceSig.c(name, sig0.descriptor))))
@@ -1091,7 +1089,7 @@ class MethodTranslator(
                     stackPop()
                 }
             }
-            0xb6 -> { // invoke virtual
+            INVOKE_VIRTUAL -> {
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
 
                     stackPush()
@@ -1108,7 +1106,7 @@ class MethodTranslator(
                     stackPop()
 
                 } else if (
-                    sig0 in hIndex.finalMethods // &&
+                    hIndex.isFinal(sig0) // &&
                 // todo a method that is final should always pass this, but somehow,
                 //  me/anno/utils/hpc/WorkSplitter/processUnbalanced(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V
                 //  doesn't pass the test
@@ -1169,7 +1167,7 @@ class MethodTranslator(
                                     name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
                                     name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
                                 ) throw IllegalStateException("$sig0 -> $sig1 must not be final!!!")
-                                if (sig1 in hIndex.abstractMethods) throw IllegalStateException()
+                                if (hIndex.isAbstract(sig1)) throw IllegalStateException()
                                 ActuallyUsedIndex.add(this.sig, sig1)
                                 printer.append(Call(name2))
                                 stackPop()
@@ -1205,8 +1203,8 @@ class MethodTranslator(
                     }
                 }
             }
-            // invokespecial; typically, <init>, but also can be private or super function; -> no resolution required
-            0xb7 -> {
+            // typically, <init>, but also can be private or super function; -> no resolution required
+            INVOKE_SPECIAL -> {
                 if (!ignoreNonCriticalNullPointers) {
                     checkNotNull0(owner, name, ::getCaller)
                 }
@@ -1222,7 +1220,7 @@ class MethodTranslator(
                     } else {
                         stackPush()
                         val name2 = methodName(sig)
-                        assertFalse(sig in hIndex.abstractMethods)
+                        assertFalse(hIndex.isAbstract(sig))
                         ActuallyUsedIndex.add(this.sig, sig)
                         printer.append(Call(name2))
                         stackPop()
@@ -1230,7 +1228,7 @@ class MethodTranslator(
                 }
             }
             // static, no resolution required
-            0xb8 -> {
+            INVOKE_STATIC -> {
                 pop(splitArgs, true, ret)
                 val inline = hIndex.inlined[sig]
                 if (inline != null) {
@@ -1239,7 +1237,7 @@ class MethodTranslator(
                 } else {
                     stackPush()
                     val name2 = methodName(sig)
-                    assertFalse(sig in hIndex.abstractMethods)
+                    assertFalse(hIndex.isAbstract(sig))
                     ActuallyUsedIndex.add(this.sig, sig)
                     printer.append(Call(name2))
                     if (comments) printer.comment("static call")
@@ -1585,7 +1583,7 @@ class MethodTranslator(
         val type = Descriptor.parseTypeMixed(type0)
         if (printOps) println("  [${OpCode[opcode]}] $type")
         when (opcode) {
-            0xbb -> {
+            NEW_INSTR -> {
                 // new instance
                 stackPush()
                 printer.push(ptrType)

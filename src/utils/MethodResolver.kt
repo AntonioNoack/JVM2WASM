@@ -23,7 +23,7 @@ object MethodResolver {
     private fun checkNotConstructable(methodSig: MethodSig) {
         val clazz = methodSig.clazz
         val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
-        val isStatic = methodSig in hIndex.staticMethods
+        val isStatic = hIndex.isStatic(methodSig)
         if (!(clazz2 in dIndex.constructableClasses || isStatic) &&
             methodSig in hIndex.methodsByClass[clazz2]!!
         ) {
@@ -39,7 +39,7 @@ object MethodResolver {
     private fun getImplementedMethod(methodSig: MethodSig): MethodSig? {
         val mapped = hIndex.getAlias(methodSig)
         if (mapped in hIndex.jvmImplementedMethods ||
-            mapped in hIndex.nativeMethods ||
+            hIndex.isNative(mapped) ||
             mapped in hIndex.customImplementedMethods
         ) {
             if (debugFindMethod) println("found impl: $mapped")
@@ -52,7 +52,7 @@ object MethodResolver {
      * */
     private fun getAbstractMethod(methodSig: MethodSig, superClass: String?): MethodSig? {
         val clazz = methodSig.clazz
-        if (hIndex.isAbstractClass(clazz) && methodSig in hIndex.abstractMethods) {
+        if (hIndex.isAbstractClass(clazz) && hIndex.isAbstract(methodSig)) {
             if (debugFindMethod) println("method & clazz are abstract -> returning $methodSig")
             val superMethodSig = if (superClass != null) {
                 resolveMethod(methodSig.withClass(superClass))

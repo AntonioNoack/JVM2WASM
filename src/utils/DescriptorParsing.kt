@@ -10,7 +10,7 @@ val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
 
 fun genericsTypes(sig: MethodSig): String {
-    return genericsTypes(sig.descriptor, sig in hIndex.staticMethods)
+    return genericsTypes(sig.descriptor, hIndex.isStatic(sig))
 }
 
 fun genericsTypes(desc: Descriptor, isStatic: Boolean): String {
@@ -106,11 +106,11 @@ fun methodNames(sig: MethodSig): List<String> {
 }
 
 fun methodName(clazz: String, name: String, descriptor: String, isStatic: Boolean): String {
-    return methodName(MethodSig.c(clazz, name, descriptor, isStatic))
+    return methodName(MethodSig.c(clazz, name, descriptor))
 }
 
 fun methodName(clazz: String, sig: InterfaceSig): String {
-    return methodName(MethodSig.c(clazz, sig.name, sig.descriptor.raw, false))
+    return methodName(MethodSig.c(clazz, sig.name, sig.descriptor.raw))
 }
 
 private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1024)

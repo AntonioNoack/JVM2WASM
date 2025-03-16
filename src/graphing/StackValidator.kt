@@ -2,6 +2,7 @@ package graphing
 
 import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
+import hIndex
 import hierarchy.HierarchyIndex
 import hierarchy.HierarchyIndex.methodAliases
 import implementedMethods
@@ -303,7 +304,7 @@ object StackValidator {
     private fun hasSelfParam(func: Any): Boolean {
         return when (func) {
             is FunctionImpl -> false // helper function
-            is MethodSig -> func !in HierarchyIndex.staticMethods
+            is MethodSig -> !hIndex.isStatic(func)
             else -> assertFail()
         }
     }

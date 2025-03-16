@@ -10,6 +10,9 @@ import org.objectweb.asm.*
 import replaceClass
 import useResultForThrowables
 import utils.*
+import utils.CommonInstructions.INVOKE_INTERFACE
+import utils.CommonInstructions.INVOKE_STATIC
+import utils.CommonInstructions.NEW_INSTR
 import wasm.instr.CallIndirect
 import wasm.instr.FuncType
 
@@ -99,21 +102,18 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val retType = descriptor1.returnType
         if (retType != null) clazz.dep(retType)
 
-        val isStatic = opcode == 0xb8
-        val isInterfaceCall = opcode == 0xb9
-        val sig1 = MethodSig.c(owner, name, descriptor, isStatic)
+        val isStatic = opcode == INVOKE_STATIC
+        val isInterfaceCall = opcode == INVOKE_INTERFACE
+        val sig1 = MethodSig.c(owner, name, descriptor)
 
         val isNewMethod = HierarchyIndex.registerMethod(sig1)
-        if (isNewMethod) {
+        if (isNewMethod && opcode != 0) {
             val access =
                 if (isStatic) Opcodes.ACC_STATIC
                 else if (isInterfaceCall) Opcodes.ACC_INTERFACE
                 else 0
             hIndex.methodFlags[sig1] = access
-            if (isStatic) hIndex.staticMethods.add(sig1)
-            if (hIndex.notImplementedMethods.add(sig1)) {
-                hIndex.hasSuperMaybeMethods.add(sig1)
-            }
+            hIndex.notImplementedMethods.add(sig1)
             // may be a child method
         }
 
@@ -165,8 +165,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             val interface1 = descriptor.returnType!!
             val dst = args[1] as Handle
 
-            visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
-
             // DynPrinter.print(name, descriptor, method, args)
             // println("dyn $interface1")
 
@@ -177,9 +175,14 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // b) a function, that creates the interface for calling
             // c) a function, that implements the target, calls b() using variables from a()
 
+
+            visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
+
             // register new class (not visitable)
-            // todo I really don't know of these called methods are static or not.. are they???
-            val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc, false)
+            // I really don't know of these called methods are static or not.. are they???
+            //  sun/misc/ObjectInputFilter$Config/lambda$static$0 is static
+            //  java/util/function/DoubleConsumer/lambda$andThen$0(Ljava_util_function_DoubleConsumer;D)V isn't static
+            val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
             val synthClassName = getSynthClassName(sig, dst)
             val print = false// calledMethod.name == "<init>"
             if (print) println(args.joinToString())
@@ -211,9 +214,8 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             // actual function, which is being implemented by dst
             hIndex.missingClasses.add(synthClassName)
 
-            visitMethodInsn1(0, dst.owner, dst.name, dst.desc, false)
-
-            val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc, false)
+            // bridge isn't static, it just calls the static lambda
+            val bridge = MethodSig.c(synthClassName, name, implementationTargetDesc)
             calledMethods.add(bridge)
             hIndex.jvmImplementedMethods.add(bridge)
 
@@ -251,7 +253,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         instructionIndex++
         val type = Descriptor.parseTypeMixed(type0)
         clazz.dep(type)
-        if (opcode == 0xbb) {
+        if (opcode == NEW_INSTR) {
             if (type.endsWith("[]")) throw IllegalStateException(type)
             val type2 = if (type.startsWith("[[") || type.startsWith("[L")) "[]" else type
             constructedClasses.add(type2)

@@ -248,9 +248,9 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
     // for debugging
     if (addDebugMethods) {
-        method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;", false))
-        method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;", false))
-        method(MethodSig.c("java/lang/Thread", INSTANCE_INIT, "()V", false))
+        method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;"))
+        method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
+        method(MethodSig.c("java/lang/Thread", INSTANCE_INIT, "()V"))
     }
 }
 
@@ -365,7 +365,7 @@ fun isRootType(clazz: String): Boolean {
 }
 
 var allocationStart = -1
-val entrySig = MethodSig.c("", "entry", "()V", false)
+val entrySig = MethodSig.c("", "entry", "()V")
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
     jvm2wasm()
@@ -423,16 +423,12 @@ fun jvm2wasm() {
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
 
-    hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
-    hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
-    hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
-
     resolveGenericTypes()
     findNoThrowMethods()
 
     // java_lang_StrictMath_sqrt_DD
-    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D", true)] = listOf(F64_SQRT)
-    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D", true)] = listOf(F64_SQRT)
+    hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = listOf(F64_SQRT)
+    hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = listOf(F64_SQRT)
 
     findAliases()
 
@@ -441,7 +437,7 @@ fun jvm2wasm() {
     findExportedMethods()
 
     // unknown (because idk where [] is implemented), can cause confusion for my compiler
-    hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;", false))
+    hIndex.addFinalMethod(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
 
     replaceRenamedDependencies()
     checkMissingClasses()
@@ -475,7 +471,7 @@ fun jvm2wasm() {
     printMethodFieldStats()
 
     for (sig in dIndex.usedMethods) {
-        if (sig !in hIndex.nativeMethods) continue
+        if (!hIndex.isNative(sig)) continue
         if (hIndex.hasAnnotation(sig, Annotations.JAVASCRIPT) ||
             hIndex.hasAnnotation(sig, Annotations.WASM)
         ) {
@@ -593,7 +589,7 @@ fun jvm2wasm() {
         ) {
             usedButNotImplemented.remove(methodName(sig))
         }
-        if (sig in hIndex.abstractMethods) {
+        if (hIndex.isAbstract(sig)) {
             usedButNotImplemented.remove(methodName(sig))
         }
     }
@@ -795,7 +791,7 @@ fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<Stri
     }
     println()
     println("additional info:")
-    printUsed(MethodSig.c("java/lang/reflect/Constructor", "getDeclaredAnnotations", "()[Ljava/lang/Object;", false))
-    printUsed(MethodSig.c("java/lang/reflect/Executable", "getDeclaredAnnotations", "()[Ljava/lang/Object;", false))
+    printUsed(MethodSig.c("java/lang/reflect/Constructor", "getDeclaredAnnotations", "()[Ljava/lang/Object;"))
+    printUsed(MethodSig.c("java/lang/reflect/Executable", "getDeclaredAnnotations", "()[Ljava/lang/Object;"))
     throw IllegalStateException("Missing ${usedButNotImplemented.size} functions")
 }
