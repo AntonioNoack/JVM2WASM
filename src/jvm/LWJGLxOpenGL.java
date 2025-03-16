@@ -773,7 +773,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV")
-    @JavaScript(code = "throw 'Not supported/implemented'")
+    @JavaScript(code = "throw 'glGetIntegeri_v_IIAIV'")
     public static native void glGetIntegeri_v_IIAIV(int query, int index, int[] dst);
 
     @NoThrow
@@ -830,7 +830,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteBuffers_IV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL15C_glDeleteBuffers_IV'")
+    @JavaScript(code = "throw 'glDeleteBuffers_IV'")
     public static native void GL15C_glDeleteBuffers_IV(int buffer);
 
     @NoThrow
@@ -905,12 +905,12 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetFloat_IF")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL11C_glGetFloat_IF'")
+    @JavaScript(code = "throw 'glGetFloat_IF'")
     public static native float glGetFloat_IF(int type);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV'")
+    @JavaScript(code = "throw 'glVertexAttribIPointer_IIIIJV'")
     public static native void glVertexAttribIPointer_IIIIJV(int a, int b, int c, int d, long e);
 
     @NoThrow
@@ -1090,7 +1090,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV'")
+    @JavaScript(code = "throw 'glFramebufferTextureLayer_IIIIIV'")
     public static native void glFramebufferTextureLayer_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
@@ -1102,12 +1102,12 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV'")
+    @JavaScript(code = "throw 'glBlendEquationSeparatei_IIIV'")
     public static native void glBlendEquationSeparatei_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV'")
+    @JavaScript(code = "throw 'glRenderbufferStorageMultisample_IIIIIV'")
     public static native void glRenderbufferStorageMultisample_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
@@ -1133,7 +1133,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glMemoryBarrier_IV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL42C_glMemoryBarrier_IV'")
+    @JavaScript(code = "throw 'glMemoryBarrier_IV'")
     public static native void glMemoryBarrier_IV(int a);
 
     @NoThrow
@@ -1143,12 +1143,12 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV'")
+    @JavaScript(code = "throw 'glBindImageTexture_IIIZIIIV'")
     public static native void glBindImageTexture_IIIZIIIV(int a, int b, int c, boolean d, int e, int f, int g);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV'")
+    @JavaScript(code = "throw 'glGetTexImage_IIIIAIV'")
     public static native void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(int a, int b, int c, int d, int[] e);
 
     @NoThrow
@@ -1181,27 +1181,27 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV'")
+    @JavaScript(code = "throw 'glVertexAttribI1i_IIV'")
     public static native void glVertexAttribI1i_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL45C_glClipControl_IIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL45C_glClipControl_IIV'")
+    @JavaScript(code = "throw 'glClipControl_IIV'")
     public static native void glClipControl_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV'")
+    @JavaScript(code = "throw 'glBindBufferBase_IIIV'")
     public static native void glBindBufferBase_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV'")
+    @JavaScript(code = "throw 'glDispatchCompute_IIIV'")
     public static native void org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV'")
+    @JavaScript(code = "throw 'glBlendFuncSeparatei_IIIIIV'")
     public static native void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
