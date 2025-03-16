@@ -167,6 +167,12 @@ void jvm_JVM32_trackCalloc_IV(i32 classId) {
     }
 }
 
+void jvm_JVM32_trackCalloc_IIV(i32 classId, i32 arraySize) {
+    if (countAllocations && classId >= 0 && classId < callocStatistics.size()) {
+        callocStatistics[classId]++;
+    }
+}
+
 void initClassStatistics() {
     if (countAllocations) {
         callocStatistics = std::vector<i32>(global_numClasses, 0);

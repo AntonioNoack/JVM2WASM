@@ -67,7 +67,7 @@ public class GCGapFinder {
 
     private static void checkStatistics() {
         if (classSizes.length != numClasses()) {
-            throwJs("ClassSizes.length != nc");
+            throwJs("ClassSizes.length != nc", classSizes.length, numClasses());
         }
     }
 

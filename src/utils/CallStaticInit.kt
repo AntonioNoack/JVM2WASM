@@ -53,7 +53,8 @@ object CallStaticInit {
                     if (classId in FIRST_ARRAY..LAST_ARRAY) {
                         debugInfo.append("   - ${count}x $className [${TrackCallocInstr.arraySize[classId]}]\n")
                     } else {
-                        debugInfo.append("   - ${count}x $className\n")
+                        val instanceSize = gIndex.getInstanceSize(className)
+                        debugInfo.append("   - ${count}x $className ($instanceSize)\n")
                     }
                 }
                 if (allocations.size > maxPrintedClasses) {
@@ -62,7 +63,7 @@ object CallStaticInit {
                     debugInfo.append("     ... ($more more, $total total)\n")
                 }
             }
-            TrackCallocInstr.arraySize.clear()
+            TrackCallocInstr.arraySize.fill(0)
             TrackCallocInstr.counters.clear()
         }
 
