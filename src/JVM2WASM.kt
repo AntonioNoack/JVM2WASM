@@ -432,6 +432,10 @@ fun jvm2wasm() {
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
 
+    hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
+    hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
+    hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
+
     resolveGenericTypes()
     findNoThrowMethods()
 
@@ -446,7 +450,7 @@ fun jvm2wasm() {
     findExportedMethods()
 
     // unknown (because idk where [] is implemented), can cause confusion for my compiler
-    hIndex.addFinalMethod(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
+    hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
 
     replaceRenamedDependencies()
     checkMissingClasses()

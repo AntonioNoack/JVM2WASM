@@ -1053,6 +1053,12 @@ class MethodTranslator(
             throw RuntimeException("Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)")
 
         val sig = hIndex.getAlias(sig0)
+
+        val methodsByOwner = hIndex.methodsByClass.getOrPut(owner) { HashSet() }
+        if (sig == sig0 && methodsByOwner.add(sig0) && isStatic) {
+            hIndex.staticMethods.add(sig0)
+        }
+
         var calledCanThrow = canThrowError(sig)
 
         fun getCaller(printer: Builder) {

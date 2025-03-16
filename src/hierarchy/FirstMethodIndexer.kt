@@ -113,7 +113,10 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
                 else if (isInterfaceCall) Opcodes.ACC_INTERFACE
                 else 0
             hIndex.methodFlags[sig1] = access
-            hIndex.notImplementedMethods.add(sig1)
+            if (isStatic) hIndex.staticMethods.add(sig1)
+            if (hIndex.notImplementedMethods.add(sig1)) {
+                hIndex.hasSuperMaybeMethods.add(sig1)
+            }
             // may be a child method
         }
 

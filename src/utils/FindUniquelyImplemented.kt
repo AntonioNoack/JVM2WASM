@@ -33,7 +33,7 @@ fun markChildMethodsFinal(sig: MethodSig) {
     Recursion.processRecursive(sig.clazz) { clazz, remaining ->
         val sigI = sig.withClass(clazz)
         if (sigI.clazz in dIndex.constructableClasses) {
-            hIndex.addFinalMethod(sigI)
+            hIndex.finalMethods.add(sigI)
             val children = hIndex.childClasses[sigI.clazz]
             remaining.addAll(children ?: emptySet())
         }
@@ -41,7 +41,7 @@ fun markChildMethodsFinal(sig: MethodSig) {
 }
 
 fun findMethodsWithoutChildClasses(): Int {
-    val numAlreadyFinalMethods = hIndex.countFinalMethods()
+    val numAlreadyFinalMethods = hIndex.finalMethods.size
     val classes = dIndex.constructableClasses
     for (clazz in classes) {
         val print = false // clazz == "me/anno/utils/hpc/WorkSplitter" || clazz == "me/anno/utils/hpc/ProcessingQueue"
@@ -55,9 +55,7 @@ fun findMethodsWithoutChildClasses(): Int {
                 println("me/anno/utils/hpc/ProcessingQueue" in dIndex.constructableClasses)
                 throw IllegalStateException()
             }
-            for (method in methods) {
-                hIndex.addFinalMethod(method)
-            }
+            hIndex.finalMethods.addAll(methods)
         } else if (clazz in dIndex.constructableClasses) {
             // if all children have the same implementation, it's final for all of them, too
             val methods = hIndex.methodsByClass[clazz] ?: continue
@@ -73,7 +71,7 @@ fun findMethodsWithoutChildClasses(): Int {
             }
         }
     }
-    return hIndex.countFinalMethods() - numAlreadyFinalMethods
+    return hIndex.finalMethods.size - numAlreadyFinalMethods
 }
 
 /**
@@ -122,7 +120,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             !hIndex.isAbstract(sig) && // we can ignore that one
             InterfaceSig(sig) in toBeMarkedAsFinal
         ) {
-            hIndex.addFinalMethod(sig)
+            hIndex.finalMethods.add(sig)
         }
     }
 

@@ -2,13 +2,13 @@ package hierarchy
 
 import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.types.Booleans.hasFlag
-import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.*
 import utils.CallSignature
 import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
 import wasm.instr.Instruction
+import kotlin.math.abs
 
 object HierarchyIndex {
 
@@ -30,37 +30,30 @@ object HierarchyIndex {
 
     val interfaceDefaults = HashMap<MethodSig, HashSet<MethodSig>>()
 
+    val staticMethods = HashSet<MethodSig>(cap)
+    val finalMethods = HashSet<MethodSig>(cap)
     val notImplementedMethods = HashSet<MethodSig>(cap)
     val jvmImplementedMethods = HashSet<MethodSig>(cap)
     val customImplementedMethods = HashSet<MethodSig>(cap2)
+    val abstractMethods = HashSet<MethodSig>(cap)
+    val nativeMethods = HashSet<MethodSig>(cap)
+    val hasSuperMaybeMethods = HashSet<MethodSig>(cap2)
     val annotations = HashMap<MethodSig, List<Annota>>(cap2)
 
     val methodAliases = HashMap<String, MethodSig>(cap)
 
     val implementedCallSignatures = HashSet<CallSignature>()
 
-    fun addFinalMethod(method: MethodSig) {
-        methodFlags[method] = getMethodFlags(method) or ACC_FINAL
-    }
-
-    fun countFinalMethods(): Int {
-        return methodFlags.values.count { it.hasFlag(ACC_FINAL) }
+    fun isStatic(method: MethodSig): Boolean {
+        return method in staticMethods
     }
 
     fun isFinal(method: MethodSig): Boolean {
-        return getMethodFlags(method).hasFlag(ACC_FINAL)
+        return method in finalMethods
     }
 
     fun isNative(method: MethodSig): Boolean {
-        return getMethodFlags(method).hasFlag(ACC_NATIVE)
-    }
-
-    fun isAbstract(method: MethodSig): Boolean {
-        return getMethodFlags(method).hasFlag(ACC_ABSTRACT)
-    }
-
-    fun isStatic(method: MethodSig): Boolean {
-        return getMethodFlags(method).hasFlag(ACC_STATIC)
+        return method in nativeMethods
     }
 
     fun registerMethod(method: MethodSig): Boolean {
@@ -122,24 +115,21 @@ object HierarchyIndex {
     val getterMethods = HashMap<MethodSig, FieldSig>(cap2)
     // todo inline functions, which consist of a constant only
 
-    fun getMethodFlags(sig: MethodSig): Int {
-        return methodFlags.getOrDefault(sig, 0)
-    }
-
-    fun getClassFlags(clazz: String): Int {
-        return classFlags.getOrDefault(clazz, 0)
-    }
+    fun isAbstract(sig: MethodSig): Boolean = sig in abstractMethods
 
     fun isAbstractClass(clazz: String): Boolean {
-        return getClassFlags(clazz).hasFlag(ACC_ABSTRACT)
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_ABSTRACT)
     }
 
     fun isInterfaceClass(clazz: String): Boolean {
-        return getClassFlags(clazz).hasFlag(ACC_INTERFACE)
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_INTERFACE)
     }
 
     fun isEnumClass(clazz: String): Boolean {
-        return getClassFlags(clazz).hasFlag(ACC_ENUM)
+        val flags = classFlags.getOrDefault(clazz, 0)
+        return flags.hasFlag(ACC_ENUM)
     }
 
     fun isChildClassOfInterface(child: String, parent: String): Boolean {
