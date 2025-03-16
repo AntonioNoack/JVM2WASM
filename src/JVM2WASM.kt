@@ -385,10 +385,9 @@ fun jvm2wasm() {
     val bodyPrinter = StringBuilder2(4096)
     val dataPrinter = StringBuilder2(4096)
 
-    val predefinedClasses = registerDefaultClasses()
-
     // todo confirm type shift using WASMEngine
 
+    val predefinedClasses = registerDefaultClasses()
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
     clock.stop("Index Hierarchy")
@@ -554,8 +553,8 @@ fun jvm2wasm() {
     //  inline calls to functions, which only call
 
     // todo code-size optimization:
-    //  1. resolve what we need by all entry points
-    //  2. resolve what we need by static-init and translate it
+    //  1. resolve what we need by all entry points (done)
+    //  2. resolve what we need by static-init and translate it (we still do too much)
     //  3. execute static init
     //  4. resolve what we need without static-init and re-translate/optimize&ship it
     //    - also optimize static field reading: many will be read-only after static-init

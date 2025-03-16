@@ -10,7 +10,6 @@ import me.anno.io.Streams.writeLE64
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ACC_NATIVE
@@ -116,7 +115,7 @@ private fun fillInFields(
 
     val emptyFieldPtr = indexStartPtr + classData.position
     classData.writeClass(OBJECT_ARRAY)
-    classData.writeLE32(0)
+    classData.writeLE32(0) // length = 0
 
     val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
     val fieldSize = gIndex.getInstanceSize("java/lang/reflect/Field")
@@ -125,26 +124,10 @@ private fun fillInFields(
 
         val className = gIndex.classNamesByIndex[classIndex]
 
-        val instanceFields = gIndex.getFieldOffsets(className, false).fields
-            .entries.map { (name, field) ->
-                FieldEntry(name, field, isNativeType(field.type).toInt(ACC_NATIVE))
-            }
+        val instanceFields0 = gIndex.getFieldOffsets(className, false).fields
+        val staticFields0 = gIndex.getFieldOffsets(className, true).fields
 
-        val staticFields = gIndex.getFieldOffsets(className, true).fields
-            .entries.map { (name, field) ->
-                FieldEntry(name, field, ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE))
-            }
-
-        val allFields = (instanceFields + staticFields)
-            .sortedWith { a, b ->
-                // this sorting could be used to optimize a little
-                // todo do we use this sorting anywhere? if not, we could remove it, too
-                val na = !isNativeType(a.field.type)
-                val nb = !isNativeType(b.field.type)
-                na.compareTo(nb).ifSame { a.name.compareTo(b.name) }
-            }
-
-        if (allFields.isEmpty()) {
+        if (instanceFields0.isEmpty() && staticFields0.isEmpty()) {
             val pos = classData.position
             classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
             classData.writePointer(emptyFieldPtr)
@@ -152,6 +135,15 @@ private fun fillInFields(
             continue
         }
 
+        val instanceFields = instanceFields0.map { (name, field) ->
+            FieldEntry(name, field, isNativeType(field.type).toInt(ACC_NATIVE))
+        }
+
+        val staticFields = staticFields0.map { (name, field) ->
+            FieldEntry(name, field, ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE))
+        }
+
+        val allFields = instanceFields + staticFields
         val fieldPointers = IntArray(allFields.size) {
             val field = allFields[it]
             fieldCache.getOrPut(field) {
@@ -365,6 +357,12 @@ fun appendMethodInstance(
     val callSignature = CallSignature.c(sig).format()
     val callSignaturePtr = gIndex.getString(callSignature, indexStartPtr, classData)
 
+    val dynamicIndex =
+        if (false) DynIndex.getDynamicIndex(declaringClassIndex, sig, InterfaceSig(sig), -1, null)
+        else -1
+    // todo mark this method as used-by-reflections,
+    //  and translate all used-by-reflection methods, too
+
     val params = sig.descriptor.params
     val parameterTypeArrayPtr = parameterArrays.getOrPut(params) {
         appendParamsArray(indexStartPtr, classData, params, classSize)
@@ -375,7 +373,7 @@ fun appendMethodInstance(
     val methodPtr = indexStartPtr + classData.position
     classData.writeClass(methodClassIndex)
     assertEquals(objectOverhead, OFFSET_METHOD_SLOT)
-    classData.writeLE32(-1) // slot; todo find the slot in the dynamic table
+    classData.writeLE32(dynamicIndex) // slot
     classData.writePointer(namePtr) // name
     classData.writePointer(getReturnTypePtr(sig.descriptor.returnType, indexStartPtr, classSize)) // return type
     classData.writePointer(parameterTypeArrayPtr) // parameters

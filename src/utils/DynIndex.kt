@@ -134,7 +134,7 @@ object DynIndex {
 
     private var printDynamicIndex = false
 
-    fun getDynamicIndex(classId: Int, sig: MethodSig, sig0: InterfaceSig, idx: Int, debugInfo: StringBuilder2): Int {
+    fun getDynamicIndex(classId: Int, sig: MethodSig, sig0: InterfaceSig, idx: Int, debugInfo: StringBuilder2?): Int {
         val print = printDynamicIndex
         val impl = resolveMethod(sig, true) ?: sig
         // if method is missing, find replacement
@@ -145,7 +145,7 @@ object DynIndex {
         if (dynIndexI != null) {
             numOk++
             if (print || aidtCtr++ < 50) println("  $idx -> $dynIndexI")
-            if (printDebug) {
+            if (printDebug && debugInfo != null) {
                 debugInfo.append("  ").append(idx).append(": ")
                     .append(dynIndexI.index).append(" // ").append(mapped).append("\n")
             }
@@ -158,7 +158,7 @@ object DynIndex {
                 if (mapped != sig) printUsed(mapped)
             }
             if (print || aidtCtr++ < 50) println("    $idx -> -1") // , available:
-            if (printDebug) {
+            if (printDebug && debugInfo != null) {
                 debugInfo.append("  ").append(idx).append(": ")
                     .append(sig0).append(" -> -1 // ").append(mapped).append("\n")
             }
@@ -172,14 +172,14 @@ object DynIndex {
                 }
                 val dynIndexJ = addDynIndex(mapped, name)
                 if (print || aidtCtr++ < 50) println("    $idx -> $dynIndexJ*")
-                if (printDebug) {
+                if (printDebug && debugInfo != null) {
                     debugInfo.append("  ").append(idx).append(": ")
                         .append(dynIndexJ).append("* // ").append(mapped).append("\n")
                 }
                 return dynIndexJ
             } else {
                 numBroken++
-                if (printDebug) {
+                if (printDebug && debugInfo != null) {
                     debugInfo.append("  ").append(idx).append(": ")
                         .append(sig0).append(" -> -1X // ").append(mapped).append("\n")
                 }
