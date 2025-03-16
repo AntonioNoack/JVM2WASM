@@ -24,20 +24,20 @@ object ActuallyUsedIndex {
     val resolved: HashSet<String> = HashSet()
     fun resolve(): HashSet<String> {
         val resolved = resolved
-        val todoList = ArrayList<String>()
-        fun todo(sig: String) {
+        val remaining = ArrayList<String>()
+        fun addMaybe(sig: String) {
             if (resolved.add(sig)) {
-                todoList.add(sig)
+                remaining.add(sig)
             }
         }
-        todo(methodName(dynIndexSig))
-        todo(methodName(entrySig))
-        while (todoList.isNotEmpty()) {
-            val sig = todoList.removeLast()
+        addMaybe(methodName(dynIndexSig))
+        addMaybe(methodName(entrySig))
+        while (remaining.isNotEmpty()) {
+            val sig = remaining.removeLast()
             val uses1 = uses[sig]
             if (uses1 != null) {
                 for (sig1 in uses1) {
-                    todo(sig1)
+                    addMaybe(sig1)
                 }
             }
         }

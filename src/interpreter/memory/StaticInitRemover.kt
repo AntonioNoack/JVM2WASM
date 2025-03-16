@@ -1,8 +1,10 @@
 package interpreter.memory
 
 import gIndex
+import me.anno.utils.structures.maps.Maps.removeIf
 import utils.MethodSig
 import utils.STATIC_INIT
+import utils.functionTable
 import wasm.instr.*
 import wasm.instr.Instructions.Return
 import wasm.parser.FunctionImpl
@@ -13,11 +15,11 @@ object StaticInitRemover {
     private val emptyInitBody = listOf(Return)
 
     fun removeStaticInit() {
-        // todo it would be nice to completely remove them;
-        //  for that, we need to remove them from the dynamic index (replace them with a dummy),
-        //  or remap all dynamic index data (nah, maybe later)
         removeInitFunction()
         removeStaticInitFromFunctionBodies()
+        removeStaticInitFromFunctionTable()
+
+        // todo remove functions, that are no longer references, e.g., GC-init-helpers
     }
 
     private fun removeInitFunction() {
@@ -27,14 +29,21 @@ object StaticInitRemover {
         )
     }
 
+    private fun removeStaticInitFromFunctionTable() {
+        // to do it would be nice to completely remove them;
+        //  for that, we need to remap all dynamic index data (nah, maybe later)
+        functionTable.replaceAll { funcName ->
+            if (funcName.startsWith("static_")) "init"
+            else funcName
+        }
+    }
+
     private fun removeStaticInitFromFunctionBodies() {
-        for ((sig, func) in gIndex.translatedMethods) {
-            if (sig.name == STATIC_INIT || func.funcName.startsWith("static_")) {
-                func.body = emptyInitBody
-                func.locals = emptyList()
-            } else {
-                func.body = removeStaticInit(func.body)
-            }
+        gIndex.translatedMethods.removeIf { (sig, func) ->
+            sig.name == STATIC_INIT || func.funcName.startsWith("static_")
+        }
+        for (func in gIndex.translatedMethods.values) {
+            func.body = removeStaticInit(func.body)
         }
     }
 

@@ -12,10 +12,8 @@ import wasm.instr.Instruction
 
 object HierarchyIndex {
 
-    private val LOGGER = LogManager.getLogger(HierarchyIndex::class)
-
-    private const val cap = 4096
-    private const val cap2 = 256
+    private const val cap = 1 shl 14
+    private const val cap2 = 1 shl 10
 
     val superClass = HashMap<String, String>(cap)
     val childClasses = HashMap<String, HashSet<String>>(cap)

@@ -30,6 +30,7 @@ import translator.MethodTranslator.Companion.comments
 import utils.*
 import utils.DefaultClassLayouts.registerDefaultOffsets
 import utils.DynIndex.appendDynamicFunctionTable
+import utils.DynIndex.appendDynamicFunctionTable2
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
 import utils.DynIndex.resolveIndirectTablePtr
@@ -95,8 +96,16 @@ var useDefaultKotlinReflection = false
 
 var alignFieldsProperly = true
 
-var callStaticInitOnce = false // not supported, because there is lots of cyclic dependencies (24 cycles)
-var callStaticInitAtCompileTime = false // todo implement this
+// not supported, because there is lots of cyclic dependencies (24 cycles)
+// var callStaticInitOnce = false
+
+/**
+ * calls all static-init-blocks at compile time using an interpreter:
+ * - static init code can be removed from the final executable
+ * - startup time might be slightly reduced
+ * - executable constant size gets larger
+ * */
+var callStaticInitAtCompileTime = true
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -546,8 +555,7 @@ fun jvm2wasm() {
     ptr = appendResourceTable(dataPrinter, ptr)
 
     // must come after invoke dynamic
-    appendDynamicFunctionTable(dataPrinter, implementedMethods) // idx -> function
-    appendFunctionTypes(dataPrinter)
+    appendDynamicFunctionTable() // idx -> function
 
     val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
 
@@ -727,6 +735,9 @@ fun jvm2wasm() {
         LOGGER.info("New Base Memory: $allocationStart (${allocationStart.formatFileSize()})")
         clock.stop("StaticInit WASM-VM")
     }
+
+    appendDynamicFunctionTable2(dataPrinter)
+    appendFunctionTypes(dataPrinter)
 
     if (comments) dataPrinter.append(";; globals:\n")
 

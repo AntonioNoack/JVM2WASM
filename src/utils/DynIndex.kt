@@ -4,11 +4,11 @@ import dIndex
 import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
+import implementedMethods
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.Recursion
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
@@ -38,17 +38,26 @@ object DynIndex {
         return dynIndex[name]!!
     }
 
-    data class SortingKey(val sig: MethodSig) : Comparable<SortingKey> {
-        override fun compareTo(other: SortingKey): Int {
-            return sig.name.compareTo(other.sig.name).ifSame {
-                sig.descriptor.raw.compareTo(other.sig.descriptor.raw)
+    private fun resolveByAlias(name: String): String {
+        var name2 = name
+        // resolve by aliases
+        while (true) {
+            val sig = hIndex.getAlias(name2) ?: break
+            val name3 = methodName(sig)
+            if (name2 == name3) {
+                assertTrue(name2 in implementedMethods) {
+                    printUsed(sig)
+                    "Missing impl of $name2/$sig"
+                }
+                break
             }
+            name2 = name3
         }
+        return name2
     }
 
-    fun appendDynamicFunctionTable(printer: StringBuilder2, implementedMethods: Map<String, MethodSig>) {
-        val nameToMethod = calculateNameToMethod()
-        val dynamicMethods = implementedMethods.entries
+    private fun findDynamicMethods(): List<MutableMap.MutableEntry<String, MethodSig>> {
+        return implementedMethods.entries
             .filter { (_, sig) -> // saving space by remove functions that cannot be invoked dynamically
                 sig.clazz != INTERFACE_CALL_NAME &&
                         sig.name != INSTANCE_INIT &&
@@ -58,32 +67,21 @@ object DynIndex {
                         !hIndex.isFinal(sig) &&
                         !hIndex.isAbstract(sig) &&
                         hIndex.getAlias(sig) == sig
-            }
-            .sortedBy { (_, sig) -> SortingKey(sig) }
+            }.sortedBy { it.key }
+    }
+
+    fun appendDynamicFunctionTable() {
+        val nameToMethod = calculateNameToMethod()
+        val dynamicMethods = findDynamicMethods()
         for ((name, sig) in dynamicMethods) {
             val sig1 = nameToMethod[name]
             if (sig1 != null && hIndex.isAbstract(sig1))
                 throw IllegalStateException("$name is abstract, but also listed")
             addDynIndex(sig, name)
         }
-        printer.append("(table ${dynIndex.size} funcref)\n")
-        printer.append("(elem (i32.const 0)\n")
         functionTable.ensureCapacity(dynIndex.size)
         for ((sig0, name, _) in dynIndexSorted) {
-            var name2 = name
-            // resolve by aliases
-            while (true) {
-                val sig = hIndex.getAlias(name2) ?: break
-                val name3 = methodName(sig)
-                if (name2 == name3) {
-                    assertTrue(name2 in implementedMethods) {
-                        printUsed(sig)
-                        "Missing impl of $name2/$sig"
-                    }
-                    break
-                }
-                name2 = name3
-            }
+            val name2 = resolveByAlias(name)
 
             val sig2 = nameToMethod[name2]
             assertFalse(sig2 != null && hIndex.isAbstract(sig2)) { "$name is abstract, but also listed" }
@@ -91,12 +89,19 @@ object DynIndex {
             val sig = nameToMethod[name2] ?: sig0
             assertFalse(hIndex.isAbstract(sig)) { "$name2 is abstract, but also listed" }
 
-            printer.append("  $").append(name2).append('\n')
             functionTable.add(name2)
             ActuallyUsedIndex.add(dynIndexSig, sig)
         }
-        printer.append(")\n")
         LOGGER.info("${dynamicMethods.size}/${implementedMethods.size} implemented methods are dynamic")
+    }
+
+    fun appendDynamicFunctionTable2(printer: StringBuilder2) {
+        printer.append("(table ${dynIndex.size} funcref)\n")
+        printer.append("(elem (i32.const 0)\n")
+        for (i in functionTable.indices) {
+            printer.append("  $").append(functionTable[i]).append('\n')
+        }
+        printer.append(")\n")
     }
 
     /**
