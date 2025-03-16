@@ -33,6 +33,8 @@ class DependencyResolver {
     private val remaining = HashSet<MethodSig>(size)
     private val depsIfConstructable = HashMap<String, HashSet<MethodSig>>(size)
     private val usedByClass = HashMap<String, HashSet<MethodSig>>(size / 8) // 23s -> 13s ❤
+    private val usedMethods1 = HashSet<MethodSig>(64)
+    private val dependencies = HashSet<MethodSig>(64)
 
     private fun addAlwaysConstructableClasses() {
         constructableClasses.addAll(
@@ -58,24 +60,21 @@ class DependencyResolver {
         )
     }
 
-
-    val usedMethods1 = HashSet<MethodSig>(64)
-
-    fun used(sig: MethodSig): Boolean {
+    private fun used(sig: MethodSig): Boolean {
         return sig in usedMethods1 || sig in remaining || sig in usedMethods
     }
 
-    fun addRemaining(method: MethodSig) {
+    private fun addRemaining(method: MethodSig) {
         if (method !in dIndex.usedMethods) {
             remaining.add(method)
         }
     }
 
-    fun addRemaining(methods: Collection<MethodSig>) {
+    private fun addRemaining(methods: Collection<MethodSig>) {
         for (sig in methods) addRemaining(sig)
     }
 
-    fun handleBecomingConstructable(sig: MethodSig, clazz: String, newUsedMethods: MutableSet<MethodSig>) {
+    private fun handleBecomingConstructable(sig: MethodSig, clazz: String, newUsedMethods: MutableSet<MethodSig>) {
         if (!constructableClasses.add(clazz)) return
 
         // println("$clazz becomes constructible")
@@ -83,13 +82,28 @@ class DependencyResolver {
         // val print = clazz == "kotlin/jvm/internal/PropertyReference1Impl"
         // if (print) println("$sig -> $clazz")
 
-        // check for all interfaces, whether we should implement their functions
-        fun handleInterfaces(clazz1: String) {
-            val interfaces2 = hIndex.interfaces[clazz1]
+        handleInterfaceBecomingConstructable(clazz, sig, newUsedMethods)
+
+        val superClass = hIndex.superClass[clazz]
+        if (superClass != null) handleBecomingConstructable(sig, superClass, newUsedMethods)
+
+        val dependenciesByConstructable = depsIfConstructable.remove(clazz) ?: emptySet()
+        // println("  dependencies by constructable[$clazz]: $dependenciesByConstructable")
+        addRemaining(dependenciesByConstructable)
+        handleSuperBecomingConstructable(clazz, newUsedMethods)
+    }
+
+    // check for all interfaces, whether we should implement their functions
+    private fun handleInterfaceBecomingConstructable(
+        clazz: String, sig: MethodSig,
+        newUsedMethods: MutableSet<MethodSig>,
+    ) {
+        Recursion.processRecursive(clazz) { checkedClass, remaining ->
+            val interfaces2 = hIndex.interfaces[checkedClass]
             if (interfaces2 != null) {
                 for (interface1 in interfaces2) {
                     handleBecomingConstructable(sig, interface1, newUsedMethods)
-                    handleInterfaces(interface1)
+                    remaining.add(interface1)
                     val methods = hIndex.methodsByClass[interface1] ?: continue
                     for (method2 in methods) {
                         if (used(method2)) {
@@ -98,20 +112,15 @@ class DependencyResolver {
                     }
                 }
             }
-            val superClass1 = hIndex.superClass[clazz1]
-            if (superClass1 != null) handleInterfaces(superClass1)
+            val superClass1 = hIndex.superClass[checkedClass]
+            if (superClass1 != null) remaining.add(superClass1)
         }
-        handleInterfaces(clazz)
+    }
 
-        val superClass = hIndex.superClass[clazz]
-        if (superClass != null) handleBecomingConstructable(sig, superClass, newUsedMethods)
-
-        val dependenciesByConstructable = depsIfConstructable.remove(clazz) ?: emptySet()
-        // println("  dependencies by constructable[$clazz]: $dependenciesByConstructable")
-        addRemaining(dependenciesByConstructable)
-
-        // of all super classes, depend on all their relevant methods
-        fun handleSuper(superClass: String) {
+    // of all super classes, depend on all their relevant methods
+    private fun handleSuperBecomingConstructable(clazz: String, newUsedMethods: MutableSet<MethodSig>) {
+        var superClass = clazz
+        while (true) {
             // if (clazz == "java/util/Collections\$SetFromMap") println("processing $superClass")
             val superMethods = usedByClass[superClass]
             if (superMethods != null) {
@@ -123,18 +132,15 @@ class DependencyResolver {
                     }
                 }
             }
-            handleSuper(hIndex.superClass[superClass] ?: return)
+            superClass = hIndex.superClass[superClass] ?: break
         }
-        handleSuper(clazz)
     }
 
-    val dependencies = HashSet<MethodSig>(64)
-
-    fun checkState(i: Int) {
+    private fun checkState(i: Int) {
         // can be filled to check the validity of the current solution
     }
 
-    fun processDependency(method: MethodSig) {
+    private fun processDependency(method: MethodSig) {
         if (method.name == INSTANCE_INIT || hIndex.isStatic(method) || method.clazz in constructableClasses) {
             addRemaining(method)
         } else {
@@ -142,13 +148,13 @@ class DependencyResolver {
         }
     }
 
-    fun processDependencies(dependencies: Set<MethodSig>) {
+    private fun processDependencies(dependencies: Set<MethodSig>) {
         for (method in dependencies) {
             processDependency(method)
         }
     }
 
-    fun handleInterfaceBecomesUsed(sig: MethodSig, usedInterface: MethodSig) {
+    private fun handleInterfaceBecomesUsed(sig: MethodSig, usedInterface: MethodSig) {
         // println("adding used-as-interface: $usedInterface")
         if (!usedInterfaceCalls.add(usedInterface)) return
 

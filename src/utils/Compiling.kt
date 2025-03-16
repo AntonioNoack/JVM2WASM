@@ -681,7 +681,6 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                         signature: String?,
                         exceptions: Array<out String>?
                     ): MethodVisitor? {
-                        val isStatic = access.hasFlag(ACC_STATIC)
                         val sig1 = MethodSig.c(clazz, name, descriptor)
                         val map = hIndex.getAlias(sig1)
                         return if (sig1 !in dIndex.methodsWithForbiddenDependencies &&
