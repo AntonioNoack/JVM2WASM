@@ -1,6 +1,8 @@
 package dependency
 
 import entrySig
+import hIndex
+import listEntryPoints
 import utils.DynIndex.dynIndexSig
 import utils.MethodSig
 import utils.methodName
@@ -8,8 +10,8 @@ import utils.methodName
 object ActuallyUsedIndex {
 
     private val isLocked get() = resolved.isNotEmpty()
+    private val uses = HashMap<String, HashSet<String>>()
     val usedBy = HashMap<String, HashSet<String>>()
-    val uses = HashMap<String, HashSet<String>>()
 
     fun add(caller: MethodSig, called: MethodSig) {
         val callerName = methodName(caller)
@@ -19,6 +21,16 @@ object ActuallyUsedIndex {
         if ((changed0 || changed1) && isLocked) {
             throw IllegalStateException("Cannot add dependencies after resolution!, $callerName -> $calledName")
         }
+    }
+
+    fun addEntryPointsToActuallyUsed() {
+        listEntryPoints({
+            for (sig in hIndex.methodsByClass[it]!!) {
+                add(entrySig, sig)
+            }
+        }, { sig ->
+            add(entrySig, sig)
+        })
     }
 
     val resolved: HashSet<String> = HashSet()

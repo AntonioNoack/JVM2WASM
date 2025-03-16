@@ -19,7 +19,6 @@ import resources
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignBuffer
 import translator.GeneratorIndex.alignPointer
-import translator.GeneratorIndex.alignment
 import translator.GeneratorIndex.checkAlignment
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
@@ -458,8 +457,10 @@ val functionTable = ArrayList<String>()
 
 var printDebug = true
 
-var staticTablePtr = -1
-var staticInitFlagTablePtr = 0
+var staticFieldOffsetsPtr = -1
+var staticInitFlagsPtr = -1
+var staticFieldsStartPtr = -1
+var staticFieldsEndPtr = -1
 
 fun lookupStaticVariable(className: String, offset: Int): Int {
     val offsets = gIndex.getFieldOffsets(className, true)
@@ -470,10 +471,11 @@ fun lookupStaticVariable(className: String, offset: Int): Int {
 fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: Int): Int {
     LOGGER.info("[appendStaticInstanceTable]")
     val debugInfo = StringBuilder2()
-    staticTablePtr = ptr0
-    staticInitFlagTablePtr = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
-    var ptr = staticInitFlagTablePtr + numClasses // 1 byte for flag for init
-    val staticBuffer = ByteArrayOutputStream2(numClasses * 4)
+    staticFieldOffsetsPtr = ptr0
+    staticInitFlagsPtr = ptr0 + 4 * numClasses // 4 bytes for offset to static memory
+    staticFieldsStartPtr = alignPointer(staticInitFlagsPtr + numClasses) // 1 byte for flag for init
+    var ptr = staticFieldsStartPtr
+    val staticFieldOffsets = ByteArrayOutputStream2(numClasses * 4)
     for (i in 0 until numClasses) {
         val className = gIndex.classNamesByIndex[i]
         val fieldOffsets = gIndex.getFieldOffsets(className, true)
@@ -481,7 +483,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
 
         // todo we could be less strict, if there is only smaller-sized fields
         ptr = alignPointer(ptr)
-        staticBuffer.writeLE32(if (size == 0) 0 else ptr)
+        staticFieldOffsets.writeLE32(if (size == 0) 0 else ptr)
         fieldOffsets.staticOffsetPtr = ptr
         if (printDebug && size > 0) {
             debugInfo.append("[").append(i).append("] ")
@@ -498,9 +500,10 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
             .writeBytes(debugInfo.values, 0, debugInfo.size)
     }
 
-    val ptr2 = appendData(printer, staticTablePtr, staticBuffer)
-    assertTrue(ptr >= ptr2)
-    return ptr
+    assertEquals(staticFieldOffsets.position, 4 * numClasses)
+    appendData(printer, staticFieldOffsetsPtr, staticFieldOffsets)
+    staticFieldsEndPtr = alignPointer(ptr)
+    return staticFieldsEndPtr
 }
 
 val segments = ArrayList<DataSection>()
@@ -510,12 +513,8 @@ fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArrayOutputSt
     return appendData(printer, startIndex, data.toByteArray())
 }
 
-fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
-
-    checkAlignment(startIndex)
-    checkAlignment(data.size)
-
-    val segment = startIndex until (startIndex + data.size)
+private fun checkNoOtherSectionOverlaps(startIndex: Int, dataSize: Int) {
+    val segment = startIndex until (startIndex + dataSize)
     val mid1 = segment.first + segment.last
     val length1 = segment.last - segment.first
     for (seg in segments) {
@@ -526,6 +525,15 @@ fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
         if (abs(mid1 - mid2) < length1 + length2)
             throw IllegalStateException("Overlapping segments $segment, $seg")
     }
+}
+
+fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
+
+    checkAlignment(startIndex)
+    checkAlignment(data.size)
+
+    checkNoOtherSectionOverlaps(startIndex, data.size)
+
     segments.add(DataSection(startIndex, data))
     printer.append("(data ($ptrType.const ${startIndex}) \"")
     writeData(printer, data)

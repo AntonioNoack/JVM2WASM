@@ -95,16 +95,8 @@ object CallStaticInit {
         if (printDebug) printStats(engine, name, i)
     }
 
-    fun callStaticInitAtCompileTime(
-        ptr: Int, staticCallOrder: List<MethodSig>,
-        dataPrinter: StringBuilder2
-    ): Int {
-
-        val clock = Clock(LOGGER)
-
-        // create VM
-        val originalMemory = ptr
-        val extraMemory = 17 shl 20
+    private fun createEngine(originalMemory: Int): WASMEngine {
+        val extraMemory = 6 shl 20
         val engine = WASMEngine(originalMemory + extraMemory)
         assertTrue(globals.isNotEmpty()) // should not be empty
         engine.registerGlobals(globals)
@@ -117,10 +109,22 @@ object CallStaticInit {
         engine.resolveCalls()
         assertTrue(functionTable.isNotEmpty()) // usually should not be empty
         engine.registerFunctionTable(functionTable)
+        return engine
+    }
+
+    fun callStaticInitAtCompileTime(
+        ptr: Int, staticInitFunctions: List<MethodSig>,
+        printer: StringBuilder2
+    ): Int {
+
+        val clock = Clock(LOGGER)
+
+        // create VM
+        val engine = createEngine(ptr)
+
         // call all static init functions;
         // partially sort these methods by dependencies
         //  for better code-complexity and allocation measurements
-        val staticInitFunctions = staticCallOrder
         val time0i = System.nanoTime()
 
         LOGGER.info("Total static init functions: ${staticInitFunctions.size}")
@@ -144,8 +148,14 @@ object CallStaticInit {
         LOGGER.info("Executed ${engine.instructionCounter} instructions for StaticInit")
         clock.stop("calls, ${(engine.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s")
 
-        val ptr1 = MemoryOptimizer.optimizeMemory(engine, dataPrinter)
-        clock.stop("optimizeMemory")
+        val ptr1: Int
+        if (false) {
+            ptr1 = MemoryOptimizer.optimizeMemory(engine, printer)
+            clock.stop("optimizeMemory")
+        } else {
+            ptr1 = MemoryOptimizer.justAppendData(engine, printer)
+            clock.stop("justAppendData")
+        }
 
         StaticInitRemover.removeStaticInit()
         LOGGER.info("New Base Memory: $allocationStart (${allocationStart.formatFileSize()})")

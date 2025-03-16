@@ -8,7 +8,6 @@ import utils.FieldSig
 import utils.MethodSig
 import utils.methodName
 import wasm.instr.Instruction
-import kotlin.math.abs
 
 object HierarchyIndex {
 

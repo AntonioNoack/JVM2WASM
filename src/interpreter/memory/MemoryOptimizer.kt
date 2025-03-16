@@ -12,11 +12,8 @@ import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.structures.Recursion.processRecursive2
 import me.anno.utils.structures.lists.Lists.createList
 import org.apache.logging.log4j.LogManager
+import utils.*
 import utils.StaticClassIndices.*
-import utils.StringBuilder2
-import utils.appendData
-import utils.is32Bits
-import utils.lookupStaticVariable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -103,7 +100,6 @@ object MemoryOptimizer {
         //  - collect how much space we can save
         //  - remap instances, and all references to them (!!! WeakRef, too)
 
-        val makeMemoryNonGCAble = true
         // todo since we want to make all space non-GC-able,
         //  clear WeakRef.weakRefInstances before collecting memory (free those instances, too)
         //  -> set WeakRef.weakRefInstances.count to zero
@@ -136,7 +132,26 @@ object MemoryOptimizer {
         //  we need our new code for that,
         //  use new special const for that(?)
 
+        // more memory was changed than just dynamic allocated things, especially the static memory space
+        // todo is there more data slices that have been changed?
+        appendStaticMemory(engine, printer)
+
         return finishMemoryReplacement(printer, newBytes)
+    }
+
+    fun justAppendData(engine: WASMEngine, printer: StringBuilder2): Int {
+        appendStaticMemory(engine, printer)
+        val i0 = allocationStart
+        val i1 = getAllocationPointer(engine)
+        val newBytes = engine.bytes.copyOfRange(i0, i1)
+        return finishMemoryReplacement(printer, newBytes)
+    }
+
+    private fun appendStaticMemory(engine: WASMEngine, printer: StringBuilder2) {
+        val i0 = staticFieldsStartPtr
+        val i1 = staticFieldsEndPtr
+        val staticFields = engine.bytes.copyOfRange(i0, i1)
+        appendData(printer, i0, staticFields)
     }
 
     private fun collectUsedAddresses(

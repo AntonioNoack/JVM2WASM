@@ -11,6 +11,7 @@ import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
 import hierarchy.FirstClassIndexer.Companion.readType
+import hierarchy.HierarchyIndex.getAlias
 import implementedMethods
 import listEntryPoints
 import listLibrary
@@ -309,8 +310,7 @@ fun findExportedMethods() {
     }
 }
 
-fun replaceRenamedDependencies() {
-    val clock = Clock(LOGGER)
+fun replaceRenamedDependencies(clock: Clock) {
     LOGGER.info("[replaceRenamedDependencies]")
     fillInDependenciesForAliases()
     clock.stop("fillInDependenciesForAliases")
@@ -364,9 +364,7 @@ fun checkMissingClasses() {
 
 fun resolveAll(entryClasses: Set<String>, entryPoints: Set<MethodSig>) {
     LOGGER.info("[resolveAll]")
-    val clock = Clock("ResolveAll")
     dIndex.resolve(entryClasses, entryPoints)
-    clock.stop("dIndex.resolve()")
 }
 
 fun indexFieldsInSyntheticMethods() {
@@ -416,7 +414,7 @@ fun printInterfaceIndex() {
     }
 }
 
-fun assignNativeCode() {
+fun parseInlineWASM() {
     LOGGER.info("[assignNativeCode]")
     for ((method, code, noinline) in hIndex.annotations.entries
         .mapNotNull { (method, annotations) ->
@@ -435,7 +433,7 @@ fun assignNativeCode() {
     }
 }
 
-fun parseInlineWASM(code: String): List<Instruction> {
+private fun parseInlineWASM(code: String): List<Instruction> {
     return WATParser().parseExpression(code)
 }
 
@@ -592,20 +590,10 @@ val imports = ArrayList<Import>()
 fun printForbiddenMethods(importPrinter: StringBuilder2, missingMethods: HashSet<MethodSig>) {
     LOGGER.info("[printForbiddenMethods]")
     if (MethodTranslator.comments) importPrinter.append(";; forbidden\n")
-    loop@ for (sig in dIndex.methodsWithForbiddenDependencies
-        .filter { it in dIndex.usedMethods }
-        .sortedBy { methodName(it) }) {
-        val name = methodName(sig)
-        var sig2: MethodSig
-        while (true) {
-            sig2 = hIndex.methodAliases[name] ?: sig
-            if (sig2 != sig) {
-                if (sig2 !in dIndex.usedMethods) {
-                    throw NotImplementedError("$sig was used, but $sig2 wasn't")
-                }
-                continue@loop
-            } else break
-        }
+    val forbidden = dIndex.methodsWithForbiddenDependencies
+        .filter { it in dIndex.usedMethods && getAlias(it) == it }
+        .sortedBy { methodName(it) }
+    for (sig in forbidden) {
         importPrinter.import2(sig)
         if (!missingMethods.add(sig))
             throw IllegalStateException()

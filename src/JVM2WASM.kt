@@ -1,47 +1,39 @@
 import dependency.ActuallyUsedIndex
+import dependency.ActuallyUsedIndex.addEntryPointsToActuallyUsed
 import dependency.DependencyIndex
 import dependency.DependencyIndex.constructableClasses
 import dependency.StaticDependencies
-import hierarchy.DelayedLambdaUpdate
 import hierarchy.HierarchyIndex
-import interpreter.WASMEngine
-import interpreter.functions.TrackCallocInstr
-import interpreter.memory.MemoryOptimizer
-import interpreter.memory.StaticInitRemover
 import jvm.JVM32
 import me.anno.io.Streams.readText
-import me.anno.maths.Maths.align
 import me.anno.maths.Maths.ceilDiv
-import me.anno.maths.Maths.min
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.types.Floats.f1
-import me.anno.utils.types.Floats.f3
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
+import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.classNamesByIndex
 import translator.GeneratorIndex.dataStart
-import translator.GeneratorIndex.nthGetterMethods
 import translator.GeneratorIndex.stringStart
-import translator.GeneratorIndex.translatedMethods
 import translator.MethodTranslator.Companion.comments
 import utils.*
 import utils.DefaultClassLayouts.registerDefaultOffsets
+import utils.DefaultClasses.registerDefaultClasses
 import utils.DynIndex.appendDynamicFunctionTable
-import utils.DynIndex.appendDynamicFunctionTable2
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
+import utils.DynIndex.calculateDynamicFunctionTable
 import utils.DynIndex.resolveIndirectTablePtr
+import utils.MissingFunctions.checkUsedButNotImplemented
+import utils.MissingFunctions.findUsedButNotImplemented
 import utils.NativeHelperFunctions.appendNativeHelperFunctions
-import utils.PrintUsed.printUsed
 import utils.WASMTypes.*
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder
 import java.io.FileNotFoundException
-import kotlin.math.ceil
 import kotlin.math.sin
 
 const val api = ASM9
@@ -393,77 +385,59 @@ fun jvm2wasm() {
     val bodyPrinter = StringBuilder2(4096)
     val dataPrinter = StringBuilder2(4096)
 
-    val predefinedClasses = listOf(
-        "java/lang/Object", "[]", // 4
-        "[I", "[F", // 4
-        "[Z", "[B", // 1
-        "[C", "[S", // 2
-        "[J", "[D", // 8
-        // do we really need to hardcode them? yes, for convenience in JavaScript
-        // todo -> use named constants in JavaScript
-        "java/lang/String", // #10
-        "java/lang/Class", // #11
-        "java/lang/System", // #12
-        "java/io/Serializable", // #13
-        "java/lang/Throwable", // #14
-        "java/lang/StackTraceElement", // #15
-        "int", "long", "float", "double",
-        "boolean", "byte", "short", "char", "void", // #24
-    )
-
-    for (i in 1 until 13) {
-        hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
-    }
-
-    for (i in predefinedClasses.indices) {
-        val clazz = predefinedClasses[i]
-        gIndex.classIndex[clazz] = i
-        gIndex.classNamesByIndex.add(clazz)
-    }
-
-    StaticClassIndices.validateClassIndices()
-
-    for (i in StaticClassIndices.FIRST_NATIVE..StaticClassIndices.LAST_NATIVE) {
-        hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
-    }
+    val predefinedClasses = registerDefaultClasses()
 
     // todo confirm type shift using WASMEngine
 
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
+    clock.stop("Index Hierarchy")
 
-    hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
-    hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
-    hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
+    cleanupJVMImplemented()
+    clock.stop("Cleanup JVM Implemented")
 
     resolveGenericTypes()
+    clock.stop("Resolve Generics")
+
     findNoThrowMethods()
+    clock.stop("Find NoThrow-Methods")
 
     // java_lang_StrictMath_sqrt_DD
     hIndex.inlined[MethodSig.c("java/lang/StrictMath", "sqrt", "(D)D")] = listOf(F64_SQRT)
     hIndex.inlined[MethodSig.c("java/lang/Math", "sqrt", "(D)D")] = listOf(F64_SQRT)
 
     findAliases()
+    clock.stop("Find Aliases")
 
     val (entryPoints, entryClasses) = collectEntryPoints()
+    clock.stop("Collect Entry Points")
 
     findExportedMethods()
+    clock.stop("Find Exported Methods")
 
     // unknown (because idk where [] is implemented), can cause confusion for my compiler
     hIndex.finalMethods.add(MethodSig.c("[]", "clone", "()Ljava/lang/Object;"))
 
-    replaceRenamedDependencies()
+    replaceRenamedDependencies(clock)
+    clock.stop("Replace Renamed Methods")
+
     checkMissingClasses()
+    clock.stop("Check missing classes")
 
     resolveAll(entryClasses, entryPoints)
+    clock.stop("Resolve All")
 
     // doesn't work yet, because of java/lang-class interdependencies,
     // and probably lots of them in our project, too
     val staticCallOrder = StaticDependencies.calculatePartialStaticCallOrder()
+    clock.stop("Static Call Order")
 
     indexFieldsInSyntheticMethods()
     calculateFieldOffsets()
-    assignNativeCode()
+    clock.stop("Field Offsets")
+
+    parseInlineWASM()
+    clock.stop("Parse Inline WASM")
 
     headerPrinter.append("(module\n")
 
@@ -501,6 +475,7 @@ fun jvm2wasm() {
     val jsPseudoImplemented = createPseudoJSImplementations(jsImplemented, missingMethods)
 
     printAbstractMethods(bodyPrinter, missingMethods)
+    clock.stop("Printing forbidden/native/... methods")
 
     for (sig in dIndex.usedMethods) {
         if (sig in hIndex.jvmImplementedMethods) {
@@ -513,6 +488,7 @@ fun jvm2wasm() {
         dIndex.usedMethods.filter { hIndex.getAlias(it) == it },
         implementedMethods.values.toSet()
     )
+    clock.stop("Uniquely Implemented Methods")
 
     /** translate method implementations */
     // find all aliases, that are being used
@@ -559,83 +535,20 @@ fun jvm2wasm() {
     ptr = appendResourceTable(dataPrinter, ptr)
 
     // must come after invoke dynamic
-    appendDynamicFunctionTable() // idx -> function
+    calculateDynamicFunctionTable() // idx -> function
 
-    val usedButNotImplemented = HashSet<String>(gIndex.actuallyUsed.usedBy.keys)
+    appendNthGetterMethods(bodyPrinter)
 
-    for (func in jsImplemented) usedButNotImplemented.remove(func.key)
-    for (func in jsPseudoImplemented) usedButNotImplemented.remove(func.key)
-    for (func in gIndex.translatedMethods) usedButNotImplemented.remove(methodName(func.key))
-    for ((name, dlu) in DelayedLambdaUpdate.needingBridgeUpdate) {
-        if (name in dIndex.constructableClasses) {
-            usedButNotImplemented.remove(methodName(dlu.calledMethod))
-            usedButNotImplemented.remove(methodName(dlu.bridgeMethod))
-        }
-    }
+    val usedButNotImplemented = findUsedButNotImplemented(jsImplemented, jsPseudoImplemented)
 
-    // append nth-getter-methods
-    for (desc in gIndex.nthGetterMethods.values.sortedWith(FunctionOrder)) {
-        bodyPrinter.append(desc)
-    }
-
-    listEntryPoints({
-        for (sig in hIndex.methodsByClass[it]!!) {
-            ActuallyUsedIndex.add(entrySig, sig)
-        }
-    }, { sig ->
-        ActuallyUsedIndex.add(entrySig, sig)
-    })
+    addEntryPointsToActuallyUsed()
 
     val usedMethods = ActuallyUsedIndex.resolve()
-    usedButNotImplemented.retainAll(usedMethods)
-
-    val nameToMethod = calculateNameToMethod()
-    val usedBotNotImplementedMethods =
-        usedButNotImplemented
-            .mapNotNull { nameToMethod[it] }
-
-    for (sig in usedBotNotImplementedMethods) {
-        if (sig.clazz in hIndex.interfaceClasses &&
-            sig !in hIndex.jvmImplementedMethods &&
-            sig !in hIndex.customImplementedMethods
-        ) {
-            usedButNotImplemented.remove(methodName(sig))
-        }
-        if (hIndex.isAbstract(sig)) {
-            usedButNotImplemented.remove(methodName(sig))
-        }
-    }
-
-    if (usedButNotImplemented.isNotEmpty()) {
-        printMissingFunctions(usedButNotImplemented, usedMethods)
-    }
+    checkUsedButNotImplemented(usedMethods, usedButNotImplemented)
 
     clock.stop("Before Globals")
 
-    fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
-        globals[name] = GlobalVariable(name, type, value, isMutable)
-    }
-
-    defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
-    defineGlobal("staticTable", ptrType, staticTablePtr) // static table
-    defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
-    defineGlobal("numClasses", ptrType, numClasses)
-    defineGlobal("classInstanceTable", ptrType, classInstanceTablePtr)
-    defineGlobal("classSize", ptrType, gIndex.getInstanceSize("java/lang/Class"))
-    defineGlobal("staticInitTable", ptrType, staticInitFlagTablePtr)
-    defineGlobal("stackTraceTable", ptrType, stackTraceTablePtr)
-    defineGlobal("resourceTable", ptrType, resourceTablePtr)
-
-    defineGlobal("stackEndPointer", ptrType, ptr) // stack end ptr
-    ptr += stackSize
-    defineGlobal("stackPointer", ptrType, ptr, true) // stack ptr
-    defineGlobal("stackPointerStart", ptrType, ptr) // stack ptr start address
-
-    ptr = align(ptr + 4, 16)
-    allocationStart = ptr
-    // allocation start address
-    defineGlobal("allocationPointer", ptrType, ptr, true)
-    defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
+    ptr = defineGlobals(classTableStart, numClasses, ptr)
 
     // todo code-size optimization:
     //  inline calls to functions, which only call
@@ -651,42 +564,102 @@ fun jvm2wasm() {
         ptr = CallStaticInit.callStaticInitAtCompileTime(ptr, staticCallOrder, dataPrinter)
     }
 
-    appendDynamicFunctionTable2(dataPrinter)
+    appendDynamicFunctionTable(dataPrinter)
     appendFunctionTypes(dataPrinter)
 
-    if (comments) dataPrinter.append(";; globals:\n")
-
-    fun printGlobal(name: String, type: String, type2: String, value: Int) {
-        // can be mutable...
-        dataPrinter.append("(global $").append(name).append(" ").append(type).append(" (").append(type2)
-            .append(".const ").append(value).append("))\n")
-    }
-
-    for (global in globals.values.sortedBy { it.name }) {
-        val isMutable = global.isMutable
-        val type = global.type
-        val value = global.initialValue
-        printGlobal(global.name, if (isMutable) "(mut $type)" else type, type, value)
-    }
+    appendGlobals(dataPrinter)
 
     printMethodImplementations(bodyPrinter, usedMethods)
     printInterfaceIndex()
 
     val sizeInPages = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
-    headerPrinter.append("(memory (import \"js\" \"mem\") ").append(sizeInPages).append(")\n")
 
-    createJSImports(jsImplemented, jsPseudoImplemented, sizeInPages)
+    writeJavaScriptImportsFile(jsImplemented, jsPseudoImplemented, sizeInPages)
 
+    val joined = joinPrinters(
+        sizeInPages, headerPrinter,
+        importPrinter, dataPrinter, bodyPrinter
+    )
+
+    printStats(joined)
+    compileToWASM(joined)
+}
+
+private fun cleanupJVMImplemented() {
+    hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
+    hIndex.abstractMethods.removeAll(hIndex.jvmImplementedMethods)
+    hIndex.nativeMethods.removeAll(hIndex.jvmImplementedMethods)
+}
+
+private fun appendNthGetterMethods(bodyPrinter: StringBuilder2) {
+    // append nth-getter-methods
+    for (desc in gIndex.nthGetterMethods.values.sortedWith(FunctionOrder)) {
+        bodyPrinter.append(desc)
+    }
+}
+
+private fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
+    globals[name] = GlobalVariable(name, type, value, isMutable)
+}
+
+private fun defineGlobals(classTableStart: Int, numClasses: Int, ptr0: Int): Int {
+
+    defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
+    defineGlobal("staticTable", ptrType, staticFieldOffsetsPtr) // static table
+    defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
+    defineGlobal("numClasses", ptrType, numClasses)
+    defineGlobal("classInstanceTable", ptrType, classInstanceTablePtr)
+    defineGlobal("classSize", ptrType, gIndex.getInstanceSize("java/lang/Class"))
+    defineGlobal("staticInitTable", ptrType, staticInitFlagsPtr)
+    defineGlobal("stackTraceTable", ptrType, stackTraceTablePtr)
+    defineGlobal("resourceTable", ptrType, resourceTablePtr)
+
+    var ptr = ptr0
+    defineGlobal("stackEndPointer", ptrType, ptr) // stack end ptr
+    ptr += stackSize
+    defineGlobal("stackPointer", ptrType, ptr, true) // stack ptr
+    defineGlobal("stackPointerStart", ptrType, ptr) // stack ptr start address
+
+    ptr = alignPointer(ptr + 4) // +4 for the top stack entry
+    allocationStart = ptr
+    // allocation start address
+    defineGlobal("allocationPointer", ptrType, ptr, true)
+    defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
+    return ptr
+}
+
+private fun appendGlobals(dataPrinter: StringBuilder2) {
+    if (comments) dataPrinter.append(";; globals:\n")
+    for (global in globals.values.sortedBy { it.name }) {
+        dataPrinter.append("(global $").append(global.name).append(" ")
+        if (global.isMutable) dataPrinter.append("(mut ")
+        dataPrinter.append(global.type)
+        if (global.isMutable) dataPrinter.append(')')
+        dataPrinter
+            .append(" (").append(global.type).append(".const ")
+            .append(global.initialValue).append("))\n")
+    }
+}
+
+private fun joinPrinters(
+    sizeInPages: Int,
+    headerPrinter: StringBuilder2, importPrinter: StringBuilder2,
+    dataPrinter: StringBuilder2, bodyPrinter: StringBuilder2
+): StringBuilder2 {
     // close module
+    headerPrinter.append("(memory (import \"js\" \"mem\") ").append(sizeInPages).append(")\n")
     headerPrinter.ensureExtra(importPrinter.size + dataPrinter.size + bodyPrinter.size)
     headerPrinter.append(importPrinter)
     headerPrinter.append(dataPrinter)
     headerPrinter.append(bodyPrinter)
     headerPrinter.append(if (comments) ") ;; end of module\n" else ")\n")
+    return headerPrinter
+}
 
+private fun printStats(printer: StringBuilder2) {
     LOGGER.info(
         "WAT size (${if (comments) "with" else "without"} comments): " +
-                headerPrinter.length.formatFileSize()
+                printer.length.formatFileSize()
     )
     LOGGER.info("Setter/Getter-Methods: ${hIndex.setterMethods.size}/${hIndex.getterMethods.size}")
     LOGGER.info(
@@ -694,30 +667,6 @@ fun jvm2wasm() {
                 "size: ${gIndex.totalStringSize.formatFileSize()}"
     )
     LOGGER.info("${constructableClasses.size}/${classNamesByIndex.size} classes are constructable")
-
-    compileToWASM(headerPrinter)
 }
 
 val globals = HashMap<String, GlobalVariable>()
-
-fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
-    println("\nMissing functions:")
-    val nameToMethod = calculateNameToMethod()
-    for (name in usedButNotImplemented) {
-        println("  $name")
-        println("    resolved: ${name in resolved}")
-        val sig = hIndex.getAlias(name) ?: nameToMethod[name]
-        if (sig != null) {
-            println("    alias: " + hIndex.getAlias(name))
-            println("    name2method: " + nameToMethod[name])
-            println("    translated: " + (sig in gIndex.translatedMethods))
-            print("    ")
-            printUsed(sig)
-        }
-    }
-    println()
-    println("additional info:")
-    printUsed(MethodSig.c("java/lang/reflect/Constructor", "getDeclaredAnnotations", "()[Ljava/lang/Object;"))
-    printUsed(MethodSig.c("java/lang/reflect/Executable", "getDeclaredAnnotations", "()[Ljava/lang/Object;"))
-    throw IllegalStateException("Missing ${usedButNotImplemented.size} functions")
-}

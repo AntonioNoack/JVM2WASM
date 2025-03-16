@@ -70,7 +70,7 @@ object DynIndex {
             }.sortedBy { it.key }
     }
 
-    fun appendDynamicFunctionTable() {
+    fun calculateDynamicFunctionTable() {
         val nameToMethod = calculateNameToMethod()
         val dynamicMethods = findDynamicMethods()
         for ((name, sig) in dynamicMethods) {
@@ -95,7 +95,7 @@ object DynIndex {
         LOGGER.info("${dynamicMethods.size}/${implementedMethods.size} implemented methods are dynamic")
     }
 
-    fun appendDynamicFunctionTable2(printer: StringBuilder2) {
+    fun appendDynamicFunctionTable(printer: StringBuilder2) {
         printer.append("(table ${dynIndex.size} funcref)\n")
         printer.append("(elem (i32.const 0)\n")
         for (i in functionTable.indices) {
