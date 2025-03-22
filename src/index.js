@@ -55,8 +55,8 @@ try {
                 let length = lib.r32(chars + objectOverhead)
                 if(length < 0 || length > 65535) return "STRING TOO LONG OR SHORT11!!: "+length
                 return new TextDecoder().decode(new Uint8Array(memory.buffer, chars + arrayOverhead, length));
-            } else return "INCORRECT CLASS IN STRING.CHARS!!!"
-        } else return "INVALID_STRING!!1! at "+x
+            } else throw "INCORRECT CLASS IN STRING.CHARS!!!"
+        } else throw "INVALID_STRING!!1! at " + x + ", class " + lib.rCl(x)
         return x;
     }
 

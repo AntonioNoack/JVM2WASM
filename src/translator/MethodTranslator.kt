@@ -172,6 +172,7 @@ class MethodTranslator(
 
         @Suppress("UNUSED_PARAMETER")
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
+            // return methodName(sig) == "kotlin_text_StringsKt__StringsJVMKt_replace_Ljava_lang_StringLjava_lang_StringLjava_lang_StringZLjava_lang_String"
             return false
         }
     }
@@ -1581,7 +1582,8 @@ class MethodTranslator(
         descriptor: String?,
         visible: Boolean
     ): AnnotationVisitor? {
-        println("  type annotation $typeRef, $typePath, $descriptor, $visible")
+        // only occurrences: 16777216, null, Lkotlin/internal/OnlyInputTypes;, false
+        if (printOps) println("  type annotation $typeRef, $typePath, $descriptor, $visible")
         return null
     }
 

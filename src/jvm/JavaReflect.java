@@ -57,12 +57,15 @@ public class JavaReflect {
                 String fieldName = field.getName();
                 // log("field[i]:", fieldName);
                 // log("field[i].offset:", getFieldOffset(field));
-                if (name.equals(fieldName)) return field;
+                if (name.equals(fieldName)) {
+                    log("Found field", clazz.getName(), name);
+                    return field;
+                }
             }
             // use parent class as well, so we need fewer entries in each array
             clazz = clazz.getSuperclass();
             if (clazz == null) {
-                log("looked for field, but failed", originalClass.getName(), name);
+                log("Missing field", originalClass.getName(), name);
                 return null; // not really JVM-conform, but we don't want exception-throwing
             }
         }
@@ -133,13 +136,17 @@ public class JavaReflect {
 
     public static int getFieldOffset(Field field) {
         int offset = readI32AtOffset(field, OFFSET_FIELD_SLOT);
-        if (offset < objectOverhead && !Modifier.isStatic(field.getModifiers()))
+        if (offset < objectOverhead && !Modifier.isStatic(field.getModifiers())) {
+            log("Field/0", getAddr(field));
+            log("Field/1", field.getDeclaringClass().getName(), field.getName(), field.getModifiers());
             throwJs("Field offset must not be zero");
+        }
         return offset;
     }
 
     @Alias(names = "java_lang_reflect_Field_get_Ljava_lang_ObjectLjava_lang_Object")
     public static Object Field_get(Field field, Object instance) {
+        log("Field_get", getAddr(field), getAddr(instance));
         int addr = getFieldAddr(field, instance);
         // if the field is native, we have to wrap it
         Class<?> clazz = field.getType();
@@ -179,11 +186,14 @@ public class JavaReflect {
     @Alias(names = "java_lang_reflect_Field_set_Ljava_lang_ObjectLjava_lang_ObjectV")
     public static void Field_set(Field field, Object instance, Object value) {
         int addr = getFieldAddr(field, instance);
-        log("Field.set()", addr, getAddr(value));
-        log("Field.newValue", String.valueOf(value));
+        // log("Field.set()", addr, getAddr(value));
+        // log("Field.newValue", String.valueOf(value));
         boolean isInstanceOfType = field.getType().isInstance(value);
-        log("Field.type vs newType", field.getType().getName(), value == null ? null : value.getClass().getName());
-        log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
+        if (!isInstanceOfType) {
+            throw new ClassCastException("Cannot set " + field + " to " + instance);
+        }
+        // log("Field.type vs newType", field.getType().getName(), value == null ? null : value.getClass().getName());
+        // log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
         switch (field.getType().getName()) {
             case "boolean":
                 write8(addr, (byte) (((Boolean) value) ? 1 : 0));

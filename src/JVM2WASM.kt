@@ -308,26 +308,26 @@ fun printMethodFieldStats() {
     val usedFields = dIndex.usedGetters.filter { it in dIndex.usedSetters }
     if (dIndex.usedMethods.size + usedFields.size < 1000) {
 
-        println("classes:")
+        LOGGER.info("classes:")
         for (clazz in dIndex.constructableClasses) {
-            println(clazz)
+            LOGGER.info(clazz)
         }
-        println()
+        LOGGER.info()
 
-        println("methods:")
+        LOGGER.info("methods:")
         for (m in dIndex.usedMethods.map { methodName(it) }.sorted()) {
-            println(m)
+            LOGGER.info(m)
         }
-        println()
+        LOGGER.info()
 
-        println("fields:")
+        LOGGER.info("fields:")
         for (f in usedFields.map { it.toString() }.toSortedSet()) {
-            println(f)
+            LOGGER.info(f)
         }
-        println()
+        LOGGER.info()
     }
 
-    println(
+    LOGGER.info(
         "${dIndex.usedMethods.size} methods + ${usedFields.size} fields, " +
                 "${hIndex.superClass.size} classes indexed, ${dIndex.constructableClasses.size} constructable"
     )

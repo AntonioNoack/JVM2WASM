@@ -9,9 +9,10 @@ import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
+import translator.GeneratorIndex.alignPointer
 import utils.MethodResolver.resolveMethod
 import utils.PrintUsed.printUsed
 
@@ -71,7 +72,7 @@ object DynIndex {
     }
 
     fun calculateDynamicFunctionTable() {
-        val nameToMethod = calculateNameToMethod()
+        val nameToMethod = hIndex.methodByName
         val dynamicMethods = findDynamicMethods()
         for ((name, sig) in dynamicMethods) {
             val sig1 = nameToMethod[name]
@@ -226,15 +227,16 @@ object DynIndex {
 
     var resolveIndirectTablePtr = 0
     private var aidtCtr = 50 // disabled
-    fun appendInvokeDynamicTable(printer: StringBuilder2, startOfMethodTable: Int, numClasses: Int): Int {
+    fun appendInvokeDynamicTable(printer: StringBuilder2, ptr: Int, numClasses: Int): Int {
         LOGGER.info("[appendInvokeDynamicTable]")
         val debugInfo = StringBuilder2()
 
+        val startOfMethodTable = alignPointer(ptr)
         resolveIndirectTablePtr = startOfMethodTable
 
         val methodTable = ByteArrayOutputStream2(numClasses * 4)
         val dynamicIndexData = ByteArrayOutputStream2(numClasses * 4)
-        val startOfDynamicIndexData = startOfMethodTable + numClasses * 4
+        val startOfDynamicIndexData = alignPointer(startOfMethodTable + numClasses * 4)
         var ptr = startOfDynamicIndexData
 
         for (classId in 0 until numClasses) {
@@ -291,7 +293,7 @@ object DynIndex {
         // append class instanceOf-table
         val classTableData = ByteArrayOutputStream2(numClasses * 4)
         val instanceTableData = ByteArrayOutputStream2()
-        val instanceTableStart = classTableStart + numClasses * 4
+        val instanceTableStart = alignPointer(classTableStart + numClasses * 4)
         var ptr = instanceTableStart
         val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V"))
 

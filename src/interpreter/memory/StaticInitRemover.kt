@@ -61,7 +61,7 @@ object StaticInitRemover {
                             nextInstr is Call && nextInstr.name == "stackPop" &&
                             prevInstr2 is Const
                         ) {
-                            instr1.subList(i - 2, i + 1).clear()
+                            instr1.subList(i - 2, i + 2).clear()
                             i -= 3 // -2 from prevInstr2, -1 from i++
                         } else {
                             instr1.removeAt(i)

@@ -7,6 +7,7 @@ import dIndex
 import fieldsRWRequired
 import gIndex
 import hIndex
+import hierarchy.Annota
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
@@ -23,11 +24,9 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
-import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
-import org.objectweb.asm.Opcodes.ACC_STATIC
 import replaceClass
 import resolvedMethods
 import translator.ClassTranslator
@@ -242,35 +241,38 @@ fun findNoThrowMethods() {
 
 fun findAliases() {
     LOGGER.info("[findAliases]")
-    val nameToMethod0 = calculateNameToMethod()
     for ((sig, annotations) in hIndex.annotations) {
         val alias = annotations.firstOrNull { it.clazz == Annotations.ALIAS }
-        if (alias != null) {
-            @Suppress("UNCHECKED_CAST")
-            val aliasNames = alias.properties["names"] as List<String>
-            for (aliasName in aliasNames) {
-                if ('|' in aliasName) throw IllegalStateException(aliasName)
-                // val aliasName = alias.properties["name"] as String
-                if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
-                if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-                if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-                val previous = hIndex.getAlias(aliasName)
-                if (previous != null && previous != sig) throw IllegalStateException("Cannot replace $aliasName -> $previous with -> $sig")
-                hIndex.setAlias(aliasName, sig)
-            }
-        }
+        if (alias != null) findAlias(sig, alias)
         val revAlias = annotations.firstOrNull { it.clazz == Annotations.REV_ALIAS }
-        if (revAlias != null) {
-            val aliasName = revAlias.properties["name"] as String
-            if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
-            if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-            if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
-            val sig1 = nameToMethod0[aliasName]
-            if (sig1 != null) {
-                hIndex.setAlias(sig, sig1)
-            } else LOGGER.info("Skipped $sig -> $aliasName, because unknown")
-        }
+        if (revAlias != null) findRevAlias(sig, revAlias)
     }
+}
+
+private fun findAlias(sig: MethodSig, alias: Annota) {
+    @Suppress("UNCHECKED_CAST")
+    val aliasNames = alias.properties["names"] as List<String>
+    for (aliasName in aliasNames) {
+        if ('|' in aliasName) throw IllegalStateException(aliasName)
+        // val aliasName = alias.properties["name"] as String
+        if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
+        if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
+        if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
+        val previous = hIndex.getAlias(aliasName)
+        if (previous != null && previous != sig) throw IllegalStateException("Cannot replace $aliasName -> $previous with -> $sig")
+        hIndex.setAlias(aliasName, sig)
+    }
+}
+
+private fun findRevAlias(sig: MethodSig, revAlias: Annota) {
+    val aliasName = revAlias.properties["name"] as String
+    if (aliasName.startsWith('$')) throw IllegalStateException("alias $aliasName must not start with dollar symbol")
+    if (aliasName.contains('/')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
+    if (aliasName.contains('(')) throw IllegalStateException("alias $aliasName must not contain slashes, but underscores")
+    val sig1 = hIndex.methodByName[aliasName]
+    if (sig1 != null) {
+        hIndex.setAlias(sig, sig1)
+    } else LOGGER.info("Skipped $sig -> $aliasName, because unknown")
 }
 
 fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {

@@ -862,38 +862,33 @@ class StructuralAnalysis(
                         nodeB.inputs.size == 1
             }
 
-            fun negateInner(nodeB: BranchNode, nodeC: GraphingNode): Boolean {
-                return nodeB.ifTrue == nodeA && nodeB.ifFalse == nodeC
-            }
-
             val ifTrue = nodeA.ifTrue
             val ifFalse = nodeA.ifFalse
             if (ifTrue == ifFalse) continue // not thought over yet
 
             val ifTrueIsB = isValidBAndC(ifTrue, ifFalse)
             val ifFalseIsB = isValidBAndC(ifFalse, ifTrue)
+            if (ifTrueIsB == ifFalseIsB) continue
 
             val nodeB: BranchNode
             val nodeC: GraphingNode
-            val negate: Boolean
 
-            if (ifTrueIsB && !ifFalseIsB) {
+            if (ifTrueIsB) {
                 nodeB = ifTrue as BranchNode
                 nodeC = ifFalse
-                negate = false
-            } else if (ifFalseIsB && !ifTrueIsB) {
+            } else {
                 nodeB = ifFalse as BranchNode
                 nodeC = ifTrue
-                negate = true
-            } else continue
+            }
 
             val label = "smallCircleB${methodTranslator.nextLoopIndex++}"
-            if (negateInner(nodeB, nodeC)) {
+
+            if (nodeB.ifTrue == nodeC && nodeB.ifFalse == nodeA) {
                 nodeB.printer.append(I32EQZ)
             }
             val jump = JumpIf(BreakableInstruction.tmp)
             nodeB.printer.append(jump)
-            if (negate) nodeA.printer.append(I32EQZ)
+            if (ifFalseIsB) nodeA.printer.append(I32EQZ)
             nodeA.printer.append(
                 IfBranch(
                     nodeB.printer.instrs, emptyList(),
@@ -973,7 +968,7 @@ class StructuralAnalysis(
      * */
     fun joinNodes(): Builder {
 
-        printOps = false // methodTranslator.isLookingAtSpecial
+        printOps = methodTranslator.isLookingAtSpecial
 
         if (printOps) {
             println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")

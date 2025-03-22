@@ -8,7 +8,6 @@ import org.apache.logging.log4j.LogManager
 import utils.StringBuilder2
 import utils.WASMTypes.*
 import wasm.instr.*
-import wasm.instr.Drop
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
@@ -34,9 +33,10 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
+import wasm.parser.LocalVariable
 
 class FunctionWriter(
-    val function: FunctionImpl, val globals: Map<String, GlobalVariable>,
+    val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>
 ) {
 
@@ -54,16 +54,31 @@ class FunctionWriter(
                         "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq"
                 ).split(',').toHashSet()
 
+        private const val SYMBOLS = "+-*/:&|%<=>!"
     }
 
     private var depth = 1
-    private val localsByName = function.locals
-        .associateBy { it.name }
+    private var localsByName: Map<String, LocalVariable> = emptyMap()
+    private val tmpExprBuilder = StringBuilder2()
 
     private val stack = ArrayList<StackElement>()
     private var genI = 0
 
-    fun write() {
+    lateinit var function: FunctionImpl
+
+    private fun init(function: FunctionImpl) {
+        this.function = function
+        depth = 1
+        localsByName = function.locals
+            .associateBy { it.name }
+        stack.clear()
+        genI = 0
+    }
+
+    fun write(function: FunctionImpl) {
+
+        init(function)
+
         defineFunctionHead(function, true)
         writer.append(" {\n")
 
@@ -291,7 +306,6 @@ class FunctionWriter(
         return this
     }
 
-    private val tmpExprBuilder = StringBuilder2()
     private fun unaryInstr(
         aType: String, rType: String,
         k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
@@ -344,7 +358,6 @@ class FunctionWriter(
         }
     }
 
-    private val symbols = "+-*/:&|%<=>!"
     private fun extractSymbolsFromExpression(expr: String): String {
         val builder = StringBuilder2()
         var depth = 0
@@ -353,7 +366,7 @@ class FunctionWriter(
             if (char == '(') depth++
             if (char == ')') depth--
             if (depth == 0) {
-                if (char in symbols) {
+                if (char in SYMBOLS) {
                     builder.append(char)
                 }
             }

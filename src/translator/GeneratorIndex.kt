@@ -64,13 +64,16 @@ object GeneratorIndex {
 
             val alignment = ptrSize
             alignBuffer(buffer, alignment)
+
             val ptr = ptr0 + buffer.position
 
             // append string class
             buffer.writeClass(stringClass)
             buffer.writeLE32(str.hashCode()) // hash, precomputed for faster start times :3
             buffer.writePointer(ptr + stringInstanceSize) // ptr to char array
-            buffer.fill(objectOverhead + 4 + ptrSize, stringInstanceSize)
+            buffer.fill(objectOverhead + intSize + ptrSize, stringInstanceSize)
+
+            // append char/byte array
             buffer.writeClass(stringArrayClass)
             val length: Int
             if (byteStrings) {
@@ -86,8 +89,6 @@ object GeneratorIndex {
                     buffer.writeLE16(chr.code)
                 }
             }
-
-            alignBuffer(buffer)
 
             totalStringSize += objectOverhead + ptrSize + intSize + // String
                     arrayOverhead + length * (if (byteStrings) 1 else 2) // char[]

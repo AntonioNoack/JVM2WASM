@@ -38,11 +38,11 @@ fun testSwitchCase() {
 fun testCppWriter(func0: FunctionImpl) {
     assertEquals(0, writer.length)
     FunctionWriter(
-        func0, emptyMap(), mapOf(
+        emptyMap(), mapOf(
             "AfterSwitch" to Import("AfterSwitch", emptyList(), emptyList()),
             "AfterLoop" to Import("AfterLoop", emptyList(), emptyList())
         )
-    ).write()
+    ).write(func0)
     println(writer.toString())
     // confirm everything correct
     assertEquals(

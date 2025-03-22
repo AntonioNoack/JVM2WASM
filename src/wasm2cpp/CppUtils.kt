@@ -32,18 +32,14 @@ fun defineFunctionImplementations(
     functions: List<FunctionImpl>, globals: Map<String, GlobalVariable>,
     functionsByName: Map<String, FunctionImpl>
 ) {
-    "".split("")
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
-    val tested =
-        "org_apache_logging_log4j_LoggerImpl_interleaveImpl_Ljava_lang_StringALjava_lang_ObjectLjava_lang_String"
-    val functions1 = functions// .filter { it.funcName == tested }
-    for (fi in functions1.indices) {
-        val function = functions1[fi]
+    val functionWriter = FunctionWriter(globals, functionsByName)
+    for (fi in functions.indices) {
+        val function = functions[fi]
         val pos0 = writer.size
         try {
-            FunctionWriter(function, globals, functionsByName).write()
-            // throw IllegalStateException("case5 is/was broken")
+            functionWriter.write(function)
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)

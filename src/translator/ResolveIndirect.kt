@@ -6,7 +6,7 @@ import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import ignoreNonCriticalNullPointers
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator.Companion.comments
@@ -43,7 +43,7 @@ object ResolveIndirect {
 
     private fun Builder.fixThrowable(calledCanThrow: Boolean, sigJ: MethodSig) {
         if (calledCanThrow != canThrowError(sigJ)) {
-            append( if (calledCanThrow) i32Const0 else Call.panic)
+            append(if (calledCanThrow) i32Const0 else Call.panic)
         }
     }
 
@@ -143,6 +143,8 @@ object ResolveIndirect {
             .sumOf { groupedByClass[it].second.size }
     }
 
+    private val groupedByClassCache = HashMap<MethodSig, List<Pair<MethodSig, List<String>>>?>(1 shl 16)
+
     private fun MethodTranslator.resolveIndirectTree(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
         options: Set<MethodSig>, getCaller: (Builder) -> Unit,
@@ -152,8 +154,10 @@ object ResolveIndirect {
         val tmpI32 = variables.tmpI32
         val tmpPtr = variables.tmpPtr
 
-        val groupedByClass = findMethodsGroupedByClass(sig0, sig)
-            ?: return false
+        val groupedByClass =
+            groupedByClassCache.getOrPut(sig0) {
+                findMethodsGroupedByClass(sig0, sig)
+            } ?: return false
 
         // if there is too many tests, use resolveIndirect
         val numTests = countTests(groupedByClass)

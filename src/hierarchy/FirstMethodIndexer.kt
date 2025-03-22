@@ -23,7 +23,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     private val writtenFields = HashSet<FieldSig>()
     private val constructedClasses = HashSet<String>()
 
-    private val annotations = ArrayList<Annota>()
     private val interfaceCalls = HashSet<MethodSig>()
 
     private var usesSelf = false
@@ -266,7 +265,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor {
         val properties = HashMap<String, Any?>()
         val clazz = Descriptor.parseType(descriptor)
-        annotations.add(Annota(clazz, properties))
+        hIndex.addAnnotation(sig, Annota(clazz, properties))
         if (clazz == Annotations.USED_IF_DEFINED) {
             dIndex.usedMethods.add(sig)
         }
@@ -326,7 +325,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
     private fun defineCallIndirectWASM(funcType: FuncType) {
         val callInstr = CallIndirect(funcType).toString()
-        annotations.add(Annota(Annotations.WASM, mapOf("code" to callInstr)))
+        hIndex.addAnnotation(sig, Annota(Annotations.WASM, mapOf("code" to callInstr)))
         gIndex.types.add(funcType)
     }
 
@@ -351,10 +350,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             val callSignature = CallSignature.c(sig, removeLastParam = true)
             hIndex.implementedCallSignatures.add(callSignature)
             defineCallIndirectWASM(callSignature.toFuncType())
-        }
-
-        if (annotations.isNotEmpty()) {
-            hIndex.annotations[sig] = annotations
         }
 
         if (interfaceCalls.isNotEmpty()) {

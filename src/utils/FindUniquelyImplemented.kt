@@ -2,7 +2,7 @@ package utils
 
 import dIndex
 import hIndex
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.structures.maps.CountMap
 import org.apache.logging.log4j.LogManager
 

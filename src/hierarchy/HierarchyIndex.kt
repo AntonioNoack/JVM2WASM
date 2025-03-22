@@ -22,6 +22,7 @@ object HierarchyIndex {
     val methodsByClass = HashMap<String, HashSet<MethodSig>>(cap)
     val classFlags = HashMap<String, Int>(cap)
     val methodFlags = HashMap<MethodSig, Int>(cap)
+    val methodByName = HashMap<String, MethodSig>(cap)
 
     val genericsByClass = HashMap<String, List<GenericSig>>(cap) // name, superType
     val genericSuperTypes = HashMap<String, List<String>>(cap)
@@ -37,11 +38,15 @@ object HierarchyIndex {
     val abstractMethods = HashSet<MethodSig>(cap)
     val nativeMethods = HashSet<MethodSig>(cap)
     val hasSuperMaybeMethods = HashSet<MethodSig>(cap2)
-    val annotations = HashMap<MethodSig, List<Annota>>(cap2)
+    val annotations = HashMap<MethodSig, ArrayList<Annota>>(cap2)
 
     val methodAliases = HashMap<String, MethodSig>(cap)
 
     val implementedCallSignatures = HashSet<CallSignature>()
+
+    fun addAnnotation(sig: MethodSig, annotation: Annota) {
+        annotations.getOrPut(sig, ::ArrayList).add(annotation)
+    }
 
     fun isStatic(method: MethodSig): Boolean {
         return method in staticMethods
@@ -56,6 +61,7 @@ object HierarchyIndex {
     }
 
     fun registerMethod(method: MethodSig): Boolean {
+        methodByName[methodName(method)] = method
         return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)
     }
 

@@ -21,16 +21,10 @@ class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
     }
 
     fun append(str: CharSequence): StringBuilder2 {
-        if (str == "drop drop") {
-            drop()
-            drop()
-        } else {
-            ensureExtra(str.length)
-            for (i in str.indices) {
-                val c = str[i]
-                if (c.code > 127) throw IllegalArgumentException("Character must be ascii: '$c'")
-                add(c.code.toByte())
-            }
+        for (i in str.indices) {
+            val c = str[i]
+            if (c.code > 127) throw IllegalArgumentException("Character must be ascii: '$c'")
+            add(c.code.toByte())
         }
         return this
     }

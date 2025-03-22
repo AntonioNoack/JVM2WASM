@@ -3,7 +3,6 @@ package graphing
 import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
 import hIndex
-import hierarchy.HierarchyIndex
 import hierarchy.HierarchyIndex.methodAliases
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
@@ -21,7 +20,6 @@ import utils.WASMTypes.*
 import utils.helperFunctions
 import utils.ptrType
 import wasm.instr.*
-import wasm.instr.Drop
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
@@ -149,7 +147,7 @@ object StackValidator {
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
     ) {
-        val print = isLookingAtSpecial(sig)
+        val print = false && isLookingAtSpecial(sig)
         if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
         for (j in instructions.indices) {

@@ -8,7 +8,7 @@ import graphing.StackValidator.validateNodes1
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
 import translator.MethodTranslator

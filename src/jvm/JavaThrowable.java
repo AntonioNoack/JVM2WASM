@@ -171,10 +171,11 @@ public class JavaThrowable {
         for (int i = 0; i < stackLength; i++) {
             int stackData = read32(sp);
             int throwableLookup = lookupBasePtr + stackData * 12;
-            // log("stack data", i, stackData);
+            log("STE/0", sp, stackData, throwableLookup);
             String clazz = ptrTo(read32(throwableLookup));
             String name = ptrTo(read32(throwableLookup + 4));
             int line = read32(throwableLookup + 8);
+            log("Created STE", clazz, name, line);
             array[i] = new StackTraceElement(clazz, name, clazz, line);
             sp += 4;
         }

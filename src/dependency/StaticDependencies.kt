@@ -6,8 +6,8 @@ import dependency.DependencyIndex.interfaceDependencies
 import dependency.DependencyIndex.methodDependencies
 import dependency.DependencyIndex.setterDependencies
 import hIndex
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Recursion
 import me.anno.utils.structures.lists.TopologicalSort
 import org.apache.logging.log4j.LogManager
 import utils.FieldSig

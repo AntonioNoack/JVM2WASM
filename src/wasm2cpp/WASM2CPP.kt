@@ -43,13 +43,13 @@ fun validate() {
     val parser = parseWAT(text)
     clock.stop("Parsing")
     validate(parser)
+    clock.stop("Validating")
 }
 
 fun validate(parser: WATParser) {
     validateParsedFunctionsWithOriginals(parser.functions)
     validateFunctionTable(parser.functionTable)
     validateGlobals(parser.globals)
-    clock.stop("Validating")
 }
 
 fun wasm2cpp() {
@@ -61,11 +61,13 @@ fun wasm2cpp() {
     val parser = parseWAT(text)
     clock.stop("Parsing")
     validate(parser)
+    clock.stop("Validating")
 
     compactBinaryData(parser.dataSections)
+    clock.stop("Compacting Binary Data")
     wasm2cpp(parser.functions, parser.functionTable, parser.imports, parser.globals)
-
     clock.stop("Transpiling")
+
     clock.total("WASM2CPP")
 }
 
@@ -138,13 +140,16 @@ fun printBody(label: String, instructions: List<Instruction>) {
 fun wasm2cppFromMemory() {
     val clock = Clock("WASM2CPP-FromMemory")
     compactBinaryData(segments)
+    clock.stop("Compacting Binary Data")
     val normalMethods = GeneratorIndex.translatedMethods.values
     val helperMethods = helperFunctions.values
     val getNthMethods = GeneratorIndex.nthGetterMethods.values
-    val functions = ArrayList<FunctionImpl>(normalMethods.size + helperMethods.size + getNthMethods.size)
+    val size = normalMethods.size + helperMethods.size + getNthMethods.size
+    val functions = ArrayList<FunctionImpl>(size)
     functions.addAll(normalMethods)
     functions.addAll(helperMethods)
     functions.addAll(getNthMethods)
+    clock.stop("Collecting Methods")
     wasm2cpp(functions, functionTable, imports, globals)
     clock.stop("WASM2CPP")
 }
@@ -156,11 +161,14 @@ fun wasm2cpp(
     val functionsByName = createFunctionByNameMap(functions, imports)
     functions.removeIf { it.funcName.startsWith("getNth_") }
     writeHeader(functions, functionTable, imports, globals)
+    clock.stop("Writing Header")
     val clusters = splitFunctionsIntoClusters(functions, numTargetClusters)
     for (i in clusters.indices) {
         writeCluster(i, clusters[i], globals, functionsByName)
+        clock.stop("Writing Cluster [$i]")
     }
     writeFuncTable(functions, functionTable)
+    clock.stop("Writing FuncTable")
 }
 
 fun defineReturnStructs(functions: Collection<FunctionImpl>) {
@@ -256,7 +264,8 @@ fun parseWAT(text: String): WATParser {
 private fun createFunctionByNameMap(
     functions: ArrayList<FunctionImpl>, imports: List<Import>
 ): Map<String, FunctionImpl> {
-    val functionsByName = HashMap<String, FunctionImpl>(functions.size + imports.size)
+    val size = functions.size + imports.size
+    val functionsByName = HashMap<String, FunctionImpl>(size)
     for (i in functions.indices) {
         val func = functions[i]
         functionsByName[func.funcName] = func
@@ -283,11 +292,11 @@ fun writeHeader(
 
     writer.append("// header\n")
     writer.append("#ifdef MAIN_CPP\n")
-    writer.append("void* memory = nullptr;\n")
-    writer.append("void* indirect[").append(functionTable.size).append("];\n")
+    writer.append("  void* memory = nullptr;\n")
+    writer.append("  void* indirect[").append(functionTable.size).append("];\n")
     writer.append("#else\n")
-    writer.append("extern void* memory;\n")
-    writer.append("extern void* indirect[").append(functionTable.size).append("];\n")
+    writer.append("  extern void* memory;\n")
+    writer.append("  extern void* indirect[").append(functionTable.size).append("];\n")
     writer.append("#endif\n")
     writer.append("[[noreturn]] void unreachable(std::string);\n")
     writer.append('\n')

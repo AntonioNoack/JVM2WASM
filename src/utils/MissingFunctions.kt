@@ -35,9 +35,8 @@ object MissingFunctions {
 
         usedButNotImplemented.retainAll(usedMethods)
 
-        val nameToMethod = calculateNameToMethod()
         val usedBotNotImplementedMethods =
-            usedButNotImplemented.mapNotNull { nameToMethod[it] }
+            usedButNotImplemented.mapNotNull { hIndex.methodByName[it] }
 
         for (sig in usedBotNotImplementedMethods) {
             if (sig.clazz in hIndex.interfaceClasses &&
@@ -58,7 +57,7 @@ object MissingFunctions {
 
     fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
         println("\nMissing functions:")
-        val nameToMethod = calculateNameToMethod()
+        val nameToMethod = hIndex.methodByName
         for (name in usedButNotImplemented) {
             println("  $name")
             println("    resolved: ${name in resolved}")

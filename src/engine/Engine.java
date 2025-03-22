@@ -14,6 +14,7 @@ import me.anno.config.DefaultConfig;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
+import me.anno.engine.WindowRenderFlags;
 import me.anno.engine.ui.render.RenderMode;
 import me.anno.engine.ui.render.SceneView;
 import me.anno.fonts.Font;
@@ -141,7 +142,7 @@ public class Engine {
         GFX.check("main");
 
         instance.gameInit();
-        EngineBase.Companion.setShowFPS(true);
+        WindowRenderFlags.INSTANCE.setShowFPS(true);
         DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", true);
         DefaultConfig.INSTANCE.set("debug.ui.showDebugFrames", true);
 

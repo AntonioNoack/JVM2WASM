@@ -60,16 +60,25 @@ fun isNativeType(type: String) = when (type) {
     else -> type in NativeTypes.nativeTypes
 }
 
+private fun ByteArrayOutputStream2.writePointerAt(ptr: Int, at: Int) {
+    val pos = position
+    position = at
+    writePointer(ptr)
+    position = pos
+}
+
+private fun ByteArrayOutputStream2.writeLE32At(ptr: Int, at: Int) {
+    val pos = position
+    position = at
+    writeLE32(ptr)
+    position = pos
+}
+
 private fun fillInClassNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
         val name = gIndex.classNamesByIndex[clazz].replace('/', '.') // getName() returns name with dots
-        checkAlignment(classData.position)
         val strPtr = gIndex.getString(name, classInstanceTablePtr, classData)
-        checkAlignment(classData.position)
-        val pos = classData.position
-        classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_NAME
-        classData.writePointer(strPtr)
-        classData.position = pos
+        classData.writePointerAt(strPtr, clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_NAME)
     }
 }
 
@@ -78,31 +87,21 @@ private fun fillInClassSimpleNames(numClasses: Int, classData: ByteArrayOutputSt
         val fullName = gIndex.classNamesByIndex[clazz]
         val simpleName = fullName.split('/', '.').last()
         val strPtr = gIndex.getString(simpleName, classInstanceTablePtr, classData)
-        val pos = classData.position
-        classData.position = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_SIMPLE_NAME
-        classData.writePointer(strPtr)
-        classData.position = pos
+        classData.writePointerAt(strPtr, clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_SIMPLE_NAME)
     }
 }
 
 private fun fillInClassIndices(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (classIndex in 0 until numClasses) {
-        val pos = classData.position
-        classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_INDEX
-        classData.writeLE32(classIndex)
-        classData.position = pos
+        classData.writeLE32At(classIndex, classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_INDEX)
     }
 }
 
 private fun fillInClassModifiers(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val dstPtr = clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_MODIFIERS
-        val pos = classData.position
         val className = gIndex.classNamesByIndex[clazz]
         val modifiers = hIndex.classFlags[className] ?: 0
-        classData.position = dstPtr
-        classData.writePointer(modifiers)
-        classData.position = pos
+        classData.writeLE32At(modifiers, clazz * classSize + StaticFieldOffsets.OFFSET_CLASS_MODIFIERS)
     }
 }
 
@@ -127,11 +126,9 @@ private fun fillInFields(
         val instanceFields0 = gIndex.getFieldOffsets(className, false).fields
         val staticFields0 = gIndex.getFieldOffsets(className, true).fields
 
+        val dstPointer = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
         if (instanceFields0.isEmpty() && staticFields0.isEmpty()) {
-            val pos = classData.position
-            classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
-            classData.writePointer(emptyFieldPtr)
-            classData.position = pos
+            classData.writePointerAt(emptyFieldPtr, dstPointer)
             continue
         }
 
@@ -170,10 +167,7 @@ private fun fillInFields(
             classData.writePointer(fieldPtr)
         }
 
-        val pos = classData.position
-        classData.position = classIndex * classSize + StaticFieldOffsets.OFFSET_CLASS_FIELDS
-        classData.writePointer(arrayPtr)
-        classData.position = pos
+        classData.writePointerAt(arrayPtr, dstPointer)
 
     }
 }
@@ -291,6 +285,7 @@ private fun fillInMethods(
         val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods).toHashSet()
         methodsForClass.add(methods)
         // append all methods
+        val dstPointer = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
         val arrayToWrite = if (methods.isNotEmpty()) {
             val methodPointers = methods.map { method ->
                 assertTrue(CallSignature.c(method) in hIndex.implementedCallSignatures)
@@ -312,10 +307,7 @@ private fun fillInMethods(
             arrayPtr
         } else emptyArrayPtr
 
-        val pos = classData.position
-        classData.position = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
-        classData.writePointer(arrayToWrite)
-        classData.position = pos
+        classData.writePointerAt(arrayToWrite, dstPointer)
     }
 }
 
@@ -444,11 +436,6 @@ fun appendFunctionTypes(printer: StringBuilder2) {
         }
         printer.append(")))\n")
     }
-}
-
-fun calculateNameToMethod(): Map<String, MethodSig> {
-    return hIndex.methodsByClass.map { it.value }.flatten()
-        .associateBy { methodName(it) }
 }
 
 val functionTable = ArrayList<String>()

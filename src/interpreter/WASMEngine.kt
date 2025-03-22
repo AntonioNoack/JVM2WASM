@@ -176,6 +176,7 @@ class WASMEngine(memorySize: Int) {
         registerFunction("jvm_JavaLang_printByte_IZV", listOf(i32, i32), emptyList(), PrintByteInstr)
         registerFunction("jvm_JavaLang_printFlush_ZV", listOf(i32), emptyList(), PrintFlushInstr)
         registerFunction("jvm_JVM32_grow_IZ", listOf(i32), listOf(i32), GrowMemoryInstr)
+        registerEmptyFunction("jvm_GarbageCollector_markJSReferences_V")
         registerFunction(
             "jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV",
             listOf(ptrType, ptrType), emptyList(), PrintStackTraceHead

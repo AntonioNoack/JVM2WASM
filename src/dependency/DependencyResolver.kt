@@ -1,7 +1,6 @@
 package dependency
 
 import cannotUseClass
-import dIndex
 import dependency.DependencyIndex.constructableClasses
 import dependency.DependencyIndex.constructorDependencies
 import dependency.DependencyIndex.getterDependencies
@@ -14,12 +13,20 @@ import dependency.DependencyIndex.usedInterfaceCalls
 import dependency.DependencyIndex.usedMethods
 import dependency.DependencyIndex.usedSetters
 import fieldsRWRequired
-import gIndex
-import hIndex
+import hierarchy.HierarchyIndex.childClasses
+import hierarchy.HierarchyIndex.getAlias
+import hierarchy.HierarchyIndex.interfaceDefaults
+import hierarchy.HierarchyIndex.interfaces
+import hierarchy.HierarchyIndex.isStatic
+import hierarchy.HierarchyIndex.methodsByClass
+import hierarchy.HierarchyIndex.setAlias
+import hierarchy.HierarchyIndex.superClass
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
+import translator.GeneratorIndex.classNamesByIndex
+import translator.GeneratorIndex.fieldOffsets
 import utils.INSTANCE_INIT
 import utils.INTERFACE_CALL_NAME
 import utils.MethodResolver.resolveMethod
@@ -65,7 +72,7 @@ class DependencyResolver {
     }
 
     private fun addRemaining(method: MethodSig) {
-        if (method !in dIndex.usedMethods) {
+        if (method !in usedMethods) {
             remaining.add(method)
         }
     }
@@ -84,7 +91,7 @@ class DependencyResolver {
 
         handleInterfaceBecomingConstructable(clazz, sig, newUsedMethods)
 
-        val superClass = hIndex.superClass[clazz]
+        val superClass = superClass[clazz]
         if (superClass != null) handleBecomingConstructable(sig, superClass, newUsedMethods)
 
         val dependenciesByConstructable = depsIfConstructable.remove(clazz) ?: emptySet()
@@ -99,12 +106,12 @@ class DependencyResolver {
         newUsedMethods: MutableSet<MethodSig>,
     ) {
         Recursion.processRecursive(clazz) { checkedClass, remaining ->
-            val interfaces2 = hIndex.interfaces[checkedClass]
+            val interfaces2 = interfaces[checkedClass]
             if (interfaces2 != null) {
                 for (interface1 in interfaces2) {
                     handleBecomingConstructable(sig, interface1, newUsedMethods)
                     remaining.add(interface1)
-                    val methods = hIndex.methodsByClass[interface1] ?: continue
+                    val methods = methodsByClass[interface1] ?: continue
                     for (method2 in methods) {
                         if (used(method2)) {
                             newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor))
@@ -112,17 +119,17 @@ class DependencyResolver {
                     }
                 }
             }
-            val superClass1 = hIndex.superClass[checkedClass]
+            val superClass1 = superClass[checkedClass]
             if (superClass1 != null) remaining.add(superClass1)
         }
     }
 
     // of all super classes, depend on all their relevant methods
     private fun handleSuperBecomingConstructable(clazz: String, newUsedMethods: MutableSet<MethodSig>) {
-        var superClass = clazz
+        var superClassI = clazz
         while (true) {
             // if (clazz == "java/util/Collections\$SetFromMap") println("processing $superClass")
-            val superMethods = usedByClass[superClass]
+            val superMethods = usedByClass[superClassI]
             if (superMethods != null) {
                 for (method2 in superMethods) {
                     val childMethod = method2.withClass(clazz)
@@ -132,7 +139,7 @@ class DependencyResolver {
                     }
                 }
             }
-            superClass = hIndex.superClass[superClass] ?: break
+            superClassI = superClass[superClassI] ?: break
         }
     }
 
@@ -141,7 +148,7 @@ class DependencyResolver {
     }
 
     private fun processDependency(method: MethodSig) {
-        if (method.name == INSTANCE_INIT || hIndex.isStatic(method) || method.clazz in constructableClasses) {
+        if (method.name == INSTANCE_INIT || isStatic(method) || method.clazz in constructableClasses) {
             addRemaining(method)
         } else {
             depsIfConstructable.getOrPut(method.clazz, ::HashSet).add(method)
@@ -160,16 +167,16 @@ class DependencyResolver {
 
         Recursion.processRecursive(usedInterface.clazz) { interfaceI, remaining1 ->
             handleBecomingConstructable(sig, interfaceI, dependencies)
-            remaining1.addAll(hIndex.interfaces[interfaceI] ?: emptyList())
+            remaining1.addAll(interfaces[interfaceI] ?: emptyList())
         }
 
         // add default implementation for $usedInterface
-        addRemaining(hIndex.interfaceDefaults[usedInterface] ?: emptySet())
+        addRemaining(interfaceDefaults[usedInterface] ?: emptySet())
         checkState(6)
 
         Recursion.processRecursive(usedInterface.clazz) { clazz, remaining1 ->
             processDependency(usedInterface.withClass(clazz))
-            remaining1.addAll(hIndex.childClasses[clazz] ?: emptySet())
+            remaining1.addAll(childClasses[clazz] ?: emptySet())
         }
         checkState(7)
     }
@@ -181,20 +188,14 @@ class DependencyResolver {
         }
     }
 
-    private fun handleChildImplementations(sig: MethodSig, clazz: String, dstChildImplementations: HashSet<MethodSig>) {
-        for (childClass in hIndex.childClasses[clazz] ?: return) {
-            val print = childClass == "me/anno/utils/hpc/ProcessingQueue"
-            if (print) println("  | child: $childClass, constructable? ${childClass in constructableClasses}")
-            handleChildImplementations(sig, childClass, dstChildImplementations)
+    private fun findChildImplementations(sig: MethodSig, clazz: String, dstChildImplementations: HashSet<MethodSig>) {
+        Recursion.processRecursive(clazz) { childClass, remaining ->
             if (childClass in constructableClasses) {
-                val sig2 = sig.withClass(childClass)
-                val sig3 = resolvedMethods[sig2] ?: sig2
-                if (print) {
-                    if (sig3 != sig2) println("    $sig2 -> $sig3")
-                    else println("    $sig2")
-                }
-                dstChildImplementations.add(sig2) // not really useful, just for correctness checking
-                dstChildImplementations.add(sig3)
+                val children1 = childClasses[childClass]
+                remaining.addAll(children1 ?: emptySet())
+                val childSig = sig.withClass(childClass)
+                val resolvedChildSig = resolvedMethods[childSig] ?: childSig
+                dstChildImplementations.add(resolvedChildSig)
             }
         }
     }
@@ -216,28 +217,22 @@ class DependencyResolver {
         remaining.addAll(entryPoints)
         remaining.addAll(usedMethods)
 
-        for ((index, offsets) in gIndex.fieldOffsets) {
-            if (index.hasFlag(1) && offsets.hasFields()) { // static
-                remaining.add(MethodSig.c(gIndex.classNamesByIndex[index shr 1], STATIC_INIT, "()V"))
-            }
-        }
+        addStaticInitsForFields()
 
         usedMethods.clear()
 
         checkState(0)
 
-        while (remaining.isNotEmpty()) {
-            val sig = remaining.first()
+        while (true) {
+            val sig = remaining.firstOrNull() ?: break
             assertTrue(remaining.remove(sig))
             assertTrue(usedMethods.add(sig))
-
-            // println("[+dep] $sig")
 
             dependencies.clear()
 
             checkState(1)
 
-            val isStatic = hIndex.isStatic(sig)
+            val isStatic = isStatic(sig)
             val resolved = resolveMethod(sig, true)
             if (!isStatic) {
                 usedByClass.getOrPut(sig.clazz, ::HashSet).add(sig)
@@ -245,118 +240,128 @@ class DependencyResolver {
 
             checkState(2)
 
-            val alias = hIndex.getAlias(sig)
-            // println("[alias] $sig -> $name -> $alias")
+            val alias = getAlias(sig)
             if (alias != sig) {
+
                 methodDependencies[sig] = methodDependencies[alias] ?: hashSetOf()
                 getterDependencies[sig] = getterDependencies[alias] ?: emptySet()
                 setterDependencies[sig] = setterDependencies[alias] ?: emptySet()
                 constructorDependencies[sig] = constructorDependencies[alias] ?: emptySet()
                 interfaceDependencies[sig] = interfaceDependencies[alias] ?: HashSet()
-                hIndex.setAlias(sig, alias)
+
+                setAlias(sig, alias)
                 addRemaining(alias)
-                // methodsWithForbiddenDependencies.add(sig) // why???
-                handleChildImplementations(sig, sig.clazz, dependencies)
+                findChildImplementations(sig, sig.clazz, dependencies)
                 processDependencies(dependencies)
-                continue
-            }
 
-            checkState(3)
-
-            if (sig.name != INSTANCE_INIT && sig.name != STATIC_INIT) {
-
-                if (!isStatic && sig.clazz !in constructableClasses)
-                    throw IllegalStateException("$sig is being used without class being constructable")
-
-                if (resolved != null && resolved != sig) {
-                    addRemaining(resolved)
-                    continue
-                }
-            }
-
-            checkState(4)
-
-            dependencies.addAll(methodDependencies[resolved] ?: emptyList())
-
-            usedMethods1.clear()
-            usedMethods1.addAll(dependencies)
-
-            checkState(5)
-
-            handleInterfaceDependencies(sig)
-
-            checkState(8)
-
-            // for every method that's being indexed, index all child implementations as well for all classes, that can be constructed
-            // this can change at runtime -> we need to repeat this, whenever a new constructable class is being found
-
-            // println("  handling $sig")
-            if (sig.name != INSTANCE_INIT && !isStatic) {
-                handleChildImplementations(sig, sig.clazz, dependencies)
-            }
-
-            checkState(9)
-
-            val usedGetters1 = getterDependencies[sig] ?: emptySet()
-            val usedSetters1 = setterDependencies[sig] ?: emptySet()
-            // if a method touches sth forbidden, and it's no entry point, remove it
-            // because we have to implement it ourselves anyway
-            if (usedMethods1.any { isForbiddenClass(it.clazz) }
-                || usedGetters1.any { isForbiddenClass(it.clazz) }
-                || usedSetters1.any { isForbiddenClass(it.clazz) }
-            ) {
-                if (sig.clazz == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor.raw == "hashCode()I")
-                    throw IllegalStateException("$sig is native, not forbidden")
-                methodsWithForbiddenDependencies.add(sig)
-                checkState(10)
             } else {
 
-                // abstract classes cannot be constructed, even if they have constructors; interfaces neither
-                if (sig.clazz != INTERFACE_CALL_NAME && sig.name == INSTANCE_INIT) {
-                    handleBecomingConstructable(sig, sig.clazz, dependencies)
-                    checkState(11)
-                }
+                checkState(3)
 
-                checkState(12)
-
-                // println("--- Processing $sig ---")
-                val newClasses = constructorDependencies[sig]
-                if (newClasses != null) {
-                    for (newClass in newClasses) {
-                        handleBecomingConstructable(sig, newClass, dependencies)
-                        checkState(13)
+                if (sig.name != INSTANCE_INIT && sig.name != STATIC_INIT) {
+                    assertTrue(isStatic || sig.clazz in constructableClasses)
+                    if (resolved != null && resolved != sig) {
+                        addRemaining(resolved)
+                        continue
                     }
                 }
 
-                processDependencies(dependencies)
+                checkState(4)
 
-                usedGetters.addAll(usedGetters1)
-                usedSetters.addAll(usedSetters1)
+                dependencies.addAll(methodDependencies[resolved] ?: emptyList())
 
-                checkState(14)
+                usedMethods1.clear()
+                usedMethods1.addAll(dependencies)
 
-            }
+                checkState(5)
 
-            // of all reached static fields, clinit must be called (when reading static properties)
-            // only if complement function is defined as well
-            val strict = fieldsRWRequired
-            for (field in usedGetters1) {
-                if (field.isStatic && (!strict || field in usedSetters)) {
-                    addRemaining(MethodSig.staticInit(field.clazz))
+                handleInterfaceDependencies(sig)
+
+                checkState(8)
+
+                // for every method that's being indexed, index all child implementations as well for all classes, that can be constructed
+                // this can change at runtime -> we need to repeat this, whenever a new constructable class is being found
+
+                // println("  handling $sig")
+                if (sig.name != INSTANCE_INIT && !isStatic) {
+                    findChildImplementations(sig, sig.clazz, dependencies)
                 }
-            }
-            for (field in usedSetters1) {
-                if (field.isStatic && (!strict || field in usedGetters)) {
-                    addRemaining(MethodSig.staticInit(field.clazz))
-                }
-            }
 
-            checkState(15)
+                checkState(9)
 
+                checkUsedFields(sig)
+
+            }
         }
 
         checkConstructorDependencies(usedMethods1)
 
+    }
+
+    private fun addStaticInitsForFields() {
+        for ((index, offsets) in fieldOffsets) {
+            if (index.hasFlag(1) && offsets.hasFields()) { // static
+                remaining.add(MethodSig.c(classNamesByIndex[index shr 1], STATIC_INIT, "()V"))
+            }
+        }
+    }
+
+    private fun checkUsedFields(sig: MethodSig) {
+        val usedGetters1 = getterDependencies[sig] ?: emptySet()
+        val usedSetters1 = setterDependencies[sig] ?: emptySet()
+        // if a method touches sth forbidden, and it's no entry point, remove it
+        // because we have to implement it ourselves anyway
+        if (usedMethods1.any { isForbiddenClass(it.clazz) }
+            || usedGetters1.any { isForbiddenClass(it.clazz) }
+            || usedSetters1.any { isForbiddenClass(it.clazz) }
+        ) {
+            if (sig.clazz == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor.raw == "hashCode()I")
+                throw IllegalStateException("$sig is native, not forbidden")
+            methodsWithForbiddenDependencies.add(sig)
+            checkState(10)
+        } else {
+
+            // abstract classes cannot be constructed, even if they have constructors; interfaces neither
+            if (sig.clazz != INTERFACE_CALL_NAME && sig.name == INSTANCE_INIT) {
+                handleBecomingConstructable(sig, sig.clazz, dependencies)
+                checkState(11)
+            }
+
+            checkState(12)
+
+            // println("--- Processing $sig ---")
+            val newClasses = constructorDependencies[sig]
+            if (newClasses != null) {
+                for (newClass in newClasses) {
+                    handleBecomingConstructable(sig, newClass, dependencies)
+                    checkState(13)
+                }
+            }
+
+            processDependencies(dependencies)
+
+            usedGetters.addAll(usedGetters1)
+            usedSetters.addAll(usedSetters1)
+
+            checkState(14)
+
+        }
+
+        // of all reached static fields, clinit must be called (when reading static properties)
+        // only if complement function is defined as well
+        val strict = fieldsRWRequired
+        for (field in usedGetters1) {
+            if (field.isStatic && (!strict || field in usedSetters)) {
+                addRemaining(MethodSig.staticInit(field.clazz))
+            }
+        }
+        for (field in usedSetters1) {
+            if (field.isStatic && (!strict || field in usedGetters)) {
+                addRemaining(MethodSig.staticInit(field.clazz))
+            }
+        }
+
+        checkState(15)
     }
 
     private fun checkConstructorDependencies(usedMethods: Set<MethodSig>) {

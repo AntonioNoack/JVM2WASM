@@ -5,7 +5,7 @@ import graphing.GraphingNode
 import graphing.ReturnNode
 import graphing.SequenceNode
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.Recursion
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.createArrayList
 import utils.Builder

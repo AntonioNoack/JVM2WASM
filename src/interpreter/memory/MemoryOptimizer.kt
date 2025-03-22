@@ -9,7 +9,7 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.structures.Recursion.processRecursive2
+import me.anno.utils.algorithms.Recursion.processRecursive2
 import me.anno.utils.structures.lists.Lists.createList
 import org.apache.logging.log4j.LogManager
 import utils.*
