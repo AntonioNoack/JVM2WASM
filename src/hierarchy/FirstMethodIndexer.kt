@@ -10,9 +10,13 @@ import org.objectweb.asm.*
 import replaceClass
 import useResultForThrowables
 import utils.*
+import utils.CommonInstructions.GET_FIELD
+import utils.CommonInstructions.GET_STATIC
 import utils.CommonInstructions.INVOKE_INTERFACE
 import utils.CommonInstructions.INVOKE_STATIC
 import utils.CommonInstructions.NEW_INSTR
+import utils.CommonInstructions.SET_FIELD
+import utils.CommonInstructions.SET_STATIC
 import wasm.instr.CallIndirect
 import wasm.instr.FuncType
 
@@ -305,16 +309,15 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
         // only getters are of importance, because setters without getters don't matter
         val type = Descriptor.parseType(descriptor)
-        val sig = FieldSig(owner, name, type, opcode < 0xb4)
+        val isStatic = opcode == GET_STATIC || opcode == SET_STATIC
+        val sig = FieldSig(owner, name, type, isStatic)
         lastField = sig
         // final fields can be inlined :)
         if (sig !in hIndex.finalFields) {
             // fields are only relevant if they are both written and read
             when (opcode) {
-                0xb2 -> readFields.add(sig)// get static
-                0xb3 -> writtenFields.add(sig)  // put static
-                0xb4 -> readFields.add(sig)   // get field
-                0xb5 -> writtenFields.add(sig)  // put field
+                GET_STATIC, GET_FIELD -> readFields.add(sig)
+                SET_STATIC, SET_FIELD -> writtenFields.add(sig)
             }
         }
     }

@@ -97,7 +97,7 @@ var alignFieldsProperly = true
  * - startup time might be slightly reduced
  * - executable constant size gets larger
  * */
-var callStaticInitAtCompileTime = true
+var callStaticInitAtCompileTime = false
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false

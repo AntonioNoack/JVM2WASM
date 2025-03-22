@@ -2,8 +2,12 @@ package utils
 
 import utils.CommonInstructions.ANEW_ARRAY_INSTR
 import utils.CommonInstructions.ARRAY_LENGTH_INSTR
+import utils.CommonInstructions.GET_FIELD
+import utils.CommonInstructions.GET_STATIC
 import utils.CommonInstructions.NEW_ARRAY_INSTR
 import utils.CommonInstructions.NEW_INSTR
+import utils.CommonInstructions.SET_FIELD
+import utils.CommonInstructions.SET_STATIC
 
 object OpCode {
     operator fun get(opcode: Int): String {
@@ -187,10 +191,10 @@ object OpCode {
             0xaf -> "dreturn"
             0xb0 -> "areturn"
             0xb1 -> "return"
-            0xb2 -> "getstatic"
-            0xb3 -> "putstatic"
-            0xb4 -> "getfield"
-            0xb5 -> "putfield"
+            GET_STATIC -> "getstatic"
+            SET_STATIC -> "putstatic"
+            GET_FIELD -> "getfield"
+            SET_FIELD -> "putfield"
             0xb6 -> "invokevirtual"
             0xb7 -> "invokespecial"
             0xb8 -> "invokestatic"

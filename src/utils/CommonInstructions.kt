@@ -13,5 +13,10 @@ object CommonInstructions {
     const val ARRAY_LENGTH_INSTR = 0xbe
     const val ATHROW_INSTR = 0xbf
 
+    const val GET_FIELD = 0xb4
+    const val SET_FIELD = 0xb5
+    const val GET_STATIC = 0xb2
+    const val SET_STATIC = 0xb3
+
     const val DUP_INSTR = 0x59
 }

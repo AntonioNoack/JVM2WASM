@@ -42,11 +42,15 @@ import utils.*
 import utils.Builder.Companion.isDuplicable
 import utils.CommonInstructions.ARRAY_LENGTH_INSTR
 import utils.CommonInstructions.ATHROW_INSTR
+import utils.CommonInstructions.GET_FIELD
+import utils.CommonInstructions.GET_STATIC
 import utils.CommonInstructions.INVOKE_INTERFACE
 import utils.CommonInstructions.INVOKE_SPECIAL
 import utils.CommonInstructions.INVOKE_STATIC
 import utils.CommonInstructions.INVOKE_VIRTUAL
 import utils.CommonInstructions.NEW_INSTR
+import utils.CommonInstructions.SET_FIELD
+import utils.CommonInstructions.SET_STATIC
 import utils.PrintUsed.printUsed
 import utils.ReplaceOptimizer.optimizeUsingReplacements
 import utils.WASMTypes.*
@@ -1136,14 +1140,14 @@ class MethodTranslator(
                     when {
                         setter != null -> {
                             visitFieldInsn2(
-                                if (isStatic(setter)) 0xb3 else 0xb5,
+                                if (isStatic(setter)) SET_STATIC else SET_FIELD,
                                 setter.clazz, setter.name, setter.descriptor, true
                             )
                             calledCanThrow = false
                         }
                         getter != null -> {
                             visitFieldInsn2(
-                                if (isStatic(getter)) 0xb2 else 0xb4,
+                                if (isStatic(getter)) GET_STATIC else GET_FIELD,
                                 getter.clazz, getter.name, getter.descriptor, true
                             )
                             calledCanThrow = false
@@ -1891,11 +1895,11 @@ class MethodTranslator(
         // getstatic, putstatic, getfield, putfield
         if (printOps) println("  [field] ${OpCode[opcode]}, $owner, $name, $type")
         val wasmType = jvm2wasmTyped(type)
-        val static = opcode <= 0xb3
+        val static = opcode == GET_STATIC || opcode == SET_STATIC
         val fieldOffset = gIndex.getFieldOffset(owner, name, type, static)
         val sig = FieldSig(owner, name, type, static)
         val value = hIndex.finalFields[sig]
-        val setter = opcode == 0xb3 || opcode == 0xb5
+        val setter = opcode == SET_FIELD || opcode == SET_STATIC
         if (value != null) {
             if (!checkNull) throw IllegalStateException("Field $owner,$name,$type is final")
             if (setter) {
@@ -1913,8 +1917,7 @@ class MethodTranslator(
                 visitLdcInsn(value) // too easy xD
             }
         } else when (opcode) {
-            0xb2 -> {
-                // get static
+            GET_STATIC -> {
                 if (name in enumFieldsNames) {
                     callStaticInit(owner)
                     val clazzIndex = gIndex.getClassIndex(owner)
@@ -1953,8 +1956,7 @@ class MethodTranslator(
                     printer.push(wasmType).append(Const.zero[wasmType]!!)
                 }
             }
-            0xb3 -> {
-                // put static
+            SET_STATIC -> {
                 if (name in enumFieldsNames) {
                     val clazzIndex = gIndex.getClassIndex(owner)
                     val fieldOffset1 = gIndex.getFieldOffset(
@@ -1988,8 +1990,7 @@ class MethodTranslator(
                     printer.drop()
                 }
             }
-            0xb4 -> {
-                // get field
+            GET_FIELD -> {
                 // second part of check is <self>
                 if (comments) {
                     printer.comment(
@@ -2020,8 +2021,7 @@ class MethodTranslator(
                         .append(Const.zero[wasmType]!!)
                 }
             }
-            0xb5 -> {
-                // set field
+            SET_FIELD -> {
                 // second part of check is <self>
                 if (comments) {
                     printer.comment(

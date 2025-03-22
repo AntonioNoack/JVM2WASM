@@ -11,6 +11,7 @@ import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.*
 import utils.CommonInstructions.DUP_INSTR
+import utils.CommonInstructions.GET_FIELD
 import utils.CommonInstructions.INVOKE_INTERFACE
 import utils.CommonInstructions.INVOKE_STATIC
 import utils.CommonInstructions.INVOKE_VIRTUAL
@@ -163,7 +164,7 @@ class DelayedLambdaUpdate(
             if (usesSelf) {
                 if (comments) mt.printer.comment("[0] += self")
                 mt.visitVarInsn(0x2a, 0) // local.get this
-                mt.visitFieldInsn2(0xb4, synthClassName, "self", "java/lang/Object", false) // get field
+                mt.visitFieldInsn2(GET_FIELD, synthClassName, "self", "java/lang/Object", false) // get field
             } else {
                 mt.printer.append(i32Const0)
                 if (comments) mt.printer.comment("self, unused")
@@ -180,7 +181,7 @@ class DelayedLambdaUpdate(
             if (comments) mt.printer.comment("[1] += $arg")
             // load self for field
             mt.visitVarInsn(0x2a, 0) // local.get this
-            mt.visitFieldInsn2(0xb4, synthClassName, fieldName, arg, false) // get field
+            mt.visitFieldInsn2(GET_FIELD, synthClassName, fieldName, arg, false) // get field
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
                 boxUnbox(arg, wanted ?: "", mt, true)
             }
