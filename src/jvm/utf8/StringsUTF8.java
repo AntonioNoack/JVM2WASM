@@ -116,6 +116,8 @@ public class StringsUTF8 {
             byte b0 = toUpperCase(read8(a0));
             byte b1 = toUpperCase(read8(a1));
             if (b0 != b1) return false; // even with ignored case, they are different -> no match
+            a0++; // advance to next position
+            a1++;
         }
     }
 

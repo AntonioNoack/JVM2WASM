@@ -3,6 +3,7 @@ package utils
 import dIndex
 import gIndex
 import hIndex
+import implementedMethods
 import jvm.JVM32.*
 import jvm.JVMShared.intSize
 import me.anno.io.Streams.writeLE32
@@ -21,6 +22,7 @@ import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.checkAlignment
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
+import utils.MethodResolver.resolveMethod
 import utils.StaticClassIndices.BYTE_ARRAY
 import utils.StaticClassIndices.OBJECT_ARRAY
 import utils.StaticFieldOffsets.OFFSET_CLASS_METHODS
@@ -220,10 +222,10 @@ private fun appendFieldInstance(
 }
 
 var classInstanceTablePtr = 0
-fun appendClassInstanceTable(printer: StringBuilder2, indexStartPtr: Int, numClasses: Int): Int {
+fun appendClassInstanceTable(printer: StringBuilder2, ptr: Int, numClasses: Int): Int {
     LOGGER.info("[appendClassInstanceTable]")
 
-    checkAlignment(indexStartPtr)
+    val indexStartPtr = alignPointer(ptr)
     classInstanceTablePtr = indexStartPtr
 
     val classFields = gIndex.getFieldOffsets("java/lang/Class", false)
@@ -268,7 +270,7 @@ private fun fillInMethods(
 
     val methodsByClass = dIndex.usedMethods
         .filter { isCallable(it) }.groupBy { it.clazz }
-    val methodsForClass = ArrayList<Set<MethodSig>>(numClasses)
+    val methodsForClass = ArrayList<Collection<MethodSig>>(numClasses)
     for (declaringClassIndex in 0 until numClasses) {
         // find all methods with valid call signature
         val clazzName = gIndex.classNamesByIndex[declaringClassIndex]
@@ -281,8 +283,18 @@ private fun fillInMethods(
                             "$clazzName[${declaringClassIndex}] >= $superClass[$superClassIdx]"
                 )
             else emptySet()
+
+        fun hasBeenImplemented(sig: MethodSig): Boolean {
+            val resolved = resolveMethod(sig, true) ?: return false
+            return methodName(resolved) in implementedMethods
+        }
+
+        val isConstructable = clazzName in dIndex.constructableClasses
         val superMethods1 = methodsByClass[clazzName] ?: emptyList()
-        val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods).toHashSet()
+        val methods = (superMethods1.map { it.withClass(clazzName) } + superMethods)
+            .distinct() // remove duplicates
+            .filter { isConstructable || hIndex.isStatic(it) }  // if not constructable, only append static methods
+            .filter { hasBeenImplemented(it) } // filter by implemented methods
         methodsForClass.add(methods)
         // append all methods
         val dstPointer = declaringClassIndex * classSize + OFFSET_CLASS_METHODS
@@ -332,13 +344,12 @@ fun appendParamsArray(
     return ptr
 }
 
-private fun getReturnTypePtr(returnType: String?, indexStartPtr: Int, classSize: Int): Int {
-    return if (returnType != null) {
-        // return type; if unknown = not constructable, just return java/lang/Object
-        // that isn't really wrong, null is java/lang/Object
-        val returnTypeClass = gIndex.getClassIndexOrNull(returnType) ?: 0
-        getClassInstancePtr(returnTypeClass, indexStartPtr, classSize)
-    } else 0
+private fun getReturnTypePtr(returnType0: String?, indexStartPtr: Int, classSize: Int): Int {
+    val returnType = returnType0 ?: "void"
+    // return type; if unknown = not constructable, just return java/lang/Object
+    // that isn't really wrong, null is java/lang/Object
+    val returnTypeClass = gIndex.getClassIndexOrNull(returnType) ?: 0
+    return getClassInstancePtr(returnTypeClass, indexStartPtr, classSize)
 }
 
 fun appendMethodInstance(
@@ -349,9 +360,7 @@ fun appendMethodInstance(
     val callSignature = CallSignature.c(sig).format()
     val callSignaturePtr = gIndex.getString(callSignature, indexStartPtr, classData)
 
-    val dynamicIndex =
-        if (false) DynIndex.getDynamicIndex(declaringClassIndex, sig, InterfaceSig(sig), -1, null)
-        else -1
+    val dynamicIndex = DynIndex.getDynamicIndex(declaringClassIndex, sig, InterfaceSig(sig), -1, null)
     // todo mark this method as used-by-reflections,
     //  and translate all used-by-reflection methods, too
 

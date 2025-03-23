@@ -4,9 +4,13 @@ import annotations.Alias;
 
 import java.lang.reflect.Method;
 
-import static jvm.JVM32.readPtrAtOffset;
+import static jvm.JVM32.*;
+import static jvm.JavaReflect.getClassIndex;
+import static jvm.NativeLog.log;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static utils.StaticClassIndices.*;
 import static utils.StaticFieldOffsets.OFFSET_METHOD_CALL_SIGNATURE;
+import static utils.StaticFieldOffsets.OFFSET_METHOD_SLOT;
 
 /**
  * Implements java.lang.reflect.Method.invoke, which is quite a complicated process
@@ -57,21 +61,47 @@ public class JavaReflectMethod {
 
     }
 
+    private static Class<?> getNonPrimitiveClass(Class<?> clazz) {
+        // primitive classes always return false for isInstance (by spec), so convert them to the wrapper classes
+        int idx = getClassIndex(clazz);
+        if (idx >= FIRST_NATIVE && idx <= LAST_NATIVE) {
+            idx += FIRST_INSTANCE - FIRST_NATIVE;
+            return findClass(idx);
+        }
+        return clazz;
+    }
+
     private static void verifyReturnType(Method self, Object returnValue) {
         Class<?> returnType = self.getReturnType();
-        if (!returnType.isInstance(returnValue)) {
+        if (returnType == void.class) return;// no return type
+
+        if (returnValue == null) {
+            if (returnType.isPrimitive()) {
+                log("Expected {}, got null", returnType.getName());
+                throw new ClassCastException("Call returned wrong object");
+            } else {
+                // everything is fine
+                // we don't know about nullability (yet?)
+                return;
+            }
+        }
+
+        Class<?> returnType1 = getNonPrimitiveClass(returnType);
+        if (!returnType1.isInstance(returnValue)) {
+            log("Expected", returnType.getName());
+            log("Actual", returnValue.getClass().getName());
             throw new ClassCastException("Call returned wrong object");
         }
     }
 
-    private static Object execute(Method self)
-            throws NoSuchFieldException, IllegalAccessException {
+    private static Object execute(Method self) {
         int methodId = getMethodId(self);
         Object[] args = joinedCallArguments;
         Object arg0 = args[0];
         Object arg1 = args[1];
         Class<?> returnType = self.getReturnType();
         String callSignature = getCallSignature(self);
+        log("Invoking", self.getDeclaringClass().getName(), self.getName(), methodId);
         switch (callSignature) {
             // static runnable
             case "V":
@@ -141,20 +171,23 @@ public class JavaReflectMethod {
         if (instance instanceof Short) return (short) instance;
         if (instance instanceof Byte) return (byte) instance;
         if (instance instanceof Character) return (char) instance;
-        throw new ClassCastException("Object cannot be cast to int");
+        if (instance instanceof Boolean) return (boolean) instance ? 1 : 0;
+        log("Class (int-like):", instance != null ? instance.getClass().getName() : null);
+        throw new ClassCastException("Object cannot be cast to int-like");
     }
 
     private static Object castToIntObject(int value, Class<?> returnType) {
+        if (returnType == boolean.class) return value != 0;
         if (returnType == int.class) return value;
         if (returnType == short.class) return (short) value;
         if (returnType == byte.class) return (byte) value;
         if (returnType == char.class) return (char) value;
+        log("Class (int):", returnType.getName());
         throw new ClassCastException("Object cannot be cast to int");
     }
 
-    private static int getMethodId(Method self)
-            throws NoSuchFieldException, IllegalAccessException {
-        return self.getClass().getDeclaredField("slot").getInt(self);
+    private static int getMethodId(Method self) {
+        return readI32AtOffset(self, OFFSET_METHOD_SLOT);
     }
 
     private static void joinCallArguments(Object prepended, Object[] src) {

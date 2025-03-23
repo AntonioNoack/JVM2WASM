@@ -78,12 +78,11 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_getDeclaredMethods_AW")
     public static <V> Method[] Class_getDeclaredMethods(Class<V> clazz) {
-        return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
+        return Class_getMethods(clazz); // just return all of them :)
     }
 
     @Alias(names = "java_lang_Class_getMethods_AW")
     public static <V> Method[] Class_getMethods(Class<V> clazz) {
-        // todo we probably need to join this with our parent's methods
         return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
     }
 
@@ -123,15 +122,15 @@ public class JavaReflect {
     }
 
     private static boolean matches(Method method, String name, Class<?>[] parameters) {
-        if (method.getName().equals(name) && parameters.length == method.getParameterCount()) {
-            Class<?>[] params2 = method.getParameterTypes();
-            for (int j = 0, l2 = parameters.length; j < l2; j++) {
-                if (parameters[j] != params2[j]) {
-                    return false;
-                }
+        if (!method.getName().equals(name)) return false;
+        if (parameters.length != method.getParameterCount()) return false;
+        Class<?>[] params2 = method.getParameterTypes();
+        for (int i = 0, length = parameters.length; i < length; i++) {
+            if (parameters[i] != params2[i]) {
+                return false;
             }
-            return true;
-        } else return false;
+        }
+        return true;
     }
 
     public static int getFieldOffset(Field field) {
@@ -409,19 +408,8 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_isPrimitive_Z")
     public static <V> boolean java_lang_Class_isPrimitive_Z(Class<V> clazz) {
-        switch (clazz.getName()) {
-            case "boolean":
-            case "byte":
-            case "char":
-            case "short":
-            case "float":
-            case "integer":
-            case "double":
-            case "long":
-                return true;
-            default:
-                return false;
-        }
+        int index = getClassIndex(clazz);
+        return index >= FIRST_NATIVE && index <= LAST_NATIVE;
     }
 
     @Alias(names = "java_lang_ClassLoader_loadClass_Ljava_lang_StringZLjava_lang_Class")

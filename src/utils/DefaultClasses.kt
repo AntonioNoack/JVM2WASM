@@ -16,14 +16,16 @@ object DefaultClasses {
             "java/lang/String", // #10
             "java/lang/Class", // #11
             "java/lang/System", // #12
-            "java/io/Serializable", // #13
+            "java/lang/Number", // #13, must be before number child classes
             "java/lang/Throwable", // #14
             "java/lang/StackTraceElement", // #15
             "int", "long", "float", "double",
             "boolean", "byte", "short", "char", "void", // #24
+            "java/lang/Integer", "java/lang/Long", "java/lang/Float", "java/lang/Double",
+            "java/lang/Boolean", "java/lang/Byte", "java/lang/Short", "java/lang/Character", "java/lang/Void", // #33
         )
 
-        for (i in 1 until 13) {
+        for (i in 1 until 16) {
             hIndex.registerSuperClass(predefinedClasses[i], "java/lang/Object")
         }
 

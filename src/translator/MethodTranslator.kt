@@ -171,7 +171,11 @@ class MethodTranslator(
             "stackPush", "stackPop", "printStackTraceLine",
             "createGCFieldTable", "findFieldsByClass", "setStackTrace",
             "calloc", "findGap", "allocateNewSpace", "writeClass",
-            "Throwable_printStackTrace_V", "getStackDepth"
+            "Throwable_printStackTrace_V", "getStackDepth",
+            "instanceOfExact", "instanceOfNonInterface", "isChildOrSameClassNonInterface",
+            "resolveInterface", "resolveInterfaceByClass",
+            "readPtrAtOffset",
+            "new_java_lang_String_ACIIV"
         )
 
         @Suppress("UNUSED_PARAMETER")
