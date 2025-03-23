@@ -134,7 +134,6 @@ object CallStaticInit {
             val sig = staticInitFunctions[i]
             callMethod(engine, methodName(sig), i)
         }
-        callMethod(engine, "gc", -2)
 
         if (printDebug) {
             debugFolder.getChild("callStaticInit.txt")
@@ -151,7 +150,7 @@ object CallStaticInit {
         clock.stop("calls, ${(engine.instructionCounter * 1e3f / (timeI - time0i)).f1()} MInstr/s")
 
         val ptr1: Int
-        if (false) {
+        if (true) {
             // todo clear gaps field, because it no longer is valid, when we optimize the memory
             ptr1 = MemoryOptimizer.optimizeMemory(engine, printer)
             clock.stop("optimizeMemory")

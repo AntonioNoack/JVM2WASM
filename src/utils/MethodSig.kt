@@ -15,6 +15,18 @@ data class MethodSig private constructor(
 
     override fun toString() = "$clazz/$name$descriptor"
 
+    // saving the hash brings a ~5% speedup, but it's very random :/
+    private val hash = (clazz.hashCode() * 31 + name.hashCode()) * 31 + descriptor.hashCode()
+    override fun hashCode(): Int = hash
+
+    override fun equals(other: Any?): Boolean {
+        return other === this || other is MethodSig &&
+                other.hash == hash &&
+                other.clazz == clazz &&
+                other.name == name &&
+                other.descriptor == descriptor
+    }
+
     companion object {
 
         fun c(clazz: String, name: String, descriptor: String): MethodSig {

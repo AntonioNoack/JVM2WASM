@@ -96,8 +96,10 @@ var alignFieldsProperly = true
  * - static init code can be removed from the final executable
  * - startup time might be slightly reduced
  * - executable constant size gets larger
+ *
+ * -> regarding WASM, the resulting file is ~12% bigger after compression
  * */
-var callStaticInitAtCompileTime = false
+var callStaticInitAtCompileTime = true
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -141,6 +143,7 @@ val classReplacements = hashMapOf(
     "java/util/concurrent/ConcurrentSkipListSet" to "java/util/HashSet",
     "java/util/concurrent/ConcurrentHashMap" to "java/util/HashMap",
     "java/util/concurrent/ConcurrentMap" to "java/util/Map",
+    "java/util/concurrent/Semaphore" to "jvm/custom/Semaphore",
     "java/lang/ref/WeakReference" to "jvm/custom/WeakRef",
     "java/lang/String" to if (useUTF8Strings) "jvm/custom/UTF8String" else "java/lang/String",
     "java/io/BufferedWriter" to if (byteStrings) "jvm/utf8/BufferedWriterUTF8" else "java/io/BufferedWriter",
@@ -200,11 +203,14 @@ fun cannotUseClass(clazz: String): Boolean {
             (clazz.startsWith("jdk/internal/") &&
                     clazz != "jdk/internal/misc/TerminatingThreadLocal") ||
             clazz.startsWith("com/github/junrar/") || // not needed
-            clazz.startsWith("java/util/concurrent/") || // not useful without threading
+            (clazz.startsWith("java/util/concurrent/") && // not useful without threading
+                    clazz != "java/util/concurrent/TimeoutException" &&
+                    clazz != "java/util/concurrent/TimeUnit") ||
             clazz.startsWith("java/awt/image/") || // not available anyway
             clazz.startsWith("java/awt/Component") || // not available anyway
             clazz.startsWith("javax/imageio/") || // not available anyway
             clazz.startsWith("java/util/regex/") || // let's see how much space it takes -> 2.2 MB wasm text out of 70
+            clazz.startsWith("java/security/") ||
             // todo this is used by BigDecimal... surely it's not really needed... right?
             // clazz.startsWith("java/io/ObjectStream") ||
             sin(0f) < 0f // false
@@ -310,19 +316,19 @@ fun printMethodFieldStats() {
 
         LOGGER.info("classes:")
         for (clazz in dIndex.constructableClasses) {
-            LOGGER.info(clazz)
+            LOGGER.info("[${gIndex.getClassIndex(clazz)}] $clazz")
         }
         LOGGER.info()
 
         LOGGER.info("methods:")
         for (m in dIndex.usedMethods.map { methodName(it) }.sorted()) {
-            LOGGER.info(m)
+            LOGGER.info("- $m")
         }
         LOGGER.info()
 
         LOGGER.info("fields:")
-        for (f in usedFields.map { it.toString() }.toSortedSet()) {
-            LOGGER.info(f)
+        for (field in usedFields.map { it.toString() }.toSortedSet()) {
+            LOGGER.info("- $field")
         }
         LOGGER.info()
     }
@@ -337,7 +343,7 @@ val hIndex = HierarchyIndex
 val dIndex = DependencyIndex
 val gIndex = GeneratorIndex
 
-val implementedMethods = HashMap<String, MethodSig>()
+val implementedMethods = HashMap<String, MethodSig>(1 shl 16)
 
 val clock = Clock("JVM2WASM")
 
@@ -395,7 +401,7 @@ fun jvm2wasm() {
     cleanupJVMImplemented()
     clock.stop("Cleanup JVM Implemented")
 
-    resolveGenericTypes()
+    resolveGenericMethodTypes()
     clock.stop("Resolve Generics")
 
     findNoThrowMethods()
@@ -485,7 +491,7 @@ fun jvm2wasm() {
     // 4811/15181 -> 3833/15181, 1906 unique
     findUniquelyImplemented(
         dIndex.usedMethods.filter { hIndex.getAlias(it) == it },
-        implementedMethods.values.toSet()
+        implementedMethods.values.toSet(), clock
     )
     clock.stop("Uniquely Implemented Methods")
 

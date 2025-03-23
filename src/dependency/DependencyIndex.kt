@@ -22,7 +22,7 @@ object DependencyIndex {
     val usedSetters = HashSet<FieldSig>(cap)
     val usedInterfaceCalls = HashSet<MethodSig>(cap2)
 
-    lateinit var constructableClasses: HashSet<String>
+    val constructableClasses = HashSet<String>(cap2)
 
     fun findSuperMethod(method: MethodSig): MethodSig? {
         return findSuperMethod0(method) ?: findSuperMethod1(method)

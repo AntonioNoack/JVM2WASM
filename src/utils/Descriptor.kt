@@ -12,7 +12,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
     val wasmReturnType = if (returnType != null) jvm2wasmTyped(returnType) else null
 
     override fun equals(other: Any?): Boolean {
-        return other is Descriptor && other.raw == raw
+        return other === this || other is Descriptor && other.raw == raw
     }
 
     override fun hashCode(): Int = raw.hashCode()

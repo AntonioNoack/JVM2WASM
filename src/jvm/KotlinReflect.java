@@ -3,6 +3,7 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 import kotlin.jvm.internal.ClassBasedDeclarationContainer;
+import kotlin.jvm.internal.ClassReference;
 import kotlin.reflect.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -16,6 +17,7 @@ import java.util.List;
 
 import static jvm.JVM32.findClass;
 import static jvm.JVMShared.numClasses;
+import static jvm.JavaReflect.Class_getSimpleName;
 import static jvm.JavaReflect.getClassIndex;
 
 @SuppressWarnings("rawtypes")
@@ -215,6 +217,21 @@ public class KotlinReflect {
     @Alias(names = "kotlin_reflect_full_KClasses_getDeclaredMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection")
     public static <V> Collection<V> kotlin_reflect_full_KClasses_getDeclaredMemberProperties_Lkotlin_reflect_KClassLjava_util_Collection(KClass<V> clazz) {
         // Class c = ((KClassImpl) clazz).getJClass();
+        return Collections.emptyList();
+    }
+
+    @Alias(names = "kotlin_jvm_internal_ClassReference_getSimpleName_Ljava_lang_String")
+    public static String ClassReference_getSimpleName(ClassReference c) {
+        return c.getJClass().getSimpleName();
+    }
+
+    @Alias(names = "kotlin_reflect_jvm_internal_KClassImpl_getSimpleName_Ljava_lang_String")
+    public static String KClassImpl_getSimpleName(ClassBasedDeclarationContainer c) {
+        return Class_getSimpleName(c.getJClass());
+    }
+
+    @Alias(names = "kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection")
+    public static Collection<Object> KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(ClassBasedDeclarationContainer clazz) {
         return Collections.emptyList();
     }
 

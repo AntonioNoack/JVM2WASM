@@ -2,14 +2,14 @@ package utils
 
 import dIndex
 import hIndex
+import me.anno.utils.Clock
 import me.anno.utils.algorithms.Recursion
 import me.anno.utils.structures.maps.CountMap
 import org.apache.logging.log4j.LogManager
 
 private val LOGGER = LogManager.getLogger("FindUniquelyImplemented")
 
-val childImplementationMap = HashMap<MethodSig, HashSet<MethodSig>>()
-
+private val childImplementationMap = HashMap<MethodSig, HashSet<MethodSig>>(1 shl 12)
 fun findConstructableChildImplementations(sig: MethodSig): Set<MethodSig> {
     return if (sig.clazz in dIndex.constructableClasses) {
         childImplementationMap.getOrPut(sig) {
@@ -31,53 +31,56 @@ fun findConstructableChildImplementations(sig: MethodSig): Set<MethodSig> {
 
 fun markChildMethodsFinal(sig: MethodSig) {
     Recursion.processRecursive(sig.clazz) { clazz, remaining ->
-        val sigI = sig.withClass(clazz)
-        if (sigI.clazz in dIndex.constructableClasses) {
-            hIndex.finalMethods.add(sigI)
-            val children = hIndex.childClasses[sigI.clazz]
-            remaining.addAll(children ?: emptySet())
+        if (clazz in dIndex.constructableClasses) {
+            if (hIndex.finalMethods.add(sig.withClass(clazz))) {
+                val children = hIndex.childClasses[clazz]
+                if (children != null) remaining.addAll(children)
+            }
         }
     }
 }
 
 fun findMethodsWithoutChildClasses(): Int {
     val numAlreadyFinalMethods = hIndex.finalMethods.size
-    val classes = dIndex.constructableClasses
-    for (clazz in classes) {
+    val constructableClasses = dIndex.constructableClasses
+    val childClasses = hIndex.childClasses
+    val finalMethods = hIndex.finalMethods
+    for (clazz in constructableClasses) {
         val print = false // clazz == "me/anno/utils/hpc/WorkSplitter" || clazz == "me/anno/utils/hpc/ProcessingQueue"
-        if (print) println("$clazz, constructable? ${clazz in dIndex.constructableClasses}")
-        val childClasses = hIndex.childClasses[clazz] ?: emptySet()
-        if (childClasses.none { it in dIndex.constructableClasses }) {
+        if (print) println("$clazz, constructable? ${clazz in constructableClasses}")
+        val methods = hIndex.methodsByClass[clazz] ?: continue
+        val childClassesI = childClasses[clazz] ?: emptySet()
+        if (childClassesI.none { it in constructableClasses }) {
             // no constructable child classes -> all its methods must be final
-            val methods = hIndex.methodsByClass[clazz] ?: continue
             if (print) {
                 println(methods)
-                println("me/anno/utils/hpc/ProcessingQueue" in dIndex.constructableClasses)
+                println("me/anno/utils/hpc/ProcessingQueue" in constructableClasses)
                 throw IllegalStateException()
             }
-            hIndex.finalMethods.addAll(methods)
-        } else if (clazz in dIndex.constructableClasses) {
+            finalMethods.addAll(methods)
+        } else if (clazz in constructableClasses) {
             // if all children have the same implementation, it's final for all of them, too
-            val methods = hIndex.methodsByClass[clazz] ?: continue
             for (method in methods) {
                 if (!hIndex.isFinal(method)) {
                     val variants = findConstructableChildImplementations(method)
                     if (variants.size == 1) {
                         if (print) println("new final $method for variants: $variants")
                         // mark all child methods final
+                        // hIndex.finalMethods.add(method)
                         markChildMethodsFinal(method)
                     } else if (print) println("not-final $method, ${variants.size}x")
                 } else if (print) println("already final: $method")
             }
         }
     }
-    return hIndex.finalMethods.size - numAlreadyFinalMethods
+    return finalMethods.size - numAlreadyFinalMethods
 }
 
 /**
  * find functions with a single implementation only, and make it final
  * */
-fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMethods: Set<MethodSig>) {
+fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMethods: Set<MethodSig>, clock: Clock) {
+    clock.start()
     LOGGER.info("[findUniquelyImplemented]")
 
     // we only need this for classes, where multiple classes are constructable
@@ -86,6 +89,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
     // of all classes without constructable child classes,
     // all their methods are final
     var finalMethods = findMethodsWithoutChildClasses()
+    clock.stop("findMethodsWithoutChildClasses [$finalMethods]")
 
     val methodCounter = CountMap<InterfaceSig>(usedMethods.size)
     for (sig in usedMethods) {
@@ -105,6 +109,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             }
         }
     }
+    clock.stop("Method Counter [${methodCounter.values.size}]")
 
     val toBeMarkedAsFinal = HashSet<InterfaceSig>(finalMethods)
     for ((sig, counter) in methodCounter.values) {
@@ -112,6 +117,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             toBeMarkedAsFinal.add(sig)
         }
     }
+    clock.stop("Prepare MarkAsFinal")
 
     // mark all those methods as final
     for (sig in usedMethods) {
@@ -123,6 +129,9 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
             hIndex.finalMethods.add(sig)
         }
     }
+    clock.stop("Execute MarkAsFinal")
 
+    LOGGER.info("Used methods: ${usedMethods.size}")
+    LOGGER.info("Implemented methods: ${implementedMethods.size}")
     LOGGER.info("Found $finalMethods uniquely implemented methods and made them final")
 }

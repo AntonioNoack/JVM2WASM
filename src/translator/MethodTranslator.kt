@@ -1039,12 +1039,11 @@ class MethodTranslator(
 
 
     fun visitMethodInsn2(
-        opcode0: Int, owner0: String, name: String, descriptor: String,
+        opcode: Int, owner: String, name: String, descriptor: String,
         isInterface: Boolean, checkThrowable: Boolean
     ): Boolean {
-        val isStatic = opcode0 == 0xb8
-        val sig0 = MethodSig.c(owner0, name, descriptor)
-        return visitMethodInsn2(opcode0, sig0, isInterface, checkThrowable)
+        val sig = MethodSig.c(owner, name, descriptor)
+        return visitMethodInsn2(opcode, sig, isInterface, checkThrowable)
     }
 
     fun visitMethodInsn2(opcode0: Int, sig0: MethodSig, isInterface: Boolean, checkThrowable: Boolean): Boolean {
@@ -1052,7 +1051,7 @@ class MethodTranslator(
         val owner = sig0.clazz
         val name = sig0.name
         val descriptor = sig0.descriptor
-        val isStatic = opcode0 == 0xb8
+        val isStatic = opcode0 == INVOKE_STATIC || name == STATIC_INIT
 
         if (printOps) println("  [call] ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface")
 
@@ -1061,14 +1060,14 @@ class MethodTranslator(
         if (isStatic != hIndex.isStatic(sig0))
             throw RuntimeException("Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)")
 
-        val sig = hIndex.getAlias(sig0)
+        val sig1 = hIndex.getAlias(sig0)
 
         val methodsByOwner = hIndex.methodsByClass.getOrPut(owner) { HashSet() }
-        if (sig == sig0 && methodsByOwner.add(sig0) && isStatic) {
+        if (sig1 == sig0 && methodsByOwner.add(sig0) && isStatic) {
             hIndex.staticMethods.add(sig0)
         }
 
-        var calledCanThrow = canThrowError(sig)
+        var calledCanThrow = canThrowError(sig1)
 
         fun getCaller(printer: Builder) {
             if (splitArgs.isNotEmpty()) {
@@ -1098,7 +1097,7 @@ class MethodTranslator(
                     stackPush()
 
                     printer.append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
-                    ActuallyUsedIndex.add(this.sig, sig)
+                    ActuallyUsedIndex.add(this.sig, sig1)
                     if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
                     stackPop()
@@ -1110,9 +1109,9 @@ class MethodTranslator(
                     stackPush()
                     getCaller(printer)
 
-                    if (comments) printer.comment("not constructable class, $sig, $owner, $name, $descriptor")
+                    if (comments) printer.comment("not constructable class, $sig1, $owner, $name, $descriptor")
                     printer
-                        .append(i32Const(gIndex.getString(methodName(sig))))
+                        .append(i32Const(gIndex.getString(methodName(sig1))))
                         // instance, function index -> function-ptr
                         .append(Call.resolveIndirectFail)
                         .append(Unreachable)
@@ -1121,25 +1120,33 @@ class MethodTranslator(
                     stackPop()
 
                 } else if (
-                    hIndex.isFinal(sig0) // &&
-                // todo a method that is final should always pass this, but somehow,
-                //  me/anno/utils/hpc/WorkSplitter/processUnbalanced(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V
-                //  doesn't pass the test
-                // findConstructableChildImplementations(sig0).size < 2
+                    hIndex.isFinal(sig0) &&
+                    // todo a method that is final should always pass this, but somehow,
+                    //  me/anno/utils/hpc/WorkSplitter/processUnbalanced(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V
+                    //  doesn't pass the test
+                    findConstructableChildImplementations(sig0).size < 2
                 ) {
 
-                    val sigs = findConstructableChildImplementations(sig0)
-                    assertTrue(sigs.size < 2) { "Unclear $sig0 -> $sig?, options: $sigs" }
-                    val sig1 = sigs.firstOrNull() ?: sig
+                    val methods = findConstructableChildImplementations(sig0)
+                    if (methods.size > 1) {
+                        println("sig0: $sig0")
+                        println("sig1: $sig1")
+                        println("Options:")
+                        for (option in methods) {
+                            println("  - $option")
+                        }
+                        assertFail("Unclear candidates")
+                    }
+                    val sig2 = methods.firstOrNull() ?: sig1
 
-                    val setter = hIndex.setterMethods[sig1]
-                    val getter = hIndex.getterMethods[sig1]
+                    val setter = hIndex.setterMethods[sig2]
+                    val getter = hIndex.getterMethods[sig2]
 
                     fun isStatic(field: FieldSig): Boolean {
                         return field.name in gIndex.getFieldOffsets(field.clazz, true).fields
                     }
 
-                    val isEmpty = sig1 in hIndex.emptyFunctions
+                    val isEmpty = sig2 in hIndex.emptyFunctions
 
                     when {
                         setter != null -> {
@@ -1158,7 +1165,7 @@ class MethodTranslator(
                         }
                         isEmpty -> {
                             pop(splitArgs, false, ret)
-                            if (comments) printer.comment("skipping empty2 $sig1")
+                            if (comments) printer.comment("skipping empty2 $sig2")
                             for (j in splitArgs.indices) printer.drop() // drop arguments
                             printer.drop() // drop called
                             calledCanThrow = false
@@ -1170,20 +1177,22 @@ class MethodTranslator(
                             pop(splitArgs, false, ret)
                             // final, so not actually virtual;
                             // can be directly called
-                            val inline = hIndex.inlined[sig1]
+                            val inline = hIndex.inlined[sig2]
                             if (inline != null) {
                                 printer.append(inline)
-                                printer.comment("virtual-inlined $sig1")
+                                printer.comment("virtual-inlined $sig2")
                             } else {
                                 stackPush()
-                                val name2 = methodName(sig1)
+                                val name2 = methodName(sig2)
                                 val name3 = methodName(sig0)
                                 if (name3 == "java_lang_Object_hashCode_I" ||
                                     name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
                                     name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
-                                ) throw IllegalStateException("$sig0 -> $sig1 must not be final!!!")
-                                if (hIndex.isAbstract(sig1)) throw IllegalStateException()
-                                ActuallyUsedIndex.add(this.sig, sig1)
+                                ) throw IllegalStateException("$sig0 -> $sig2 must not be final!!!")
+                                if (hIndex.isAbstract(sig2)) {
+                                    throw IllegalStateException("Calling abstract method: $sig0 -> $sig1 -> $sig2")
+                                }
+                                ActuallyUsedIndex.add(this.sig, sig2)
                                 printer.append(Call(name2))
                                 stackPop()
                             }
@@ -1214,7 +1223,7 @@ class MethodTranslator(
                         pop(splitArgs, false, ret)
                         printer.append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
                         if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
-                        ActuallyUsedIndex.add(this.sig, sig)
+                        ActuallyUsedIndex.add(this.sig, sig1)
                     }
                 }
             }
@@ -1224,19 +1233,19 @@ class MethodTranslator(
                     checkNotNull0(owner, name, ::getCaller)
                 }
                 pop(splitArgs, false, ret)
-                val inline = hIndex.inlined[sig]
+                val inline = hIndex.inlined[sig1]
                 if (inline != null) {
                     printer.append(inline)
-                    if (comments) printer.comment("special-inlined $sig")
+                    if (comments) printer.comment("special-inlined $sig1")
                 } else {
-                    if (sig.descriptor.raw == "()V" && sig in hIndex.emptyFunctions) {
+                    if (sig1.descriptor.raw == "()V" && sig1 in hIndex.emptyFunctions) {
                         printer.drop()
-                        if (comments) printer.comment("skipping empty $sig")
+                        if (comments) printer.comment("skipping empty $sig1")
                     } else {
                         stackPush()
-                        val name2 = methodName(sig)
-                        assertFalse(hIndex.isAbstract(sig))
-                        ActuallyUsedIndex.add(this.sig, sig)
+                        val name2 = methodName(sig1)
+                        assertFalse(hIndex.isAbstract(sig1))
+                        ActuallyUsedIndex.add(this.sig, sig1)
                         printer.append(Call(name2))
                         stackPop()
                     }
@@ -1245,15 +1254,15 @@ class MethodTranslator(
             // static, no resolution required
             INVOKE_STATIC -> {
                 pop(splitArgs, true, ret)
-                val inline = hIndex.inlined[sig]
+                val inline = hIndex.inlined[sig1]
                 if (inline != null) {
                     printer.append(inline)
-                    if (comments) printer.comment("static-inlined $sig")
+                    if (comments) printer.comment("static-inlined $sig1")
                 } else {
                     stackPush()
-                    val name2 = methodName(sig)
-                    assertFalse(hIndex.isAbstract(sig))
-                    ActuallyUsedIndex.add(this.sig, sig)
+                    val name2 = methodName(sig1)
+                    assertFalse(hIndex.isAbstract(sig1))
+                    ActuallyUsedIndex.add(this.sig, sig1)
                     printer.append(Call(name2))
                     if (comments) printer.comment("static call")
                     stackPop()

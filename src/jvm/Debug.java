@@ -8,7 +8,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 import static jvm.JVM32.getAddr;
+import static jvm.JavaReflect.getClassIndex;
 import static jvm.NativeLog.log;
+import static utils.StaticClassIndices.*;
 
 public class Debug {
 
@@ -38,29 +40,30 @@ public class Debug {
     public static void debugField(Object instance, boolean staticToo, Field f) throws IllegalAccessException {
         String name = f.getName();
         String type = f.getType().getName();
-        switch (type) {
-            case "byte":
+        int typeIdx = getClassIndex(f.getType());
+        switch (typeIdx) {
+            case NATIVE_BYTE:
                 log(type, name, f.getByte(instance));
                 break;
-            case "short":
+            case NATIVE_SHORT:
                 log(type, name, f.getShort(instance));
                 break;
-            case "char":
+            case NATIVE_CHAR:
                 log(type, name, f.getChar(instance));
                 break;
-            case "int":
+            case NATIVE_INT:
                 log(type, name, f.getInt(instance));
                 break;
-            case "long":
+            case NATIVE_LONG:
                 log(type, name, f.getLong(instance));
                 break;
-            case "float":
+            case NATIVE_FLOAT:
                 log(type, name, f.getFloat(instance));
                 break;
-            case "double":
+            case NATIVE_DOUBLE:
                 log(type, name, f.getDouble(instance));
                 break;
-            case "boolean":
+            case NATIVE_BOOLEAN:
                 log(type, name, f.getBoolean(instance));
                 break;
             default:

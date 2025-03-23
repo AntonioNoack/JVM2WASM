@@ -105,7 +105,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val retType = descriptor1.returnType
         if (retType != null) clazz.dep(retType)
 
-        val isStatic = opcode == INVOKE_STATIC
+        val isStatic = opcode == INVOKE_STATIC || name == STATIC_INIT
         val isInterfaceCall = opcode == INVOKE_INTERFACE
         val sig1 = MethodSig.c(owner, name, descriptor)
 

@@ -395,12 +395,26 @@ try {
         entries.sort((a,b) => b[1]-a[1])
         var l = Math.min(20, entries.length)
         var highest = {}
-        for(var i=0;i<l;i++){
-            var e = entries[i]
+        for(let i=0;i<l;i++){
+            let e = entries[i]
             highest[i+'.'+e[0]+'.'+findClass(e[0])]=e[1]
         }
         console.log(highest)
         console.log('total:', total)
+    }
+    window.flipImageVertically = function(w,h,buffer){
+        let rowSize = w * 4; // 4 bytes per pixel (RGBA)
+        let tempRow = new Uint8ClampedArray(rowSize);
+
+        for (let y = 0, h2 = Math.floor(h / 2); y < h2; y++) {
+            let topOffset = y * rowSize;
+            let bottomOffset = (h - 1 - y) * rowSize;
+
+            // Swap the top and bottom rows
+            tempRow.set(buffer.subarray(topOffset, topOffset + rowSize));
+            buffer.copyWithin(topOffset, bottomOffset, bottomOffset + rowSize);
+            buffer.set(tempRow, bottomOffset);
+        }
     }
 
     var refs = window.jsRefs = {}

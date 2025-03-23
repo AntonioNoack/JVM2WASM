@@ -12,6 +12,7 @@ import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
 import hierarchy.FirstClassIndexer.Companion.readType
+import hierarchy.GenericSig
 import hierarchy.HierarchyIndex.getAlias
 import implementedMethods
 import listEntryPoints
@@ -65,8 +66,21 @@ fun indexHierarchyFromEntryPoints() {
     LOGGER.info("Empty functions: ${hIndex.emptyFunctions.size}")
 }
 
-fun resolveGenericTypes() {
-    LOGGER.info("[resolveGenericTypes]")
+fun extractGenericTypes(superType: String, generics: List<GenericSig>): List<String> {
+    var i = superType.indexOf('<') + 1
+    val params = ArrayList<String>(generics.size)
+    for (j in generics.indices) {
+        // extract next param from generics
+        val k = superType.readType(i)
+        params.add(descWithoutGenerics(superType.substring(i, k)))
+        i = if (superType[k] == '>') superType.indexOf('<', k + 1) + 1 else k
+        if (i == 0) break
+    }
+    return params
+}
+
+fun resolveGenericMethodTypes() {
+    LOGGER.info("[resolveGenericMethodTypes]")
     for ((clazz, superTypes) in hIndex.genericSuperTypes) {
         val baseMethods = hIndex.methodsByClass[clazz] ?: continue
         val ownGenerics = hIndex.genericsByClass[clazz]
@@ -81,15 +95,7 @@ fun resolveGenericTypes() {
                 continue
             }
 
-            var i = superType.indexOf('<') + 1
-            val params = ArrayList<String>(generics.size)
-            for (j in generics.indices) {
-                // extract next param from generics
-                val k = superType.readType(i)
-                params.add(descWithoutGenerics(superType.substring(i, k)))
-                i = if (superType[k] == '>') superType.indexOf('<', k + 1) + 1 else k
-                if (i == 0) break
-            }
+            val params = extractGenericTypes(superType, generics)
 
             // to do find all abstract methods in superType to be mapped
             // to do all parent classes as well (?)

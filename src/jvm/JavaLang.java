@@ -774,4 +774,17 @@ public class JavaLang {
         return self.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(self));
     }
 
+    @Alias(names = "java_lang_Object_notifyAll_V")
+    public static void Object_notifyAll_V(Object self) {
+        // idk...
+    }
+
+    @Alias(names = "java_lang_Object_wait_V")
+    public static void Object_wait_V(Object self) {
+    }
+
+    @Alias(names = "java_lang_Object_wait_JV")
+    public static void Object_wait_JV(Object self, long timeout) {
+    }
+
 }

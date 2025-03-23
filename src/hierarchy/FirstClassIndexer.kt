@@ -208,7 +208,7 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(api) {
         val isAbstract = access.hasFlag(ACC_ABSTRACT)
         val isNative = access.hasFlag(ACC_NATIVE)
         val isFinal = access.hasFlag(ACC_FINAL) or this.isFinal
-        val isStatic = access.hasFlag(ACC_STATIC)
+        val isStatic = access.hasFlag(ACC_STATIC) || name == STATIC_INIT
 
         val sig = MethodSig.c(clazz, name, descriptor)
         if (signature != null) {
@@ -261,8 +261,13 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(api) {
         // if field is final, just create a map, and don't even try to access those fields : make them "virtual"
         //  just hardcode them in the assembly :)
         val type = Descriptor.parseType(descriptor)
+        val sig = FieldSig(clazz, name, type, access.hasFlag(ACC_STATIC))
         if (value != null && access.hasFlag(ACC_FINAL)) {
-            hIndex.finalFields[FieldSig(clazz, name, type, access.hasFlag(ACC_STATIC))] = value
+            hIndex.finalFields[sig] = value
+        }
+
+        if (signature != null) {
+            hIndex.genericFieldSignatures[sig] = signature
         }
 
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))

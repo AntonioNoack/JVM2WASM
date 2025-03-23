@@ -4,8 +4,6 @@ import annotations.Alias;
 import annotations.NoThrow;
 import annotations.UsedIfIndexed;
 import annotations.WASM;
-import kotlin.jvm.internal.ClassBasedDeclarationContainer;
-import kotlin.jvm.internal.ClassReference;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -13,8 +11,6 @@ import java.io.File;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 
 import static jvm.JVM32.*;
@@ -58,7 +54,7 @@ public class JavaReflect {
                 // log("field[i]:", fieldName);
                 // log("field[i].offset:", getFieldOffset(field));
                 if (name.equals(fieldName)) {
-                    log("Found field", clazz.getName(), name);
+                    // log("Found field", clazz.getName(), name);
                     return field;
                 }
             }
@@ -145,27 +141,26 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Field_get_Ljava_lang_ObjectLjava_lang_Object")
     public static Object Field_get(Field field, Object instance) {
-        log("Field_get", getAddr(field), getAddr(instance));
+        // log("Field_get", getAddr(field), getAddr(instance));
         int addr = getFieldAddr(field, instance);
         // if the field is native, we have to wrap it
         Class<?> clazz = field.getType();
-        String clazzName = clazz.getName();
-        switch (clazzName) {
-            case "boolean":
+        switch (getClassIndex(clazz)) {
+            case NATIVE_BOOLEAN:
                 return read8(addr) > 0;
-            case "byte":
+            case NATIVE_BYTE:
                 return read8(addr);
-            case "short":
+            case NATIVE_SHORT:
                 return read16s(addr);
-            case "char":
+            case NATIVE_CHAR:
                 return read16u(addr);
-            case "int":
+            case NATIVE_INT:
                 return read32(addr);
-            case "long":
+            case NATIVE_LONG:
                 return read64(addr);
-            case "float":
+            case NATIVE_FLOAT:
                 return read32f(addr);
-            case "double":
+            case NATIVE_DOUBLE:
                 return read64f(addr);
             default:
                 return ptrTo(read32(addr));
@@ -193,29 +188,29 @@ public class JavaReflect {
         }
         // log("Field.type vs newType", field.getType().getName(), value == null ? null : value.getClass().getName());
         // log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
-        switch (field.getType().getName()) {
-            case "boolean":
+        switch (getClassIndex(field.getType())) {
+            case NATIVE_BOOLEAN:
                 write8(addr, (byte) (((Boolean) value) ? 1 : 0));
                 break;
-            case "byte":
+            case NATIVE_BYTE:
                 write8(addr, (Byte) value);
                 break;
-            case "short":
+            case NATIVE_SHORT:
                 write16(addr, (Short) value);
                 break;
-            case "char":
+            case NATIVE_CHAR:
                 write16(addr, (Character) value);
                 break;
-            case "int":
+            case NATIVE_INT:
                 write32(addr, (Integer) value);
                 break;
-            case "long":
+            case NATIVE_LONG:
                 write64(addr, (Long) value);
                 break;
-            case "float":
+            case NATIVE_FLOAT:
                 write32(addr, (Float) value);
                 break;
-            case "double":
+            case NATIVE_DOUBLE:
                 write64(addr, (Double) value);
                 break;
             default:
@@ -354,6 +349,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_forName_Ljava_lang_StringLjava_lang_Class")
     public static <V> Class<V> Class_forName(String name) throws ClassNotFoundException {
+        // usually doesn't support primitive classes, but I don't get why they wouldn't be supported
         @SuppressWarnings("unchecked")
         Class<V> clazz = (Class<V>) getClassesForName().get(name);
         if (clazz == null) log("Missing class, returning null", name);
@@ -469,44 +465,10 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getPrimitiveClass_Ljava_lang_StringLjava_lang_Class")
-    public static Class<?> Class_getPrimitiveClass(String name) {
+    public static Class<?> Class_getPrimitiveClass(String name) throws ClassNotFoundException {
         // we need to get them by index, because the Java compiler
         //  returns nonsense like Short.TYPE, which calls this very method to be initialized
-        int classIdx;
-        switch (name) {
-            case "boolean":
-                classIdx = NATIVE_BOOLEAN;
-                break;
-            case "byte":
-                classIdx = NATIVE_BYTE;
-                break;
-            case "char":
-                classIdx = NATIVE_CHAR;
-                break;
-            case "short":
-                classIdx = NATIVE_SHORT;
-                break;
-            case "int":
-                classIdx = NATIVE_INT;
-                break;
-            case "long":
-                classIdx = NATIVE_LONG;
-                break;
-            case "float":
-                classIdx = NATIVE_FLOAT;
-                break;
-            case "double":
-                classIdx = NATIVE_DOUBLE;
-                break;
-            case "void":
-                classIdx = NATIVE_VOID;
-                break;
-            default:
-                // avoid exceptions
-                throwJs("getPrimitiveClass", name);
-                return null;
-        }
-        return findClass(classIdx);
+        return Class_forName(name);
     }
 
     @NoThrow
@@ -572,21 +534,6 @@ public class JavaReflect {
         return false;
     }
 
-    @Alias(names = "kotlin_jvm_internal_ClassReference_getSimpleName_Ljava_lang_String")
-    public static String ClassReference_getSimpleName(ClassReference c) {
-        return c.getJClass().getSimpleName();
-    }
-
-    @Alias(names = "kotlin_reflect_jvm_internal_KClassImpl_getSimpleName_Ljava_lang_String")
-    public static String KClassImpl_getSimpleName(ClassBasedDeclarationContainer c) {
-        return Class_getSimpleName(c.getJClass());
-    }
-
-    @Alias(names = "kotlin_reflect_full_KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection")
-    public static Collection<Object> KClasses_getMemberFunctions_Lkotlin_reflect_KClassLjava_util_Collection(ClassBasedDeclarationContainer clazz) {
-        return Collections.emptyList();
-    }
-
     @NoThrow
     @Alias(names = "java_lang_Class_getSimpleName_Ljava_lang_String")
     public static <V> String Class_getSimpleName(Class<V> c) {
@@ -648,21 +595,20 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object")
     public static Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<?> clazz, int length) {
-        String name = clazz.getName();
-        switch (name) {
-            case "int":
+        switch (getClassIndex(clazz)) {
+            case NATIVE_INT:
                 return new int[length];
-            case "long":
+            case NATIVE_LONG:
                 return new long[length];
-            case "byte":
+            case NATIVE_BYTE:
                 return new byte[length];
-            case "short":
+            case NATIVE_SHORT:
                 return new short[length];
-            case "char":
+            case NATIVE_CHAR:
                 return new char[length];
-            case "float":
+            case NATIVE_FLOAT:
                 return new float[length];
-            case "double":
+            case NATIVE_DOUBLE:
                 return new double[length];
             default:
                 return new Object[length];
@@ -734,17 +680,17 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Constructor_getParameterCount_I")
-    private static int java_lang_reflect_Constructor_getParameterCount_I(Object self) {
+    private static int Constructor_getParameterCount_I(Object self) {
         return 0; // anything else isn't supported at the moment
     }
 
     @Alias(names = "java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ")
-    public static boolean java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ(Object self, Object other) {
+    public static boolean Constructor_equals_Ljava_lang_ObjectZ(Object self, Object other) {
         return self == other;
     }
 
     @Alias(names = "java_lang_reflect_Constructor_toString_Ljava_lang_String")
-    public static String java_lang_reflect_Constructor_toString_Ljava_lang_String(Object self) {
+    public static String Constructor_toString_Ljava_lang_String(Object self) {
         return self.getClass().getName();
     }
 
@@ -768,7 +714,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getInterfaces_AW")
-    public static Object[] java_lang_Class_getInterfaces_AW(Object self) {
+    public static Object[] Class_getInterfaces_AW(Object self) {
         return empty;// to do -> not really used anyway
     }
 
@@ -777,28 +723,28 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_ClassLoaderXParallelLoaders_register_Ljava_lang_ClassZ")
-    public static boolean java_lang_ClassLoaderXParallelLoaders_register_Ljava_lang_ClassZ(Object clazz) {
+    public static boolean ClassLoaderXParallelLoaders_register_Ljava_lang_ClassZ(Object clazz) {
         // idc
         return false;
     }
 
     @Alias(names = "java_lang_Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
-    public static Annotation java_lang_Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object annotClass) {
+    public static Annotation Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object annotClass) {
         // todo implement properly
         return null;
     }
 
     @Alias(names = "java_lang_ClassLoader_loadLibrary0_Ljava_lang_ClassLjava_io_FileZ")
-    public static boolean java_lang_ClassLoader_loadLibrary0_Ljava_lang_ClassLjava_io_FileZ(Object clazz, File file) {
+    public static boolean ClassLoader_loadLibrary0_Ljava_lang_ClassLjava_io_FileZ(Object clazz, File file) {
         return false;
     }
 
     @Alias(names = "java_lang_ClassLoaderXNativeLibrary_finalize_V")
-    public static void java_lang_ClassLoaderXNativeLibrary_finalize_V(Object self) {
+    public static void ClassLoaderXNativeLibrary_finalize_V(Object self) {
     }
 
     @Alias(names = "java_lang_ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV")
-    public static void java_lang_ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV(Object clazz, String file, boolean sth) {
+    public static void ClassLoader_loadLibrary_Ljava_lang_ClassLjava_lang_StringZV(Object clazz, String file, boolean sth) {
     }
 
     @Alias(names = "java_lang_reflect_Executable_getParameters_AW")
@@ -807,7 +753,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
-    public static Object java_lang_reflect_Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object clazz) {
+    public static Object Executable_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object clazz) {
         return null;
     }
 
@@ -844,7 +790,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_AccessibleObject_setAccessible_ZV")
-    public static void java_lang_reflect_AccessibleObject_setAccessible_ZV(Object self, boolean accessible) {
+    public static void AccessibleObject_setAccessible_ZV(Object self, boolean accessible) {
         // nothing to do
     }
 }

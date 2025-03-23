@@ -511,6 +511,14 @@ roid java_util_zip_Deflater_end_JV(i64) { return RET_VOID; }
 roid java_util_zip_Deflater_initIDs_V() { return RET_VOID; }
 roid java_util_zip_Inflater_end_JV(i64) { return RET_VOID; }
 roid java_util_zip_Inflater_initIDs_V() { return RET_VOID; }
+roid static_java_util_concurrent_TimeUnit_V() { return RET_VOID; }
+roid static_java_util_GregorianCalendar_V() { return RET_VOID; }
+ret32 java_util_Date_normalize_Lsun_util_calendar_BaseCalendarXDate(i32) { return RET_NULL; }
+ret32 java_util_GregorianCalendar_clone_Ljava_lang_Object(i32) { return RET_NULL; }
+ret32 java_util_Date_getCalendarSystem_Lsun_util_calendar_BaseCalendarXDateLsun_util_calendar_BaseCalendar(i32) { return RET_NULL; }
+ret32 java_util_Date_getJulianCalendar_Lsun_util_calendar_BaseCalendar() { return RET_NULL; }
+roid new_java_util_GregorianCalendar_Ljava_util_TimeZoneLjvm_custom_LocaleV(i32,i32,i32) { return RET_VOID; }
+roid java_util_GregorianCalendar_setZoneShared_ZV(i32,i32) { return RET_VOID; }
 
 std::vector<void*> garbageWhileGC;
 i32 jvm_JVM32_getAllocatedSize_I() { return allocatedSize; }
@@ -672,15 +680,12 @@ void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstAr
 }
 
 i64 me_anno_ui_debug_JSMemory_jsUsedMemory_J() { return 0; }
-roid me_anno_utils_Sleep_waitUntilOrThrow_ZJLjava_lang_ObjectLkotlin_jvm_functions_Function0V(i32, i64, i32, i32) { return RET_VOID; }
 roid new_java_text_SimpleDateFormat_V(i32) { return RET_VOID; }
 roid new_kotlin_text_Regex_Ljava_lang_StringV(i32, i32) { return RET_VOID; }
 
 roid static_java_lang_reflect_AccessibleObject_V() { }
 roid static_java_util_Date_V() { }
 roid static_java_util_Formatter_V() { }
-roid static_me_anno_audio_AudioFXCache_V() { }
-roid static_me_anno_video_formats_gpu_GPUFrame_V() { }
 
 roid java_io_BufferedInputStream_fill_V(i32) { return RET_VOID; }
 roid java_io_RandomAccessFile_close0_V(i32) { return RET_VOID; }

@@ -69,7 +69,9 @@ public class TextGen {
             "ctx.textAlign='center'\n" +
             "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
             "ctx.fillText(arg2,w/2,1+h/1.3);\n" +
-            "gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h).data);\n" +
+            "let buffer = ctx.getImageData(0,0,w,h).data;\n" +
+            "flipImageVertically(w,h,buffer);\n" +
+            "gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n" +
             "return w;")
     public static native int genTexTexture(String font, float fontSize, String text, int wl, int h);
 
@@ -101,19 +103,20 @@ public class TextGen {
     }
 
     @NoThrow
-    @JavaScript(code = "let w=arg3,h=arg4,d=arg5;\n" +
+    @JavaScript(code = "let font=arg0,w=arg3,h=arg4,d=arg5,color0Int=arg7,color1Int=arg6;\n" +
             "txtCanvas.width=w;txtCanvas.height=h*d;\n" +
-            "let color0 = '#'+arg7.toString(16).padStart(6,'0');\n" +
-            "let color1 = '#'+arg6.toString(16).padStart(6,'0');\n" +
+            "let color0 = '#'+color0Int.toString(16).padStart(6,'0');\n" +
+            "let color1 = '#'+color1Int.toString(16).padStart(6,'0');\n" +
             "ctx.textAlign='center'\n" +
-            "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
+            "ctx.font=(arg1|0)+'px '+str(font);\n" +
             "for(let i=0;i<d;i++) {\n" +
             "   ctx.fillStyle=color0;\n" + // clear space, just in case
             "   ctx.fillRect(0,i*h,w,h);\n" +
             "   ctx.fillStyle=color1;\n" +
-            "   ctx.fillText(String.fromCharCode(arg2+i),w/2,arg8+h*i);\n" +
+            "   ctx.fillText(String.fromCharCode(arg2+(d-1-i)),w/2,arg8+h*i);\n" +
             "}\n" +
             "let buffer = ctx.getImageData(0,0,w,h*d).data;\n" +
+            "flipImageVertically(w,h*d,buffer);\n" +
             "gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n")
     public static native void genASCIITexture(
             String font, float fontSize, int text0, int width, int height, int depth,

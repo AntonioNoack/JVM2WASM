@@ -28,10 +28,8 @@ public class ThreadLocal2<V> {
         Supplier<V> supplier = this.supplier;
         if (supplier != null) {
             object = supplier.get();
-            log("Got instance from ThreadLocal", getAddr(object));
             this.supplier = null;
         }
-        log("Returning from ThreadLocal", getAddr(object));
         return object;
     }
 }

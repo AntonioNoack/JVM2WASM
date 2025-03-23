@@ -3,10 +3,7 @@ package hierarchy
 import me.anno.utils.structures.lists.Lists.firstOrNull2
 import me.anno.utils.types.Booleans.hasFlag
 import org.objectweb.asm.Opcodes.*
-import utils.CallSignature
-import utils.FieldSig
-import utils.MethodSig
-import utils.methodName
+import utils.*
 import wasm.instr.Instruction
 
 object HierarchyIndex {
@@ -49,7 +46,7 @@ object HierarchyIndex {
     }
 
     fun isStatic(method: MethodSig): Boolean {
-        return method in staticMethods
+        return method.name == STATIC_INIT || method in staticMethods
     }
 
     fun isFinal(method: MethodSig): Boolean {
@@ -109,6 +106,7 @@ object HierarchyIndex {
     val missingClasses = HashSet<String>(cap2)
 
     val finalFields = HashMap<FieldSig, Any>(cap)
+    val genericFieldSignatures = HashMap<FieldSig, String>(cap)
 
     val exportedMethods = HashSet<MethodSig>(cap)
     val usesSelf = HashMap<MethodSig, Boolean>(cap)

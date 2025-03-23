@@ -13,6 +13,7 @@ import dependency.DependencyIndex.usedInterfaceCalls
 import dependency.DependencyIndex.usedMethods
 import dependency.DependencyIndex.usedSetters
 import fieldsRWRequired
+import hIndex
 import hierarchy.HierarchyIndex.childClasses
 import hierarchy.HierarchyIndex.getAlias
 import hierarchy.HierarchyIndex.interfaceDefaults
@@ -21,8 +22,9 @@ import hierarchy.HierarchyIndex.isStatic
 import hierarchy.HierarchyIndex.methodsByClass
 import hierarchy.HierarchyIndex.setAlias
 import hierarchy.HierarchyIndex.superClass
-import me.anno.utils.assertions.assertTrue
+import me.anno.tests.LOGGER
 import me.anno.utils.algorithms.Recursion
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
 import translator.GeneratorIndex.classNamesByIndex
@@ -42,6 +44,22 @@ class DependencyResolver {
     private val usedByClass = HashMap<String, HashSet<MethodSig>>(size / 8) // 23s -> 13s ❤
     private val usedMethods1 = HashSet<MethodSig>(64)
     private val dependencies = HashSet<MethodSig>(64)
+
+    private fun depAdd(sig0: MethodSig, sig: MethodSig) {
+        if (isForbiddenClass(sig.clazz)) {
+            // ignore that dependency
+            methodsWithForbiddenDependencies.add(sig0)
+            return
+        }
+        dependencies.add(sig)
+        if (sig.name == INSTANCE_INIT && sig.clazz !in constructableClasses) {
+            handleBecomingConstructable(sig, sig.clazz)
+        }
+    }
+
+    private fun depAdd(sig0: MethodSig, methods: Collection<MethodSig>?) {
+        for (method in methods ?: return) depAdd(sig0, method)
+    }
 
     private fun addAlwaysConstructableClasses() {
         constructableClasses.addAll(
@@ -81,7 +99,8 @@ class DependencyResolver {
         for (sig in methods) addRemaining(sig)
     }
 
-    private fun handleBecomingConstructable(sig: MethodSig, clazz: String, newUsedMethods: MutableSet<MethodSig>) {
+    private fun handleBecomingConstructable(sig: MethodSig, clazz: String) {
+        if (isForbiddenClass(clazz)) return
         if (!constructableClasses.add(clazz)) return
 
         // println("$clazz becomes constructible")
@@ -89,32 +108,29 @@ class DependencyResolver {
         // val print = clazz == "kotlin/jvm/internal/PropertyReference1Impl"
         // if (print) println("$sig -> $clazz")
 
-        handleInterfaceBecomingConstructable(clazz, sig, newUsedMethods)
+        handleInterfaceBecomingConstructable(clazz, sig)
 
         val superClass = superClass[clazz]
-        if (superClass != null) handleBecomingConstructable(sig, superClass, newUsedMethods)
+        if (superClass != null) handleBecomingConstructable(sig, superClass)
 
         val dependenciesByConstructable = depsIfConstructable.remove(clazz) ?: emptySet()
         // println("  dependencies by constructable[$clazz]: $dependenciesByConstructable")
         addRemaining(dependenciesByConstructable)
-        handleSuperBecomingConstructable(clazz, newUsedMethods)
+        handleSuperBecomingConstructable(clazz, sig)
     }
 
     // check for all interfaces, whether we should implement their functions
-    private fun handleInterfaceBecomingConstructable(
-        clazz: String, sig: MethodSig,
-        newUsedMethods: MutableSet<MethodSig>,
-    ) {
+    private fun handleInterfaceBecomingConstructable(clazz: String, sig: MethodSig) {
         Recursion.processRecursive(clazz) { checkedClass, remaining ->
             val interfaces2 = interfaces[checkedClass]
             if (interfaces2 != null) {
                 for (interface1 in interfaces2) {
-                    handleBecomingConstructable(sig, interface1, newUsedMethods)
+                    handleBecomingConstructable(sig, interface1)
                     remaining.add(interface1)
                     val methods = methodsByClass[interface1] ?: continue
                     for (method2 in methods) {
                         if (used(method2)) {
-                            newUsedMethods.add(MethodSig.c(clazz, method2.name, method2.descriptor))
+                            depAdd(sig, method2.withClass(clazz))
                         }
                     }
                 }
@@ -125,7 +141,7 @@ class DependencyResolver {
     }
 
     // of all super classes, depend on all their relevant methods
-    private fun handleSuperBecomingConstructable(clazz: String, newUsedMethods: MutableSet<MethodSig>) {
+    private fun handleSuperBecomingConstructable(clazz: String, sig: MethodSig) {
         var superClassI = clazz
         while (true) {
             // if (clazz == "java/util/Collections\$SetFromMap") println("processing $superClass")
@@ -135,7 +151,7 @@ class DependencyResolver {
                     val childMethod = method2.withClass(clazz)
                     if (method2 !in methodsWithForbiddenDependencies) {
                         // if (clazz == "java/util/Collections\$SetFromMap") println("  marked $childMethod for use")
-                        newUsedMethods.add(childMethod)
+                        depAdd(sig, childMethod)
                     }
                 }
             }
@@ -155,10 +171,11 @@ class DependencyResolver {
         }
     }
 
-    private fun processDependencies(dependencies: Set<MethodSig>) {
+    private fun processDependencies() {
         for (method in dependencies) {
             processDependency(method)
         }
+        dependencies.clear()
     }
 
     private fun handleInterfaceBecomesUsed(sig: MethodSig, usedInterface: MethodSig) {
@@ -166,7 +183,7 @@ class DependencyResolver {
         if (!usedInterfaceCalls.add(usedInterface)) return
 
         Recursion.processRecursive(usedInterface.clazz) { interfaceI, remaining1 ->
-            handleBecomingConstructable(sig, interfaceI, dependencies)
+            handleBecomingConstructable(sig, interfaceI)
             remaining1.addAll(interfaces[interfaceI] ?: emptyList())
         }
 
@@ -210,7 +227,6 @@ class DependencyResolver {
      * */
     fun resolve(entryClasses: Set<String>, entryPoints: Set<MethodSig>) {
 
-        constructableClasses = HashSet(size)
         addAlwaysConstructableClasses()
         constructableClasses.addAll(entryClasses)
 
@@ -233,6 +249,11 @@ class DependencyResolver {
             checkState(1)
 
             val isStatic = isStatic(sig)
+            if (!isStatic && sig.clazz !in constructableClasses) {
+                LOGGER.warn("${sig.clazz} became constructable by $sig")
+                handleBecomingConstructable(sig, sig.clazz)
+            }
+
             val resolved = resolveMethod(sig, true)
             if (!isStatic) {
                 usedByClass.getOrPut(sig.clazz, ::HashSet).add(sig)
@@ -252,7 +273,7 @@ class DependencyResolver {
                 setAlias(sig, alias)
                 addRemaining(alias)
                 findChildImplementations(sig, sig.clazz, dependencies)
-                processDependencies(dependencies)
+                processDependencies()
 
             } else {
 
@@ -268,7 +289,7 @@ class DependencyResolver {
 
                 checkState(4)
 
-                dependencies.addAll(methodDependencies[resolved] ?: emptyList())
+                depAdd(sig, methodDependencies[resolved])
 
                 usedMethods1.clear()
                 usedMethods1.addAll(dependencies)
@@ -290,6 +311,8 @@ class DependencyResolver {
                 checkState(9)
 
                 checkUsedFields(sig)
+
+                processDependencies()
 
             }
         }
@@ -323,7 +346,7 @@ class DependencyResolver {
 
             // abstract classes cannot be constructed, even if they have constructors; interfaces neither
             if (sig.clazz != INTERFACE_CALL_NAME && sig.name == INSTANCE_INIT) {
-                handleBecomingConstructable(sig, sig.clazz, dependencies)
+                handleBecomingConstructable(sig, sig.clazz)
                 checkState(11)
             }
 
@@ -333,12 +356,12 @@ class DependencyResolver {
             val newClasses = constructorDependencies[sig]
             if (newClasses != null) {
                 for (newClass in newClasses) {
-                    handleBecomingConstructable(sig, newClass, dependencies)
+                    handleBecomingConstructable(sig, newClass)
                     checkState(13)
                 }
             }
 
-            processDependencies(dependencies)
+            processDependencies()
 
             usedGetters.addAll(usedGetters1)
             usedSetters.addAll(usedSetters1)
@@ -359,10 +382,33 @@ class DependencyResolver {
             if (field.isStatic && (!strict || field in usedGetters)) {
                 addRemaining(MethodSig.staticInit(field.clazz))
             }
+
+            // if field.type is constructing instances,
+            //  mark that class as constructable
+            if (field.descriptor in constructingClasses) {
+                val generics = hIndex.genericFieldSignatures[field]
+                if (generics != null && generics.endsWith(";>;")) {
+                    val idx = generics.indexOf("<L")
+                    val subType = generics.substring(idx + 2, generics.length - 3)
+                    assertTrue(';' !in subType) // else multiple generic parameters...
+                    if (subType !in constructingClasses) {
+                        depAdd(sig, MethodSig.c(subType, INSTANCE_INIT, "()V"))
+                        println("$sig -> $field -> $subType")
+                    }
+                }
+            }
         }
 
         checkState(15)
     }
+
+    /**
+     * classes, which use reflections to create instances
+     * todo move this to companion or main config or so...
+     * */
+    private val constructingClasses = listOf(
+        "me/anno/utils/pooling/Stack"
+    )
 
     private fun checkConstructorDependencies(usedMethods: Set<MethodSig>) {
         for (sig in usedMethods) {
