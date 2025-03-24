@@ -5,9 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.charset.Charset;
 import java.util.Locale;
 
-import static jvm.JVM32.getAddr;
-import static jvm.JVM32.getAllocationStart;
-import static jvm.JVM32.unsignedLessThan;
+import static jvm.JVM32.*;
 import static jvm.JVMShared.unsafeCast;
 import static jvm.JavaUtil.String_format;
 
@@ -56,7 +54,7 @@ public class UTF8String implements CharSequence, Comparable<String> {
         // return UTF8String / Slice depending on whether included, and length :)
         if (start == 0 && end == length()) return this;
         int length = end - start;
-        if (length + length >= this.length() || (length > 8 && unsignedLessThan(getAddr(this), getAllocationStart()))) {
+        if (length + length >= this.length() || (length > 8 && !isDynamicInstance(this))) {
             return new UTF8Slice(this, start, length);
         } else {
             byte[] bytes = new byte[length];

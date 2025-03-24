@@ -2,7 +2,6 @@ package engine;
 
 import annotations.*;
 import jvm.FillBuffer;
-import jvm.GCTraversal;
 import jvm.JavaLang;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
@@ -56,12 +55,13 @@ import java.util.Objects;
 import static engine.GFXBase2Kt.renderFrame2;
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
-import static jvm.JVMShared.getTypeShift;
+import static jvm.JVMShared.getInstanceSizeNonArray;
 import static jvm.JVMShared.numClasses;
 import static jvm.JavaLang.Object_toString;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
+import static utils.StaticClassIndices.*;
 
 @SuppressWarnings("unused")
 public class Engine {
@@ -619,57 +619,56 @@ public class Engine {
     /**
      * for debugging, prints all strings that were generated at runtime
      */
-    @NoThrow // todo what are idx0 and len???
-    private static void printDynamicStrings(int idx0, int len) {
-        int instance = getAllocationStart();
+    @NoThrow
+    private static void printDynamicStrings(int firstPrintedStringId, int numPrintedStringIds) {
+        int instancePtr = getAllocationStart();
         final int endPtr = getNextPtr();
-        int idx = 0;
+        int stringId = 0;
         final int nc = numClasses();
-        int endIdx = idx0 + len;
+        int maxStringId = firstPrintedStringId + numPrintedStringIds;
         int lastClass = -1;
         int lastSize = 0;
         int instanceCtr = 0;
-        while (unsignedLessThan(instance, endPtr) && idx < endIdx) {
+        while (unsignedLessThan(instancePtr, endPtr) && stringId < maxStringId) {
 
             // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
-            final int clazz = readClassId(instance);
-            if (unsignedGreaterThanEqual(clazz, nc)) {
-                log("Handling", instance, clazz);
-                log("Illegal class index {} >= {} at {}!", clazz, nc, instance);
+            final int classId = readClassIdImpl(instancePtr);
+            if (unsignedGreaterThanEqual(classId, nc)) {
+                log("Handling", instancePtr, classId);
+                log("Illegal class index {} >= {} at {}!", classId, nc, instancePtr);
                 return;
             }
 
             int size;
-            if (unsignedLessThan(clazz - 1, 9)) { // clazz > 0 && clazz < 10
+            if (classId >= FIRST_ARRAY && classId <= LAST_ARRAY) { // clazz > 0 && clazz < 10
                 // handle arrays by size
-                size = arrayOverhead + (arrayLength(instance) << getTypeShift(clazz));
+                size = getArraySizeInBytes(arrayLength(instancePtr), classId);
+                size = adjustCallocSize(size);
             } else {
                 // handle class instance
-                size = GCTraversal.classSizes[clazz];
+                size = getInstanceSizeNonArray(classId);
             }
 
-            size = adjustCallocSize(size);
-
-            if (clazz == 10) {
-                log("found instance", idx, instance);
-                if (unsignedLessThan(idx - idx0, len)) {
-                    log((String) ptrTo(instance));
+            if (classId == STRING) {
+                log("found instance", stringId, instancePtr);
+                if (unsignedLessThan(stringId - firstPrintedStringId, numPrintedStringIds)) {
+                    log((String) ptrTo(instancePtr));
                 }
-                idx++;
+                stringId++;
             } else {
-                if (clazz == lastClass) {
+                if (classId == lastClass) {
                     lastSize += size;
                     instanceCtr++;
                 } else {
                     if (lastClass >= 0) {
                         log("clazz", lastClass, lastSize, instanceCtr);
                     }
-                    lastClass = clazz;
+                    lastClass = classId;
                     lastSize = size;
                     instanceCtr = 1;
                 }
             }
-            instance += size;
+            instancePtr += size;
         }
         log("clazz (last)", lastClass, lastSize, instanceCtr);
     }
@@ -700,7 +699,7 @@ public class Engine {
     @Alias(names = "org_apache_logging_log4j_LoggerImpl_print_Ljava_lang_StringLjava_lang_StringV")
     public static void LoggerImpl_print(LoggerImpl self, String prefix, String text) {
         // avoid printing line-by-line like the original, because JS saves the stack trace for each warning
-        String line2 = "[" + LoggerImpl.Companion.getTimeStamp() + "," + self.getPrefix() + self.getSuffix() + "] " + text;
+        String line2 = "[" + LoggerImpl.Companion.getTimeStamp() + "," + prefix + ":" + self.getName() + "] " + text;
         LoggerImpl_printRaw(self, prefix, line2);
     }
 

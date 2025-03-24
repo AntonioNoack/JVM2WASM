@@ -3,12 +3,15 @@ package jvm;
 import annotations.*;
 
 import static jvm.ArrayAccessSafe.arrayStore;
+import static jvm.GCGapFinder.getInstanceSize;
 import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
+import static utils.StaticClassIndices.FIRST_ARRAY;
+import static utils.StaticClassIndices.LAST_ARRAY;
 import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 
 @SuppressWarnings("unused")
@@ -16,7 +19,8 @@ public class JVM32 {
 
     public static final int objectOverhead = 4;// 3x class, 1x GC
     public static final int arrayOverhead = objectOverhead + 4;// length
-    public static final int ptrSize = 4; // this is JVM32, so this is correct
+    public static final int ptrSizeBits = 2; // this is JVM32, so this is correct
+    public static final int ptrSize = 1 << ptrSizeBits;
     public static boolean trackAllocations = true;
 
     // public static int fieldTableOffset = getFieldTableOffset(); // for GC
@@ -38,12 +42,6 @@ public class JVM32 {
     public static native int staticInstancesOffset();
 
     @NoThrow
-    @Alias(names = "findClass")
-    public static Class<Object> findClass(int classIdx) {
-        return ptrTo(findClassPtr(classIdx));
-    }
-
-    @NoThrow
     @WASM(code = "") // todo this method shall only be used by JVM32
     public static native <V> V ptrTo(int addr);
 
@@ -51,6 +49,10 @@ public class JVM32 {
     public static <V> V ptrTo(long addr) {
         return ptrTo((int) addr);
     }
+
+    @NoThrow
+    @WASM(code = "") // automatically converted
+    public static native int getAddr(Object obj);
 
     @NoThrow
     @WASM(code = "global.get $classSize")
@@ -61,20 +63,26 @@ public class JVM32 {
     public static native int getClassInstanceTable();
 
     @NoThrow
-    public static int findClassPtr(int classId) {
+    @Alias(names = "findClass")
+    public static Class<Object> classIdToInstance(int classId) {
+        return ptrTo(classIdToInstancePtr(classId));
+    }
+
+    @NoThrow
+    public static int classIdToInstancePtr(int classId) {
         return classId * getClassSize() + getClassInstanceTable();
     }
 
     @NoThrow
     @Alias(names = "findStatic")
-    public static int findStatic(int clazz, int offset) {
+    public static int findStatic(int classId, int offset) {
         // log("finding static", clazz, offset);
-        return read32(staticInstancesOffset() + (clazz << 2)) + offset;
+        return read32(staticInstancesOffset() + (classId << 2)) + offset;
     }
 
     static void failCastCheck(Object instance, int clazz) {
-        Class<Object> isClass = findClass(readClassIdI(instance));
-        Class<Object> checkClass = findClass(clazz);
+        Class<Object> isClass = classIdToInstance(readClassId(instance));
+        Class<Object> checkClass = classIdToInstance(clazz);
         log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
         throw new ClassCastException();
     }
@@ -95,21 +103,17 @@ public class JVM32 {
     }
 
     @Alias(names = "createInstance")
-    public static int createInstance(int clazz) {
-        validateClassIdx(clazz);
-        if (trackAllocations) trackCalloc(clazz);
-        int instanceSize = getInstanceSizeNonArray(clazz);
+    public static int createInstance(int classId) {
+        validateClassId(classId);
+        if (trackAllocations) trackCalloc(classId);
+        int instanceSize = getInstanceSizeNonArray(classId);
         if (instanceSize <= 0)
             throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
         int newInstance = calloc(instanceSize);
 
-        // log("Creating", clazz, newInstance);
-        /*if (instanceSize > 1024) {
-            log("Allocating", clazz, instanceSize, newInstance);
-            printStackTrace();
-        }*/
-
-        writeClass(newInstance, clazz);
+        writeClass(newInstance, classId);
+        // log("Created", classId, newInstance, instanceSize);
+        // if (newInstance > 10_300_000) validateAllClassIds();
         return newInstance;
     }
 
@@ -134,28 +138,37 @@ public class JVM32 {
     }
 
     @Alias(names = "createNativeArray1")
-    public static int createNativeArray1(int length, int clazz) {
-        // log("creating native array", length, clazz);
+    public static int createNativeArray1(int length, int classId) {
         if (length < 0) throw new IllegalArgumentException();
-        if (trackAllocations) trackCalloc(clazz, length);
-        int typeShift = getTypeShiftUnsafe(clazz);
+        if (trackAllocations) trackCalloc(classId, length);
+        int typeShift = getTypeShiftUnsafe(classId);
         int numDataBytes = length << typeShift;
         if ((numDataBytes >>> typeShift) != length) {
             throw new IllegalArgumentException("Length is too large for 32 bit memory");
         }
-        int instanceSize = arrayOverhead + numDataBytes;
+        int instanceSize = getArraySizeInBytes(length, classId);
         int newInstance = calloc(instanceSize);
 
-        /*if (instanceSize > 1024) {
-            log("Allocating", clazz, instanceSize, newInstance);
-            printStackTrace();
-        }*/
-
-        // log("calloc/2", clazz, instanceSize, newInstance);
-        writeClass(newInstance, clazz); // [] has index 1
+        writeClass(newInstance, classId); // [] has index 1
         write32(newInstance + objectOverhead, length); // array length
-        // log("instance:", newInstance);
+        // log("Created[]", classId, newInstance, instanceSize);
+        // if (newInstance > 10_300_000) validateAllClassIds();
         return newInstance;
+    }
+
+    public static int getArraySizeInBytes(int length, int classId) {
+        if (classId < FIRST_ARRAY || classId > LAST_ARRAY) {
+            log("Invalid classId for getArraySizeInBytes", classId);
+            throw new IllegalArgumentException();
+        }
+        int typeShift = getTypeShiftUnsafe(classId);
+        int numDataBytes = length << typeShift;
+        if ((numDataBytes >>> typeShift) != length) {
+            log("Length is too large for 32 bit memory", length, typeShift);
+            throw new IllegalArgumentException();
+        }
+        int size = arrayOverhead + numDataBytes;
+        return adjustCallocSize(size);
     }
 
     @Alias(names = "createNativeArray2")
@@ -254,24 +267,23 @@ public class JVM32 {
         write32(ptr, clazz | (GarbageCollector.iteration << 24));
     }
 
-    public static int calloc(int size) {
-
-        size = adjustCallocSize(size);
-
-        int ptr;
+    private static int malloc(int size) {
         // enough space for the first allocations
         if (GarbageCollectorFlags.hasGaps) {
             // try to find a freed place in gaps first
-            ptr = GarbageCollector.findGap(size);
+            int ptr = GarbageCollector.findGap(size);
             if (ptr == 0) {
                 ptr = GarbageCollector.allocateNewSpace(size);
             }
+            return ptr;
         } else {
-            ptr = GarbageCollector.allocateNewSpace(size);
+            return GarbageCollector.allocateNewSpace(size);
         }
+    }
 
-        int endPtr = ptr + size;
-        fill64(ptr, endPtr, 0);
+    public static int calloc(int size) {
+        int ptr = malloc(size);
+        fill64(ptr, ptr + size, 0);
         return ptr;
     }
 
@@ -437,25 +449,9 @@ public class JVM32 {
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(int a, int b);
 
-    @Alias(names = "isOOB")
-    public static void checkOutOfBounds(int instance, int index) {
-        if (instance == 0) throw new NullPointerException("isOOB");
-        // checkAddress(instance);
-        int length = read32(instance + objectOverhead);
-        if (ge_ub(index, length)) {
-            throw new IndexOutOfBoundsException();
-        }
-    }
-
-    @Alias(names = "isOOB2")
-    public static void checkOutOfBounds(int instance, int index, int clazz) {
-        if (instance == 0) throw new NullPointerException("isOOB2");
-        // checkAddress(instance);
-        if (readClassId(instance) != clazz) throwJs("Incorrect clazz!", instance, readClassId(instance), clazz);
-        int length = read32(instance + objectOverhead);
-        if (ge_ub(index, length)) {
-            throw new IndexOutOfBoundsException();
-        }
+    @NoThrow
+    public static boolean isDynamicInstance(Object instance) {
+        return unsignedGreaterThanEqual(getAddr(instance), getAllocationStart());
     }
 
     @NoThrow
@@ -511,28 +507,19 @@ public class JVM32 {
     public static native long _d2l(double v);
 
     /**
-     * returns the class index for the given instance;
-     * preventing inlining, so we can call it from JS
-     */
-    @NoThrow
-    @Alias(names = "readClass")
-    public static int readClass1(int addr) {
-        return readClassId(addr);
-    }
-
-    /**
      * returns the class index for the given instance
      */
     @NoThrow
     @WASM(code = "i32.load i32.const 16777215 i32.and")
-    public static native int readClassId(int addr);
+    public static native int readClassIdImpl(int addr);
 
     /**
      * returns the class index for the given instance
      */
     @NoThrow
-    public static int readClassIdI(Object instance) {
-        return readClassId(getAddr(instance));
+    @Alias(names = "readClass")
+    public static int readClassId(Object instance) {
+        return readClassIdImpl(getAddr(instance));
     }
 
     @NoThrow
@@ -547,8 +534,49 @@ public class JVM32 {
     }
 
     @NoThrow
+    public static void writeI8AtOffset(Object instance, int offset, byte value) {
+        write8(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static void writeI16AtOffset(Object instance, int offset, short value) {
+        write16(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static byte readI8AtOffset(Object instance, int offset) {
+        return read8(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static short readS16AtOffset(Object instance, int offset) {
+        return read16s(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static char readU16AtOffset(Object instance, int offset) {
+        return read16u(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static float readF32AtOffset(Object instance, int offset) {
+        return read32f(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static double readF64AtOffset(Object instance, int offset) {
+        return read64f(getAddr(instance) + offset);
+    }
+
+    @NoThrow
     public static int readI32AtOffset(Object instance, int offset) {
+        // todo offset must become long for ptrSize=8
         return read32(getAddr(instance) + offset);
+    }
+
+    @NoThrow
+    public static long readI64AtOffset(Object instance, int offset) {
+        return read64(getAddr(instance) + offset);
     }
 
     @NoThrow
@@ -562,6 +590,21 @@ public class JVM32 {
     }
 
     @NoThrow
+    public static void writeI64AtOffset(Object instance, int offset, long value) {
+        write64(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static void writeF32AtOffset(Object instance, int offset, float value) {
+        write32(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static void writeF64AtOffset(Object instance, int offset, double value) {
+        write64(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
     public static void writePtrAtOffset(Object instance, int offset, Object value) {
         writeI32AtOffset(instance, offset, getAddr(value));
     }
@@ -571,22 +614,42 @@ public class JVM32 {
     private static native void printStackTraceLine(int depth, String clazz, String method, int line);
 
     @NoThrow
-    @Alias(names = "getClassIndexPtr")
-    public static <V> int getClassIndexPtr(int classIndex) {
-        validateClassIdx(classIndex);
-        int addr = findClassPtr(classIndex) + OFFSET_CLASS_INDEX;
-        int actualIndex = read32(addr);
+    @Alias(names = "getClassIdPtr")
+    public static <V> int getClassIdPtr(int classIndex) {
+        validateClassId(classIndex);
+        int classIdPtr = classIdToInstancePtr(classIndex) + OFFSET_CLASS_INDEX;
+
+        int actualIndex = read32(classIdPtr);
         // log("getClassIndexPtr", classIndex, addr, actualIndex);
         if (actualIndex != classIndex) {
             log("addr = {} * {}", classIndex, getClassSize());
             log("+ {} + {}", getClassInstanceTable(), OFFSET_CLASS_INDEX);
-            throwJs("Expected {} at {}, got {}", classIndex, addr, actualIndex);
+            throwJs("Expected {} at {}, got {}", classIndex, classIdPtr, actualIndex);
         }
-        return addr;
+        return classIdPtr;
     }
 
     @NoThrow
-    @WASM(code = "") // auto
-    public static native int getAddr(Object obj);
+    @Alias(names = "checkWrite")
+    public static void checkWrite(int addr0, int offset, int length) {
+        int fieldAddr = addr0 + offset;
+        if (addr0 > 0) {
+            // not static
+            int classId = readClassIdImpl(addr0);
+            int instanceSize = getInstanceSize(addr0, classId);
+            if (instanceSize < offset + length || offset < 0) {
+                log("Invalid write!!!", addr0, classId, offset);
+                throwJs();
+            }
+        }
+
+        int magicAddress = 10386896;
+        int magicLength = 8;
+        if (fieldAddr < magicAddress + magicLength &&
+                fieldAddr + length > magicAddress) {
+            log("Invalid Write???", addr0, offset, length);
+            new RuntimeException("Invalid Write???").printStackTrace();
+        }
+    }
 
 }

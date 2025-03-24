@@ -2,8 +2,16 @@ package utils
 
 import utils.CommonInstructions.ANEW_ARRAY_INSTR
 import utils.CommonInstructions.ARRAY_LENGTH_INSTR
+import utils.CommonInstructions.ATHROW_INSTR
 import utils.CommonInstructions.GET_FIELD
 import utils.CommonInstructions.GET_STATIC
+import utils.CommonInstructions.INVOKE_DYNAMIC
+import utils.CommonInstructions.INVOKE_INTERFACE
+import utils.CommonInstructions.INVOKE_SPECIAL
+import utils.CommonInstructions.INVOKE_STATIC
+import utils.CommonInstructions.INVOKE_VIRTUAL
+import utils.CommonInstructions.MONITOR_ENTER
+import utils.CommonInstructions.MONITOR_EXIT
 import utils.CommonInstructions.NEW_ARRAY_INSTR
 import utils.CommonInstructions.NEW_INSTR
 import utils.CommonInstructions.SET_FIELD
@@ -195,20 +203,20 @@ object OpCode {
             SET_STATIC -> "putstatic"
             GET_FIELD -> "getfield"
             SET_FIELD -> "putfield"
-            0xb6 -> "invokevirtual"
-            0xb7 -> "invokespecial"
-            0xb8 -> "invokestatic"
-            0xb9 -> "invokeinterface"
-            0xba -> "invokedynamic"
+            INVOKE_VIRTUAL -> "invokevirtual"
+            INVOKE_SPECIAL -> "invokespecial"
+            INVOKE_STATIC -> "invokestatic"
+            INVOKE_INTERFACE -> "invokeinterface"
+            INVOKE_DYNAMIC -> "invokedynamic"
             NEW_INSTR -> "new"
             NEW_ARRAY_INSTR -> "newarray"
             ANEW_ARRAY_INSTR -> "anewarray"
             ARRAY_LENGTH_INSTR -> "arraylength"
-            0xbf -> "athrow"
+            ATHROW_INSTR -> "athrow"
             0xc0 -> "checkcast"
             0xc1 -> "instanceof"
-            0xc2 -> "monitorenter"
-            0xc3 -> "monitorexit"
+            MONITOR_ENTER -> "monitorenter"
+            MONITOR_EXIT -> "monitorexit"
             0xc4 -> "wide"
             0xc5 -> "multianewarray"
             0xc6 -> "ifnull"

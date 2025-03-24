@@ -25,8 +25,7 @@ public class WeakRef<V> {
     }
 
     private boolean isAfterAllocationStart() {
-        if (ptrSize == 4) return unsignedGreaterThanEqual((int) address, getAllocationStart());
-        else return address >= getAllocationStart();
+        return isDynamicInstance(ptrTo(address));
     }
 
     @SuppressWarnings("unused")

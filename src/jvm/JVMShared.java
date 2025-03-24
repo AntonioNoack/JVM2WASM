@@ -9,8 +9,7 @@ import java.io.PrintStream;
 import static jvm.JVM32.*;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
-import static utils.StaticClassIndices.FIRST_ARRAY;
-import static utils.StaticClassIndices.LAST_ARRAY;
+import static utils.StaticClassIndices.*;
 
 /**
  * Things that are shared between JVM32 and JVM64: stuff, that is independent of pointerSize/is32Bits/ptrType
@@ -220,7 +219,7 @@ public class JVMShared {
 
     @Alias(names = "wasStaticInited")
     public static boolean wasStaticInited(int index) {
-        validateClassIdx(index);
+        validateClassId(index);
         int address = getStaticInitTable() + index;
         boolean answer = read8(address) != 0;
         write8(address, (byte) 1);
@@ -229,24 +228,15 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "i32.ge_u")
-    private static native int ge_ui(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.ge_u")
     static native boolean ge_ub(int a, int b);
 
     @NoThrow
-    @WASM(code = "i32.lt_u")
-    private static native int lt(int a, int b);
-
-    @NoThrow
-    public static int getTypeShiftUnsafe(int clazz) {
-        // todo this is actually incorrect for !is32Bits, 0
-        // 0 1   2 3 4 5 6 7 8 9
-        // ? 2/3 2 2 0 0 1 1 3 3
-        int flag0 = ge_ui(clazz, 4) & lt(clazz, 6);
-        int flag1 = ge_ui(clazz, 8);
-        return 2 - flag0 - flag0 - ge_ui(clazz, 6) + flag1 + flag1;
+    public static int getTypeShiftUnsafe(int classId) {
+        if (classId == OBJECT_ARRAY) return ptrSizeBits;
+        if (classId == INT_ARRAY || classId == FLOAT_ARRAY) return 2;
+        if (classId == LONG_ARRAY || classId == DOUBLE_ARRAY) return 3;
+        if (classId == SHORT_ARRAY || classId == CHAR_ARRAY) return 1;
+        return 0; // byte, boolean
     }
 
     public static boolean isArrayClassId(int classId) {
@@ -290,7 +280,7 @@ public class JVMShared {
         while (true) {
             if (childClassIdx == parentClassIdx) return true;
             // find super classes in table
-            validateClassIdx(childClassIdx);
+            validateClassId(childClassIdx);
             int tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
             if (childClassIdx == 0) return false;
@@ -304,7 +294,7 @@ public class JVMShared {
     public static boolean isChildOrSameClassNonInterface(int childClassIdx, int parentClassIdx) {
         while (true) {
             if (childClassIdx == parentClassIdx) return true;
-            validateClassIdx(childClassIdx);
+            validateClassId(childClassIdx);
             int tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
             if (childClassIdx == 0) return false;
@@ -325,7 +315,7 @@ public class JVMShared {
     }
 
     @NoThrow
-    static void validateClassIdx(int childClassIdx) {
+    static void validateClassId(int childClassIdx) {
         if (ge_ub(childClassIdx, numClasses())) {
             log("class index out of bounds", childClassIdx, numClasses());
             throwJs();
@@ -334,7 +324,7 @@ public class JVMShared {
 
     public static int resolveInterfaceByClass(int classId, int methodId) {
         // log("resolveInterfaceByClass", classId, methodId);
-        validateClassIdx(classId);
+        validateClassId(classId);
         int tablePtr = getInheritanceTableEntry(classId);
         // log("tablePtr", tablePtr);
         if (tablePtr == 0) {
@@ -419,7 +409,7 @@ public class JVMShared {
         if (instance == null) {
             throw new NullPointerException("Instance for resolveInterface is null");
         } else {
-            return resolveInterfaceByClass(readClassIdI(instance), methodId);
+            return resolveInterfaceByClass(readClassId(instance), methodId);
         }
     }
 
@@ -431,7 +421,7 @@ public class JVMShared {
         if (instance == null) return false;
         if (classId == 0) return true;
         // checkAddress(instance);
-        int testedClass = readClassIdI(instance);
+        int testedClass = readClassId(instance);
         return isChildOrSameClass(testedClass, classId);
     }
 
@@ -443,14 +433,14 @@ public class JVMShared {
         if (instance == null) return false;
         if (clazz == 0) return true;
         // checkAddress(instance);
-        int testedClass = readClassIdI(instance);
+        int testedClass = readClassId(instance);
         return isChildOrSameClassNonInterface(testedClass, clazz);
     }
 
     @NoThrow
     @Alias(names = "instanceOfExact")
     public static boolean instanceOfExact(Object instance, int clazz) {
-        return (instance != null) & (readClassIdI(instance) == clazz);
+        return (instance != null) & (readClassId(instance) == clazz);
     }
 
     @NoThrow
@@ -466,7 +456,7 @@ public class JVMShared {
         // log("resolveIndirectByClass", classId, methodPtr);
         int x = resolveIndirectByClassUnsafe(classId, methodPtr);
         if (x < 0) {
-            Class<Object> class1 = findClass(classId);
+            Class<Object> class1 = classIdToInstance(classId);
             log("resolveIndirectByClass", class1.getName());
             throwJs("classIndex, methodPtr, resolved:", classId, methodPtr, x);
         }
@@ -499,10 +489,6 @@ public class JVMShared {
     }
 
     @NoThrow
-    @WASM(code = "global.get $resolveIndirectTable")
-    public static native int resolveIndirectTable();
-
-    @NoThrow
     @WASM(code = "global.get $numClasses")
     public static native int numClasses();
 
@@ -511,7 +497,7 @@ public class JVMShared {
         if (instance == null) {
             throw new NullPointerException("Instance for resolveIndirect is null");
         }
-        return resolveIndirectByClass(readClassIdI(instance), signatureId);
+        return resolveIndirectByClass(readClassId(instance), signatureId);
     }
 
     @NoThrow

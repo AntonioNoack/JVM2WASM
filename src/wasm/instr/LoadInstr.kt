@@ -3,7 +3,7 @@ package wasm.instr
 import interpreter.WASMEngine
 import java.nio.ByteBuffer
 
-class LoadInstr(name: String, val impl: (ByteBuffer) -> Number) : SimpleInstr(name) {
+class LoadInstr(name: String, val numBytes: Int, val impl: (ByteBuffer) -> Number) : SimpleInstr(name) {
     override fun execute(engine: WASMEngine): String? {
         val addr = engine.pop().toInt()
         val data = engine.buffer

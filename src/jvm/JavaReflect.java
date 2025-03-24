@@ -4,7 +4,7 @@ import annotations.Alias;
 import annotations.NoThrow;
 import annotations.UsedIfIndexed;
 import annotations.WASM;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -15,6 +15,7 @@ import java.util.HashMap;
 
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
+import static jvm.JavaReflectMethod.Constructor_invoke;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
@@ -27,12 +28,13 @@ public class JavaReflect {
     };
 
     @NoThrow
-    @Nullable
+    @NotNull
     @Alias(names = "java_lang_Class_getFields_AW")
     public static Field[] getFields(Class<?> clazz) {
         return readPtrAtOffset(clazz, OFFSET_CLASS_FIELDS);
     }
 
+    @NotNull
     @Alias(names = "java_lang_Class_getDeclaredFields_AW")
     public static Field[] Class_getDeclaredFields_AW(Class<?> clazz) {
         return getFields(clazz);
@@ -49,7 +51,7 @@ public class JavaReflect {
             // log("class for fields", getAddr(clazz));
             // log("fields*, length", fields, length);
             // log("looking for field", searchedField);
-            if (fields != null) for (Field field : fields) {
+            for (Field field : fields) {
                 String fieldName = field.getName();
                 // log("field[i]:", fieldName);
                 // log("field[i].offset:", getFieldOffset(field));
@@ -96,9 +98,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_getMethod_Ljava_lang_StringAWLjava_lang_reflect_Method")
     public static <V> Method Class_getMethod(Class<V> self, String name, Class<?>[] parameters) {
-        if (name == null) return null;
-        Method[] methods = Class_getMethods(self);
-        for (Method method : methods) {
+        for (Method method : Class_getMethods(self)) {
             if (matches(method, name, parameters)) {
                 return method;
             }
@@ -120,9 +120,18 @@ public class JavaReflect {
     private static boolean matches(Method method, String name, Class<?>[] parameters) {
         if (!method.getName().equals(name)) return false;
         if (parameters.length != method.getParameterCount()) return false;
-        Class<?>[] params2 = method.getParameterTypes();
-        for (int i = 0, length = parameters.length; i < length; i++) {
-            if (parameters[i] != params2[i]) {
+        return matchesParams(method.getParameterTypes(), parameters);
+    }
+
+    private static boolean matches(Constructor<?> method, Class<?>[] parameters) {
+        int actualLength = parameters != null ? parameters.length : 0;
+        if (actualLength != method.getParameterCount()) return false;
+        return matchesParams(method.getParameterTypes(), parameters);
+    }
+
+    private static boolean matchesParams(Class<?>[] expected, Class<?>[] actual) {
+        for (int i = 0, length = expected.length; i < length; i++) {
+            if (expected[i] != actual[i]) {
                 return false;
             }
         }
@@ -145,7 +154,7 @@ public class JavaReflect {
         int addr = getFieldAddr(field, instance);
         // if the field is native, we have to wrap it
         Class<?> clazz = field.getType();
-        switch (getClassIndex(clazz)) {
+        switch (getClassId(clazz)) {
             case NATIVE_BOOLEAN:
                 return read8(addr) > 0;
             case NATIVE_BYTE:
@@ -170,7 +179,7 @@ public class JavaReflect {
     private static int getFieldAddr(Field field, Object instance) {
         int offset = getFieldOffset(field);
         if (Modifier.isStatic(field.getModifiers())) {
-            return findStatic(getClassIndex(field.getDeclaringClass()), offset);
+            return findStatic(getClassId(field.getDeclaringClass()), offset);
         } else {
             if (instance == null) throw new NullPointerException("getFieldAddr");
             return getAddr(instance) + offset;
@@ -188,7 +197,7 @@ public class JavaReflect {
         }
         // log("Field.type vs newType", field.getType().getName(), value == null ? null : value.getClass().getName());
         // log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
-        switch (getClassIndex(field.getType())) {
+        switch (getClassId(field.getType())) {
             case NATIVE_BOOLEAN:
                 write8(addr, (byte) (((Boolean) value) ? 1 : 0));
                 break;
@@ -221,113 +230,113 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Field_setInt_Ljava_lang_ObjectIV")
     public static void Field_setInt(Field field, Object instance, int value) {
-        Class<?> clazz = field.getType();
-        if (!"int".equals(clazz.getName())) throw new IllegalArgumentException("Type is not an integer");
+        if (getClassId(field.getType()) != NATIVE_INT)
+            throw new IllegalArgumentException("Type is not an integer");
         write32(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getInt_Ljava_lang_ObjectI")
     public static int Field_getInt(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"int".equals(clazz.getName())) throw new IllegalArgumentException("Type is not an integer");
+        if (getClassId(field.getType()) != NATIVE_INT)
+            throw new IllegalArgumentException("Type is not an integer");
         return read32(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setFloat_Ljava_lang_ObjectFV")
     public static void Field_setFloat(Field field, Object instance, float value) {
-        Class<?> clazz = field.getType();
-        if (!"float".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a float");
+        if (getClassId(field.getType()) != NATIVE_FLOAT)
+            throw new IllegalArgumentException("Type is not a float");
         write32(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getFloat_Ljava_lang_ObjectF")
     public static float Field_getFloat(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"float".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a float");
+        if (getClassId(field.getType()) != NATIVE_FLOAT)
+            throw new IllegalArgumentException("Type is not a float");
         return read32f(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setLong_Ljava_lang_ObjectJV")
     public static void Field_setLong(Field field, Object instance, long value) {
-        Class<?> clazz = field.getType();
-        if (!"int".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");
-        write32(getFieldAddr(field, instance), value);
+        if (getClassId(field.getType()) != NATIVE_LONG)
+            throw new IllegalArgumentException("Type is not a long");
+        write64(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getLong_Ljava_lang_ObjectJ")
     public static long Field_getLong(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"long".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a long");
+        if (getClassId(field.getType()) != NATIVE_LONG)
+            throw new IllegalArgumentException("Type is not a long");
         return read64(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setDouble_Ljava_lang_ObjectDV")
     public static void Field_setDouble(Field field, Object instance, double value) {
-        Class<?> clazz = field.getType();
-        if (!"double".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a double");
+        if (getClassId(field.getType()) != NATIVE_DOUBLE)
+            throw new IllegalArgumentException("Type is not a double");
         write64(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getDouble_Ljava_lang_ObjectD")
     public static double Field_getDouble(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"double".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a double");
+        if (getClassId(field.getType()) != NATIVE_DOUBLE)
+            throw new IllegalArgumentException("Type is not a double");
         return read64f(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setByte_Ljava_lang_ObjectBV")
     public static void Field_setByte(Field field, Object instance, byte value) {
-        Class<?> clazz = field.getType();
-        if (!"byte".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a byte");
+        if (getClassId(field.getType()) != NATIVE_BYTE)
+            throw new IllegalArgumentException("Type is not a byte");
         write8(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getByte_Ljava_lang_ObjectB")
     public static byte Field_getByte(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"byte".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a byte");
+        if (getClassId(field.getType()) != NATIVE_BYTE)
+            throw new IllegalArgumentException("Type is not a byte");
         return read8(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setShort_Ljava_lang_ObjectSV")
     public static void Field_setShort(Field field, Object instance, short value) {
-        Class<?> clazz = field.getType();
-        if (!"short".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a short");
+        if (getClassId(field.getType()) != NATIVE_SHORT)
+            throw new IllegalArgumentException("Type is not a short");
         write16(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getShort_Ljava_lang_ObjectS")
     public static short Field_getShort(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"short".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a short");
+        if (getClassId(field.getType()) != NATIVE_SHORT)
+            throw new IllegalArgumentException("Type is not a short");
         return read16s(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setChar_Ljava_lang_ObjectCV")
     public static void Field_setChar(Field field, Object instance, char value) {
-        Class<?> clazz = field.getType();
-        if (!"char".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a char");
+        if (getClassId(field.getType()) != NATIVE_CHAR)
+            throw new IllegalArgumentException("Type is not a char");
         write16(getFieldAddr(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getChar_Ljava_lang_ObjectC")
     public static char Field_getChar(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"char".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a char");
+        if (getClassId(field.getType()) != NATIVE_CHAR)
+            throw new IllegalArgumentException("Type is not a char");
         return read16u(getFieldAddr(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setBoolean_Ljava_lang_ObjectZV")
     public static void Field_setBoolean(Field field, Object instance, boolean value) {
-        Class<?> clazz = field.getType();
-        if (!"boolean".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a boolean");
+        if (getClassId(field.getType()) != NATIVE_BOOLEAN)
+            throw new IllegalArgumentException("Type is not a boolean");
         write8(getFieldAddr(field, instance), (byte) (value ? 1 : 0));
     }
 
     @Alias(names = "java_lang_reflect_Field_getBoolean_Ljava_lang_ObjectZ")
     public static boolean Field_getBoolean(Field field, Object instance) {
-        Class<?> clazz = field.getType();
-        if (!"boolean".equals(clazz.getName())) throw new IllegalArgumentException("Type is not a boolean");
+        if (getClassId(field.getType()) != NATIVE_BOOLEAN)
+            throw new IllegalArgumentException("Type is not a boolean");
         return read8(getFieldAddr(field, instance)) != 0;
     }
 
@@ -340,7 +349,7 @@ public class JavaReflect {
         if (values == null) {
             JavaReflect.classesForName = values = new HashMap<>(numClasses());
             for (int i = 0, l = numClasses(); i < l; i++) {
-                Class<Object> clazz = findClass(i);
+                Class<Object> clazz = classIdToInstance(i);
                 values.put(clazz.getName(), clazz);
             }
         }
@@ -404,7 +413,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_isPrimitive_Z")
     public static <V> boolean java_lang_Class_isPrimitive_Z(Class<V> clazz) {
-        int index = getClassIndex(clazz);
+        int index = getClassId(clazz);
         return index >= FIRST_NATIVE && index <= LAST_NATIVE;
     }
 
@@ -427,8 +436,8 @@ public class JavaReflect {
 
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")
-    public static int Object_getClass(int instance) {
-        return findClassPtr(readClassId(instance));
+    public static int Object_getClass(Object instance) {
+        return classIdToInstancePtr(readClassId(instance));
     }
 
     @Alias(names = "java_lang_Object_hashCode_I")
@@ -472,24 +481,24 @@ public class JavaReflect {
     }
 
     @NoThrow
-    public static <V> int getClassIndex(Class<V> clazz) {
-        if (clazz == null) return -1;
-        return readI32AtOffset(clazz, OFFSET_CLASS_INDEX);
+    public static <V> int getClassId(Class<V> self) {
+        if (self == null) return -1;
+        return readI32AtOffset(self, OFFSET_CLASS_INDEX);
     }
 
     @NoThrow
     @Alias(names = "java_lang_Class_getModifiers_I")
-    public static <V> int getClassModifiers(Class<V> clazz) {
-        if (clazz == null) return 0;
-        return readI32AtOffset(clazz, OFFSET_CLASS_MODIFIERS);
+    public static <V> int getClassModifiers(Class<V> self) {
+        if (self == null) return 0;
+        return readI32AtOffset(self, OFFSET_CLASS_MODIFIERS);
     }
 
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")
     public static Class<Object> Class_getSuperclass_Ljava_lang_Class(Class<?> clazz) {
-        int idx = getClassIndex(clazz);
-        if (idx <= 0 || idx >= numClasses()) return null;
-        int superClassIdx = getSuperClassId(idx);
-        return findClass(superClassIdx);
+        int classId = getClassId(clazz);
+        if (classId <= 0 || classId >= numClasses()) return null;
+        int superClassId = getSuperClassId(classId);
+        return classIdToInstance(superClassId);
     }
 
     @NoThrow
@@ -546,29 +555,22 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_newInstance_Ljava_lang_Object")
-    public static <V> Object java_lang_Class_newInstance_Ljava_lang_Object(Class<V> clazz) {
-        if (clazz == null) throwJs();
-        int classIndex = getClassIndex(clazz);
-        if (classIndex < 0) throwJs();
-        if (getDynamicTableSize(classIndex) == 0) {
-            log("Cannot instantiate clazz", classIndex, clazz == null ? null : clazz.getName());
-            return null;
-        }
-        int constructorPtr = resolveIndirectByClass(classIndex, 4); // (id+1)<<2, id = 0
-        int instance = createInstance(classIndex);
-        // log("Creating class instance", classIndex, constructorPtr);
-        // todo it would be good, if we have a value for stackPush/stackPop here
-        callConstructor(instance, constructorPtr);
-        return ptrTo(instance);
+    public static <V> Object Class_newInstance_Ljava_lang_Object(Class<V> clazz) throws NoSuchMethodException {
+        Constructor<?> constructor = clazz.getConstructor((Class<?>[]) empty);
+        //noinspection ConstantValue
+        if (constructor == null) throw new IllegalStateException("Class doesn't have constructor without args");
+        return Constructor_newInstance_AWLjava_lang_Object(constructor, empty);
     }
 
-    // @WASM(code = anyMethodThrows ? "call_indirect (type $iXi)" : "call_indirect (type $iX)")
-    private static native void callConstructor(int obj, int methodPtr);
-
     @Alias(names = "java_lang_Class_toString_Ljava_lang_String")
-    public static String java_lang_Class_toString_Ljava_lang_String(Class<?> clazz) {
+    public static String Class_toString_Ljava_lang_String(Class<?> clazz) {
         // we could have to implement isInterface() otherwise
-        return clazz.getName();
+        return Class_getName_Ljava_lang_String(clazz);
+    }
+
+    @Alias(names = "java_lang_Class_getName_Ljava_lang_String")
+    public static String Class_getName_Ljava_lang_String(Class<?> self) {
+        return readPtrAtOffset(self, OFFSET_CLASS_NAME);
     }
 
     @Alias(names = "java_lang_Class_getAnnotations_AW")
@@ -581,7 +583,7 @@ public class JavaReflect {
     public static boolean java_lang_Class_isInstance_Ljava_lang_ObjectZ(Class<?> clazz, Object instance) {
         if (instance == null) return false;
         if (instance.getClass() == clazz) return true;
-        int classIndex = getClassIndex(clazz);
+        int classIndex = getClassId(clazz);
         if (classIndex >= 0) {
             return instanceOf(instance, classIndex);
         }
@@ -595,7 +597,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object")
     public static Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<?> clazz, int length) {
-        switch (getClassIndex(clazz)) {
+        switch (getClassId(clazz)) {
             case NATIVE_INT:
                 return new int[length];
             case NATIVE_LONG:
@@ -630,15 +632,12 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getConstructors_AW")
-    public static <V> Object[] Class_getConstructors_AW(Class<V> self)
-            throws NoSuchFieldException, IllegalAccessException {
-        if (getDynamicTableSize(getClassIndex(self)) == 0) return empty; // not constructable class
-        return new Object[]{getConstructorWithoutArgs(self)}; // to do better implementation?
+    public static <V> Constructor<V>[] Class_getConstructors_AW(Class<V> self) {
+        return readPtrAtOffset(self, OFFSET_CLASS_CONSTRUCTORS);
     }
 
     @Alias(names = "java_lang_Class_getDeclaredConstructors_AW")
-    public static <V> Object[] Class_getDeclaredConstructors_AW(Class<V> self)
-            throws NoSuchFieldException, IllegalAccessException {
+    public static <V> Constructor<V>[] Class_getDeclaredConstructors_AW(Class<V> self) {
         return Class_getConstructors_AW(self);
     }
 
@@ -647,41 +646,39 @@ public class JavaReflect {
         return Class_getDeclaredMethods(self);
     }
 
-    private static Constructor<Object>[] constructors;
-
     @Alias(names = "java_lang_Class_getConstructor_AWLjava_lang_reflect_Constructor")
-    public static <V> Constructor<V> getConstructor(Class<V> self, Object[] args)
-            throws NoSuchFieldException, IllegalAccessException {
-        if (args == null) {
-            throwJs("Arguments was null?");
-            return null;
-        }
-        if (args.length > 0) {
-            throwJs("Cannot access constructors with arguments");
-            return null;
-        }
-        return getConstructorWithoutArgs(self);
-    }
-
-    private static <V> Constructor<V> getConstructorWithoutArgs(Class<V> clazz) throws NoSuchFieldException, IllegalAccessException {
+    public static <V> Constructor<V> Class_getConstructor(Class<V> self, Class<?>[] args) {
+        if (self == null) return null; // really shouldn't happen
+        Constructor<?>[] constructors = self.getConstructors();
+        //noinspection ConstantValue
         if (constructors == null) {
-            //noinspection unchecked
-            constructors = new Constructor[numClasses()];
+            log("Constructors of class are null :(", self.getName(), getClassId(self));
+            throwJs();
+            return null; // really, really shouldn't happen
         }
-        int idx = getClassIndex(clazz);
-        Constructor<Object> cs = constructors[idx];
-        if (cs == null) {
-            cs = ptrTo(createInstance(getClassIndex(Constructor.class)));
-            Constructor.class.getDeclaredField("clazz").set(cs, clazz);
-            constructors[idx] = cs;
+        log("Constructors:", self.getName(), constructors.length);
+        for (Constructor<?> constructor : constructors) {
+            if (matches(constructor, args)) {
+                log("Found constructor", self.getName(),
+                        constructor.getParameterTypes().length,
+                        args != null ? args.length : 0);
+                //noinspection unchecked
+                return (Constructor<V>) constructor;
+            }
         }
-        //noinspection unchecked
-        return (Constructor<V>) cs;
+        return null;
     }
 
-    @Alias(names = "java_lang_reflect_Constructor_getParameterCount_I")
-    private static int Constructor_getParameterCount_I(Object self) {
-        return 0; // anything else isn't supported at the moment
+    @Alias(names = "java_lang_reflect_Method_getParameterTypes_AW")
+    public static Class<?>[] Method_getParameterTypes_AW(Method self) {
+        // avoid cloning, when we never modify these values anyway
+        return readPtrAtOffset(self, OFFSET_METHOD_PARAMETER_TYPES);
+    }
+
+    @Alias(names = "java_lang_reflect_Constructor_getParameterTypes_AW")
+    public static Class<?>[] Constructor_getParameterTypes_AW(Constructor<?> self) {
+        // avoid cloning, when we never modify these values anyway
+        return readPtrAtOffset(self, OFFSET_CONSTRUCTOR_PARAMETER_TYPES);
     }
 
     @Alias(names = "java_lang_reflect_Constructor_equals_Ljava_lang_ObjectZ")
@@ -706,11 +703,12 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Constructor_newInstance_AWLjava_lang_Object")
-    public static <V> V Constructor_newInstance_AWLjava_lang_Object(Constructor<V> self, Object[] args)
-            throws InstantiationException, IllegalAccessException {
-        if (args != null && args.length != 0)
-            throw new IllegalArgumentException("Constructors with arguments aren't yet supported in WASM");
-        return self.getDeclaringClass().newInstance();
+    public static <V> V Constructor_newInstance_AWLjava_lang_Object(Constructor<V> self, Object[] args) {
+        int classId = getClassId(self.getDeclaringClass());
+        validateClassId(classId);
+        int instance = createInstance(classId);
+        Constructor_invoke(self, ptrTo(instance), args);
+        return ptrTo(instance);
     }
 
     @Alias(names = "java_lang_Class_getInterfaces_AW")

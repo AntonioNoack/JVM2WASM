@@ -159,6 +159,8 @@ void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringLjava_lang_StringV(i32 
 void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringV(i32 a, i32 b) { std::cout << strToCpp(a) << ", " << strToCpp(b) << std::endl; }
 void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringZV(i32 a, i32 b, i32 c) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << std::endl; }
 void jvm_NativeLog_log_Ljava_lang_StringV(i32 a) { std::cout << strToCpp(a) << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringIIV(i32 a, i32 b, i32 c, i32 d) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << d << std::endl; }
+void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << d << ", " << e << std::endl; }
 
 std::vector<i32> callocStatistics;
 void jvm_JVM32_trackCalloc_IV(i32 classId) {
@@ -471,7 +473,7 @@ i64 java_lang_System_nanoTime_J() {
     auto time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_since_start).count();
     return time_in_ns;
 }
-i32 arrayLength(i32 instance) {
+i32 arrayLength1(i32 instance) {
     return r32(instance + objectOverhead);
 }
 
@@ -543,7 +545,7 @@ GLchar tmpLog[1024];
 
 i32 strToJVM(i32 data, std::string str) {
     if(!data) return 0;
-    i32 length = std::min(arrayLength(data), (i32) str.size());
+    i32 length = std::min(arrayLength1(data), (i32) str.size());
     for(i32 i=0;i<length;i++) {
         w16(data + arrayOverhead + i*2, str[i]);
     }
@@ -587,7 +589,7 @@ i32 jvm_LWJGLxGLFW_getWindowWidth_I() { return width; }
 i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32 data, i32 shader) {
     GLsizei len = 0;
     glGetProgramInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
-    len = std::min(len, (GLsizei) arrayLength(data));
+    len = std::min(len, (GLsizei) arrayLength1(data));
     for(GLsizei i=0;i<len;i++) {
         w16(data + arrayOverhead + i*2, tmpLog[i]);
     }
@@ -598,7 +600,7 @@ i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32 data, i32 shader) {
     // (GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog
     GLsizei len = 0;
     glGetShaderInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
-    len = std::min(len, (GLsizei) arrayLength(data));
+    len = std::min(len, (GLsizei) arrayLength1(data));
     for(GLsizei i=0;i<len;i++) {
         w16(data + arrayOverhead + i*2, tmpLog[i]);
     }
@@ -673,7 +675,7 @@ void org_lwjgl_opengl_GL46C_glPopDebugGroup_V() {
     glPopDebugGroup();
 }
 void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstArray) {
-    if(arrayLength(dstArray) < 1) return;
+    if(arrayLength1(dstArray) < 1) return;
     GLint dst = 0;
     glGetIntegeri_v(type, index, &dst);
     w32(dstArray + arrayOverhead, dst);

@@ -54,6 +54,14 @@ public class NativeLog {
     public static native void log(String msg, int param, int param2, int param3);
 
     @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2, arg3);")
+    public static native void log(String msg, String x, int param, int param2);
+
+    @NoThrow
+    @JavaScript(code = "console.log(str(arg0), str(arg1), arg2, arg3, arg4);")
+    public static native void log(String msg, String x, int param, int param2, int param3);
+
+    @NoThrow
     @JavaScript(code = "console.log(arg0, str(arg1), str(arg2), arg3);")
     public static native void log(int i, String msg, String param, int param2);
 

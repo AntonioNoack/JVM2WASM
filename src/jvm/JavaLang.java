@@ -230,16 +230,16 @@ public class JavaLang {
         if (src == null || dst == null) throw new NullPointerException("arraycopy");
         if (length < 0) throw new IllegalArgumentException("length<0");
         if ((src == dst && srcIndex == dstIndex) || length == 0) return; // done :)
-        int src1 = getAddr(src), dst1 = getAddr(dst);
 
-        int clazz1 = readClassId(src1), clazz2 = readClassId(dst1);
-        if (clazz1 != clazz2) {
-            log("Mismatched classes:", clazz1, clazz2);
+        int classIdSrc = readClassId(src), classIdDst = readClassId(dst);
+        if (classIdSrc != classIdDst) {
+            log("Mismatched classes:", classIdSrc, classIdDst);
             throw new RuntimeException("Mismatched types");
         }
 
         int delta = arrayOverhead;
-        int shift = getTypeShift(clazz1);// shall be executed here to confirm that this is arrays
+        int shift = getTypeShift(classIdSrc);// shall be executed here to confirm that this is arrays
+        int src1 = getAddr(src), dst1 = getAddr(dst);
         int src2 = src1 + delta + (srcIndex << shift);
         int dst2 = dst1 + delta + (dstIndex << shift);
 

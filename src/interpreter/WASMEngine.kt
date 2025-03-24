@@ -189,7 +189,7 @@ class WASMEngine(memorySize: Int) {
         registerGetter("jvm_JVM32_getAllocatedSize_I", i32) { it.bytes.size }
         registerGetter("java_lang_System_nanoTime_J", i64) { System.nanoTime() }
         registerGetter("java_lang_System_currentTimeMillis_J", i64) { System.currentTimeMillis() }
-        for (code in "i,?,??,?i,???,?i?,?ii,?iii,???i".split(',')) {
+        for (code in "i,?,??,?i,???,?i?,?ii,?iii,??ii,??iii,???i".split(',')) {
             registerLogFunction(code)
         }
         registerUnaryMathFunction("java_lang_StrictMath_log_DD", StrictMath::log)

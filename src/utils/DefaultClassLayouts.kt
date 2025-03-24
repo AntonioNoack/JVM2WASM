@@ -39,6 +39,7 @@ object DefaultClassLayouts {
         val constructor = "java/lang/reflect/Constructor"
         val accessibleObject = "java/lang/reflect/AccessibleObject"
 
+        // todo we might be able to remove instance-init, because we have proper constructors now
         eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V")), 0)
         eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
 
@@ -75,7 +76,9 @@ object DefaultClassLayouts {
         eq(clazz, "simpleName", string, ptrSize + intSize, OFFSET_CLASS_SIMPLE_NAME)
         eq(clazz, "fields", "[$field", ptrSize * 2 + intSize, OFFSET_CLASS_FIELDS)
         eq(clazz, "methods", "[$method", ptrSize * 3 + intSize, OFFSET_CLASS_METHODS)
-        eq(clazz, "modifiers", "int", ptrSize * 4 + intSize, OFFSET_CLASS_MODIFIERS)
+        eq(clazz, "constructors", "[$constructor", ptrSize * 4 + intSize, OFFSET_CLASS_CONSTRUCTORS)
+        eq(clazz, "enumConstants", "[java/lang/Enum", ptrSize * 5 + intSize, OFFSET_CLASS_ENUM_CONSTANTS)
+        eq(clazz, "modifiers", "int", ptrSize * 6 + intSize, OFFSET_CLASS_MODIFIERS)
 
         // remove securityCheckCache and override, we don't need them
         eq(field, "slot", "int", 0, OFFSET_FIELD_SLOT)
@@ -92,12 +95,16 @@ object DefaultClassLayouts {
         eq(method, "clazz", clazz, ptrSize * 4 + intSize, OFFSET_METHOD_DECLARING_CLASS)
         eq(method, "modifiers", "int", ptrSize * 5 + intSize, OFFSET_METHOD_MODIFIERS)
 
+        eq(constructor, "slot", "int", 0, OFFSET_CONSTRUCTOR_SLOT)
+        eq(constructor, "parameterTypes", "[$clazz", intSize, OFFSET_CONSTRUCTOR_PARAMETER_TYPES)
+        eq(constructor, "callSignature", string, ptrSize + intSize, OFFSET_CONSTRUCTOR_CALL_SIGNATURE)
+        eq(constructor, "clazz", clazz, ptrSize * 2 + intSize, OFFSET_CONSTRUCTOR_DECLARING_CLASS)
+        eq(constructor, "modifiers", "int", ptrSize * 3 + intSize, OFFSET_CONSTRUCTOR_MODIFIERS)
+
         // for sun/misc
         gIndex.getFieldOffset(thread, "threadLocalRandomSeed", "long", false)
         gIndex.getFieldOffset(thread, "threadLocalRandomSecondarySeed", "long", false)
         gIndex.getFieldOffset(thread, "threadLocalRandomProbe", "int", false)
-
-        gIndex.getFieldOffset(clazz, "enumConstants", "[]", false)
 
         // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
         hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "int", true)] = objectOverhead

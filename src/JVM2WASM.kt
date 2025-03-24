@@ -99,7 +99,7 @@ var alignFieldsProperly = true
  *
  * -> regarding WASM, the resulting file is ~12% bigger after compression
  * */
-var callStaticInitAtCompileTime = true
+var callStaticInitAtCompileTime = false
 
 // todo this needs catch-blocks, somehow..., and we get a lot of type-mismatch errors at the moment
 var useWASMExceptions = false
@@ -108,8 +108,8 @@ val useResultForThrowables = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
 var enableTracing = true
-var ignoreNonCriticalNullPointers = true
-var checkArrayAccess = false
+var ignoreNonCriticalNullPointers = false
+var checkArrayAccess = true
 var checkNullPointers = false
 var checkClassCasts = false
 var checkIntDivisions = false

@@ -48,6 +48,8 @@ import utils.CommonInstructions.INVOKE_INTERFACE
 import utils.CommonInstructions.INVOKE_SPECIAL
 import utils.CommonInstructions.INVOKE_STATIC
 import utils.CommonInstructions.INVOKE_VIRTUAL
+import utils.CommonInstructions.MONITOR_ENTER
+import utils.CommonInstructions.MONITOR_EXIT
 import utils.CommonInstructions.NEW_INSTR
 import utils.CommonInstructions.SET_FIELD
 import utils.CommonInstructions.SET_STATIC
@@ -784,9 +786,9 @@ class MethodTranslator(
                 // array length
                 stackPush()
                 printer.pop(ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.al else Call.alU)
+                    .append(if (checkArrayAccess) Call.arrayLength else Call.arrayLengthU)
                 stackPop()
-                if (checkArrayAccess) handleThrowable()
+                if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             ATHROW_INSTR -> {// athrow, easy :3
                 printer.pop(ptrType).push(ptrType)
@@ -794,10 +796,10 @@ class MethodTranslator(
                 handleThrowable(true)
                 printer.pop(ptrType)
             }
-            // 0xc2 -> printer.pop(ptrType).append("  call \$monitorEnter\n") // monitor enter
-            // 0xc3 -> printer.pop(ptrType).append("  call \$monitorExit\n") // monitor exit
-            0xc2 -> printer.pop(ptrType).drop() // monitor enter
-            0xc3 -> printer.pop(ptrType).drop() // monitor exit
+            // MONITOR_ENTER -> printer.pop(ptrType).append("  call \$monitorEnter\n") // monitor enter
+            // MONITOR_EXIT -> printer.pop(ptrType).append("  call \$monitorExit\n") // monitor exit
+            MONITOR_ENTER -> printer.pop(ptrType).drop() // monitor enter
+            MONITOR_EXIT -> printer.pop(ptrType).drop() // monitor exit
             else -> throw NotImplementedError("unknown op ${OpCode[opcode]}\n")
         }
     }
@@ -832,7 +834,7 @@ class MethodTranslator(
         if (fields.isEmpty() && !dlu.usesSelf) {
             // no instance is needed 😁:
             //  we create a four-byte pseudo instance from just the class index value
-            printer.push(ptrType).append(Call.getClassIndexPtr)
+            printer.push(ptrType).append(Call.getClassIdPtr)
             if (comments) printer.comment(synthClassName)
         } else {
             stackPush()

@@ -100,7 +100,11 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(i32, type, i32), emptyList(),
-                listOf(ParamGet[0], ParamGet[2], I32Add, ParamGet[1], storeInstr, Return)
+                listOf(
+                    // ParamGet[0], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
+
+                    ParamGet[0], ParamGet[2], I32Add,
+                    ParamGet[1], storeInstr, Return)
             )
         }
 
@@ -115,7 +119,12 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(type, i32, i32), emptyList(),
-                listOf(ParamGet[1], ParamGet[2], I32Add, ParamGet[0], storeInstr, Return)
+                listOf(
+                    // ParamGet[1], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
+
+                    ParamGet[1], ParamGet[2], I32Add,
+                    ParamGet[0], storeInstr, Return
+                )
             )
         }
 
@@ -130,7 +139,11 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(type, i32), emptyList(),
-                listOf(ParamGet[1], ParamGet[0], storeInstr, Return)
+                listOf(
+                    // i32Const0, ParamGet[1], i32Const(storeInstr.numBytes), Call.checkWrite,
+
+                    ParamGet[1], ParamGet[0], storeInstr, Return
+                )
             )
         }
 

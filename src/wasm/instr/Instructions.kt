@@ -1,7 +1,5 @@
 package wasm.instr
 
-import interpreter.WASMEngine
-import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.*
 import kotlin.math.*
 
@@ -27,21 +25,21 @@ object Instructions {
     val F64Mul = BinaryF64Instruction("f64.mul", "*", Double::times)
     val F64Div = BinaryF64Instruction("f64.div", "/", Double::div)
 
-    val I32Store8 = StoreInstr("i32.store8") { m, v -> m.put(v.toByte()) }
-    val I32Store16 = StoreInstr("i32.store16") { m, v -> m.putShort(v.toShort()) }
-    val I32Store = StoreInstr("i32.store") { m, v -> m.putInt(v.toInt()) }
-    val I64Store = StoreInstr("i64.store") { m, v -> m.putLong(v.toLong()) }
-    val F32Store = StoreInstr("f32.store") { m, v -> m.putFloat(v.toFloat()) }
-    val F64Store = StoreInstr("f64.store") { m, v -> m.putDouble(v.toDouble()) }
+    val I32Store8 = StoreInstr("i32.store8", 1) { m, v -> m.put(v.toByte()) }
+    val I32Store16 = StoreInstr("i32.store16", 2) { m, v -> m.putShort(v.toShort()) }
+    val I32Store = StoreInstr("i32.store", 4) { m, v -> m.putInt(v.toInt()) }
+    val I64Store = StoreInstr("i64.store", 8) { m, v -> m.putLong(v.toLong()) }
+    val F32Store = StoreInstr("f32.store", 4) { m, v -> m.putFloat(v.toFloat()) }
+    val F64Store = StoreInstr("f64.store", 8) { m, v -> m.putDouble(v.toDouble()) }
 
-    val I32Load8U = LoadInstr("i32.load8_u") { it.get().toInt() }
-    val I32Load8S = LoadInstr("i32.load8_s") { it.get().toInt().and(0xff) }
-    val I32Load16U = LoadInstr("i32.load16_u") { it.getShort().toInt().and(0xffff) }
-    val I32Load16S = LoadInstr("i32.load16_s") { it.getShort() }
-    val I32Load = LoadInstr("i32.load") { it.getInt() }
-    val I64Load = LoadInstr("i64.load") { it.getLong() }
-    val F32Load = LoadInstr("f32.load") { it.getFloat() }
-    val F64Load = LoadInstr("f64.load") { it.getDouble() }
+    val I32Load8U = LoadInstr("i32.load8_u", 1) { it.get().toInt() }
+    val I32Load8S = LoadInstr("i32.load8_s", 1) { it.get().toInt().and(0xff) }
+    val I32Load16U = LoadInstr("i32.load16_u", 2) { it.getShort().toInt().and(0xffff) }
+    val I32Load16S = LoadInstr("i32.load16_s", 2) { it.getShort() }
+    val I32Load = LoadInstr("i32.load", 4) { it.getInt() }
+    val I64Load = LoadInstr("i64.load", 8) { it.getLong() }
+    val F32Load = LoadInstr("f32.load", 4) { it.getFloat() }
+    val F64Load = LoadInstr("f64.load", 8) { it.getDouble() }
 
     val F32Trunc = UnaryFloatInstruction("f32.trunc", f32, "std::trunc") { truncate(it) }
     val F64Trunc = UnaryFloatInstruction("f64.trunc", f64, "std::trunc") { truncate(it) }

@@ -57,8 +57,8 @@ data class Call(val name: String) : Instruction {
         val f64ArrayStore = Call("f64ArrayStore")
         val f64ArrayStoreU = Call("f64ArrayStoreU")
 
-        val al = Call("arrayLength")
-        val alU = Call("arrayLengthU")
+        val arrayLength = Call("arrayLength")
+        val arrayLengthU = Call("arrayLengthU")
 
         val resolveIndirect = Call("resolveIndirect")
         val resolveIndirectFail = Call("resolveIndirectFail")
@@ -113,7 +113,12 @@ data class Call(val name: String) : Instruction {
         val createNativeArray = createList(20) { Call("createNativeArray$it") }
 
         val createInstance = Call("createInstance")
-        val getClassIndexPtr = Call("getClassIndexPtr")
+
+        /**
+         * Creates a pseudo-instance based on a single i32.
+         * Only allowed for instances, which aren't used as locks, and which have no fields.
+         * */
+        val getClassIdPtr = Call("getClassIdPtr")
 
         val checkCast = Call("checkCast")
         val checkCastExact = Call("checkCastExact")
@@ -126,5 +131,7 @@ data class Call(val name: String) : Instruction {
         val fcmpg = Call("fcmpg") // +1 if NaN
         val dcmpl = Call("dcmpl") // -1 if NaN
         val dcmpg = Call("dcmpg") // +1 if NaN
+
+        val checkWrite = Call("checkWrite")
     }
 }

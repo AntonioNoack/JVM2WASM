@@ -15,10 +15,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import static jvm.JVM32.findClass;
+import static jvm.JVM32.classIdToInstance;
 import static jvm.JVMShared.numClasses;
 import static jvm.JavaReflect.Class_getSimpleName;
-import static jvm.JavaReflect.getClassIndex;
+import static jvm.JavaReflect.getClassId;
 
 @SuppressWarnings("rawtypes")
 public class KotlinReflect {
@@ -181,13 +181,13 @@ public class KotlinReflect {
     @Alias(names = "kotlin_jvm_internal_Reflection_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
     public static <V> KClass<Object> Reflection_getOrCreateKotlinClass(Class<V> clazz) {
         if (clazz == null) return null;
-        return classes[getClassIndex(clazz)];
+        return classes[getClassId(clazz)];
     }
 
     @Alias(names = "kotlin_jvm_internal_ReflectionFactory_getOrCreateKotlinClass_Ljava_lang_ClassLkotlin_reflect_KClass")
     public static <V> KClass<Object> ReflectionFactory_getOrCreateKotlinClass(Class<V> clazz) {
         if (clazz == null) return null;
-        return classes[getClassIndex(clazz)];
+        return classes[getClassId(clazz)];
     }
 
     private static final KClass<Object>[] classes;
@@ -196,7 +196,7 @@ public class KotlinReflect {
         int l = numClasses();
         KClass<Object>[] c = classes = new KClass[l];
         for (int i = 0; i < l; i++) { // a few reflection methods expect this class to be used
-            Class<Object> z = findClass(i);
+            Class<Object> z = classIdToInstance(i);
             c[i] = new WASMKotlin<>(z);
             // c[i] = new KClassImpl<>(z);
             // c[i] = new ClassReference(z);

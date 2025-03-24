@@ -40,7 +40,7 @@ public class MemDebug {
     @Export
     @NoThrow
     @Alias(names = "rCl")
-    public static int rCl(int addr) {
+    public static int rCl(Object addr) {
         return readClassId(addr);
     }
 

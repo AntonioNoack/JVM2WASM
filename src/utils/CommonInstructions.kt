@@ -6,6 +6,7 @@ object CommonInstructions {
     const val INVOKE_SPECIAL = 0xb7
     const val INVOKE_VIRTUAL = 0xb6
     const val INVOKE_INTERFACE = 0xb9
+    const val INVOKE_DYNAMIC = 0xba
 
     const val NEW_INSTR = 0xbb
     const val NEW_ARRAY_INSTR = 0xbc
@@ -19,4 +20,7 @@ object CommonInstructions {
     const val SET_STATIC = 0xb3
 
     const val DUP_INSTR = 0x59
+
+    const val MONITOR_ENTER = 0xc2
+    const val MONITOR_EXIT = 0xc3
 }
