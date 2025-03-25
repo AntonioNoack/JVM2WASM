@@ -2,7 +2,9 @@ package engine;
 
 import annotations.*;
 import jvm.FillBuffer;
+import jvm.JVM32;
 import jvm.JavaLang;
+import jvm.custom.ThreadLocalRandom;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
@@ -78,7 +80,8 @@ public class Engine {
                 FontManager.INSTANCE.getAvgFontSize(font.getSizeIndex()),
                 font.getBold(),
                 font.getItalic())));
-        FontStats.INSTANCE.setGetTextLengthImpl((font, text) -> (double) TextGen.measureText1(font.getName(), font.getSize(), text));
+        FontStats.INSTANCE.setGetTextLengthImpl((font, text) ->
+                Double.valueOf(TextGen.measureText1(font.getName(), font.getSize(), text)));
     }
 
     @NoThrow
@@ -143,8 +146,8 @@ public class Engine {
 
         instance.gameInit();
         WindowRenderFlags.INSTANCE.setShowFPS(true);
-        DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", true);
-        DefaultConfig.INSTANCE.set("debug.ui.showDebugFrames", true);
+        DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", Boolean.TRUE);
+        DefaultConfig.INSTANCE.set("debug.ui.showDebugFrames", Boolean.TRUE);
 
         tick.stop("Game Init");
     }
@@ -642,7 +645,7 @@ public class Engine {
             int size;
             if (classId >= FIRST_ARRAY && classId <= LAST_ARRAY) { // clazz > 0 && clazz < 10
                 // handle arrays by size
-                size = getArraySizeInBytes(arrayLength(instancePtr), classId);
+                size = getArraySizeInBytes(arrayLength(JVM32.ptrTo(instancePtr)), classId);
                 size = adjustCallocSize(size);
             } else {
                 // handle class instance
@@ -708,5 +711,11 @@ public class Engine {
     public static void LoggerImpl_printRaw(LoggerImpl self, String prefix, String line) {
         boolean justLog = !(Objects.equals(prefix, "ERR!") || Objects.equals(prefix, "WARN"));
         JavaLang.printString(line, justLog);
+    }
+
+    @NoThrow
+    @Alias(names = "me_anno_maths_Maths_random_D")
+    public static double Maths_random_D() {
+        return ThreadLocalRandom.INSTANCE.nextDouble();
     }
 }

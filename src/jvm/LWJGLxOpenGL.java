@@ -39,9 +39,9 @@ public class LWJGLxOpenGL {
             "org_lwjgl_opengl_GL46C_glGetError_I",
             "org_lwjgl_opengl_GL46C_glGetError_I",
             "org_lwjgl_opengl_GL46C_glGetError_I"
-    })
-    @JavaScript(code = "return gl.getError()")
-    public static native int GL30C_glGetError_I();
+    }) // the browser is extremely bad with gl.getError(), each call costing 0.5-1.1ms
+    @JavaScript(code = "return 0; /* gl.getError() */")
+    public static native int glGetError_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCreateProgram_I")

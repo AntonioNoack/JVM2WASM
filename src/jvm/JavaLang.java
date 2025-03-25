@@ -4,6 +4,7 @@ import annotations.Alias;
 import annotations.JavaScript;
 import annotations.NoThrow;
 import annotations.WASM;
+import jvm.custom.ThreadLocalRandom;
 import jvm.lang.Bean;
 import org.jetbrains.annotations.NotNull;
 
@@ -744,12 +745,10 @@ public class JavaLang {
         return (float) parseDouble(src);
     }
 
-    private static final Random RANDOM = new Random(System.currentTimeMillis());
-
     @NoThrow
     @Alias(names = "kotlin_random_jdk8_PlatformThreadLocalRandom_getImpl_Ljava_util_Random")
     public static Random PlatformThreadLocalRandom_getImplRandom(Object self) {
-        return RANDOM;
+        return ThreadLocalRandom.INSTANCE;
     }
 
     @NoThrow
@@ -762,12 +761,6 @@ public class JavaLang {
     @Alias(names = "static_kotlin_internal_jdk8_JDK8PlatformImplementationsXReflectSdkVersion_V")
     public static void JDK8PlatformImplementationsXReflectSdkVersion_V() {
         // uses reflection with throwables -> nah, we don't want that
-    }
-
-    @NoThrow
-    @Alias(names = "me_anno_maths_Maths_random_D")
-    public static double Maths_random_D() {
-        return RANDOM.nextDouble();
     }
 
     public static String Object_toString(Object self) {

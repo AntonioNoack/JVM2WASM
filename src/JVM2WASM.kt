@@ -145,6 +145,7 @@ val classReplacements = hashMapOf(
     "java/util/concurrent/ConcurrentHashMap" to "java/util/HashMap",
     "java/util/concurrent/ConcurrentMap" to "java/util/Map",
     "java/util/concurrent/Semaphore" to "jvm/custom/Semaphore",
+    "java/util/concurrent/ThreadLocalRandom" to "jvm/custom/ThreadLocalRandom",
     "java/lang/ref/WeakReference" to "jvm/custom/WeakRef",
     "java/lang/String" to if (useUTF8Strings) "jvm/custom/UTF8String" else "java/lang/String",
     "java/io/BufferedWriter" to if (byteStrings) "jvm/utf8/BufferedWriterUTF8" else "java/io/BufferedWriter",

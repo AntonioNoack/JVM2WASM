@@ -711,7 +711,6 @@ ret32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { retu
 ret64 java_util_zip_Inflater_init_ZJ(i32) { return RET_NULL; }
 ret32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return RET_NULL; }
 ret32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return RET_NULL; }
-ret32 me_anno_ecs_prefab_change_PathXCompanion_generateRandomId_Ljava_lang_String(i32) { return RET_NULL; }
 ret64 me_anno_input_Input_initForGLFWXlambdaX1_Lme_anno_gpu_OSWindowJIJVxd26ac3d_address_J(i32) { return RET_NULL; }
 ret64 me_anno_input_Input_initForGLFWXlambdaX2_Lme_anno_gpu_OSWindowJIIVxd26ac3d_address_J(i32) { return RET_NULL; }
 ret64 me_anno_input_Input_initForGLFWXlambdaX3_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return RET_NULL; }
