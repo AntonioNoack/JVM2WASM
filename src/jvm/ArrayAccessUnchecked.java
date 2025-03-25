@@ -13,6 +13,12 @@ public class ArrayAccessUnchecked {
         writeI32AtOffset(instance, arrayOverhead + (index << 2), value);
     }
 
+    @NoThrow // used by replacement logic for (un)safe array access
+    @SuppressWarnings("unused")
+    public static void arrayStore(Object[] instance, int index, Object value) {
+        writePtrAtOffset(instance, arrayOverhead + index * ptrSize, value);
+    }
+
     @NoThrow
     @Alias(names = "i64ArrayStoreU")
     public static void arrayStore(Object instance, int index, long value) {
@@ -21,13 +27,13 @@ public class ArrayAccessUnchecked {
 
     @NoThrow
     @Alias(names = "f32ArrayStoreU")
-    public static void arrayStore(Object instance, int index, float value) {
+    public static void arrayStore(float[] instance, int index, float value) {
         writeF32AtOffset(instance, arrayOverhead + (index << 2), value);
     }
 
     @NoThrow
     @Alias(names = "f64ArrayStoreU")
-    public static void arrayStore(Object instance, int index, double value) {
+    public static void arrayStore(double[] instance, int index, double value) {
         writeF64AtOffset(instance, arrayOverhead + (index << 3), value);
     }
 
@@ -39,7 +45,7 @@ public class ArrayAccessUnchecked {
 
     @NoThrow
     @Alias(names = "i16ArrayStoreU")
-    public static void arrayStore(Object instance, int index, short value) {
+    public static void arrayStore(char[] instance, int index, short value) {
         writeI16AtOffset(instance, arrayOverhead + (index << 1), value);
     }
 
@@ -57,13 +63,13 @@ public class ArrayAccessUnchecked {
 
     @NoThrow
     @Alias(names = "f32ArrayLoadU")
-    public static float arrayLoad32f(Object instance, int index) {
+    public static float arrayLoad32f(float[] instance, int index) {
         return readF32AtOffset(instance, arrayOverhead + (index << 2));
     }
 
     @NoThrow
     @Alias(names = "f64ArrayLoadU")
-    public static double arrayLoad64f(Object instance, int index) {
+    public static double arrayLoad64f(double[] instance, int index) {
         return readF64AtOffset(instance, arrayOverhead + (index << 3));
     }
 
@@ -75,13 +81,13 @@ public class ArrayAccessUnchecked {
 
     @NoThrow
     @Alias(names = "u16ArrayLoadU")
-    public static char arrayLoad16u(Object instance, int index) {
+    public static char arrayLoad16u(char[] instance, int index) {
         return readU16AtOffset(instance, arrayOverhead + (index << 1));
     }
 
     @NoThrow
     @Alias(names = "s16ArrayLoadU")
-    public static short arrayLoad16s(Object instance, int index) {
+    public static short arrayLoad16s(short[] instance, int index) {
         return readS16AtOffset(instance, arrayOverhead + (index << 1));
     }
 
