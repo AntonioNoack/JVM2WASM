@@ -25,7 +25,7 @@ object MethodResolver {
         val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
         val isStatic = hIndex.isStatic(methodSig)
         if (!(clazz2 in dIndex.constructableClasses || isStatic) &&
-            methodSig in hIndex.methodsByClass[clazz2]!!
+            methodSig in (hIndex.methodsByClass[clazz2] ?: emptyList())
         ) {
             printUsed(methodSig)
             println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz2 }.map { it.key }}")

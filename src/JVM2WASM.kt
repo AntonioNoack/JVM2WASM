@@ -11,7 +11,6 @@ import me.anno.utils.Clock
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
 import org.apache.logging.log4j.LogManager
-import org.objectweb.asm.Opcodes.ASM9
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.classNamesByIndex
@@ -36,7 +35,6 @@ import wasm2cpp.FunctionOrder
 import java.io.FileNotFoundException
 import kotlin.math.sin
 
-const val api = ASM9
 private val LOGGER = LogManager.getLogger("JVM2WASM")
 
 // todo replace simple bridge methods like the following with just an alias
@@ -51,6 +49,9 @@ private val LOGGER = LogManager.getLogger("JVM2WASM")
  *   return tmp0;
  * }
  * */
+
+// todo it would be nice to create a heap-dump after a crash in C++/JS onto disk,
+//  and to create an explorer for it, which shows all objects, properties, ...
 
 // todo find pseudo-instances, which are actually created exactly once,
 //  and make all their fields static, and eliminate that instance (maybe replace it with a shared standard java/lang/Object)
@@ -107,9 +108,9 @@ var crashOnAllExceptions = true
 val useResultForThrowables = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
-var enableTracing = true
+var enableTracing = false
 var ignoreNonCriticalNullPointers = false
-var checkArrayAccess = true
+var checkArrayAccess = false
 var checkNullPointers = false
 var checkClassCasts = false
 var checkIntDivisions = false

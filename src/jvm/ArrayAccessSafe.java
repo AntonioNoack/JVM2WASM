@@ -23,14 +23,20 @@ public class ArrayAccessSafe {
         writeI64AtOffset(instance, arrayOverhead + (index << 3), value);
     }
 
+    @Alias(names = "ptrArrayStore")
+    public static void arrayStore(Object[] instance, int index, Object value) {
+        checkOutOfBounds(instance, index, OBJECT_ARRAY);
+        writePtrAtOffset(instance, arrayOverhead + index * ptrSize, value);
+    }
+
     @Alias(names = "f32ArrayStore")
-    public static void arrayStore(Object instance, int index, float value) {
+    public static void arrayStore(float[] instance, int index, float value) {
         checkOutOfBounds(instance, index, FLOAT_ARRAY);
         writeF32AtOffset(instance, arrayOverhead + (index << 2), value);
     }
 
     @Alias(names = "f64ArrayStore")
-    public static void arrayStore(Object instance, int index, double value) {
+    public static void arrayStore(double[] instance, int index, double value) {
         checkOutOfBounds(instance, index, DOUBLE_ARRAY);
         writeF64AtOffset(instance, arrayOverhead + (index << 3), value);
     }
@@ -62,13 +68,13 @@ public class ArrayAccessSafe {
     }
 
     @Alias(names = "f32ArrayLoad")
-    public static float arrayLoad32f(Object instance, int index) {
+    public static float arrayLoad32f(float[] instance, int index) {
         checkOutOfBounds(instance, index, FLOAT_ARRAY);
         return readF32AtOffset(instance, arrayOverhead + (index << 2));
     }
 
     @Alias(names = "f64ArrayLoad")
-    public static double arrayLoad64f(Object instance, int index) {
+    public static double arrayLoad64f(double[] instance, int index) {
         checkOutOfBounds(instance, index, DOUBLE_ARRAY);
         return readF64AtOffset(instance, arrayOverhead + (index << 3));
     }
@@ -80,13 +86,13 @@ public class ArrayAccessSafe {
     }
 
     @Alias(names = "u16ArrayLoad")
-    public static char arrayLoad16u(Object instance, int index) {
+    public static char arrayLoad16u(char[] instance, int index) {
         checkOutOfBounds(instance, index, CHAR_ARRAY);
         return readU16AtOffset(instance, arrayOverhead + (index << 1));
     }
 
     @Alias(names = "s16ArrayLoad")
-    public static short arrayLoad16s(Object instance, int index) {
+    public static short arrayLoad16s(short[] instance, int index) {
         checkOutOfBounds(instance, index, SHORT_ARRAY);
         return readS16AtOffset(instance, arrayOverhead + (index << 1));
     }

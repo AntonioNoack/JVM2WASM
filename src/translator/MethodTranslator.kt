@@ -3,7 +3,6 @@ package translator
 import alwaysUseFieldCalls
 import annotations.Boring
 import annotations.NotCalled
-import api
 import canThrowError
 import checkArrayAccess
 import checkClassCasts
@@ -21,6 +20,7 @@ import graphing.StructuralAnalysis
 import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
+import hierarchy.FirstClassIndexer
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -154,7 +154,7 @@ class MethodTranslator(
     val clazz: String,
     val name: String,
     val descriptor: Descriptor,
-) : MethodVisitor(api) {
+) : MethodVisitor(FirstClassIndexer.API_LEVEL) {
 
     companion object {
 

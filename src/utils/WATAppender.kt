@@ -239,6 +239,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, ptr: Int, numClasses: Int)
     fillInClassIndices(numClasses, classData, classSize)
     fillInClassModifiers(numClasses, classData, classSize)
 
+    alignBuffer(classData, 4)
     val emptyArrayPtr = indexStartPtr + classData.size()
     classData.writeClass(OBJECT_ARRAY)
     classData.writeLE32(0) // length
@@ -269,40 +270,63 @@ private fun fillInMethods(
     val methodClassIndex = gIndex.getClassIndex(className)
     val methodSize = gIndex.getInstanceSize(className)
 
-    val methodsByClass = dIndex.usedMethods
-        .filter { ((it.name == INSTANCE_INIT) == writeConstructors) && isCallable(it) }.groupBy { it.clazz }
+    fun isConstructableOrStatic(sig: MethodSig): Boolean {
+        return sig.clazz in dIndex.constructableClasses || hIndex.isStatic(sig)
+    }
+
+    fun isInitAsExpected(sig: MethodSig): Boolean {
+        return ((sig.name == INSTANCE_INIT) == writeConstructors)
+    }
+
+    val methodsByClass =
+        dIndex.usedMethods.filter { sig ->
+            hasBeenImplemented(sig) &&
+                    isConstructableOrStatic(sig) &&
+                    isInitAsExpected(sig) &&
+                    isCallable(sig)
+        }.groupBy { it.clazz }
+
     val methodsForClass = ArrayList<Collection<MethodSig>>(numClasses)
-    val offsetClassMethods = if(writeConstructors) OFFSET_CLASS_CONSTRUCTORS else OFFSET_CLASS_METHODS
-    for (declaringClassIndex in 0 until numClasses) {
+    val offsetClassMethods = if (writeConstructors) OFFSET_CLASS_CONSTRUCTORS else OFFSET_CLASS_METHODS
+    for (classId in 0 until numClasses) {
         // find all methods with valid call signature
-        val clazzName = gIndex.classNamesByIndex[declaringClassIndex]
+        val clazzName = gIndex.classNamesByIndex[classId]
         val superClass = hIndex.superClass[clazzName]
         val superClassIdx = if (superClass != null) gIndex.getClassIndex(superClass) else -1
         val superMethods =
             if (superClass != null) methodsForClass.getOrNull(superClassIdx)
                 ?: throw IllegalStateException(
                     "Classes must be ordered for GC-Init! " +
-                            "$clazzName[${declaringClassIndex}] >= $superClass[$superClassIdx]"
+                            "$clazzName[${classId}] >= $superClass[$superClassIdx]"
                 )
             else emptySet()
 
         val isConstructable = clazzName in dIndex.constructableClasses
-        val methods = if (!writeConstructors || isConstructable) {
-            val superMethods1 = methodsByClass[clazzName] ?: emptyList()
-            (superMethods1.map { it.withClass(clazzName) } + superMethods)
-                .distinct() // remove duplicates
-                .filter { isConstructable || hIndex.isStatic(it) }  // if not constructable, only append static methods
-                .filter { hasBeenImplemented(it) } // filter by implemented methods
-        } else emptyList()
+        val methods = if (writeConstructors) {
+            if (isConstructable) {
+                val selfMethods1 = methodsByClass[clazzName] ?: emptyList()
+                selfMethods1.filter { hasBeenImplemented(it) } // filter by implemented methods
+            } else emptyList()
+        } else {
+            val selfMethods1 = methodsByClass[clazzName] ?: emptyList()
+            (selfMethods1 + superMethods.map {
+                // withClass is only needed, if !static
+                if (hIndex.isStatic(it)) it
+                else it.withClass(clazzName)
+            }).distinct() // remove duplicates
+        }
         methodsForClass.add(methods)
 
         // append all methods
         val arrayToWrite = if (methods.isNotEmpty()) {
             val methodPointers = methods.map { method ->
-                assertTrue(CallSignature.c(method) in hIndex.implementedCallSignatures)
+                val callSignature = CallSignature.c(method)
+                assertTrue(callSignature in hIndex.implementedCallSignatures) {
+                    "Missing call signature for $method: $callSignature"
+                }
                 methodCache.getOrPut(method) {
                     appendMethodInstance(
-                        method, indexStartPtr, classData, declaringClassIndex,
+                        method, indexStartPtr, classData, classId,
                         methodClassIndex, classSize, methodSize,
                         writeConstructors
                     )
@@ -319,7 +343,7 @@ private fun fillInMethods(
             arrayPtr
         } else emptyArrayPtr
 
-        val dstPointer = declaringClassIndex * classSize + offsetClassMethods
+        val dstPointer = classId * classSize + offsetClassMethods
         classData.writePointerAt(arrayToWrite, dstPointer)
     }
 }
@@ -383,7 +407,7 @@ fun appendMethodInstance(
     classData.writePointer(getClassInstancePtr(declaringClassIndex, indexStartPtr, classSize)) // declaredClass
     val modifiers = hIndex.methodFlags[sig] ?: 0
     classData.writeLE32(modifiers) // e.g., static flag
-    classData.fill(objectOverhead + 2 * intSize + (if(writeConstructors) 3 else 5) * ptrSize, methodSize)
+    classData.fill(objectOverhead + 2 * intSize + (if (writeConstructors) 3 else 5) * ptrSize, methodSize)
     assertEquals(methodPtr + methodSize, indexStartPtr + classData.position)
     return methodPtr
 }

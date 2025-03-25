@@ -110,7 +110,7 @@ data class Call(val name: String) : Instruction {
         val instanceOfExact = Call("instanceOfExact")
 
         val createObjectArray = Call("createObjectArray")
-        val createNativeArray = createList(20) { Call("createNativeArray$it") }
+        val createNativeArray = createList(7) { Call("createNativeArray$it") }
 
         val createInstance = Call("createInstance")
 

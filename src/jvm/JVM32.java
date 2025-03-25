@@ -2,7 +2,6 @@ package jvm;
 
 import annotations.*;
 
-import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.GCGapFinder.getInstanceSize;
 import static jvm.GarbageCollector.largestGaps;
 import static jvm.JVMShared.*;
@@ -126,19 +125,19 @@ public class JVM32 {
     private static native void trackCalloc(int clazz, int size);
 
     @Alias(names = "createObjectArray")
-    public static int createObjectArray(int length) {
+    public static Object[] createObjectArray(int length) {
         // probably a bit illegal; should be fine for us, saving allocations :)
         if (length == 0) {
-            Object sth = emptyArray;
-            if (sth != null) return getAddr(sth);
+            Object[] sth = emptyArray;
+            if (sth != null) return sth;
             // else awkward, probably recursive trap
         }
         // log("creating array", length);
-        return createNativeArray1(length, 1);
+        return (Object[]) createNativeArray1(length, 1);
     }
 
     @Alias(names = "createNativeArray1")
-    public static int createNativeArray1(int length, int classId) {
+    public static Object createNativeArray1(int length, int classId) {
         if (length < 0) throw new IllegalArgumentException();
         if (trackAllocations) trackCalloc(classId, length);
         int typeShift = getTypeShiftUnsafe(classId);
@@ -153,7 +152,7 @@ public class JVM32 {
         write32(newInstance + objectOverhead, length); // array length
         // log("Created[]", classId, newInstance, instanceSize);
         // if (newInstance > 10_300_000) validateAllClassIds();
-        return newInstance;
+        return ptrTo(newInstance);
     }
 
     public static int getArraySizeInBytes(int length, int classId) {
@@ -169,56 +168,6 @@ public class JVM32 {
         }
         int size = arrayOverhead + numDataBytes;
         return adjustCallocSize(size);
-    }
-
-    @Alias(names = "createNativeArray2")
-    public static int createNativeArray2(int l0, int l1, int clazz) {
-        if (l0 == 0) return 0;
-        int array = createNativeArray1(l0, 1);
-        for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray1(l1, clazz));
-        }
-        return array;
-    }
-
-    @Alias(names = "createNativeArray3")
-    public static int createNativeArray3(int l0, int l1, int l2, int clazz) {
-        if (l0 == 0) return 0;
-        int array = createNativeArray1(l0, 1);
-        for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray2(l1, l2, clazz));
-        }
-        return array;
-    }
-
-    @Alias(names = "createNativeArray4")
-    public static int createNativeArray4(int l0, int l1, int l2, int l3, int clazz) {
-        if (l0 == 0) return 0;
-        int array = createNativeArray1(l0, 1);
-        for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray3(l1, l2, l3, clazz));
-        }
-        return array;
-    }
-
-    @Alias(names = "createNativeArray5")
-    public static int createNativeArray5(int l0, int l1, int l2, int l3, int l4, int clazz) {
-        if (l0 == 0) return 0;
-        int array = createNativeArray1(l0, 1);
-        for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray4(l1, l2, l3, l4, clazz));
-        }
-        return array;
-    }
-
-    @Alias(names = "createNativeArray6")
-    public static int createNativeArray6(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
-        if (l0 == 0) return 0;
-        int array = createNativeArray1(l0, 1);
-        for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray5(l1, l2, l3, l4, l5, clazz));
-        }
-        return array;
     }
 
     @NoThrow

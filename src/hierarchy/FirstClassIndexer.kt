@@ -1,6 +1,5 @@
 package hierarchy
 
-import api
 import hIndex
 import hierarchy.HierarchyIndex.methodFlags
 import me.anno.utils.types.Booleans.hasFlag
@@ -21,7 +20,7 @@ import java.io.IOException
 /**
  * find super classes, interfaces and annotations for all types
  * */
-class FirstClassIndexer(val clazz: String) : ClassVisitor(api) {
+class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
 
     init {
         if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
@@ -32,6 +31,7 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(api) {
     companion object {
 
         private val LOGGER = LogManager.getLogger(FirstClassIndexer::class)
+        const val API_LEVEL = ASM9
 
         private fun String.readType0(i: Int): Int {
             val j = indexOf(';', i)

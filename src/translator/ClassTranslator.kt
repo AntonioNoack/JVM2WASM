@@ -1,15 +1,13 @@
 package translator
 
-import api
 import dIndex
 import hIndex
-import me.anno.utils.types.Booleans.hasFlag
+import hierarchy.FirstClassIndexer
 import org.objectweb.asm.*
-import org.objectweb.asm.Opcodes.ACC_STATIC
 import replaceClass
 import utils.MethodSig
 
-class ClassTranslator(val clazz: String) : ClassVisitor(api) {
+class ClassTranslator(val clazz: String) : ClassVisitor(FirstClassIndexer.API_LEVEL) {
 
     init {
         if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")

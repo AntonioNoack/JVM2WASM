@@ -29,7 +29,7 @@ public class JavaReflectMethod {
         if (self == null) throw new IllegalArgumentException("Method must not be null");
 
         int methodId = getMethodId(self);
-        log("Invoking", self.getDeclaringClass().getName(), self.getName(), methodId);
+        // log("Invoking", self.getDeclaringClass().getName(), self.getName(), methodId);
 
         verifyCallerType(self, calledOrNull);
         verifyArgumentTypes(self.getParameterTypes(), args, methodId);
@@ -46,7 +46,7 @@ public class JavaReflectMethod {
         if (self == null) throw new IllegalArgumentException("Method must not be null");
 
         int methodId = getMethodId(self);
-        log("Creating", self.getDeclaringClass().getName(), methodId);
+        // log("Creating", self.getDeclaringClass().getName(), methodId);
 
         verifyArgumentTypes(self.getParameterTypes(), args, methodId);
 
@@ -64,7 +64,6 @@ public class JavaReflectMethod {
     }
 
     private static void verifyArgumentTypes(Class<?>[] expectedTypes, Object[] providedArguments, int methodId) {
-        // todo we need to make sure to store the metadata of the originals
         int expectedLength = expectedTypes.length;
         int actualLength = providedArguments.length;
         if (expectedLength != actualLength) {
@@ -117,7 +116,6 @@ public class JavaReflectMethod {
     }
 
     private static Object execute(int methodId, Class<?> returnType, String callSignature) {
-        // todo it would be good, if we had a value for stackPush/stackPop here
         Object[] args = joinedCallArguments;
         Object arg0 = args[0];
         Object arg1 = args[1];

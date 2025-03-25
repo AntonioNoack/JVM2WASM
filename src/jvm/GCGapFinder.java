@@ -37,7 +37,7 @@ public class GCGapFinder {
 
     private static boolean handleWeakRefs(int instance) {
 
-        log("handleWeakRefs");
+        // log("handleWeakRefs");
 
         // isUsed needs to be re-set, if we have parallelGC, because the instance might be around again
         // WeakRef-references need to be deleted in ordinary and parallel GC
@@ -77,7 +77,7 @@ public class GCGapFinder {
     private static boolean wasUsed;
 
     public static void findLargestGapsInit(int[] largestGaps) {
-        log("Finding largest gaps");
+        // log("Finding largest gaps");
         fillZeros(largestGaps);
 
         // log("Scanning", instance, endPtr, iter);
@@ -91,7 +91,7 @@ public class GCGapFinder {
         gapStart = currPtr;
         wasUsed = true;
 
-        log("Preparing WeakRefs");
+        // log("Preparing WeakRefs");
         prepareWeakRefs();
     }
 
@@ -106,7 +106,7 @@ public class GCGapFinder {
         final int endPtr = GCGapFinder.endPtr;
         boolean wasUsed = GCGapFinder.wasUsed;
 
-        log("[Gaps]", instancePtr);
+        // log("[Gaps]", instancePtr);
 
         int freedMemory = 0;
         while (unsignedLessThan(instancePtr, endPtr)) {
@@ -114,7 +114,7 @@ public class GCGapFinder {
             // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
             int classId = readClassIdImpl(instancePtr);
             int size = getInstanceSize(instancePtr, classId);
-            log("Gaps", instancePtr, classId, size);
+            // log("Gaps", instancePtr, classId, size);
             validateClassId(classId);
 
             boolean isUsed = read8(instancePtr + GC_OFFSET) == iteration;
@@ -190,7 +190,7 @@ public class GCGapFinder {
 
     @NoThrow
     private static void replaceWithByteArray(int gapStart, int available) {
-        log("Replacing Gap", gapStart, available);
+        // log("Replacing Gap", gapStart, available);
         write32(gapStart, BYTE_ARRAY_CLASS); // byte array, generation 0
         write32(gapStart + objectOverhead, available - arrayOverhead); // length
     }

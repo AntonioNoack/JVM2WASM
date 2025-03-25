@@ -156,21 +156,21 @@ public class JavaReflect {
         Class<?> clazz = field.getType();
         switch (getClassId(clazz)) {
             case NATIVE_BOOLEAN:
-                return read8(addr) > 0;
+                return Boolean.valueOf(read8(addr) > 0);
             case NATIVE_BYTE:
-                return read8(addr);
+                return Byte.valueOf(read8(addr));
             case NATIVE_SHORT:
-                return read16s(addr);
+                return Short.valueOf(read16s(addr));
             case NATIVE_CHAR:
-                return read16u(addr);
+                return Character.valueOf(read16u(addr));
             case NATIVE_INT:
-                return read32(addr);
+                return Integer.valueOf(read32(addr));
             case NATIVE_LONG:
-                return read64(addr);
+                return Long.valueOf(read64(addr));
             case NATIVE_FLOAT:
-                return read32f(addr);
+                return Float.valueOf(read32f(addr));
             case NATIVE_DOUBLE:
-                return read64f(addr);
+                return Double.valueOf(read64f(addr));
             default:
                 return ptrTo(read32(addr));
         }
@@ -597,24 +597,15 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_Array_newArray_Ljava_lang_ClassILjava_lang_Object")
     public static Object Array_newArray_Ljava_lang_ClassILjava_lang_Object(Class<?> clazz, int length) {
-        switch (getClassId(clazz)) {
-            case NATIVE_INT:
-                return new int[length];
-            case NATIVE_LONG:
-                return new long[length];
-            case NATIVE_BYTE:
-                return new byte[length];
-            case NATIVE_SHORT:
-                return new short[length];
-            case NATIVE_CHAR:
-                return new char[length];
-            case NATIVE_FLOAT:
-                return new float[length];
-            case NATIVE_DOUBLE:
-                return new double[length];
-            default:
-                return new Object[length];
+        int classId = getClassId(clazz);
+        if (classId < FIRST_NATIVE || classId > LAST_NATIVE) {
+            // create object array
+            classId = OBJECT_ARRAY;
+        } else {
+            // create native array
+            classId = classId + INT_ARRAY - NATIVE_INT;
         }
+        return createNativeArray1(length, classId);
     }
 
     @Alias(names = "java_lang_reflect_AccessibleObject_checkAccess_Ljava_lang_ClassLjava_lang_ClassLjava_lang_ObjectIV")
@@ -650,18 +641,12 @@ public class JavaReflect {
     public static <V> Constructor<V> Class_getConstructor(Class<V> self, Class<?>[] args) {
         if (self == null) return null; // really shouldn't happen
         Constructor<?>[] constructors = self.getConstructors();
-        //noinspection ConstantValue
-        if (constructors == null) {
-            log("Constructors of class are null :(", self.getName(), getClassId(self));
-            throwJs();
-            return null; // really, really shouldn't happen
-        }
-        log("Constructors:", self.getName(), constructors.length);
+        // log("Constructors:", self.getName(), constructors.length);
         for (Constructor<?> constructor : constructors) {
             if (matches(constructor, args)) {
-                log("Found constructor", self.getName(),
+                /*log("Found constructor", self.getName(),
                         constructor.getParameterTypes().length,
-                        args != null ? args.length : 0);
+                        args != null ? args.length : 0);*/
                 //noinspection unchecked
                 return (Constructor<V>) constructor;
             }

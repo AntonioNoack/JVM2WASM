@@ -4,6 +4,7 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
+import org.apache.logging.log4j.LogManager
 
 class BinaryWriter(
     val stream: ByteArrayList,
@@ -11,6 +12,7 @@ class BinaryWriter(
 ) {
 
     companion object {
+        private val LOGGER = LogManager.getLogger(BinaryWriter::class)
         val kInvalidIndex = -1
     }
 
@@ -132,7 +134,7 @@ class BinaryWriter(
     }
 
     fun beginSection(type: SectionType, numElements: Int) {
-        println("Writing section $type, x$numElements @${stream.size}")
+        LOGGER.info("Writing section $type, x$numElements @${stream.size}")
         beginKnownSection(type)
         writeU32Leb128(numElements)
     }

@@ -1,6 +1,5 @@
 package utils
 
-import api
 import canThrowError
 import cannotThrow
 import dIndex
@@ -681,7 +680,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
     for (clazz in classesToLoad) {
         if (filterClass(clazz)) try {
             ClassReader(clazz).accept(
-                object : ClassVisitor(api) {
+                object : ClassVisitor(FirstClassIndexer.API_LEVEL) {
                     override fun visitMethod(
                         access: Int,
                         name: String,

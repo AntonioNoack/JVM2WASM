@@ -1,6 +1,5 @@
 package hierarchy
 
-import api
 import dIndex
 import gIndex
 import hIndex
@@ -20,7 +19,8 @@ import utils.CommonInstructions.SET_STATIC
 import wasm.instr.CallIndirect
 import wasm.instr.FuncType
 
-class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) : MethodVisitor(api) {
+class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val isStatic: Boolean) :
+    MethodVisitor(FirstClassIndexer.API_LEVEL) {
 
     private val calledMethods = HashSet<MethodSig>()
     private val readFields = HashSet<FieldSig>()

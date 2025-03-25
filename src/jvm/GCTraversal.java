@@ -59,28 +59,25 @@ public class GCTraversal {
         byte iter = iteration;
 
         int classId = readClassId(instance);
-        if (classId >= 0 && classId < numClasses()) {
+        /*if (classId >= 0 && classId < numClasses()) {
             String className = classIdToInstance(classId).getName();
             log("Traversal", className, getAddr(instance));
         } else {
             log("Invalid class ID", getAddr(instance), classId);
             throw new IllegalStateException();
-        }
+        }*/
 
         if (state == iter) return; // already handled
 
         writeI8AtOffset(instance, GC_OFFSET, iter);
         if (classId == OBJECT_ARRAY) {
-            int i = 0;
             for (Object instanceI : (Object[]) instance) {
-                log("Object[]", i++, getAddr(instance));
                 traverse(instanceI);
             }
         } else {
             int[] offsets = instanceFieldOffsets[classId];
             if (offsets == null) return;
             for (int offset : offsets) {
-                log("Object.x", offset, getAddr(instance));
                 traverse(readPtrAtOffset(instance, offset));
             }
         }

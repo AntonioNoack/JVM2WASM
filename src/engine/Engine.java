@@ -339,7 +339,7 @@ public class Engine {
             texture.afterUpload(false, 4, 4);
         }
         if (texture != null) texture.checkSession();
-        log("Finishing texture", String.valueOf(texture), String.valueOf(texture != null && texture.isCreated()));
+        // log("Finishing texture", String.valueOf(texture), String.valueOf(texture != null && texture.isCreated()));
         if (callback != null) {
             callback.ok(texture);
         }
@@ -675,7 +675,7 @@ public class Engine {
 
     @NoThrow
     @JavaScript(code = "" +
-            "console.log('running thread', str(arg1));\n" +
+            "// console.log('running thread', str(arg1));\n" +
             "safe(window.lib.runRunnable(arg0));\n")
     private static native void runAsyncImpl(Function0<Object> runnable, String name);
 

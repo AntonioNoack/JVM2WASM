@@ -6,6 +6,7 @@ import sun.misc.SharedSecrets;
 
 import java.io.PrintStream;
 
+import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.JVM32.*;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
@@ -504,4 +505,48 @@ public class JVMShared {
     @WASM(code = "") // auto
     public static native <V> V unsafeCast(Object obj);
 
+    @Alias(names = "createNativeArray2")
+    public static Object[] createNativeArray2(int l0, int l1, int clazz) {
+        Object[] array = createObjectArray(l0);
+        for (int i = 0; i < l0; i++) {
+            arrayStore(array, i, createNativeArray1(l1, clazz));
+        }
+        return array;
+    }
+
+    @Alias(names = "createNativeArray3")
+    public static Object[] createNativeArray3(int l0, int l1, int l2, int clazz) {
+        Object[] array = createObjectArray(l0);
+        for (int i = 0; i < l0; i++) {
+            arrayStore(array, i, createNativeArray2(l1, l2, clazz));
+        }
+        return array;
+    }
+
+    @Alias(names = "createNativeArray4")
+    public static Object[] createNativeArray4(int l0, int l1, int l2, int l3, int clazz) {
+        Object[] array = createObjectArray(l0);
+        for (int i = 0; i < l0; i++) {
+            arrayStore(array, i, createNativeArray3(l1, l2, l3, clazz));
+        }
+        return array;
+    }
+
+    @Alias(names = "createNativeArray5")
+    public static Object[] createNativeArray5(int l0, int l1, int l2, int l3, int l4, int clazz) {
+        Object[] array = createObjectArray(l0);
+        for (int i = 0; i < l0; i++) {
+            arrayStore(array, i, createNativeArray4(l1, l2, l3, l4, clazz));
+        }
+        return array;
+    }
+
+    @Alias(names = "createNativeArray6")
+    public static Object[] createNativeArray6(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
+        Object[] array = createObjectArray(l0);
+        for (int i = 0; i < l0; i++) {
+            arrayStore(array, i, createNativeArray5(l1, l2, l3, l4, l5, clazz));
+        }
+        return array;
+    }
 }
