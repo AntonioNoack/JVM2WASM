@@ -185,7 +185,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGenTextures_AIV")
-    public static void org_lwjgl_opengl_GL11C_glGenTextures_AIV(int[] v) {
+    public static void glGenTextures_AIV(int[] v) {
         for (int i = 0, l = v.length; i < l; i++) {
             v[i] = glGenTexture();
         }
@@ -194,17 +194,17 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClearColor_FFFFV")
     @JavaScript(code = "gl.clearColor(arg0,arg1,arg2,arg3)")
-    public static native void org_lwjgl_opengl_GL11C_glClearColor_FFFFV(float r, float g, float b, float a);
+    public static native void glClearColor_FFFFV(float r, float g, float b, float a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClearDepth_DV")
     @JavaScript(code = "gl.clearDepth(arg0)")
-    public static native void org_lwjgl_opengl_GL11C_glClearDepth_DV(double depth);
+    public static native void glClearDepth_DV(double depth);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClear_IV")
     @JavaScript(code = "gl.clear(arg0)")
-    public static native void org_lwjgl_opengl_GL11C_glClear_IV(int mask);
+    public static native void glClear_IV(int mask);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteProgram_IV")
@@ -215,12 +215,12 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBindTexture_IIV")
     @JavaScript(code = "if(arg0 == 37120) arg0 = 3553; gl.bindTexture(arg0,unmap(arg1))")
-    public static native void org_lwjgl_opengl_GL45C_glBindTexture_IIV(int mode, int tex);
+    public static native void glBindTexture_IIV(int mode, int tex);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glActiveTexture_IV")
     @JavaScript(code = "gl.activeTexture(arg0)")
-    public static native void org_lwjgl_opengl_GL45C_glActiveTexture_IV(int id);
+    public static native void glActiveTexture_IV(int id);
 
     // todo implement multisampling like https://stackoverflow.com/questions/47934444/webgl-framebuffer-multisampling
     // https://webglfundamentals.org/webgl/lessons/webgl-shaders-and-glsl.html
@@ -289,21 +289,21 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_system_MemoryUtil_getUnsafeInstance_Lsun_misc_Unsafe")
-    public static Unsafe org_lwjgl_system_MemoryUtil_getUnsafeInstance_Lsun_misc_Unsafe() {
+    public static Unsafe MemoryUtil_getUnsafeInstance_Lsun_misc_Unsafe() {
         return Unsafe.getUnsafe();
     }
 
     @Alias(names = "org_lwjgl_system_MemoryUtil_memAddress_Ljava_nio_IntBufferJ")
-    public static long org_lwjgl_system_MemoryUtil_memAddress_Ljava_nio_IntBufferJ(IntBuffer buffer) {
+    public static long MemoryUtil_memAddress_Ljava_nio_IntBufferJ(IntBuffer buffer) {
         return getAddr(buffer);
     }
 
     @Alias(names = "org_lwjgl_system_Library_loadSystem_Ljava_util_function_ConsumerLjava_util_function_ConsumerLjava_lang_ClassLjava_lang_StringLjava_lang_StringV")
-    public static <V> void org_lwjgl_system_Library_loadSystem(Consumer<V> x, Consumer<V> y, Class<V> ctx, String module, String name) {
+    public static <V> void Library_loadSystem(Consumer<V> x, Consumer<V> y, Class<V> ctx, String module, String name) {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL_create_V")
-    public static void org_lwjgl_opengl_GL_create_V() {
+    public static void GL_create_V() {
     }
 
     @NoThrow
@@ -324,14 +324,14 @@ public class LWJGLxOpenGL {
 
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetShaderInfoLog_ILjava_lang_String")
-    public static String GL20_glGetShaderInfoLog(int shader) {
+    public static String glGetShaderInfoLog(int shader) {
         char[] buffer = FillBuffer.getBuffer();
         int length = fillShaderInfoLog(buffer, shader);
         return filterErrors(buffer, length);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetProgramInfoLog_ILjava_lang_String")
-    public static String GL20_glGetProgramInfoLog(int program) {
+    public static String glGetProgramInfoLog(int program) {
         char[] buffer = FillBuffer.getBuffer();
         int length = fillProgramInfoLog(buffer, program);
         return filterErrors(buffer, length);
@@ -389,7 +389,7 @@ public class LWJGLxOpenGL {
     public static native int glGetProgrami_III(int program, int type);
 
     @Alias(names = "org_lwjgl_opengl_GL_createCapabilities_Lorg_lwjgl_opengl_GLCapabilities")
-    public static GLCapabilities org_lwjgl_opengl_GL_createCapabilities() {
+    public static GLCapabilities GL_createCapabilities() {
         return null;
     }
 
@@ -409,12 +409,12 @@ public class LWJGLxOpenGL {
             "if(arg0 == 0x8D57) return 1;\n" + // multisampled texture aren't supported, multisampled renderbuffers would be
             "if(arg0 == 0x826E) return 1024;\n" + // max uniform locations; not defined in WebGL
             "if(arg0 == 0x821B || arg0 == 0x821C) return 0;\n" + // 0x821B, 0x821C = major, minor version
-            "if(arg0 == 0x8CDF) return 1;\n" + // max color attachments
+            "// if(arg0 == 0x8CDF) return 1;\n" + // max color attachments
             "return gl.getParameter(arg0)")
     public static native int glGetIntegerImpl(int i);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetString_ILjava_lang_String")
-    public static String org_lwjgl_opengl_GL11C_glGetString_ILjava_lang_String(int mode) {
+    public static String glGetString_ILjava_lang_String(int mode) {
         switch (mode) {
             case GL_VERSION:
                 return "WebGL2"; // todo return webgl if webgl1
@@ -510,17 +510,17 @@ public class LWJGLxOpenGL {
     @NoThrow
     @JavaScript(code = "gl.scissor(arg0,arg1,arg2,arg3)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glScissor_IIIIV")
-    private static native void GL11C_glScissor_IIIIV(int x, int y, int w, int h);
+    private static native void glScissor_IIIIV(int x, int y, int w, int h);
 
     @NoThrow
     @JavaScript(code = "gl.flush()")
     @Alias(names = "org_lwjgl_opengl_GL46C_glFlush_V")
-    private static native void GL11C_glFlush_V();
+    private static native void glFlush_V();
 
     @NoThrow
     @JavaScript(code = "gl.finish()")
     @Alias(names = "org_lwjgl_opengl_GL46C_glFinish_V")
-    private static native void GL11C_glFinish_V();
+    private static native void glFinish_V();
 
     @NoThrow
     @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
@@ -540,43 +540,6 @@ public class LWJGLxOpenGL {
         readPixelsF32(x, y, w, h, format, type, getAddr(data) + arrayOverhead, data.length);
     }
 
-    @NoThrow // todo for JavaScript, bind texture to framebuffer, like we did it previously, and then use glReadPixels
-    @JavaScript(code = "/* not yet implemented */")
-    public static native void glGetTextureSubImageAny(
-            int ptr, int level, int x, int y, int z,
-            int w, int h, int d, int format, int type, int dataPtr, int length
-    );
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIIAFV")
-    public static void glGetTextureSubImage_IIIIIIIIIIAFV(
-            int ptr, int level, int x, int y, int z,
-            int w, int h, int d, int format, int type, float[] dst
-    ) {
-        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
-                getAddr(dst) + arrayOverhead, dst.length << 2);
-    }
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIIAIV")
-    public static void glGetTextureSubImage_IIIIIIIIIIAIV(
-            int ptr, int level, int x, int y, int z,
-            int w, int h, int d, int format, int type, int[] dst
-    ) {
-        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
-                getAddr(dst) + arrayOverhead, dst.length << 2);
-    }
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL45C_glGetTextureSubImage_IIIIIIIIIILjava_nio_ByteBufferV")
-    public static void glGetTextureSubImage_IIIIIIIIIILjava_nio_ByteBufferV(
-            int ptr, int level, int x, int y, int z,
-            int w, int h, int d, int format, int type, ByteBuffer dst
-    ) throws NoSuchFieldException, IllegalAccessException {
-        glGetTextureSubImageAny(ptr, level, x, y, z, w, h, d, format, type,
-                getBufferAddr(dst), dst.remaining());
-    }
-
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIILjava_nio_ByteBufferV")
     public static void glTexImage2D_IIIIIIIILjava_nio_ByteBufferV(
             int target, int level, int format, int w, int h, int border,
@@ -588,7 +551,7 @@ public class LWJGLxOpenGL {
         //texImage2D(target, level, internalformat, format, type)
         //texImage2D(target, level, internalformat, format, type, pixels)
         //
-        //// WebGL2
+        // WebGL2
         //texImage2D(target, level, internalformat, width, height, border, format, type, offset)
         //texImage2D(target, level, internalformat, width, height, border, format, type, source)
         //texImage2D(target, level, internalformat, width, height, border, format, type, srcData, srcOffset)
@@ -601,7 +564,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIIAIV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIAIV(
+    public static void glTexImage2D_IIIIIIIIAIV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, int[] data) {
         boolean swizzle = dataFormat == GL_BGRA;
@@ -616,7 +579,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIILjava_nio_FloatBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_FloatBufferV(
+    public static void glTexImage2D_IIIIIIIILjava_nio_FloatBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, FloatBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -629,7 +592,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIILjava_nio_ShortBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_ShortBufferV(
+    public static void glTexImage2D_IIIIIIIILjava_nio_ShortBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ShortBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -641,7 +604,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_ByteBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_ByteBufferV(
+    public static void glTexSubImage2D_IIIIIIIILjava_nio_ByteBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ByteBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -649,7 +612,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIILjava_nio_FloatBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_FloatBufferV(
+    public static void glTexSubImage2D_IIIIIIIILjava_nio_FloatBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, FloatBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -657,7 +620,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIILjava_nio_ShortBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_ShortBufferV(
+    public static void glTexSubImage2D_IIIIIIIILjava_nio_ShortBufferV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, ShortBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
@@ -665,7 +628,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIILjava_nio_ByteBufferV")
-    public static void org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIILjava_nio_ByteBufferV(
+    public static void glTexImage3D_IIIIIIIIILjava_nio_ByteBufferV(
             int target, int level, int format, int w, int h, int d, int border,
             int dataFormat, int dataType, ByteBuffer data) throws NoSuchFieldException, IllegalAccessException {
         if (data == null) {
@@ -716,7 +679,7 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexParameteriv_IIAIV")
     // @JavaScript(code = "gl.texParameteriv(arg0,arg1,new Uint32Array(memory.buffer,arg2+arrayOverhead,lib.r32(arg2+objectOverhead)))")
-    public static void org_lwjgl_opengl_GL11C_glTexParameteriv_IIAIV(int target, int mode, int[] value) {
+    public static void glTexParameteriv_IIAIV(int target, int mode, int[] value) {
         if (mode == 0x8E46) log("Warning(glTexParameteriv): texture swizzling is not supported in WebGL");
         else log("Warning(glTexParameteriv)! Unknown mode", mode);
     }
@@ -778,7 +741,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_AIV")
-    public static void org_lwjgl_opengl_GL15C_glDeleteQueries_AIV(int[] queries) {
+    public static void glDeleteQueries_AIV(int[] queries) {
         for (int id : queries) glDeleteQueries(id);
     }
 
@@ -804,7 +767,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4x3fv_IZLjava_nio_FloatBufferV")
-    public static void GL21C_glUniformMatrix4x3fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
+    public static void glUniformMatrix4x3fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
         uniformMatrix4x3fv(location, transpose, getBufferAddr(data), data.remaining());
     }
 
@@ -821,17 +784,17 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenBuffers_I")
     @JavaScript(code = "return map(gl.createBuffer())")
-    public static native int GL15C_glGenBuffers_I();
+    public static native int glGenBuffers_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBindBuffer_IIV")
     @JavaScript(code = "gl.bindBuffer(arg0,unmap(arg1))")
-    public static native void GL15C_glBindBuffer_IIV(int target, int buffer);
+    public static native void glBindBuffer_IIV(int target, int buffer);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteBuffers_IV")
     @JavaScript(code = "throw 'glDeleteBuffers_IV'")
-    public static native void GL15C_glDeleteBuffers_IV(int buffer);
+    public static native void glDeleteBuffers_IV(int buffer);
 
     @NoThrow
     @JavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
@@ -857,7 +820,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glReadPixels_IIIIIILjava_nio_ByteBufferV")
-    public static void org_lwjgl_opengl_GL11C_glReadPixels_IIIIIILjava_nio_ByteBufferV(
+    public static void glReadPixels_IIIIIILjava_nio_ByteBufferV(
             int x, int y, int w, int h, int a, int b, ByteBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
         readPixelsU8(x, y, w, h, a, b, getBufferAddr(data), data.remaining());
@@ -865,7 +828,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV(
+    public static void glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV(
             int a, int b, int c, int d, int e, int f, int g, int h, DoubleBuffer data
     ) throws NoSuchFieldException, IllegalAccessException {
         if (data == null) {
@@ -947,19 +910,19 @@ public class LWJGLxOpenGL {
     private static native void bufferData16(int target, int addr, int length, int usage);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ByteBufferIV")
-    public static void GL15C_glBufferData_ILjava_nio_ByteBufferIV(int target, ByteBuffer data, int usage)
+    public static void glBufferData_ILjava_nio_ByteBufferIV(int target, ByteBuffer data, int usage)
             throws NoSuchFieldException, IllegalAccessException {
         bufferData8(target, getBufferAddr(data), data.remaining(), usage);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ShortBufferIV")
-    public static void GL15C_glBufferData_ILjava_nio_ShortBufferIV(int target, ShortBuffer data, int usage)
+    public static void glBufferData_ILjava_nio_ShortBufferIV(int target, ShortBuffer data, int usage)
             throws NoSuchFieldException, IllegalAccessException {
         bufferData16(target, getBufferAddr(data), data.remaining(), usage);
     }
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_IAIIV")
-    public static void org_lwjgl_opengl_GL15C_glBufferData_IAIIV(int target, int[] data, int usage) {
+    public static void glBufferData_IAIIV(int target, int[] data, int usage) {
         bufferData8(target, getAddr(data) + arrayOverhead, data.length << 2, usage);
     }
 
@@ -972,7 +935,7 @@ public class LWJGLxOpenGL {
     private static native void bufferSubData16(int target, long offset, int addr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ByteBufferV")
-    public static void GL15C_glBufferSubData_IJLjava_nio_ByteBufferV(int target, long offset, ByteBuffer data)
+    public static void glBufferSubData_IJLjava_nio_ByteBufferV(int target, long offset, ByteBuffer data)
             throws NoSuchFieldException, IllegalAccessException {
         if (offset < 0 || offset > Integer.MAX_VALUE)
             throw new IllegalArgumentException("Offset is out of bounds for WebGL!");
@@ -980,7 +943,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJAIV")
-    public static void GL15C_glBufferSubData_IJAIV(int target, long offset, int[] data) {
+    public static void glBufferSubData_IJAIV(int target, long offset, int[] data) {
         if (offset < 0 || offset > Integer.MAX_VALUE)
             throw new IllegalArgumentException("Offset is out of bounds for WebGL!");
         bufferSubData8(target, offset, getAddr(data) + arrayOverhead, data.length);
@@ -1016,7 +979,7 @@ public class LWJGLxOpenGL {
     public static native void GLXXC_glDeleteTextures(int id);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteTextures_AIV")
-    public static void org_lwjgl_opengl_GL11C_glDeleteTextures_AIV(int[] ids) {
+    public static void glDeleteTextures_AIV(int[] ids) {
         for (int id : ids) {
             GLXXC_glDeleteTextures(id);
         }
@@ -1124,12 +1087,12 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGetQueryObjecti_III")
     @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
-    public static native int GL15C_glGetQueryObjecti_III(int a, int b);
+    public static native int glGetQueryObjecti_III(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ")
     @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
-    public static native long GL33C_glGetQueryObjecti64_IIJ(int a, int b);
+    public static native long glGetQueryObjecti64_IIJ(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glMemoryBarrier_IV")
@@ -1149,32 +1112,32 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV")
     @JavaScript(code = "throw 'glGetTexImage_IIIIAIV'")
-    public static native void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(int a, int b, int c, int d, int[] e);
+    public static native void glGetTexImage_IIIIAIV(int a, int b, int c, int d, int[] e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIADV")
-    public static void org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIADV(
+    public static void glTexImage2D_IIIIIIIIADV(
             int a, int b, int c, int d, int e, int f, int g, int h, double[] data) {
         texImage2DAny(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 3);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIADV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIADV(
+    public static void glTexSubImage2D_IIIIIIIIADV(
             int a, int b, int c, int d, int e, int f, int g, int h, double[] data) {
         texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 3);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIAFV")
-    public static void org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIIAFV(
+    public static void glTexSubImage2D_IIIIIIIIAFV(
             int a, int b, int c, int d, int e, int f, int g, int h, float[] data) {
         texSubImage2D(a, b, c, d, e, f, g, h, getAddr(data) + arrayOverhead, data.length << 2);
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIIAIV")
-    public static void org_lwjgl_opengl_GL12C_glTexImage3D_IIIIIIIIIAIV(
+    public static void glTexImage3D_IIIIIIIIIAIV(
             int a, int b, int c, int d, int e, int f, int g, int h, int i, int[] data) {
         texImage3DAny(a, b, c, d, e, f, g, h, i, getAddr(data) + arrayOverhead, data.length << 2);
     }
@@ -1197,12 +1160,12 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV")
     @JavaScript(code = "throw 'glDispatchCompute_IIIV'")
-    public static native void org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV(int a, int b, int c);
+    public static native void glDispatchCompute_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV")
     @JavaScript(code = "throw 'glBlendFuncSeparatei_IIIIIV'")
-    public static native void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(int a, int b, int c, int d, int e);
+    public static native void glBlendFuncSeparatei_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV")
@@ -1258,7 +1221,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawBuffers_AIV")
-    public static void GLXXC_glDrawBuffers_AIV(int[] modes) {
+    public static void glDrawBuffers_AIV(int[] modes) {
         drawBuffersCreate();
         for (int mode : modes) {
             drawBuffersPush(mode);
@@ -1295,13 +1258,13 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "static_org_lwjgl_opengl_GLDebugMessageCallbackI_V")
-    public static void static_org_lwjgl_opengl_GLDebugMessageCallbackI_V() {
+    public static void static_GLDebugMessageCallbackI_V() {
         // idc
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_AIV")
-    private static void org_lwjgl_opengl_GL15C_glGenQueries_AIV(int[] ids) {
+    private static void glGenQueries_AIV(int[] ids) {
         for (int i = 0; i < ids.length; i++) {
             ids[i] = GL15C_glGenQueries_I();
         }
@@ -1315,7 +1278,7 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_IV")
     @JavaScript(code = "gl.deleteQuery(unmap(arg0))")
-    private static native void org_lwjgl_opengl_GL15C_glDeleteQueries_IV(int id);
+    private static native void glDeleteQueries_IV(int id);
 
     @NoThrow
     @JavaScript(code = "")

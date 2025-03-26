@@ -59,16 +59,21 @@ public class TextGen {
     }
 
     @NoThrow
-    @JavaScript(code = "arg2=str(arg2);\n" +
-            "measureText(arg0,arg1,arg2);\n" + // defines tmp
+    @JavaScript(code = "" +
+            "let text=str(arg2), fontNamePtr = arg0, fontSize = arg1;\n" +
+            "measureText(fontNamePtr,fontSize,text);\n" + // defines tmp
             "let w=Math.max(1,Math.min(arg3,Math.ceil(tmp.width))),h=arg4;\n" +
             "txtCanvas.width=w;txtCanvas.height=h;\n" +
             "ctx.fillStyle='#000'\n" +
             "ctx.fillRect(0,0,w,h)\n" +
             "ctx.fillStyle='#fff'\n" +
-            "ctx.textAlign='center'\n" +
-            "ctx.font=(arg1|0)+'px '+str(arg0);\n" +
-            "ctx.fillText(arg2,w/2,1+h/1.3);\n" +
+            "ctx.textAlign='left'\n" +
+            "ctx.font=(fontSize|0)+'px '+str(fontNamePtr);\n" +
+            "let lines = text.split('\\n');\n" + // ctx.fillText ignores linebreaks
+            "let spacing = h/lines.length;\n" +
+            "for(let i=0;i<lines.length;i++){\n" +
+            "   ctx.fillText(lines[i],0,(i+0.8)*spacing);\n" +
+            "}\n" +
             "let buffer = ctx.getImageData(0,0,w,h).data;\n" +
             "flipImageVertically(w,h,buffer);\n" +
             "gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n" +
@@ -103,7 +108,8 @@ public class TextGen {
     }
 
     @NoThrow
-    @JavaScript(code = "let font=arg0,w=arg3,h=arg4,d=arg5,color0Int=arg7,color1Int=arg6;\n" +
+    @JavaScript(code = "" +
+            "let font=arg0,w=arg3,h=arg4,d=arg5,color0Int=arg7,color1Int=arg6;\n" +
             "txtCanvas.width=w;txtCanvas.height=h*d;\n" +
             "let color0 = '#'+color0Int.toString(16).padStart(6,'0');\n" +
             "let color1 = '#'+color1Int.toString(16).padStart(6,'0');\n" +

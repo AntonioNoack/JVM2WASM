@@ -12,12 +12,18 @@ import kotlin.jvm.functions.Function2;
 import me.anno.Time;
 import me.anno.cache.AsyncCacheData;
 import me.anno.config.DefaultConfig;
+import me.anno.ecs.Entity;
+import me.anno.ecs.components.light.DirectionalLight;
+import me.anno.ecs.components.light.SpotLight;
 import me.anno.ecs.components.mesh.Mesh;
+import me.anno.ecs.components.mesh.MeshComponent;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
 import me.anno.engine.WindowRenderFlags;
+import me.anno.engine.ui.control.DraggingControlSettings;
 import me.anno.engine.ui.render.RenderMode;
 import me.anno.engine.ui.render.SceneView;
+import me.anno.engine.ui.render.SuperMaterial;
 import me.anno.fonts.Font;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
@@ -88,6 +94,15 @@ public class Engine {
     @JavaScript(code = "return 1;")
     public static native boolean runsInBrowser();
 
+    private static void markFieldsAsUsed() {
+        // todo add an annotation/setting to mark these fields as used
+        DraggingControlSettings settings = new DraggingControlSettings();
+        settings.setRenderMode(settings.getRenderMode());
+        settings.setShowDebugFrames(true);
+        settings.setShowRenderTimes(true);
+        settings.setSuperMaterial(SuperMaterial.Companion.getNONE());
+    }
+
     @Export
     @NoThrow
     @SuppressWarnings("ConfusingMainMethod")
@@ -119,10 +134,12 @@ public class Engine {
 
         log("Created IcoSphere");
 
-        panel = SceneView.Companion.testScene(icoSphere, sceneView -> {
-            sceneView.getRenderView().setRenderMode(RenderMode.Companion.getDEFAULT());
-            return Unit.INSTANCE;
-        });
+        Entity scene = new Entity();
+        scene.add(new MeshComponent(icoSphere));
+        DirectionalLight sun = new DirectionalLight();
+        sun.getColor().set(10f);
+        scene.add(new Entity().add(sun).setPosition(0.5, 0.0, 0.0));
+        panel = SceneView.Companion.testScene(scene, null);
 
         panel.setWeight(1f);
         instance = new TestEngine("Engine", () -> Collections.singletonList(panel));
@@ -146,8 +163,8 @@ public class Engine {
 
         instance.gameInit();
         WindowRenderFlags.INSTANCE.setShowFPS(true);
-        DefaultConfig.INSTANCE.set("debug.ui.showRenderTimes", Boolean.TRUE);
-        DefaultConfig.INSTANCE.set("debug.ui.showDebugFrames", Boolean.TRUE);
+
+        markFieldsAsUsed();
 
         tick.stop("Game Init");
     }
@@ -206,6 +223,7 @@ public class Engine {
     @Export
     public static void mouseUp(int key) {
         if (window == null) return;
+        // todo bug: right click is calling Mouse-Click even after having moved a large distance, which is annoying
         Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key));
     }
 

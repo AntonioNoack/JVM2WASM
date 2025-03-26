@@ -220,7 +220,7 @@ try {
     }
 
     document.onmousedown = function(e){
-        if(lib && inited) {
+        if (lib && inited) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
             lib.engine_Engine_mouseDown_IV(mapMouseButton(e.button))
             e.preventDefault()
@@ -228,7 +228,7 @@ try {
     }
 
     document.onmouseup = function(e) {
-        if(lib && inited) {
+        if (lib && inited) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
             lib.engine_Engine_mouseUp_IV(mapMouseButton(e.button))
             e.preventDefault()
@@ -236,12 +236,8 @@ try {
     }
 
     document.oncontextmenu = function(e){
-        if(lib && inited){
-            lib.engine_Engine_mouseDown_IV(1)
-            lib.engine_Engine_mouseUp_IV(1)
-            e.preventDefault()
-            return false
-        }
+        e.preventDefault()
+        return false
     }
 
     // todo copy paste events
