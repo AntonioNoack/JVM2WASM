@@ -1259,21 +1259,21 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "static_org_lwjgl_opengl_GLDebugMessageCallbackI_V")
     public static void static_GLDebugMessageCallbackI_V() {
-        // idc
+        // nothing to do here
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_AIV")
     private static void glGenQueries_AIV(int[] ids) {
-        for (int i = 0; i < ids.length; i++) {
-            ids[i] = GL15C_glGenQueries_I();
+        for (int i = 0, length = ids.length; i < length; i++) {
+            ids[i] = glGenQueries_I();
         }
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_I")
     @JavaScript(code = "return map(gl.createQuery())")
-    private static native int GL15C_glGenQueries_I();
+    private static native int glGenQueries_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_IV")
