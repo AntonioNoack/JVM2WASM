@@ -94,6 +94,34 @@ Inspired by the parallel GC crashing during development, I also developed a conc
 the load is spread out over multiple frames, reducing FPS slightly (5ms first frame, ~1ms/frame) for a few frames, for a second.
 It only crashed after 236,000 iterations (why ever). This is the best choice for stability and performance.
 
+### Performance Comparison using SciMark 2.0a
+
+| Performance Test                 | Amazon JDK    | WASM in Chrome      | C++ (Debug)          | C++ (Release)          |
+|----------------------------------|---------------|---------------------|----------------------|------------------------|
+| **Composite Score**              | 4646.12       | 85.86 (54x slower)  | 169.53 (27x slower)  | 3265.81 (1.4x slower)  |
+| FFT (1024)                       | 2895.01       | 66.82 (43x slower)  | 75.23 (38x slower)   | 3037.42 (1.05x faster) |
+| SOR (100x100)                    | 2306.35       | 159.25 (14x slower) | 407.73 (5.6x slower) | 2611.93 (1.13x faster) |
+| Monte Carlo                      | 1431.18       | 29.31 (48x slower)  | 63.91 (22x slower)   | 1126.99 (1.27x slower) |
+| Sparse MatMult (N=1000, nz=5000) | 4086.42       | 86.39 (47x slower)  | 206.22 (20x slower)  | 4050.12 (tie)          |
+| LU (100x100)                     | 12511.65      | 87.54 (142x slower) | 94.55 (132x slower)  | 5502.60 (2.27x slower) |
+
+## System Information
+
+- **Java Version**: 1.8.0_402 Corretto (Amazon.com Inc.)
+- **OS**: Windows 10 (10.0.19045, amd64)
+- **Memory**: 32GB DDR5 4800 MT/s
+- **CPU**: Ryzen 9 7950x3D
+- **Chrome**: 125.0.6422.60 (outdated by a few months)
+
+Test run in a regular engine build, 2025/03/27 on *abf3660e18cc583710b77943e78db881b7d79dda*.
+Running the performance tests in the JDK somehow gets it stuck in measureMonteCarlo with the normal run mode 🤔.
+It finished in debug-mode though, which is why I used the JDK debug-mode for my results.
+
+## Compilation times (JRE + Rem's Engine)
+Translating JVM bytecode to C++ and WAT takes 10-12 seconds (without static-init at compile-time, that is 3s extra).
+Translating WAT to WASM using WABT (WASM binary toolkit) in WSL takes roughly three seconds.
+Compiling the debug build currently takes roughly five seconds, and release build takes thirty seconds.
+
 ## Used Libraries / Dependencies
 - [ObjectWeb ASM 9.3](https://asm.ow2.io/)
 - [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)
