@@ -16,6 +16,7 @@ import java.io.PrintStream;
 import java.nio.*;
 import java.util.function.Consumer;
 
+import static engine.Engine.runsInBrowser;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.read32;
 import static jvm.JVMShared.write32;
@@ -567,14 +568,14 @@ public class LWJGLxOpenGL {
     public static void glTexImage2D_IIIIIIIIAIV(
             int target, int level, int format, int w, int h, int border,
             int dataFormat, int dataType, int[] data) {
-        boolean swizzle = dataFormat == GL_BGRA;
-        if (swizzle) dataFormat = GL_RGBA;
+        boolean needsSwizzle = runsInBrowser() && dataFormat == GL_BGRA;
+        if (needsSwizzle) dataFormat = GL_RGBA;
         if (data == null) {
             texImage2DNullptr(target, level, format, w, h, border, dataFormat, dataType);
         } else {
-            if (swizzle) rgba2argb(data);
+            if (needsSwizzle) rgba2argb(data);
             texImage2DAny(target, level, format, w, h, border, dataFormat, dataType, getAddr(data) + arrayOverhead, data.length << 2);
-            if (swizzle) argb2rgba(data);
+            if (needsSwizzle) argb2rgba(data);
         }
     }
 
@@ -1048,7 +1049,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV")
-    @JavaScript(code = "/*console.log('glFramebufferTexture2D', arguments);*/gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
+    @JavaScript(code = "gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
     public static native void glFramebufferTexture2D_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
