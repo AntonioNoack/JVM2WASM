@@ -414,14 +414,15 @@ i32 dcmpl(f64 a, f64 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 i32 fcmpg(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 i32 fcmpl(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
 
-i32 engine_Engine_fillURL_ACI(i32) { return 0; }
+i32 engine_Engine_fillBaseURL_ACI(i32) { return 0; }
 
 roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(
     i32 pathPtr, i32 texturePtr, i32 callback
 ) {
-    std::string path = strToCpp(pathPtr);
+    std::string path = "../src/" + strToCpp(pathPtr);
     std::cout << "Loading image '" << path << "'" << std::endl;
     int w, h, numChannels; // todo load async?
+    stbi_set_flip_vertically_on_load(true);
     unsigned char *data = stbi_load(path.c_str(), &w, &h, &numChannels, 4);
     if(data != nullptr && w > 0 && h > 0) {
         std::cout << "Image Size: " << w << " x " << h << std::endl;

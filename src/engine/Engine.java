@@ -11,17 +11,13 @@ import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.Time;
 import me.anno.cache.AsyncCacheData;
-import me.anno.config.DefaultConfig;
 import me.anno.ecs.Entity;
-import me.anno.ecs.components.light.DirectionalLight;
-import me.anno.ecs.components.light.SpotLight;
 import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.MeshComponent;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
 import me.anno.engine.WindowRenderFlags;
 import me.anno.engine.ui.control.DraggingControlSettings;
-import me.anno.engine.ui.render.RenderMode;
 import me.anno.engine.ui.render.SceneView;
 import me.anno.engine.ui.render.SuperMaterial;
 import me.anno.fonts.Font;
@@ -35,13 +31,17 @@ import me.anno.gpu.texture.Texture2D;
 import me.anno.gpu.texture.TextureCache;
 import me.anno.graph.visual.render.RenderGraph;
 import me.anno.image.Image;
+import me.anno.image.ImageCache;
+import me.anno.image.raw.GPUImage;
 import me.anno.input.Clipboard;
 import me.anno.input.Input;
 import me.anno.input.Key;
+import me.anno.io.files.BundledRef;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
 import me.anno.io.files.Reference;
 import me.anno.io.files.inner.temporary.InnerTmpFile;
+import me.anno.io.files.inner.temporary.InnerTmpImageFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
@@ -90,6 +90,19 @@ public class Engine {
                 Double.valueOf(TextGen.measureText1(font.getName(), font.getSize(), text)));
     }
 
+    @Alias(names = "me_anno_io_files_BundledRef_getExists_Z")
+    private static boolean BundledRef_getExists_Z(BundledRef self) {
+        return true;
+    }
+
+    private static void initAtlasFonts() {
+        // todo setup "png" in ImageCache.streamReaders, so we can use it...
+        //   not yet working like that... it's crashing
+        if (false) ImageCache.INSTANCE.registerStreamReader("png", (fileReference, inputStream, callback) ->
+                callback.err(new IOException("Cannot read image yet"))
+        );
+    }
+
     @NoThrow
     @JavaScript(code = "return 1;")
     public static native boolean runsInBrowser();
@@ -120,6 +133,8 @@ public class Engine {
 
         if (runsInBrowser()) {
             initBrowserFonts();
+        } else {
+            initAtlasFonts();
         }
 
         EngineBase instance;
@@ -249,14 +264,14 @@ public class Engine {
     @JavaScript(code = "let loc = window.location.href;\n" +
             "let dir = loc.substring(0, loc.lastIndexOf('/'));" +
             "return fill(arg0,dir+'/assets/')")
-    private static native int fillURL(char[] chars);
+    private static native int fillBaseURL(char[] chars);
 
     private static String baseURL;
 
     private static String getBaseURL() {
         if (baseURL == null) {
             char[] buffer = FillBuffer.getBuffer();
-            int length = fillURL(buffer);
+            int length = fillBaseURL(buffer);
             baseURL = new String(buffer, 0, length);
         }
         return baseURL;
@@ -268,34 +283,35 @@ public class Engine {
     }
 
     @Alias(names = "me_anno_io_files_Reference_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
-    public static FileReference Reference_createReference(String str) {
-        String str2 = str.indexOf('\\') >= 0 ? str.replace('\\', '/') : str;
+    public static FileReference Reference_createReference(String uri) {
+        uri = uri.indexOf('\\') >= 0 ? uri.replace('\\', '/') : uri;
+        while (uri.endsWith("/")) uri = uri.substring(0, uri.length() - 1);
 
-        if (str.startsWith("https://") || str.startsWith("http://")) {
-            return new WebRef2(str2);
+        if (uri.startsWith("https://") || uri.startsWith("http://")) {
+            return new WebRef2(uri);
         }
 
-        if (str.startsWith("res://")) {
-            String url = getBaseURL() + str2.substring(6);
+        String bundledRefPrefix = BundledRef.PREFIX;
+        if (uri.startsWith(bundledRefPrefix)) {
+            String url = getBaseURL() + uri.substring(bundledRefPrefix.length());
             return new WebRef2(url);
         }
 
-        if (str.startsWith("tmp://")) {
-            FileReference tmpRef = InnerTmpFile.find(str);
+        if (uri.startsWith("tmp://")) {
+            FileReference tmpRef = InnerTmpFile.find(uri);
             if (tmpRef == null) {
-                log("Missing temporary file {}, probably GCed", str);
+                log("Missing temporary file {}, probably GCed", uri);
                 return InvalidRef.INSTANCE;
             }
             return tmpRef;
         }
 
-        FileReference staticRef = Reference.queryStatic(str);
-        if (staticRef != null) {
-            return staticRef;
+        FileReference staticReference = Reference.queryStatic(uri);
+        if (staticReference != null) {
+            return staticReference;
         }
 
-        while (str.endsWith("/")) str = str.substring(0, str.length() - 1);
-        return new VirtualFileRef(str);
+        return new VirtualFileRef(uri);
     }
 
     @Alias(names = "me_anno_io_files_Reference_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
@@ -316,8 +332,10 @@ public class Engine {
             "   let w=img.width,h=img.height;\n" +
             "   let canvas=document.createElement('canvas')\n" +
             "   canvas.width=w;canvas.height=h;\n" +
-            "   let ctx=canvas.getContext('2d')\n" +
-            "   ctx.drawImage(img,0,0,w,h);\n" +
+            "   let ctx=canvas.getContext('2d');\n" +
+            "   ctx.save(); ctx.scale(1,-1);\n" +
+            "   ctx.drawImage(img,0,0,w,-h);\n" +
+            "   ctx.restore();\n" +
             "   let x=window.lib.prepareTexture(arg1);\n" +
             "   if(x) throw x;\n" +
             "   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,ctx.getImageData(0,0,w,h).data);\n" +
@@ -363,25 +381,36 @@ public class Engine {
         }
     }
 
-    @Alias(names = "me_anno_image_ImageGPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_Texture2D")
-    public static Texture2D ImageGPUCache_get(Object self, FileReference file, long timeout, boolean async) {
+    @Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_ITexture2D")
+    public static ITexture2D TextureCache_get(Object self, FileReference file, long timeout, boolean async) {
+        if (file == InvalidRef.INSTANCE) return null;
+        if (file instanceof InnerTmpImageFile) {
+            InnerTmpImageFile file1 = (InnerTmpImageFile) file;
+            Image image1 = file1.getImage();
+            if (image1 instanceof GPUImage) {
+                return ((GPUImage) image1).getTexture();
+            }
+        }
         if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
-        // log("asking for", file.getAbsolutePath());
-        AsyncCacheData<ITexture2D> tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, false, (callback) -> {
-            if (file instanceof WebRef2) {
+        AsyncCacheData<ITexture2D> tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, true, (callback) -> {
+            log("Reading image", file.getAbsolutePath());
+            if (file instanceof WebRef2 || file instanceof BundledRef) {
                 // call JS to generate a texture for us :)
-                Texture2D tex3 = new Texture2D(file.getName(), 1, 1, 1);
-                generateTexture(file.getAbsolutePath(), tex3, callback);
+                String path = file.getAbsolutePath();
+                String prefix = BundledRef.PREFIX;
+                if (path.startsWith(prefix)) {
+                    path = "assets/" + path.substring(prefix.length());
+                }
+                Texture2D newTexture = new Texture2D(file.getName(), 1, 1, 1);
+                generateTexture(path, newTexture, callback);
             } else {
-                log("Reading local images hasn't been implemented yet", file.getAbsolutePath());
-                callback.err(new IOException("Reading local images hasn't been implemented yet"));
+                System.err.println("Reading other images hasn't been implemented yet, '" +
+                        file.getAbsolutePath() + "', '" + Object_toString(file) + "'");
+                callback.err(new IOException("Reading other images hasn't been implemented yet"));
             }
             return Unit.INSTANCE;
         });
-        if (tex == null) return null;
-        ITexture2D tex2 = tex.getValue();
-        if (!(tex2 instanceof Texture2D)) return null;
-        return (Texture2D) tex2;
+        return tex != null ? tex.getValue() : null;
     }
 
     @Alias(names = "me_anno_io_files_thumbs_Thumbs_generateSystemIcon_Lme_anno_io_files_FileReferenceLme_anno_io_files_FileReferenceILkotlin_jvm_functions_Function2V")

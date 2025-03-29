@@ -61,6 +61,7 @@ private val LOGGER = LogManager.getLogger("JVM2WASM")
 // todo Companion-objects are unique, so make all their fields and themselves static;
 //  we don't need them to be instances
 
+// todo test: compile our C++ using Emscripten, and compare its performance to our own WASM (using SciMark)
 
 // optimizations:
 // done when there is no child implementations for a non-final, non-static function, call it directly

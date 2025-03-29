@@ -763,7 +763,8 @@ public class JavaLang {
         // uses reflection with throwables -> nah, we don't want that
     }
 
-    public static String Object_toString(Object self) {
+    @NotNull
+    public static String Object_toString(@NotNull Object self) {
         return self.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(self));
     }
 
