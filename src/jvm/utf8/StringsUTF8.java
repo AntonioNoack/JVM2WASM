@@ -7,8 +7,7 @@ import java.nio.charset.Charset;
 import java.util.Locale;
 
 import static jvm.JVM32.*;
-import static jvm.JVMShared.read32;
-import static jvm.JVMShared.read8;
+import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getClassId;
 import static utils.StaticFieldOffsets.OFFSET_STRING_HASH;
 import static utils.StaticFieldOffsets.OFFSET_STRING_VALUE;
@@ -288,7 +287,7 @@ public class StringsUTF8 {
 
     private static String newString(byte[] bytes) {
         int classIndex = getClassId(String.class); // will be 10
-        String value = ptrTo(createInstance(classIndex)); // string class
+        String value = unsafeCast(createInstance(classIndex)); // string class
         setValue(value, bytes);
         return value;
     }

@@ -217,7 +217,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             hIndex.doneClasses.add(synthClassName)
             hIndex.syntheticClasses.add(synthClassName)
 
-            // actual function, which is being implemented by dst
+            // todo why do we add it to "missing"???
             hIndex.missingClasses.add(synthClassName)
 
             // bridge isn't static, it just calls the static lambda
@@ -267,27 +267,11 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     }
 
     override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor {
-        val properties = HashMap<String, Any?>()
-        val clazz = Descriptor.parseType(descriptor)
-        hIndex.addAnnotation(sig, Annota(clazz, properties))
-        if (clazz == Annotations.USED_IF_DEFINED) {
-            dIndex.usedMethods.add(sig)
-        }
-        return object : AnnotationVisitor(api) {
-            override fun visit(name: String, value: Any?) {
-                properties[name] = value
-            }
-
-            override fun visitArray(name: String): AnnotationVisitor {
-                val values = ArrayList<Any?>()
-                properties[name] = values
-                return object : AnnotationVisitor(api) {
-                    override fun visit(name: String?, value: Any?) {
-                        values.add(value)
-                    }
-                }
-            }
-        }
+        val annotationClass = Descriptor.parseType(descriptor)
+        val annota = hIndex.addAnnotation(sig, Annota(annotationClass))
+        if (annotationClass == Annotations.USED_IF_DEFINED) dIndex.usedMethods.add(sig)
+        clazz.dep(annotationClass)
+        return AnnotaVisitor(api, annota.properties)
     }
 
     override fun visitTryCatchBlock(start: Label?, end: Label?, handler: Label?, type: String?) {
@@ -328,7 +312,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
     private fun defineCallIndirectWASM(funcType: FuncType) {
         val callInstr = CallIndirect(funcType).toString()
-        hIndex.addAnnotation(sig, Annota(Annotations.WASM, mapOf("code" to callInstr)))
+        hIndex.addAnnotation(sig, Annota(Annotations.WASM, hashMapOf("code" to callInstr)))
         gIndex.types.add(funcType)
     }
 

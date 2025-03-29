@@ -35,14 +35,26 @@ object HierarchyIndex {
     val abstractMethods = HashSet<MethodSig>(cap)
     val nativeMethods = HashSet<MethodSig>(cap)
     val hasSuperMaybeMethods = HashSet<MethodSig>(cap2)
-    val annotations = HashMap<MethodSig, ArrayList<Annota>>(cap2)
+    val methodAnnotations = HashMap<MethodSig, ArrayList<Annota>>(cap2)
 
     val methodAliases = HashMap<String, MethodSig>(cap)
 
     val implementedCallSignatures = HashSet<CallSignature>()
 
-    fun addAnnotation(sig: MethodSig, annotation: Annota) {
-        annotations.getOrPut(sig, ::ArrayList).add(annotation)
+    val fieldFlags = HashMap<FieldSig, Int>(cap)
+
+    fun addAnnotation(sig: MethodSig, annotation: Annota): Annota {
+        methodAnnotations.getOrPut(sig, ::ArrayList).add(annotation)
+        return annotation
+    }
+
+    fun addAnnotation(sig: FieldSig, annotation: Annota): Annota {
+        fieldAnnotations.getOrPut(sig, ::ArrayList).add(annotation)
+        return annotation
+    }
+
+    fun addAnnotations(sig: FieldSig, annotation: List<Annota>) {
+        fieldAnnotations.getOrPut(sig, ::ArrayList).addAll(annotation)
     }
 
     fun isStatic(method: MethodSig): Boolean {
@@ -63,7 +75,7 @@ object HierarchyIndex {
     }
 
     fun getAnnotations(sig: MethodSig): List<Annota> {
-        return annotations[sig] ?: emptyList()
+        return methodAnnotations[sig] ?: emptyList()
     }
 
     fun getAnnotation(sig: MethodSig, clazz: String): Annota? {
@@ -100,6 +112,9 @@ object HierarchyIndex {
     val inlined = HashMap<MethodSig, List<Instruction>>(cap2)
     val wasmNative = HashMap<MethodSig, List<Instruction>>(cap2)
 
+    /**
+     * used by lambda-helpers and annotations
+     * */
     val syntheticClasses = HashSet<String>(cap2)
 
     val doneClasses = HashSet<String>(cap)
@@ -107,6 +122,7 @@ object HierarchyIndex {
 
     val finalFields = HashMap<FieldSig, Any>(cap)
     val genericFieldSignatures = HashMap<FieldSig, String>(cap)
+    val fieldAnnotations = HashMap<FieldSig, ArrayList<Annota>>(cap2)
 
     val exportedMethods = HashSet<MethodSig>(cap)
     val usesSelf = HashMap<MethodSig, Boolean>(cap)

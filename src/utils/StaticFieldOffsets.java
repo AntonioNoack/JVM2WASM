@@ -26,7 +26,8 @@ public class StaticFieldOffsets {
     public static final int OFFSET_FIELD_NAME = objectOverhead + intSize;
     public static final int OFFSET_FIELD_TYPE = objectOverhead + intSize + ptrSize;
     public static final int OFFSET_FIELD_CLAZZ = objectOverhead + intSize + 2 * ptrSize;
-    public static final int OFFSET_FIELD_MODIFIERS = objectOverhead + intSize + 3 * ptrSize;
+    public static final int OFFSET_FIELD_ANNOTATIONS = objectOverhead + intSize + 3 * ptrSize;
+    public static final int OFFSET_FIELD_MODIFIERS = objectOverhead + intSize + 4 * ptrSize;
 
     public static final int OFFSET_METHOD_SLOT = objectOverhead;
     public static final int OFFSET_METHOD_NAME = objectOverhead + intSize;

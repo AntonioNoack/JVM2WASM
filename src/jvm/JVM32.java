@@ -102,14 +102,15 @@ public class JVM32 {
     }
 
     @Alias(names = "createInstance")
-    public static int createInstance(int classId) {
+    public static Object createInstance(int classId) {
         validateClassId(classId);
-        if (trackAllocations) trackCalloc(classId);
-        int instanceSize = getInstanceSizeNonArray(classId);
-        if (instanceSize <= 0)
-            throw new IllegalStateException("Non-constructable/abstract class cannot be instantiated");
-        int newInstance = calloc(instanceSize);
 
+        int instanceSize = getInstanceSizeNonArray(classId);
+        if (instanceSize < 0) throw new IllegalStateException("Non-constructable class cannot be instantiated");
+        if (instanceSize == 0) return getClassIdPtr(classId); // pseudo-instance
+
+        if (trackAllocations) trackCalloc(classId);
+        Object newInstance = calloc(instanceSize);
         writeClass(newInstance, classId);
         // log("Created", classId, newInstance, instanceSize);
         // if (newInstance > 10_300_000) validateAllClassIds();
@@ -146,13 +147,13 @@ public class JVM32 {
             throw new IllegalArgumentException("Length is too large for 32 bit memory");
         }
         int instanceSize = getArraySizeInBytes(length, classId);
-        int newInstance = calloc(instanceSize);
+        Object newInstance = calloc(instanceSize);
 
         writeClass(newInstance, classId); // [] has index 1
-        write32(newInstance + objectOverhead, length); // array length
+        writeI32AtOffset(newInstance, objectOverhead, length); // array length
         // log("Created[]", classId, newInstance, instanceSize);
         // if (newInstance > 10_300_000) validateAllClassIds();
-        return ptrTo(newInstance);
+        return newInstance;
     }
 
     public static int getArraySizeInBytes(int length, int classId) {
@@ -212,27 +213,26 @@ public class JVM32 {
     public static boolean criticalAlloc = false;
 
     @NoThrow
-    public static void writeClass(int ptr, int clazz) {
-        write32(ptr, clazz | (GarbageCollector.iteration << 24));
+    public static void writeClass(Object ptr, int clazz) {
+        writeI32AtOffset(ptr, 0, clazz | (GarbageCollector.iteration << 24));
     }
 
-    private static int malloc(int size) {
+    private static Object malloc(int size) {
         // enough space for the first allocations
+        int ptr;
         if (GarbageCollectorFlags.hasGaps) {
             // try to find a freed place in gaps first
-            int ptr = GarbageCollector.findGap(size);
+            ptr = GarbageCollector.findGap(size);
             if (ptr == 0) {
                 ptr = GarbageCollector.allocateNewSpace(size);
             }
-            return ptr;
-        } else {
-            return GarbageCollector.allocateNewSpace(size);
-        }
+        } else ptr = GarbageCollector.allocateNewSpace(size);
+        return ptrTo(ptr);
     }
 
-    public static int calloc(int size) {
-        int ptr = malloc(size);
-        fill64(ptr, ptr + size, 0);
+    public static Object calloc(int size) {
+        Object ptr = malloc(size);
+        fill64(getAddr(ptr), getAddr(ptr) + size, 0);
         return ptr;
     }
 
@@ -564,7 +564,7 @@ public class JVM32 {
 
     @NoThrow
     @Alias(names = "getClassIdPtr")
-    public static <V> int getClassIdPtr(int classIndex) {
+    public static <V> Object getClassIdPtr(int classIndex) {
         validateClassId(classIndex);
         int classIdPtr = classIdToInstancePtr(classIndex) + OFFSET_CLASS_INDEX;
 
@@ -575,7 +575,7 @@ public class JVM32 {
             log("+ {} + {}", getClassInstanceTable(), OFFSET_CLASS_INDEX);
             throwJs("Expected {} at {}, got {}", classIndex, classIdPtr, actualIndex);
         }
-        return classIdPtr;
+        return ptrTo(classIdPtr);
     }
 
     @NoThrow

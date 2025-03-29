@@ -1,3 +1,7 @@
 package hierarchy
 
-data class Annota(val clazz: String, val properties: Map<String, Any?>)
+import utils.Annotations.getAnnotaImplClass
+
+data class Annota(val clazz: String, val properties: HashMap<String, Any?> = HashMap()) {
+    val implClass get() = getAnnotaImplClass(clazz)
+}

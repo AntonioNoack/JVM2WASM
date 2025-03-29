@@ -35,6 +35,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
         // 26k entries... how is there sooo many values??? maybe we don't need to cache it...
         // we call this a million times, so each entry 40 times -> definitely worth it :)
         private val descriptorCache = HashMap<String, Descriptor>(1 shl 15)
+        private val typeCache = HashMap<String, String>(1 shl 10)
 
         fun c(descriptor: String): Descriptor {
             return descriptorCache.getOrPut(descriptor) {
@@ -42,7 +43,7 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
             }
         }
 
-        private val typeCache = HashMap<String, String>(1 shl 10)
+        val voidDescriptor = c("()V")
 
         fun parseType(descriptor: String): String {
             return typeCache.getOrPut(descriptor) {

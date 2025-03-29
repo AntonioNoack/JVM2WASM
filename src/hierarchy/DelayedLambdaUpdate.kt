@@ -19,6 +19,9 @@ import utils.CommonInstructions.NEW_INSTR
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
 
+/**
+ * Generates a synthetic class & method for lambda expressions
+ * */
 class DelayedLambdaUpdate(
     private val source: String,
     val calledMethod: MethodSig,

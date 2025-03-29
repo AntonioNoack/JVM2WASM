@@ -130,15 +130,12 @@ public class Engine {
         // panel = new AnimTextPanelTest(false);
         // panel = CellMod.createGame();
 
-        Mesh icoSphere = IcosahedronModel.INSTANCE.createIcosphere(1, 1f, new Mesh());
+        Mesh icoSphere = IcosahedronModel.INSTANCE.createIcosphere(3, 1f, new Mesh());
 
         log("Created IcoSphere");
 
-        Entity scene = new Entity();
+        Entity scene = new Entity("Scene");
         scene.add(new MeshComponent(icoSphere));
-        DirectionalLight sun = new DirectionalLight();
-        sun.getColor().set(10f);
-        scene.add(new Entity().add(sun).setPosition(0.5, 0.0, 0.0));
         panel = SceneView.Companion.testScene(scene, null);
 
         panel.setWeight(1f);

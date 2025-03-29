@@ -23,6 +23,7 @@ object DependencyIndex {
     val usedInterfaceCalls = HashSet<MethodSig>(cap2)
 
     val constructableClasses = HashSet<String>(cap2)
+    val constructableAnnotations = HashSet<String>()
 
     fun findSuperMethod(method: MethodSig): MethodSig? {
         return findSuperMethod0(method) ?: findSuperMethod1(method)

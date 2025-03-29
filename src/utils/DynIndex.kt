@@ -7,12 +7,13 @@ import hIndex
 import implementedMethods
 import jvm.JVM32.objectOverhead
 import me.anno.io.Streams.writeLE32
+import me.anno.utils.algorithms.Recursion
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.algorithms.Recursion
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignPointer
+import utils.Descriptor.Companion.voidDescriptor
 import utils.MethodResolver.resolveMethod
 import utils.PrintUsed.printUsed
 
@@ -24,7 +25,7 @@ object DynIndex {
 
     private val dynIndex = HashMap<String, DynIndexEntry>(4096)
     private val dynIndexSorted = ArrayList<DynIndexEntry>(4096)
-    val dynIndexSig = MethodSig.c("", "dynIndex", "()V")
+    val dynIndexSig = MethodSig.c("", "dynIndex", voidDescriptor)
 
     private fun addDynIndex(sig: MethodSig, name: String = methodName(sig)): Int {
         return dynIndex.getOrPut(name) {
@@ -129,7 +130,11 @@ object DynIndex {
         if (hIndex.isAbstract(sig)) return true
         if (sig.clazz == "java/lang/Object") return false
         if (sig in hIndex.jvmImplementedMethods) return false
-        val superClass = hIndex.superClass[sig.clazz] ?: throw NullPointerException(sig.clazz)
+        var superClass = hIndex.superClass[sig.clazz]
+        if (superClass == null) {
+            LOGGER.warn("Super class of ${sig.clazz} is missing")
+            superClass = "java/lang/Object"
+        }
         return methodIsAbstract(sig.withClass(superClass))
     }
 
@@ -295,7 +300,7 @@ object DynIndex {
         val instanceTableData = ByteArrayOutputStream2()
         val instanceTableStart = alignPointer(classTableStart + numClasses * 4)
         var ptr = instanceTableStart
-        val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V"))
+        val staticInitIdx = gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, voidDescriptor))
 
         val emptyTableEntry = ptr
         instanceTableData.writeLE32(0) // standard super class

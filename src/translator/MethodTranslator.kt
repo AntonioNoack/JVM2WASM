@@ -35,6 +35,14 @@ import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass
+import translator.LoadStoreHelper.getLoadCall
+import translator.LoadStoreHelper.getLoadInstr
+import translator.LoadStoreHelper.getStaticLoadCall
+import translator.LoadStoreHelper.getStaticStoreCall
+import translator.LoadStoreHelper.getStoreCall
+import translator.LoadStoreHelper.getStoreInstr
+import translator.LoadStoreHelper.getStoreInstr2
+import translator.LoadStoreHelper.getVIOStoreCall
 import translator.ResolveIndirect.resolveIndirect
 import useResultForThrowables
 import useWASMExceptions
@@ -301,7 +309,7 @@ class MethodTranslator(
 
     @Boring
     override fun visitAnnotationDefault(): AnnotationVisitor? {
-        return super.visitAnnotationDefault()
+        return null
     }
 
     @Boring
@@ -1240,7 +1248,7 @@ class MethodTranslator(
                     printer.append(inline)
                     if (comments) printer.comment("special-inlined $sig1")
                 } else {
-                    if (sig1.descriptor.raw == "()V" && sig1 in hIndex.emptyFunctions) {
+                    if (sig1.descriptor == Descriptor.voidDescriptor && sig1 in hIndex.emptyFunctions) {
                         printer.drop()
                         if (comments) printer.comment("skipping empty $sig1")
                     } else {
@@ -1792,87 +1800,6 @@ class MethodTranslator(
 
         if (printOps) println(" [L$label]")
         if (comments) printer.comment("[L$label]")
-    }
-
-    private fun getLoadInstr(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> I32Load8S
-        "short" -> I32Load16S
-        "char" -> I32Load16U
-        "int" -> I32Load
-        "long" -> I64Load
-        "float" -> F32Load
-        "double" -> F64Load
-        else -> if (is32Bits) I32Load else I64Load
-    }
-
-    private fun getStoreInstr(descriptor: String) = getStoreInstr2(descriptor)
-
-    private fun getStoreInstr2(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> I32Store8
-        "short", "char" -> I32Store16
-        "int" -> I32Store
-        "long" -> I64Store
-        "float" -> F32Store
-        "double" -> F64Store
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) I32Store else I64Store
-    }
-
-    private fun getStaticLoadCall(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> Call.getStaticFieldS8
-        "short" -> Call.getStaticFieldS16
-        "char" -> Call.getStaticFieldU16
-        "int" -> Call.getStaticFieldI32
-        "long" -> Call.getStaticFieldI64
-        "float" -> Call.getStaticFieldF32
-        "double" -> Call.getStaticFieldF64
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) Call.getStaticFieldI32 else Call.getStaticFieldI64
-    }
-
-    private fun getLoadCall(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> Call.getFieldS8
-        "short" -> Call.getFieldS16
-        "char" -> Call.getFieldU16
-        "int" -> Call.getFieldI32
-        "long" -> Call.getFieldI64
-        "float" -> Call.getFieldF32
-        "double" -> Call.getFieldF64
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) Call.getFieldI32 else Call.getFieldI64
-    }
-
-    private fun getStaticStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> Call.setStaticFieldI8
-        "short", "char" -> Call.setStaticFieldI16
-        "int" -> Call.setStaticFieldI32
-        "long" -> Call.setStaticFieldI64
-        "float" -> Call.setStaticFieldF32
-        "double" -> Call.setStaticFieldF64
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) Call.setStaticFieldI32 else Call.setStaticFieldI64
-    }
-
-    private fun getStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> Call.setFieldI8
-        "short", "char" -> Call.setFieldI16
-        "int" -> Call.setFieldI32
-        "long" -> Call.setFieldI64
-        "float" -> Call.setFieldF32
-        "double" -> Call.setFieldF64
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) Call.setFieldI32 else Call.setFieldI64
-    }
-
-    private fun getVIOStoreCall(descriptor: String): Instruction = when (descriptor) {
-        "boolean", "byte" -> Call.setVIOFieldI8
-        "short", "char" -> Call.setVIOFieldI16
-        "int" -> Call.setVIOFieldI32
-        "long" -> Call.setVIOFieldI64
-        "float" -> Call.setVIOFieldF32
-        "double" -> Call.setVIOFieldF64
-        "Z", "B", "I", "J", "F", "D" -> throw IllegalArgumentException()
-        else -> if (is32Bits) Call.setVIOFieldI32 else Call.setVIOFieldI64
     }
 
     private fun callStaticInit(clazz: String) {

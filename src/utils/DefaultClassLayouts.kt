@@ -6,6 +6,7 @@ import hIndex
 import jvm.JVM32.*
 import jvm.JVMShared.intSize
 import me.anno.utils.assertions.assertEquals
+import utils.Descriptor.Companion.voidDescriptor
 import utils.StaticFieldOffsets.*
 import wasm.instr.FuncType
 
@@ -38,10 +39,11 @@ object DefaultClassLayouts {
         val executable = "java/lang/reflect/Executable"
         val constructor = "java/lang/reflect/Constructor"
         val accessibleObject = "java/lang/reflect/AccessibleObject"
+        val annotation = "java/lang/Annotation"
 
         // todo we might be able to remove instance-init, because we have proper constructors now
-        eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, "()V")), 0)
-        eq(gIndex.getType(true, Descriptor.c("()V"), true), FuncType(listOf(), listOf(ptrType)))
+        eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, voidDescriptor)), 0)
+        eq(gIndex.getType(true, voidDescriptor, true), FuncType(listOf(), listOf(ptrType)))
 
         // prepare String properties
         gIndex.stringClass = gIndex.getClassIndex(string)
@@ -85,7 +87,8 @@ object DefaultClassLayouts {
         eq(field, "name", string, intSize, OFFSET_FIELD_NAME)
         eq(field, "type", clazz, ptrSize + intSize, OFFSET_FIELD_TYPE)
         eq(field, "clazz", clazz, 2 * ptrSize + intSize, OFFSET_FIELD_CLAZZ)
-        eq(field, "modifiers", "int", 3 * ptrSize + intSize, OFFSET_FIELD_MODIFIERS)
+        eq(field, "annotations", "[$annotation", 3 * ptrSize + intSize, OFFSET_FIELD_ANNOTATIONS)
+        eq(field, "modifiers", "int", 4 * ptrSize + intSize, OFFSET_FIELD_MODIFIERS)
 
         eq(method, "slot", "int", 0, OFFSET_METHOD_SLOT)
         eq(method, "name", string, intSize, OFFSET_METHOD_NAME)
@@ -111,7 +114,7 @@ object DefaultClassLayouts {
         hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "int", true)] = arrayOverhead
         hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "boolean", true)] = trackAllocations
 
-        eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, "()V")), 0)
+        eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, voidDescriptor)), 0)
         gIndex.getFieldOffset(constructor, "clazz", clazz, false)
 
     }

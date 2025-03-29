@@ -17,6 +17,7 @@ import implementedMethods
 import listEntryPoints
 import listLibrary
 import listSuperClasses
+import me.anno.engine.inspector.CachedReflections.Companion.getGetterName
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertNotEquals
@@ -25,6 +26,7 @@ import me.anno.utils.structures.Compare.ifSame
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.sortedByTopology
 import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Strings.titlecase
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import replaceClass
@@ -33,6 +35,7 @@ import translator.ClassTranslator
 import translator.FoundBetterReader
 import translator.MethodTranslator
 import utils.CommonInstructions.INVOKE_VIRTUAL
+import utils.Descriptor.Companion.voidDescriptor
 import utils.MethodResolver.resolveMethod
 import wasm.instr.Instruction
 import wasm.parser.FunctionImpl
@@ -237,7 +240,7 @@ fun resolveGenericMethodTypes() {
 
 fun findNoThrowMethods() {
     LOGGER.info("[findNoThrowMethods]")
-    for ((sig, annotations) in hIndex.annotations) {
+    for ((sig, annotations) in hIndex.methodAnnotations) {
         if (annotations.any2 { it.clazz == Annotations.NO_THROW }) {
             cannotThrow.add(methodName(sig))
         }
@@ -246,7 +249,7 @@ fun findNoThrowMethods() {
 
 fun findAliases() {
     LOGGER.info("[findAliases]")
-    for ((sig, annotations) in hIndex.annotations) {
+    for ((sig, annotations) in hIndex.methodAnnotations) {
         val alias = annotations.firstOrNull { it.clazz == Annotations.ALIAS }
         if (alias != null) findAlias(sig, alias)
         val revAlias = annotations.firstOrNull { it.clazz == Annotations.REV_ALIAS }
@@ -310,7 +313,7 @@ fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {
 
 fun findExportedMethods() {
     LOGGER.info("[findExportedMethods]")
-    for ((sig, a) in hIndex.annotations) {
+    for ((sig, a) in hIndex.methodAnnotations) {
         if (a.any2 { it.clazz == Annotations.EXPORT_CLASS }) {
             hIndex.exportedMethods.add(sig)
         }
@@ -381,6 +384,13 @@ fun indexFieldsInSyntheticMethods() {
             dlu.indexFields()
         }
     }
+    for (annotationClass in dIndex.constructableAnnotations) {
+        val implClass = Annotations.getAnnotaImplClass(annotationClass)
+        assertTrue(implClass in dIndex.constructableClasses) {
+            "Expected $annotationClass -> $implClass to be constructable, but it isn't"
+        }
+        Annotations.indexFields(annotationClass, implClass)
+    }
 }
 
 fun calculateFieldOffsets() {
@@ -423,7 +433,7 @@ fun printInterfaceIndex() {
 
 fun parseInlineWASM() {
     LOGGER.info("[assignNativeCode]")
-    for ((method, code, noinline) in hIndex.annotations.entries
+    for ((method, code, noinline) in hIndex.methodAnnotations.entries
         .mapNotNull { (method, annotations) ->
             val wasm = annotations.firstOrNull { it.clazz == Annotations.WASM }
             if (wasm != null)
@@ -488,6 +498,11 @@ fun buildSyntheticMethods() {
             dlu.generateSyntheticMethod()
         }
     }
+    for (annotationClass in dIndex.constructableAnnotations) {
+        val implClass = Annotations.getAnnotaImplClass(annotationClass)
+        assertTrue(implClass in dIndex.constructableClasses)
+        Annotations.generateGetterMethods(annotationClass, implClass)
+    }
 }
 
 /**
@@ -541,6 +556,18 @@ fun ensureIndexForInterfacesAndSuperClasses() {
         if (interfaces != null) for (interfaceI in interfaces) {
             gIndex.getClassIndex(interfaceI)
         }
+    }
+}
+
+
+/**
+ * ensure annotation class implementations are available
+ * */
+fun ensureIndexForAnnotations() {
+    LOGGER.info("[ensureIndexForAnnotations]")
+    for (annotationClass in dIndex.constructableAnnotations) {
+        gIndex.getClassIndex(annotationClass)
+        gIndex.getClassIndex(Annotations.getAnnotaImplClass(annotationClass))
     }
 }
 
@@ -795,5 +822,17 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
     for (impl in helperFunctions
         .values.sortedBy { it.funcName }) {
         bodyPrinter.append(impl)
+    }
+}
+
+fun applyKotlinFieldAnnotations() {
+    // kotlin uses stupid $annotations-methods for non-JVM-annotations
+    for (fieldSig in hIndex.fieldFlags.keys) {
+        val suffix = "\$annotations"
+        val fieldCap = fieldSig.name.titlecase()
+        val getterName = getGetterName(fieldSig.name, fieldCap)
+        val methodSig = MethodSig.c(fieldSig.clazz, getterName + suffix, voidDescriptor)
+        val annotations = hIndex.methodAnnotations[methodSig] ?: continue
+        hIndex.addAnnotations(fieldSig, annotations)
     }
 }

@@ -5,11 +5,13 @@ import dependency.DependencyIndex.constructableClasses
 import dependency.StaticDependencies
 import hierarchy.HierarchyIndex
 import jvm.JVM32
+import me.anno.engine.inspector.CachedReflections.Companion.getGetterName
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.ceilDiv
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
+import me.anno.utils.types.Strings.titlecase
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignPointer
@@ -20,6 +22,7 @@ import translator.MethodTranslator.Companion.comments
 import utils.*
 import utils.DefaultClassLayouts.registerDefaultOffsets
 import utils.DefaultClasses.registerDefaultClasses
+import utils.Descriptor.Companion.voidDescriptor
 import utils.DynIndex.appendDynamicFunctionTable
 import utils.DynIndex.appendInheritanceTable
 import utils.DynIndex.appendInvokeDynamicTable
@@ -259,7 +262,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
     if (addDebugMethods) {
         method(MethodSig.c("java/lang/Class", "getName", "()Ljava/lang/String;"))
         method(MethodSig.c("java/lang/Object", "toString", "()Ljava/lang/String;"))
-        method(MethodSig.c("java/lang/Thread", INSTANCE_INIT, "()V"))
+        method(MethodSig.c("java/lang/Thread", INSTANCE_INIT, voidDescriptor))
     }
 }
 
@@ -374,7 +377,7 @@ fun isRootType(clazz: String): Boolean {
 }
 
 var allocationStart = -1
-val entrySig = MethodSig.c("", "entry", "()V")
+val entrySig = MethodSig.c("", "entry", voidDescriptor)
 val resolvedMethods = HashMap<MethodSig, MethodSig>(4096)
 fun main() {
     jvm2wasm()
@@ -399,6 +402,9 @@ fun jvm2wasm() {
     registerDefaultOffsets()
     indexHierarchyFromEntryPoints()
     clock.stop("Index Hierarchy")
+
+    applyKotlinFieldAnnotations()
+    clock.stop("Apply Kotlin Field Annotations")
 
     cleanupJVMImplemented()
     clock.stop("Cleanup JVM Implemented")
@@ -512,6 +518,7 @@ fun jvm2wasm() {
     indexMethodsIntoGIndex(classesToLoad, predefinedClasses, ::filterClass)
     ensureIndexForConstructableClasses()
     ensureIndexForInterfacesAndSuperClasses()
+    ensureIndexForAnnotations()
 
     /**
      * calculate static layout and then set string start

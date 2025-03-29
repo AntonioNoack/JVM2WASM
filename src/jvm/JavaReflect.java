@@ -526,11 +526,14 @@ public class JavaReflect {
 
     private static final Object[] empty = new Object[0];
 
+    @Alias(names = "java_lang_reflect_Field_getAnnotations_AW")
+    public static Object[] Field_getAnnotations(Field field) {
+        return readPtrAtOffset(field, OFFSET_FIELD_ANNOTATIONS);
+    }
+
     @Alias(names = "java_lang_reflect_Field_getDeclaredAnnotations_AW")
     public static Object[] Field_getDeclaredAnnotations(Field field) {
-        // todo implement annotation instances
-        if (field == null) throw new NullPointerException("getDeclaredAnnotations");
-        return empty;
+        return readPtrAtOffset(field, OFFSET_FIELD_ANNOTATIONS);
     }
 
     @Alias(names = "java_lang_reflect_AccessibleObject_getDeclaredAnnotations_AW")
@@ -691,9 +694,9 @@ public class JavaReflect {
     public static <V> V Constructor_newInstance_AWLjava_lang_Object(Constructor<V> self, Object[] args) {
         int classId = getClassId(self.getDeclaringClass());
         validateClassId(classId);
-        int instance = createInstance(classId);
-        Constructor_invoke(self, ptrTo(instance), args);
-        return ptrTo(instance);
+        Object instance = createInstance(classId);
+        Constructor_invoke(self, instance, args);
+        return unsafeCast(instance);
     }
 
     @Alias(names = "java_lang_Class_getInterfaces_AW")

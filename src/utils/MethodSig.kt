@@ -41,7 +41,7 @@ data class MethodSig private constructor(
         }
 
         fun staticInit(clazz: String): MethodSig {
-            return c(clazz, STATIC_INIT, "()V")
+            return c(clazz, STATIC_INIT, Descriptor.voidDescriptor)
         }
 
         private fun validateClassName(clazz: String): String {

@@ -1,6 +1,7 @@
 package dependency
 
 import cannotUseClass
+import dependency.DependencyIndex.constructableAnnotations
 import dependency.DependencyIndex.constructableClasses
 import dependency.DependencyIndex.constructorDependencies
 import dependency.DependencyIndex.getterDependencies
@@ -14,11 +15,14 @@ import dependency.DependencyIndex.usedMethods
 import dependency.DependencyIndex.usedSetters
 import fieldsRWRequired
 import hIndex
+import hierarchy.Annota
 import hierarchy.HierarchyIndex.childClasses
+import hierarchy.HierarchyIndex.fieldAnnotations
 import hierarchy.HierarchyIndex.getAlias
 import hierarchy.HierarchyIndex.interfaceDefaults
 import hierarchy.HierarchyIndex.interfaces
 import hierarchy.HierarchyIndex.isStatic
+import hierarchy.HierarchyIndex.methodAnnotations
 import hierarchy.HierarchyIndex.methodsByClass
 import hierarchy.HierarchyIndex.setAlias
 import hierarchy.HierarchyIndex.superClass
@@ -29,12 +33,10 @@ import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
 import translator.GeneratorIndex.classNamesByIndex
 import translator.GeneratorIndex.fieldOffsets
-import utils.INSTANCE_INIT
-import utils.INTERFACE_CALL_NAME
+import utils.*
+import utils.Descriptor.Companion.voidDescriptor
 import utils.MethodResolver.resolveMethod
-import utils.MethodSig
 import utils.PrintUsed.printUsed
-import utils.STATIC_INIT
 
 class DependencyResolver {
 
@@ -310,8 +312,8 @@ class DependencyResolver {
 
                 checkState(9)
 
+                handleMethodAnnotations(sig)
                 checkUsedFields(sig)
-
                 processDependencies()
 
             }
@@ -324,7 +326,7 @@ class DependencyResolver {
     private fun addStaticInitsForFields() {
         for ((index, offsets) in fieldOffsets) {
             if (index.hasFlag(1) && offsets.hasFields()) { // static
-                remaining.add(MethodSig.c(classNamesByIndex[index shr 1], STATIC_INIT, "()V"))
+                remaining.add(MethodSig.c(classNamesByIndex[index shr 1], STATIC_INIT, voidDescriptor))
             }
         }
     }
@@ -363,43 +365,70 @@ class DependencyResolver {
 
             processDependencies()
 
-            usedGetters.addAll(usedGetters1)
-            usedSetters.addAll(usedSetters1)
-
             checkState(14)
 
-        }
-
-        // of all reached static fields, clinit must be called (when reading static properties)
-        // only if complement function is defined as well
-        val strict = fieldsRWRequired
-        for (field in usedGetters1) {
-            if (field.isStatic && (!strict || field in usedSetters)) {
-                addRemaining(MethodSig.staticInit(field.clazz))
-            }
-        }
-        for (field in usedSetters1) {
-            if (field.isStatic && (!strict || field in usedGetters)) {
-                addRemaining(MethodSig.staticInit(field.clazz))
-            }
-
-            // if field.type is constructing instances,
-            //  mark that class as constructable
-            if (field.descriptor in constructingClasses) {
-                val generics = hIndex.genericFieldSignatures[field]
-                if (generics != null && generics.endsWith(";>;")) {
-                    val idx = generics.indexOf("<L")
-                    val subType = generics.substring(idx + 2, generics.length - 3)
-                    assertTrue(';' !in subType) // else multiple generic parameters...
-                    if (subType !in constructingClasses) {
-                        depAdd(sig, MethodSig.c(subType, INSTANCE_INIT, "()V"))
-                        println("$sig -> $field -> $subType")
+            // of all reached static fields, clinit must be called (when reading static properties)
+            val strict = fieldsRWRequired // only if complement function is defined as well
+            for (field in usedGetters1) {
+                if (usedGetters.add(field)) {
+                    if (field.isStatic && (!strict || field in usedSetters)) {
+                        addRemaining(MethodSig.staticInit(field.clazz))
                     }
+                    handleFieldAnnotations(field, sig)
+                }
+            }
+            for (field in usedSetters1) {
+                if (usedSetters.add(field)) {
+                    if (field.isStatic && (!strict || field in usedGetters)) {
+                        addRemaining(MethodSig.staticInit(field.clazz))
+                    }
+
+                    handleFieldAnnotations(field, sig)
+                    handleFieldTypeConstructingInstances(field, sig)
                 }
             }
         }
 
         checkState(15)
+    }
+
+    private fun handleMethodAnnotations(sig: MethodSig) {
+        val annotations = methodAnnotations[sig] ?: return
+        handleAnnotations(annotations, sig)
+    }
+
+    private fun handleFieldAnnotations(field: FieldSig, sig: MethodSig) {
+        val annotations = fieldAnnotations[field] ?: return
+        handleAnnotations(annotations, sig)
+    }
+
+    private fun handleAnnotations(annotations: List<Annota>, sig: MethodSig) {
+        for (i in annotations.indices) {
+            val annotation = annotations[i]
+            if (isForbiddenClass(annotation.clazz)) continue
+            val implClass = annotation.implClass
+            if (implClass !in constructableClasses) {
+                handleBecomingConstructable(sig, implClass)
+                constructableAnnotations.add(annotation.clazz)
+            }
+        }
+    }
+
+    private fun handleFieldTypeConstructingInstances(field: FieldSig, sig: MethodSig) {
+        // if field.type is constructing instances,
+        //  mark that class as constructable (used for classes like Stack and Pool)
+        if (field.descriptor in constructingClasses) {
+            val generics = hIndex.genericFieldSignatures[field]
+            if (generics != null && generics.endsWith(";>;")) {
+                val idx = generics.indexOf("<L")
+                val subType = generics.substring(idx + 2, generics.length - 3)
+                assertTrue(';' !in subType) // else multiple generic parameters...
+                if (subType !in constructingClasses) {
+                    depAdd(sig, MethodSig.c(subType, INSTANCE_INIT, voidDescriptor))
+                    if (false) LOGGER.info("$sig -> $field -> $subType")
+                }
+            }
+        }
     }
 
     /**

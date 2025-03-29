@@ -3,18 +3,20 @@ package utils
 import dIndex
 import gIndex
 import hIndex
+import hierarchy.Annota
 import implementedMethods
 import jvm.JVM32.*
 import jvm.JVMShared.intSize
+import me.anno.engine.inspector.CachedReflections.Companion.getGetterName
 import me.anno.io.Streams.writeLE32
 import me.anno.io.Streams.writeLE64
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.toInt
+import me.anno.utils.types.Strings.titlecase
 import org.apache.logging.log4j.LogManager
-import org.objectweb.asm.Opcodes.ACC_NATIVE
-import org.objectweb.asm.Opcodes.ACC_STATIC
+import org.objectweb.asm.Opcodes.*
 import resources
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignBuffer
@@ -22,6 +24,7 @@ import translator.GeneratorIndex.alignPointer
 import translator.GeneratorIndex.checkAlignment
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator
+import utils.Annotations.appendAnnotations
 import utils.MethodResolver.resolveMethod
 import utils.StaticClassIndices.BYTE_ARRAY
 import utils.StaticClassIndices.OBJECT_ARRAY
@@ -49,7 +52,9 @@ fun OutputStream.fill(from: Int, to: Int) {
     for (i in from until to) write(0)
 }
 
-data class FieldEntry(val name: String, val field: GeneratorIndex.FieldData, val modifiers: Int)
+data class FieldEntry(val field: GeneratorIndex.FieldData, val sig: FieldSig, val modifiers: Int) {
+    val name get() = sig.name
+}
 
 /**
  * returns whether a type is native;
@@ -61,17 +66,38 @@ fun isNativeType(type: String) = when (type) {
     else -> type in NativeTypes.nativeTypes
 }
 
-private fun ByteArrayOutputStream2.writePointerAt(ptr: Int, at: Int) {
+fun ByteArrayOutputStream2.writePointerAt(ptr: Int, at: Int) {
     val pos = position
     position = at
     writePointer(ptr)
     position = pos
 }
 
-private fun ByteArrayOutputStream2.writeLE32At(ptr: Int, at: Int) {
+fun ByteArrayOutputStream2.writeLE32At(value: Int, at: Int) {
     val pos = position
     position = at
-    writeLE32(ptr)
+    writeLE32(value)
+    position = pos
+}
+
+fun ByteArrayOutputStream2.writeLE64At(value: Long, at: Int) {
+    val pos = position
+    position = at
+    writeLE64(value)
+    position = pos
+}
+
+fun ByteArrayOutputStream2.writeLE32At(value: Float, at: Int) {
+    val pos = position
+    position = at
+    writeLE32(value)
+    position = pos
+}
+
+fun ByteArrayOutputStream2.writeLE64At(value: Double, at: Int) {
+    val pos = position
+    position = at
+    writeLE64(value)
     position = pos
 }
 
@@ -131,11 +157,15 @@ private fun fillInFields(
         }
 
         val instanceFields = instanceFields0.map { (name, field) ->
-            FieldEntry(name, field, isNativeType(field.type).toInt(ACC_NATIVE))
+            val sig = FieldSig(className, name, field.type, false)
+            val modifiers = isNativeType(field.type).toInt(ACC_NATIVE)
+            FieldEntry(field, sig, modifiers)
         }
 
         val staticFields = staticFields0.map { (name, field) ->
-            FieldEntry(name, field, ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE))
+            val sig = FieldSig(className, name, field.type, true)
+            val modifiers = ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE)
+            FieldEntry(field, sig, modifiers)
         }
 
         val allFields = instanceFields + staticFields
@@ -190,7 +220,7 @@ private fun getTypeClassIndex(typeName: String): Int {
     }
 }
 
-private fun getClassInstancePtr(classIndex: Int, indexStartPtr: Int, classSize: Int): Int {
+fun getClassInstancePtr(classIndex: Int, indexStartPtr: Int, classSize: Int): Int {
     return indexStartPtr + classIndex * classSize
 }
 
@@ -199,19 +229,27 @@ private fun appendFieldInstance(
     declaringClassIndex: Int, fieldClassIndex: Int,
     classSize: Int, fieldSize: Int
 ): Int {
+
     // create new field instance
     // name must be before fieldPtr, because the name might be new!!
-    val name = gIndex.getString(field.name, indexStartPtr, classData)
+    val namePtr = gIndex.getString(field.name, indexStartPtr, classData)
+    val annotations = (hIndex.fieldAnnotations[field.sig] ?: emptyList())
+        .filter { it.implClass in dIndex.constructableClasses }
+    val annotationsPtr = appendAnnotations(annotations, indexStartPtr, classData)
+
     alignBuffer(classData)
     val fieldPtr = indexStartPtr + classData.size()
     classData.writeClass(fieldClassIndex)
     classData.writeLE32(field.field.offset) // slot
-    classData.writePointer(name) // name
+    classData.writePointer(namePtr) // name
     val typeClassIndex = getTypeClassIndex(field.field.type)
     classData.writePointer(getClassInstancePtr(typeClassIndex, indexStartPtr, classSize)) // type
     classData.writePointer(getClassInstancePtr(declaringClassIndex, indexStartPtr, classSize)) // declaring class
-    classData.writeLE32(field.modifiers) // modifiers
-    classData.fill(objectOverhead + 2 * intSize + 3 * ptrSize, fieldSize)
+    classData.writePointer(annotationsPtr)
+    val allowedExtraFlags = ACC_PRIVATE
+    val extraFlags = (hIndex.fieldFlags[field.sig] ?: 0) and allowedExtraFlags
+    classData.writeLE32(field.modifiers or extraFlags) // modifiers
+    classData.fill(objectOverhead + 2 * intSize + 4 * ptrSize, fieldSize)
     assertEquals(fieldPtr + fieldSize, indexStartPtr + classData.size())
     checkAlignment(classData.position)
     return fieldPtr
@@ -243,6 +281,8 @@ fun appendClassInstanceTable(printer: StringBuilder2, ptr: Int, numClasses: Int)
     val emptyArrayPtr = indexStartPtr + classData.size()
     classData.writeClass(OBJECT_ARRAY)
     classData.writeLE32(0) // length
+
+    Annotations.defineEmptyArray(emptyArrayPtr)
 
     fillInFields(numClasses, classData, classSize, indexStartPtr, emptyArrayPtr)
     fillInMethods(numClasses, classData, classSize, indexStartPtr, false, emptyArrayPtr)

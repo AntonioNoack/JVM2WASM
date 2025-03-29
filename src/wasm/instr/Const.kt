@@ -1,6 +1,7 @@
 package wasm.instr
 
 import interpreter.WASMEngine
+import me.anno.utils.structures.lists.LazyList
 
 data class Const(val type: ConstType, val value: Number) : Instruction {
 
@@ -13,7 +14,11 @@ data class Const(val type: ConstType, val value: Number) : Instruction {
 
     companion object {
 
-        fun i32Const(value: Int): Const = Const(ConstType.I32, value)
+        private val i32ConstCache = LazyList(512) { value ->
+            Const(ConstType.I32, value)
+        }
+
+        fun i32Const(value: Int): Const = i32ConstCache.getOrNull(value) ?: Const(ConstType.I32, value)
         fun i64Const(value: Long): Const = Const(ConstType.I64, value)
         fun f32Const(value: Float): Const = Const(ConstType.F32, value)
         fun f64Const(value: Double): Const = Const(ConstType.F64, value)

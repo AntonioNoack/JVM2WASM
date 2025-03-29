@@ -256,7 +256,7 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
         descriptor: String,
         signature: String?,
         value: Any?
-    ): FieldVisitor? {
+    ): FieldVisitor {
 
         // if field is final, just create a map, and don't even try to access those fields : make them "virtual"
         //  just hardcode them in the assembly :)
@@ -270,6 +270,8 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
             hIndex.genericFieldSignatures[sig] = signature
         }
 
+        hIndex.fieldFlags[sig] = access
+
         // if (signature != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //    println("[F] $clazz $name $descriptor $signature")
         // TE -> +TE = ? extends TE, child classes
@@ -279,10 +281,6 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
         //if (value != null && !clazz.startsWith("sun/") && !clazz.startsWith("jdk/"))
         //    println("todo: assign $clazz $name $descriptor $signature to \"$value\" (static? ${access.hasFlag(ACC_STATIC)})")
         dep(type)
-        return null
+        return FirstFieldVisitor(api, sig)
     }
-
-    override fun visitEnd() {
-    }
-
 }

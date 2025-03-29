@@ -2,6 +2,7 @@ package interpreter.memory
 
 import gIndex
 import me.anno.utils.structures.maps.Maps.removeIf
+import utils.Descriptor.Companion.voidDescriptor
 import utils.MethodSig
 import utils.STATIC_INIT
 import utils.functionTable
@@ -11,7 +12,7 @@ import wasm.parser.FunctionImpl
 
 object StaticInitRemover {
 
-    private val initSig = MethodSig.c("jvm/JVMShared", "init", "()V")
+    private val initSig = MethodSig.c("jvm/JVMShared", "init", voidDescriptor)
     private val emptyInitBody = listOf(Return)
 
     fun removeStaticInit() {

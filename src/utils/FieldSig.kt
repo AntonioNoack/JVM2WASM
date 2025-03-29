@@ -22,5 +22,5 @@ class FieldSig(val clazz: String, val name: String, val descriptor: String, val 
     }
 
     // descriptor not necessarily needed here
-    override fun toString() = (if (isStatic) "s " else "") + clazz.replace('/', '.') + '.' + name + ": " + descriptor
+    override fun toString() = (if (isStatic) "s " else "") + clazz + '.' + name + ": " + descriptor
 }
