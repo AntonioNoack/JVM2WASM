@@ -16,6 +16,7 @@ import me.anno.ecs.components.mesh.Mesh;
 import me.anno.ecs.components.mesh.MeshComponent;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
 import me.anno.engine.EngineBase;
+import me.anno.engine.Events;
 import me.anno.engine.WindowRenderFlags;
 import me.anno.engine.ui.control.DraggingControlSettings;
 import me.anno.engine.ui.render.SceneView;
@@ -25,6 +26,7 @@ import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
 import me.anno.gpu.GFX;
 import me.anno.gpu.OSWindow;
+import me.anno.gpu.RenderStep;
 import me.anno.gpu.WindowManagement;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
@@ -60,7 +62,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import static engine.GFXBase2Kt.renderFrame2;
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.getInstanceSizeNonArray;
@@ -193,66 +194,73 @@ public class Engine {
         }
         WindowManagement.updateWindows();
         Time.updateTime(dt, System.nanoTime());
-        renderFrame2(window); // easier, less stuff from other systems
+
+        GFX.activeWindow = window;
+        RenderStep.beforeRenderSteps();
+        RenderStep.renderStep(window, true);
+        Input.INSTANCE.resetFrameSpecificKeyStates();
+    }
+
+    private static void addEvent(Runnable runnable) {
+        Events.INSTANCE.addEvent(() -> {
+            runnable.run();
+            return Unit.INSTANCE;
+        });
     }
 
     @Export
     public static void mouseMove(float mouseX, float mouseY) {
         if (window == null) return;
-        Input.INSTANCE.onMouseMove(window, mouseX, mouseY);
+        addEvent(() -> Input.INSTANCE.onMouseMove(window, mouseX, mouseY));
     }
 
     @Export
     public static void keyDown(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key), System.nanoTime());
+        long time = System.nanoTime();
+        addEvent(() -> Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key), time));
     }
 
     @Export
     public static void keyUp(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key));
+        addEvent(() -> Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key)));
     }
 
     @Export
     public static void keyTyped(int key) {
         if (window == null) return;
-        Input.INSTANCE.onKeyTyped(window, Key.Companion.byId(key));
+        addEvent(() -> Input.INSTANCE.onKeyTyped(window, Key.Companion.byId(key)));
     }
 
     @Export
     public static void charTyped(int key, int mods) {
         if (window == null) return;
-        Input.INSTANCE.onCharTyped(window, key, mods);
+        addEvent(() -> Input.INSTANCE.onCharTyped(window, key, mods));
     }
 
     @Export
     public static void mouseDown(int key) {
         if (window == null) return;
-        Input.INSTANCE.onMousePress(window, Key.Companion.byId(key));
+        addEvent(() -> Input.INSTANCE.onMousePress(window, Key.Companion.byId(key)));
     }
 
     @Export
     public static void mouseUp(int key) {
         if (window == null) return;
-        // todo bug: right click is calling Mouse-Click even after having moved a large distance, which is annoying
-        Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key));
+        addEvent(() -> Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key)));
     }
 
     @Export
     public static void mouseWheel(float dx, float dy) {
         if (window == null) return;
-        Input.INSTANCE.onMouseWheel(window, dx, dy, true);
+        addEvent(() -> Input.INSTANCE.onMouseWheel(window, dx, dy, true));
     }
 
     @Export
     public static void keyModState(int state) {
-        // control: 2
-        // shift: 1
-        // capslock: 16
-        // alt: 4
-        // super: 8
-        Input.INSTANCE.setKeyModState(state);
+        // shift: 1, control: 2, alt: 4, super: 8, capslock: 16
+        addEvent(() -> Input.INSTANCE.setKeyModState(state));
     }
 
     @NoThrow
