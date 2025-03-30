@@ -158,6 +158,7 @@ val classReplacements = hashMapOf(
     // "java/util/stream/IntStream" to "jvm/utf8/IntStreamV2", // only used for codepoints()
     "kotlin/SynchronizedLazyImpl" to "jvm/custom/SimpleLazy",
     "java/io/File" to "jvm/custom/File",
+    "java/io/RandomAccessFile" to "jvm/custom/RandomAccessFile",
     "java/nio/file/Path" to "jvm/custom/File",
     "java/nio/file/Files" to "jvm/custom/File",
     "java/net/URL" to "jvm/custom/File",

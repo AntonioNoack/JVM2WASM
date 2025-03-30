@@ -1,6 +1,7 @@
 package jvm;
 
 import annotations.Alias;
+import annotations.Export;
 import annotations.NoThrow;
 
 import java.lang.reflect.Field;
@@ -50,13 +51,13 @@ public class GCTraversal {
         // log("Finished validation");
     }
 
+    @Export
     @NoThrow
     @Alias(names = "gcMarkUsed")
     private static void traverse(Object instance) {
         // check addr for ignored sections and NULL
         if (!isDynamicInstance(instance)) return; // no need for GC
         byte state = readI8AtOffset(instance, GC_OFFSET);
-        byte iter = iteration;
 
         int classId = readClassId(instance);
         /*if (classId >= 0 && classId < numClasses()) {
@@ -67,6 +68,7 @@ public class GCTraversal {
             throw new IllegalStateException();
         }*/
 
+        byte iter = iteration;
         if (state == iter) return; // already handled
 
         writeI8AtOffset(instance, GC_OFFSET, iter);

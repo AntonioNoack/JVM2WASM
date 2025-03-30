@@ -111,7 +111,7 @@ public class NioFileSystem extends FileSystem {
     public WatchService newWatchService() throws IOException {
         return new WatchService() {
             @Override
-            public void close() throws IOException {
+            public void close() {
 
             }
 
@@ -121,12 +121,12 @@ public class NioFileSystem extends FileSystem {
             }
 
             @Override
-            public WatchKey poll(long l, TimeUnit timeUnit) throws InterruptedException {
+            public WatchKey poll(long l, TimeUnit timeUnit) {
                 return null;
             }
 
             @Override
-            public WatchKey take() throws InterruptedException {
+            public WatchKey take() {
                 return null;
             }
         };

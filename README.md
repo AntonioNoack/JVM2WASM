@@ -20,6 +20,10 @@ This probably decreases performance as well.
 The resulting file is quite large at the moment, partially because a lot of unnecessary functions are encoded,
 and because they take up quite a bit of space.
 
+## Demos
+- [Snake](https://remsengine.phychi.com/jvm2wasm/snake/) (on a repeating, infinite grid)
+- [Rem's Engine](https://remsengine.phychi.com/jvm2wasm/editor/) (mainly interesting for render modes at the moment)
+
 ## Main class
 The main class for translation is [JVM2WASM.kt](src/JVM2WASM.kt). It controls, where class indexing should start,
 and which classes shall be replaced by others (to reduce total executable size).

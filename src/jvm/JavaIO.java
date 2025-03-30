@@ -79,10 +79,6 @@ public class JavaIO {
         throwJs();
     }
 
-    @Alias(names = "java_io_RandomAccessFile_close_V")
-    public static void java_io_RandomAccessFile_close_V(Object instance) {
-    }
-
     @Alias(names = "java_lang_ClassLoader_checkCreateClassLoader_Ljava_lang_Void")
     public static Object java_lang_ClassLoader_checkCreateClassLoader_Ljava_lang_Void() {
         // nothing to do

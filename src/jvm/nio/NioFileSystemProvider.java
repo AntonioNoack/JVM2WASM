@@ -26,7 +26,7 @@ public class NioFileSystemProvider extends FileSystemProvider {
     }
 
     @Override
-    public FileSystem newFileSystem(URI uri, Map<String, ?> map) throws IOException {
+    public FileSystem newFileSystem(URI uri, Map<String, ?> map) {
         throw new NotImplementedError();
         // return null;
     }
@@ -43,17 +43,17 @@ public class NioFileSystemProvider extends FileSystemProvider {
     }
 
     @Override
-    public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> set, FileAttribute<?>... fileAttributes) throws IOException {
+    public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> set, FileAttribute<?>... fileAttributes) {
         return null;
     }
 
     @Override
-    public DirectoryStream<Path> newDirectoryStream(Path path, DirectoryStream.Filter<? super Path> filter) throws IOException {
+    public DirectoryStream<Path> newDirectoryStream(Path path, DirectoryStream.Filter<? super Path> filter) {
         return null;
     }
 
     @Override
-    public void createDirectory(Path path, FileAttribute<?>... fileAttributes) throws IOException {
+    public void createDirectory(Path path, FileAttribute<?>... fileAttributes) {
 
     }
 
@@ -73,8 +73,8 @@ public class NioFileSystemProvider extends FileSystemProvider {
     }
 
     @Override
-    public boolean isSameFile(Path path, Path path1) throws IOException {
-        return false;
+    public boolean isSameFile(Path path, Path path1) {
+        return path.equals(path1);
     }
 
     @Override
@@ -83,12 +83,12 @@ public class NioFileSystemProvider extends FileSystemProvider {
     }
 
     @Override
-    public FileStore getFileStore(Path path) throws IOException {
+    public FileStore getFileStore(Path path) {
         return null;
     }
 
     @Override
-    public void checkAccess(Path path, AccessMode... accessModes) throws IOException {
+    public void checkAccess(Path path, AccessMode... accessModes) {
 
     }
 
@@ -98,17 +98,17 @@ public class NioFileSystemProvider extends FileSystemProvider {
     }
 
     @Override
-    public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> aClass, LinkOption... linkOptions) throws IOException {
+    public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> aClass, LinkOption... linkOptions) {
         return null;
     }
 
     @Override
-    public Map<String, Object> readAttributes(Path path, String s, LinkOption... linkOptions) throws IOException {
+    public Map<String, Object> readAttributes(Path path, String s, LinkOption... linkOptions) {
         return null;
     }
 
     @Override
-    public void setAttribute(Path path, String s, Object o, LinkOption... linkOptions) throws IOException {
+    public void setAttribute(Path path, String s, Object o, LinkOption... linkOptions) {
 
     }
 }
