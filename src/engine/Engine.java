@@ -352,7 +352,7 @@ public class Engine {
             "}\n" +
             "img.src = str(arg0);\n" +
             "")
-    private static native void generateTexture(String path, Texture2D texture, Callback<ITexture2D> callback);
+    private static native void generateTexture(String path, Texture2D texture, Callback<?> textureCallback);
 
     @Export
     @UsedIfIndexed
@@ -761,5 +761,11 @@ public class Engine {
     @Alias(names = "me_anno_maths_Maths_random_D")
     public static double Maths_random_D() {
         return ThreadLocalRandom.INSTANCE.nextDouble();
+    }
+
+    @NoThrow
+    @Alias(names = "me_anno_gpu_GLNames_discoverOpenGLNames_V")
+    public static void GLNames_discoverOpenGLNames() {
+        // engine will be shipped, so nothing to discover here
     }
 }

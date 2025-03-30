@@ -169,7 +169,6 @@ try {
 
         /*var supportsFP16 = !!*/gl.getExtension("EXT_color_buffer_half_float")
         /*var supportsFP32 = !!*/gl.getExtension("EXT_color_buffer_float")
-        gl.getExtension('WEBGL_color_buffer_float')
 
         console.log("Calling main function")
         safe(lib.engine_Engine_main_Ljava_lang_StringV(0))
@@ -288,8 +287,6 @@ try {
         34:267,
         36:268,
         35:269,
-        37:270,
-        38:271,
         45:260,
         46:261,
     }
@@ -308,7 +305,7 @@ try {
         if(lib && inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
             lib.engine_Engine_keyModState_IV(calcMods(e))
             lib.engine_Engine_keyDown_IV(keyMap[e.keyCode] || e.keyCode)
-            if(e.key.length == 1) lib.engine_Engine_charTyped_IIV(e.key.charCodeAt(0), calcMods(e))
+            if(e.key.length == 1 && !e.ctrlKey) lib.engine_Engine_charTyped_IIV(e.key.charCodeAt(0), calcMods(e))
             e.preventDefault()
         }
     }
