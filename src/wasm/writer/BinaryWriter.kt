@@ -3,11 +3,12 @@ package wasm.writer
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
+import me.anno.utils.structures.lists.Lists.none2
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
-import org.apache.logging.log4j.LogManager
 import utils.WASMTypes.*
 import wasm.instr.*
+import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
 import wasm.parser.FunctionImpl
 import wasm.parser.LocalVariable
@@ -16,14 +17,10 @@ import wasm.parser.LocalVariable
  * Valid source code: https://github.com/WebAssembly/wabt/blob/main/src/binary-writer.cc
  *
  * */
-class BinaryWriter(
-    val stream: ByteArrayList,
-    val module: Module,
-) {
+class BinaryWriter(val stream: ByteArrayList, val module: Module) {
 
     companion object {
-        private val LOGGER = LogManager.getLogger(BinaryWriter::class)
-        val kInvalidIndex = -1
+        const val kInvalidIndex = -1
     }
 
     private fun ByteArrayList.write(v: Int) {
@@ -57,13 +54,11 @@ class BinaryWriter(
     private val BINARY_MAGIC = 0x6d736100 // \0asm
     private val BINARY_VERSION = 1
 
-    var lastSectionPayloadOffset = 0
     val MAX_U32_LEB128_BYTES = 5
 
-    fun writeSectionHeader(type: SectionType) {
+    fun writeSectionHeader(type: SectionType): Int {
         stream.write(type.ordinal)
-        lastSectionOffset = writeU32Leb128Space()
-        lastSectionPayloadOffset = stream.size
+        return writeU32Leb128Space()
     }
 
     fun writeU32Leb128Space(): Int {
@@ -109,20 +104,32 @@ class BinaryWriter(
         assertEquals(5, MAX_U32_LEB128_BYTES)
     }
 
-    fun beginKnownSection(type: SectionType) {
-        writeSectionHeader(type)
+    fun beginKnownSection(type: SectionType): Int {
+        return writeSectionHeader(type)
     }
 
-    fun beginSection(type: SectionType, numElements: Int) {
-        LOGGER.info("Writing section $type, x$numElements @${stream.size}")
-        beginKnownSection(type)
+    fun beginCustomSection(name: String): Int {
+        val ptr = beginKnownSection(SectionType.CUSTOM)
+        writeStr(name)
+        return ptr
+    }
+
+    fun beginSubSection(): Int {
+        return writeU32Leb128Space()
+    }
+
+    fun beginSection(type: SectionType, numElements: Int): Int {
+        val ptr = beginKnownSection(type)
         writeS32Leb128(numElements)
+        return ptr
     }
 
-    var lastSectionOffset = 0
+    fun endSection(ptr: Int) {
+        writeFixupU32Leb128Size(ptr)
+    }
 
-    fun endSection() {
-        writeFixupU32Leb128Size(lastSectionOffset)
+    fun endSubSection(ptr: Int) {
+        writeFixupU32Leb128Size(ptr)
     }
 
     fun writeStr(name: String) {
@@ -216,7 +223,7 @@ class BinaryWriter(
             is LoadInstr, is StoreInstr -> {
                 // must be handled differently than SimpleInstr
                 writeOpcode((instr as SimpleInstr).opcode)
-                val alignment = when(instr){
+                val alignment = when (instr) {
                     is LoadInstr -> instr.numBytes
                     is StoreInstr -> instr.numBytes
                     else -> 0
@@ -344,16 +351,15 @@ class BinaryWriter(
     private fun writeTypeSection() {
         val types = module.types
         if (types.isEmpty()) return
-        beginSection(SectionType.TYPE, types.size)
+        val ptr = beginSection(SectionType.TYPE, types.size)
         for (i in types.indices) {
             val type = types[i]
             when (type.kind) {
                 TypeKind.FUNC -> {
-                    val funcType = type as FuncType
-                    val sig = funcType.sig
+                    val funcType = type as FuncTypeI
                     writeType(TypeKind.FUNC)
-                    writeParams(sig.paramTypes)
-                    writeParams(sig.resultTypes)
+                    writeParams(funcType.paramTypes)
+                    writeParams(funcType.resultTypes)
                 }
                 TypeKind.STRUCT -> {
                     val type2 = type as StructType
@@ -373,13 +379,13 @@ class BinaryWriter(
                 else -> throw NotImplementedError()
             }
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeImportSection() {
         val imports = module.imports
         if (imports.isEmpty()) return
-        beginSection(SectionType.IMPORT, imports.size)
+        val ptr = beginSection(SectionType.IMPORT, imports.size)
         for (i in imports.indices) {
             val import = imports[i]
             writeStr(import.moduleName)
@@ -388,7 +394,7 @@ class BinaryWriter(
             when (import.kind) {
                 ExternalKind.FUNC -> {
                     numFuncImports++
-                    writeU32Leb128((import as FuncImport).declIndex)
+                    writeS32Leb128((import as FuncImport).index)
                 }
                 ExternalKind.TABLE -> {
                     numTableImports++
@@ -408,80 +414,80 @@ class BinaryWriter(
                 }
             }
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeFunctionSection() {
         val numFunctions = module.functions.size - numFuncImports
         assertTrue(numFunctions >= 0)
         if (numFunctions == 0) return
-        beginSection(SectionType.FUNCTION, numFunctions)
+        val ptr = beginSection(SectionType.FUNCTION, numFunctions)
         for (i in numFuncImports until module.functions.size) {
             writeS32Leb128(module.functions[i].typeIndex)
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeTableSection() {
         val numTables = module.tables.size - numTableImports
         assertTrue(numTables >= 0)
         if (numTables == 0) return
-        beginSection(SectionType.TABLE, numTables)
+        val ptr = beginSection(SectionType.TABLE, numTables)
         for (i in numTableImports until module.tables.size) {
             writeTable(module.tables[i])
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeMemorySection() {
         val numMemories = module.memories.size - numMemoryImports
         assertTrue(numMemories >= 0)
         if (numMemories == 0) return
-        beginSection(SectionType.MEMORY, numMemories)
+        val ptr = beginSection(SectionType.MEMORY, numMemories)
         for (i in numMemoryImports until module.memories.size) {
             writeMemory(module.memories[i])
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeTagsSection() {
         val numTags = module.tags.size - numTagImports
         assertTrue(numTags >= 0)
         if (numTags == 0) return
-        beginSection(SectionType.TAG, numTags)
+        val ptr = beginSection(SectionType.TAG, numTags)
         for (i in numTagImports until module.tags.size) {
             writeU32Leb128(module.tags[i].funcTypeIndex)
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeGlobalsSection() {
         val numGlobals = module.globals.size - numGlobalImports
         assertTrue(numGlobals >= 0)
         if (numGlobals == 0) return
-        beginSection(SectionType.GLOBAL, numGlobals)
+        val ptr = beginSection(SectionType.GLOBAL, numGlobals)
         for (i in numGlobalImports until module.globals.size) {
             val global = module.globals[i]
             writeGlobalHeader(global)
             writeInitExpr(global.initExpr)
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeExportsSection() {
         if (module.exports.isEmpty()) return
-        beginSection(SectionType.EXPORT, module.exports.size)
+        val ptr = beginSection(SectionType.EXPORT, module.exports.size)
         for (export in module.exports) {
             writeStr(export.name)
             stream.write(export.kind.ordinal)
             writeS32Leb128(export.valueIndex)
         }
-        endSection()
+        endSection(ptr)
     }
 
-    fun writeElemSection() {
+    private fun writeElemSection() {
         if (module.elemSegments.isEmpty()) return
-        beginSection(SectionType.ELEM, module.elemSegments.size)
+        val ptr = beginSection(SectionType.ELEM, module.elemSegments.size)
         for (elemSegment in module.elemSegments) {
             stream.write(elemSegment.flags)
             assertEquals(0, elemSegment.flags) // nothing else was implemented
@@ -491,7 +497,7 @@ class BinaryWriter(
                 writeS32Leb128(elemSegment.functionTable[i])
             }
         }
-        endSection()
+        endSection(ptr)
     }
 
     private fun writeFuncLocals(locals: List<LocalVariable>) {
@@ -523,17 +529,16 @@ class BinaryWriter(
         writeOpcode(Opcode.END)
     }
 
-    fun writeCodeSection() {
+    private fun writeCodeSection() {
         if (module.code.isEmpty()) return
-        beginSection(SectionType.CODE, module.code.size)
+        val ptr = beginSection(SectionType.CODE, module.code.size)
         for (func in module.code) {
-            val start = writeU32Leb128Space()
+            val start = beginSubSection()
             writeFunc(func)
-            writeFixupU32Leb128Size(start)
-
+            endSubSection(start)
             // todo relocations???
         }
-        endSection()
+        endSection(ptr)
     }
 
     private var numFuncImports = 0
@@ -545,6 +550,86 @@ class BinaryWriter(
     private fun writeHeader() {
         stream.writeLE32(BINARY_MAGIC)
         stream.writeLE32(BINARY_VERSION)
+    }
+
+    private fun writeNames(type: NameSectionSubsectionType, names: List<String>) {
+        if (names.none2 { it.isNotEmpty() }) return
+        stream.write(type.ordinal)
+        val ptr = beginSubSection()
+        writeU32Leb128(names.size)
+        val maxNameLength = 16
+        for (i in names.indices) {
+            var name = names[i]
+            if (name.isEmpty()) continue
+            if (name.length > maxNameLength) name = name.substring(0, maxNameLength)
+            writeS32Leb128(i)
+            writeStr(name)
+        }
+        endSubSection(ptr)
+    }
+
+    private fun writeFuncNameSection() {
+        /** name-subsections:
+         * 0: "module",
+         * 1: "function",
+         * 2: "local",
+         * 3: "label",
+         * 4: "type",
+         * 5: "table",
+         * 6: "memory",
+         * 7: "global",
+         * 8: "elemseg",
+         * 9: "dataseg",
+         * a: "field",
+         * b: "tag",
+         * */
+        val ptr = beginCustomSection("name")
+
+        // todo writing these names is broken... why/how???
+        if (false) writeNames(
+            NameSectionSubsectionType.FUNCTION,
+            module.imports.filter { it.kind == ExternalKind.FUNC }.map { it.fieldName } +
+                    module.code.map { it.funcName }
+        )
+
+        if (false) {
+            writeU32Leb128(NameSectionSubsectionType.LABEL.ordinal) // local name type
+            val ptr1 = beginSubSection()
+            writeU32Leb128(module.code.size)
+            for (i in module.code.indices) {
+                val func = module.code[i]
+                writeU32Leb128(i + numFuncImports)
+                writeU32Leb128(func.locals.size)
+                for ((j, local) in func.locals.withIndex()) {
+                    writeU32Leb128(j)
+                    writeStr(local.name)
+                }
+            }
+            endSubSection(ptr1)
+        }
+
+        // types? we have names for some of them...
+        // writeNames()
+
+        writeNames(NameSectionSubsectionType.TYPE, module.types.map { (it as? FuncTypeI)?.name ?: "" })
+        writeNames(NameSectionSubsectionType.GLOBAL, module.globals.map { it.name })
+
+        endSection(ptr)
+    }
+
+    private fun writeDataSections() {
+        val dataSections = module.dataSections
+        if (dataSections.isEmpty()) return
+        val ptr = beginSection(SectionType.DATA, dataSections.size)
+        for (i in dataSections.indices) {
+            val dataSection = dataSections[i]
+            val flags = 0
+            stream.write(flags)
+            writeInitExpr(listOf(i32Const(dataSection.startIndex)))
+            writeS32Leb128(dataSection.content.size)
+            stream.write(dataSection.content)
+        }
+        endSection(ptr)
     }
 
     fun write() {
@@ -561,6 +646,9 @@ class BinaryWriter(
         writeElemSection()
         // bulk-memory-DataCount-section
         writeCodeSection()
+        writeDataSections()
+        // append code metadata?
+        writeFuncNameSection()
     }
 
 }

@@ -14,21 +14,20 @@ import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.WATParser
 import wasm.writer.*
-import wasm.writer.FuncType
 import wasm.writer.Function
 
-fun FunctionImpl.toFuncType(): wasm.instr.FuncType {
-    return wasm.instr.FuncType(params.map { it.wasmType }, results)
+fun FunctionImpl.toFuncType(): FuncType {
+    return FuncType(params.map { it.wasmType }, results)
 }
 
 lateinit var functionNameToIndex: Map<String, Int>
 
-val typeToIndex = HashMap<wasm.instr.FuncType, Int>(64)
-val typesList = ArrayList<wasm.instr.FuncType>()
+val typeToIndex = HashMap<FuncType, Int>(64)
+val typesList = ArrayList<FuncType>()
 
 lateinit var globalToIndex: Map<String, GlobalVariable>
 
-fun getTypeIndex(funcType: wasm.instr.FuncType): Int {
+fun getTypeIndex(funcType: FuncType): Int {
     return typeToIndex.getOrPut(funcType) {
         typesList.add(funcType)
         typeToIndex.size
@@ -42,17 +41,16 @@ fun insertIndicesAndDepths(instr: Instruction, depth: Int) {
             ?: throw IllegalStateException("Missing index for ${instr.name}")
         is CallIndirect -> instr.typeIndex = getTypeIndex(instr.type)
         is LoopInstr -> {
-            instr.typeIndex = getTypeIndex(wasm.instr.FuncType(instr.params, instr.results))
+            instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results))
             assertNull(branchDepth.put(instr.label, depth))
             insertIndicesAndDepths(instr.body, depth + 1)
             assertEquals(depth, branchDepth.remove(instr.label))
         }
         is IfBranch -> {
-            instr.typeIndex = getTypeIndex(wasm.instr.FuncType(instr.params, instr.results))
-            // todo do we need to increase the depth???
-            val inc = 0
-            insertIndicesAndDepths(instr.ifTrue, depth + inc)
-            insertIndicesAndDepths(instr.ifFalse, depth + inc)
+            instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results))
+            val nextDepth = depth + 1
+            insertIndicesAndDepths(instr.ifTrue, nextDepth)
+            insertIndicesAndDepths(instr.ifFalse, nextDepth)
         }
         // depth is relative, and -1
         is Jump -> instr.depth = depth - branchDepth[instr.label]!! - 1
@@ -74,11 +72,13 @@ fun main() {
     val clock = Clock("WASMWriter")
     val text = wasmTextFile.readTextSync()
     clock.stop("Read WAT")
+
     // tokenize it
     val parser = WATParser()
     parser.parse(text)
     clock.stop("Parsing")
 
+    // write it as binary WASM
     val functions = parser.functions
     val imports = parser.imports
     for (i in functions.indices) {
@@ -133,20 +133,19 @@ fun main() {
         types = typeToIndex.entries
             .sortedBy { it.value }.map { it.key }
             .map { func ->
-                FuncType(Sig(func.params.map { param ->
+                FuncTypeI(func.toString(), func.params.map { param ->
                     typeToType[param]!!
                 }, func.results.map { result ->
                     typeToType[result]!!
-                }))
+                })
             },
         imports = listOf(MemoryImport("js", "mem", memory)) +
                 parser.imports.map {
-                    // todo what is declIndex???
                     // (import "jvm" "java_io_BufferedInputStream_close_V" (func $java_io_BufferedInputStream_close_V (param i32) (result i32)))
-                    FuncImport("jvm", it.funcName, 0)
+                    FuncImport("jvm", it.funcName, getTypeIndex(it.toFuncType()))
                 },
         functions = (parser.imports + parser.functions).map { func ->
-            Function(typeToIndex[wasm.instr.FuncType(func.params.map { it.wasmType }, func.results)]!!)
+            Function(typeToIndex[FuncType(func.params.map { it.wasmType }, func.results)]!!)
         },
         tables = listOf(table),
         memories = listOf(memory),
@@ -155,7 +154,12 @@ fun main() {
             .sortedBy { it.key }.map { it.value }
             .map { global ->
                 assertEquals(i32, global.wasmType)
-                Global(listOf(i32Const(global.initialValue)), typeToType[global.wasmType]!!, global.isMutable)
+                Global(
+                    global.name,
+                    listOf(i32Const(global.initialValue)),
+                    typeToType[global.wasmType]!!,
+                    global.isMutable
+                )
             },
         exports = parser.functions
             .filter { it.isExported }
@@ -175,21 +179,12 @@ fun main() {
                 }
             )
         ),
-        code = parser.functions
+        code = parser.functions,
+        dataSections = parser.dataSections
     )
 
     val stream = ByteArrayList(1024)
-    val writer = BinaryWriter(stream, module)
-    try {
-        writer.write()
-    } catch (e: Throwable) {
-        e.printStackTrace()
-        for (i in 0 until 10_000) {
-            stream.add(0)
-        }
-        writer.endSection()
-    }
-
+    BinaryWriter(stream, module).write()
     clock.stop("Writing")
 
     wasmFolder.getChild("jvm2wasm.test.wasm")

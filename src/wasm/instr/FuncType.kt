@@ -36,6 +36,12 @@ data class FuncType(val params: List<String>, val results: List<String>) {
         }
     }
 
+    override fun toString(): String {
+        val tmp = StringBuilder2()
+        toString(tmp)
+        return tmp.toString()
+    }
+
     fun toString(dst: StringBuilder2) {
         for (param in params) {
             dst.append(getTypeChar(param))

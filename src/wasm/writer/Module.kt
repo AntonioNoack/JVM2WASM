@@ -1,5 +1,6 @@
 package wasm.writer
 
+import wasm.parser.DataSection
 import wasm.parser.FunctionImpl
 
 class Module(
@@ -13,5 +14,6 @@ class Module(
     val exports: List<Export>,
     val starts: List<Start>,
     val elemSegments: List<ElemSegment>,
-    val code: List<FunctionImpl>
+    val code: List<FunctionImpl>,
+    val dataSections: List<DataSection>
 )
