@@ -20,7 +20,14 @@ import wasm.parser.LocalVariable
 class BinaryWriter(val stream: ByteArrayList, val module: Module) {
 
     companion object {
-        const val kInvalidIndex = -1
+        const val K_INVALID_INDEX = -1
+        private const val BINARY_MAGIC = 0x6d736100 // \0asm
+        private const val BINARY_VERSION = 1
+        private const val MAX_U32_LEB128_BYTES = 5
+
+        private const val BINARY_LIMITS_HAS_MAX_FLAG = 1
+        private const val BINARY_LIMITS_IS_SHARED_FLAG = 2
+        private const val BINARY_LIMITS_IS_64_FLAG = 4
     }
 
     private fun ByteArrayList.write(v: Int) {
@@ -51,17 +58,12 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         addUnsafe((v ushr 56).toByte())
     }
 
-    private val BINARY_MAGIC = 0x6d736100 // \0asm
-    private val BINARY_VERSION = 1
-
-    val MAX_U32_LEB128_BYTES = 5
-
-    fun writeSectionHeader(type: SectionType): Int {
+    private fun writeSectionHeader(type: SectionType): Int {
         stream.write(type.ordinal)
         return writeU32Leb128Space()
     }
 
-    fun writeU32Leb128Space(): Int {
+    private fun writeU32Leb128Space(): Int {
         val startAddress = stream.size
         for (i in 0 until MAX_U32_LEB128_BYTES) {
             stream.add(0)
@@ -104,45 +106,46 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         assertEquals(5, MAX_U32_LEB128_BYTES)
     }
 
-    fun beginKnownSection(type: SectionType): Int {
+    private fun beginKnownSection(type: SectionType): Int {
         return writeSectionHeader(type)
     }
 
-    fun beginCustomSection(name: String): Int {
+    @Suppress("SameParameterValue")
+    private fun beginCustomSection(name: String): Int {
         val ptr = beginKnownSection(SectionType.CUSTOM)
         writeStr(name)
         return ptr
     }
 
-    fun beginSubSection(): Int {
+    private fun beginSubSection(): Int {
         return writeU32Leb128Space()
     }
 
-    fun beginSection(type: SectionType, numElements: Int): Int {
+    private fun beginSection(type: SectionType, numElements: Int): Int {
         val ptr = beginKnownSection(type)
         writeS32Leb128(numElements)
         return ptr
     }
 
-    fun endSection(ptr: Int) {
+    private fun endSection(ptr: Int) {
         writeFixupU32Leb128Size(ptr)
     }
 
-    fun endSubSection(ptr: Int) {
+    private fun endSubSection(ptr: Int) {
         writeFixupU32Leb128Size(ptr)
     }
 
-    fun writeStr(name: String) {
-        val bytes = name.toByteArray()
+    private fun writeStr(name: String) {
+        val bytes = name.encodeToByteArray()
         writeU32Leb128(bytes.size)
         stream.write(bytes)
     }
 
-    fun writeS32Leb128(v: Int) {
+    private fun writeS32Leb128(v: Int) {
         writeS64Leb128(v.toLong())
     }
 
-    fun writeS64Leb128(v: Long) {
+    private fun writeS64Leb128(v: Long) {
         var value = v
         if (v < 0) {
             while (true) {
@@ -169,7 +172,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         }
     }
 
-    fun writeType(type: TypeKind) {
+    private fun writeType(type: TypeKind) {
         writeS32Leb128(type.id)
     }
 
@@ -180,11 +183,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         }
     }
 
-    val BINARY_LIMITS_HAS_MAX_FLAG = 1
-    val BINARY_LIMITS_IS_SHARED_FLAG = 2
-    val BINARY_LIMITS_IS_64_FLAG = 4
-
-    fun writeLimits(limits: Limits) {
+    private fun writeLimits(limits: Limits) {
         var flags = 0
         if (limits.hasMax) flags = flags or BINARY_LIMITS_HAS_MAX_FLAG
         if (limits.isShared) flags = flags or BINARY_LIMITS_IS_SHARED_FLAG
@@ -199,25 +198,21 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         }
     }
 
-    fun writeMemory(memory: Memory) {
+    private fun writeMemory(memory: Memory) {
         writeLimits(memory.pageLimits)
     }
 
-    fun writeTable(table: Table) {
+    private fun writeTable(table: Table) {
         writeType(table.elemType)
         writeLimits(table.elemLimits)
     }
 
-    fun writeGlobalHeader(global: Global) {
+    private fun writeGlobalHeader(global: Global) {
         writeType(global.type)
         stream.write(if (global.mutable) 1 else 0)
     }
 
-    fun writeBlockDecl(decl: Int) {
-        TODO()
-    }
-
-    fun writeExpr(func: FunctionImpl?, instr: Instruction) {
+    private fun writeExpr(func: FunctionImpl?, instr: Instruction) {
         when (instr) {
             is Comment -> {}
             is LoadInstr, is StoreInstr -> {
@@ -332,11 +327,11 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         }
     }
 
-    fun writeOpcode(opcode: Opcode) {
+    private fun writeOpcode(opcode: Opcode) {
         stream.write(opcode.opcode)
     }
 
-    fun writeInitExpr(expr: List<Instruction>) {
+    private fun writeInitExpr(expr: List<Instruction>) {
         writeExprList(null, expr)
         writeOpcode(Opcode.END)
     }
@@ -391,27 +386,28 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
             writeStr(import.moduleName)
             writeStr(import.fieldName)
             stream.write(import.kind.ordinal)
-            when (import.kind) {
-                ExternalKind.FUNC -> {
+            when (import) {
+                is FuncImport -> {
                     numFuncImports++
-                    writeS32Leb128((import as FuncImport).index)
+                    writeS32Leb128(import.index)
                 }
-                ExternalKind.TABLE -> {
+                is TableImport -> {
                     numTableImports++
-                    writeTable((import as TableImport).table)
+                    writeTable(import.table)
                 }
-                ExternalKind.MEMORY -> {
+                is MemoryImport -> {
                     numMemoryImports++
-                    writeMemory((import as MemoryImport).memory)
+                    writeMemory(import.memory)
                 }
-                ExternalKind.GLOBAL -> {
+                is GlobalImport -> {
                     numGlobalImports++
-                    writeGlobalHeader((import as GlobalImport).global)
+                    writeGlobalHeader(import.global)
                 }
-                ExternalKind.TAG -> {
+                is TagImport -> {
                     numTagImports++
-                    writeU32Leb128((import as TagImport).tag.funcTypeIndex)
+                    writeU32Leb128(import.tag.funcTypeIndex)
                 }
+                else -> throw NotImplementedError()
             }
         }
         endSection(ptr)
