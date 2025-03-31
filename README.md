@@ -1,6 +1,6 @@
-# JVM2WASM
+# JVM2WASM / JVM2CPP
 
-This project is a compiler from JVM to WASM for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
+This project is a compiler from Java/Kotlin/JVM to WASM and C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
 It has a [garbage collector](src/jvm/GC.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
 The target JVM language is Java 8 (lambdas).
 
