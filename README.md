@@ -20,8 +20,8 @@ and which classes shall be replaced by others (to reduce total executable size).
 
 ## Quirks
 - I replaced the java.lang.String contents with UTF-8, because that's more sensible imo and saves memory.
-- There is only a single thread. It cannot sleep (because that's impossible in JavaScript).
-- There is only asynchronous IO via JavaScript bindings, because JavaScript has no synchronous IO (or it shouldn't be used, because that would block the UI thread).
+- There is only a single thread. It cannot sleep, because that's impossible in JavaScript.
+- There is only asynchronous IO via JavaScript bindings, because JavaScript has no synchronous IO, or it shouldn't be used, because that would block the UI thread.
 - My Java-8 implementation is lackluster in relation to lambdas: I only support Java-native lambdas.
 - It is precompiled, so at runtime, classes are immutable, and no additional .jars can be loaded.
 - Reflection is partially supported: constructors, methods and fields exist if they are used. Methods only if they have few arguments (because I haven't solved it programmatically yet). Annotations for anything else but fields aren't supported yet.
@@ -58,11 +58,13 @@ public static native boolean unsignedLessThan(int a, int b);
 
 ## WASM2CPP
 
-For running my engine in pure C++ environments, I also created a transpiler from WASM text to C++. The performance is ok-ish, running
-at 150 fps on my Ryzen 7950x3D with lots of security features disabled (max-performance mode), and rendering testSceneWithUI() with a low-poly sphere.
-The same program runs at 417 fps in Java, and ideally would achieve 600+ fps.
+For running my engine in pure C++ environments, I also created a transpiler from WASM text to C++. The performance is fine, running
+at 312 fps on my Ryzen 7950x3D with lots of security features disabled (max-performance mode), and rendering testSceneWithUI() with a medium-poly sphere.
+The same program runs at 308 fps in Java, so practically a tie.
 
 The benefit of C++ over WASM is that jumps are supported natively, so there isn't much overhead for them.
+This can be observed when the GPU isn't used much: just rendering the color of the sphere results in ~1700 fps in C++ and ~900 fps in Java.
+Also, you might have an easier time connecting to native APIs, reducing the bridge code necessary compared to Java Native Interface (JNI).
 
 The standard-library for running in C++ is pretty bare-bones at the moment, not being able to load files, not having network access, and having no font mechanism except the engine fallback (7-segment-like).
 
@@ -90,7 +92,7 @@ Inspired by the parallel GC crashing during development, I also developed a conc
 the load is spread out over multiple frames, reducing FPS slightly (5ms first frame, ~1ms/frame) for a few frames, for a second.
 It only crashed after 236,000 iterations (why ever). This is the best choice for stability and performance.
 
-### Performance Comparison using SciMark 2.0a
+## Performance Comparison using SciMark 2.0a
 
 | Performance Test                 | Amazon JDK    | WASM in Chrome      | C++ (Debug)          | C++ (Release)          |
 |----------------------------------|---------------|---------------------|----------------------|------------------------|
@@ -101,7 +103,7 @@ It only crashed after 236,000 iterations (why ever). This is the best choice for
 | Sparse MatMult (N=1000, nz=5000) | 4086.42       | 86.39 (47x slower)  | 206.22 (20x slower)  | 4050.12 (tie)          |
 | LU (100x100)                     | 12511.65      | 87.54 (142x slower) | 94.55 (132x slower)  | 5502.60 (2.27x slower) |
 
-## System Information
+### System Information
 
 - **Java Version**: 1.8.0_402 Corretto (Amazon.com Inc.)
 - **OS**: Windows 10 (10.0.19045, amd64)
@@ -113,9 +115,9 @@ Test run in a regular engine build, 2025/03/27 on *abf3660e18cc583710b77943e78db
 Running the performance tests in the JDK somehow gets it stuck in measureMonteCarlo with the normal run mode 🤔.
 It finished in debug-mode though, which is why I used the JDK debug-mode for my results.
 
-## Compilation times (JRE + Rem's Engine)
-Translating JVM bytecode to C++ and WAT takes 10-12 seconds (without static-init at compile-time, that is 3s extra).
-Compiling the debug build currently takes roughly five seconds, and release build takes thirty seconds.
+### Compilation times (JRE + Rem's Engine)
+Translating JVM bytecode to C++ and WAT and WASM takes 10-12 seconds (without static-init at compile-time, that is three seconds on top).
+Compiling the debug C++ build currently takes roughly five seconds using MSVC, and release build takes thirty seconds.
 
 ## Used Libraries / Dependencies
 - [ObjectWeb ASM 9.3](https://asm.ow2.io/)
@@ -124,3 +126,18 @@ Compiling the debug build currently takes roughly five seconds, and release buil
 The system was developed for a sun-based JVM.
 I have implemented stubs for a few methods like `sun.reflect.Reflection.getCallerClass()` and `sun.misc.VM.isSystemDomainLoader()`.
 Other JVMs might implement different backends for classes like java.nio.?Buffer, and might need stubs or implementations for them, too.
+
+## Planned features (TODOs)
+
+The following TODOs are also sorted by priority, so I'll likely implement the first ones first.
+Anyone is welcome to contribute to these topics.
+
+- Port the engine to my Meta Quest 3
+- Create nice-looking JavaScript/TypeScript
+- Create nice-looking C++ with structs as classes
+- Implement proper file IO for C++ to load assets
+- Integrate this into Rem's Engine's export feature, so you can create WASM-builds from within editor
+- Use WASM-throwables
+- Extract temporary instances to an additional stack somehow, so we save its allocations?
+- Implement stack traces in C++ using the actual stack, so having much less performance overhead, but still Throwables
+- Implement stack traces in WASM using the stack???
