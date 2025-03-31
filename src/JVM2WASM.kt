@@ -40,6 +40,11 @@ import kotlin.math.sin
 
 private val LOGGER = LogManager.getLogger("JVM2WASM")
 
+// todo finally output WASM instead of WAT ourselves to get rid of the WSL dependency and to save a few seconds
+
+// todo create pure JavaScript build with nice types etc
+// todo introduce pseudo instructions for field setters and getters to create better C++/JavaScript code
+
 // todo replace simple bridge methods like the following with just an alias
 /**
  * i32 me_anno_engine_ui_render_RenderModeXCompanion_getNO_DEPTH_Lme_anno_engine_ui_render_RenderMode(i32 p0) {
@@ -649,10 +654,10 @@ private fun appendGlobals(dataPrinter: StringBuilder2) {
     for (global in globals.values.sortedBy { it.name }) {
         dataPrinter.append("(global $").append(global.name).append(" ")
         if (global.isMutable) dataPrinter.append("(mut ")
-        dataPrinter.append(global.type)
+        dataPrinter.append(global.wasmType)
         if (global.isMutable) dataPrinter.append(')')
         dataPrinter
-            .append(" (").append(global.type).append(".const ")
+            .append(" (").append(global.wasmType).append(".const ")
             .append(global.initialValue).append("))\n")
     }
 }

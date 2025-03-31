@@ -522,6 +522,7 @@ ret32 java_util_Date_getCalendarSystem_Lsun_util_calendar_BaseCalendarXDateLsun_
 ret32 java_util_Date_getJulianCalendar_Lsun_util_calendar_BaseCalendar() { return RET_NULL; }
 roid new_java_util_GregorianCalendar_Ljava_util_TimeZoneLjvm_custom_LocaleV(i32,i32,i32) { return RET_VOID; }
 roid java_util_GregorianCalendar_setZoneShared_ZV(i32,i32) { return RET_VOID; }
+void engine_Engine_discoverGLNamesImpl_ACLjava_util_HashMapV(i32,i32) {} // not properly implementable in C++...
 
 std::vector<void*> garbageWhileGC;
 i32 jvm_JVM32_getAllocatedSize_I() { return allocatedSize; }

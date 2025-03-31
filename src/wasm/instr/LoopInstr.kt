@@ -12,6 +12,8 @@ data class LoopInstr(
     override val params: List<String>, override val results: List<String>
 ) : Instruction, BreakableInstruction {
 
+    var typeIndex = -1
+
     constructor(label: String, node: GraphingNode) :
             this(label, node.printer.instrs, node.inputStack, node.outputStack)
 

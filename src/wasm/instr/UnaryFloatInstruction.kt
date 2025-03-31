@@ -3,9 +3,10 @@ package wasm.instr
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.f32
+import wasm.writer.Opcode
 
-class UnaryFloatInstruction(name: String, type: String, call: String, val impl: (Double) -> Double) :
-    UnaryInstruction(name, type, type, call) {
+class UnaryFloatInstruction(name: String, type: String, call: String, opcode: Opcode, val impl: (Double) -> Double) :
+    UnaryInstruction(name, type, type, call, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

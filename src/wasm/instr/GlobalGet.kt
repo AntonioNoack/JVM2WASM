@@ -4,6 +4,8 @@ import interpreter.WASMEngine
 
 data class GlobalGet(val name: String) : Instruction {
 
+    var index = -1
+
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)
     }

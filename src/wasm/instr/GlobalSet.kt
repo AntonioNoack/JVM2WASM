@@ -5,6 +5,8 @@ import me.anno.utils.structures.lists.Lists.pop
 
 data class GlobalSet(val name: String) : Instruction {
 
+    var index = -1
+
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)
     }

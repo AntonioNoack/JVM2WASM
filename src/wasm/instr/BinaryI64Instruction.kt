@@ -3,9 +3,10 @@ package wasm.instr
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.i64
+import wasm.writer.Opcode
 
-class BinaryI64Instruction(name: String, cppOperator: String, val impl: (Long, Long) -> Long) :
-    BinaryInstruction(name, i64, i64, cppOperator) {
+class BinaryI64Instruction(name: String, cppOperator: String, opcode: Opcode, val impl: (Long, Long) -> Long) :
+    BinaryInstruction(name, i64, i64, cppOperator, opcode) {
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack
         val i1 = stack.pop() as Long

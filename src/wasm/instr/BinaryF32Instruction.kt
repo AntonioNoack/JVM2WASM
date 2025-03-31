@@ -3,9 +3,10 @@ package wasm.instr
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.f32
+import wasm.writer.Opcode
 
-class BinaryF32Instruction(name: String, cppOperator: String, val impl: (Float, Float) -> Float) :
-    BinaryInstruction(name, f32, f32, cppOperator) {
+class BinaryF32Instruction(name: String, cppOperator: String, opcode: Opcode, val impl: (Float, Float) -> Float) :
+    BinaryInstruction(name, f32, f32, cppOperator, opcode) {
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack
         val i1 = stack.pop() as Float

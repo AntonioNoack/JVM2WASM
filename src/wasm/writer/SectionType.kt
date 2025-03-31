@@ -1,9 +1,9 @@
 package wasm.writer
 
 // cannot strip elements, ordinal matters!
-enum class SectionType {
+enum class SectionType(val name1: String = "") {
     CUSTOM,
-    TYPE,
+    TYPE("Type"),
     IMPORT,
     FUNCTION,
     TABLE,

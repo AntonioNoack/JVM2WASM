@@ -4,6 +4,8 @@ import interpreter.WASMEngine
 
 class JumpIf(var owner: BreakableInstruction) : Instruction {
 
+    var depth = -1
+
     init {
         if (label.startsWith('$')) throw IllegalArgumentException(label)
     }

@@ -1,3 +1,7 @@
 package wasm.instr
 
-abstract class BinaryInstruction(name: String, val popType: String, val pushType: String, val cppOperator: String) : SimpleInstr(name)
+import wasm.writer.Opcode
+
+abstract class BinaryInstruction(
+    name: String, val popType: String, val pushType: String, val cppOperator: String, opcode: Opcode
+) : SimpleInstr(name, opcode)

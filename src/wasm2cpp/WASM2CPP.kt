@@ -77,7 +77,7 @@ fun validateGlobals(parsed1: Map<String, GlobalVariable>) {
     for ((name, parsed) in parsed1) {
         val original = globals[name] ?: continue
         assertEquals(original.name, parsed.name)
-        assertEquals(original.type, parsed.type)
+        assertEquals(original.wasmType, parsed.wasmType)
         assertEquals(original.initialValue, parsed.initialValue)
         assertEquals(original.isMutable, parsed.isMutable)
         passed++
@@ -213,21 +213,21 @@ fun defineGlobals(globals: Map<String, GlobalVariable>) {
         .sortedBy { it.key }.map { it.value }
     for (global in sortedGlobals) {
         if (!global.isMutable) {
-            writer.append("constexpr ").append(global.type).append(' ').append(global.fullName)
+            writer.append("constexpr ").append(global.wasmType).append(' ').append(global.fullName)
                 .append(" = ").append(global.initialValue).append(";\n")
         }
     }
     writer.append("#ifdef MAIN_CPP\n")
     for (global in sortedGlobals) {
         if (global.isMutable) {
-            writer.append(global.type).append(' ').append(global.fullName)
+            writer.append(global.wasmType).append(' ').append(global.fullName)
                 .append(" = ").append(global.initialValue).append(";\n")
         }
     }
     writer.append("#else\n")
     for (global in sortedGlobals) {
         if (global.isMutable) {
-            writer.append("extern ").append(global.type).append(' ').append(global.fullName).append(";\n")
+            writer.append("extern ").append(global.wasmType).append(' ').append(global.fullName).append(";\n")
         }
     }
     writer.append("#endif\n")

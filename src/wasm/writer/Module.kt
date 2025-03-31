@@ -1,5 +1,7 @@
 package wasm.writer
 
+import wasm.parser.FunctionImpl
+
 class Module(
     val types: List<Type>,
     val imports: List<Import>,
@@ -9,5 +11,7 @@ class Module(
     val tags: List<Tag>,
     val globals: List<Global>,
     val exports: List<Export>,
-    val starts: List<Start>
+    val starts: List<Start>,
+    val elemSegments: List<ElemSegment>,
+    val code: List<FunctionImpl>
 )

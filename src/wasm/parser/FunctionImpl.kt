@@ -12,6 +12,9 @@ open class FunctionImpl(
     var body: List<Instruction>,
     val isExported: Boolean
 ) {
+
+    var index = -1
+
     override fun toString(): String {
         val builder = StringBuilder2()
             .append("(func \$").append(funcName)

@@ -3,9 +3,10 @@ package wasm.instr
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.i32
+import wasm.writer.Opcode
 
-class EqualsZeroInstruction(name: String, type: String, call: String) :
-    UnaryInstruction(name, type, i32, call) {
+class EqualsZeroInstruction(name: String, type: String, call: String, opcode: Opcode) :
+    UnaryInstruction(name, type, i32, call, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

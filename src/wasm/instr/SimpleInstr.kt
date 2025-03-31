@@ -1,6 +1,8 @@
 package wasm.instr
 
-abstract class SimpleInstr(val name: String) : Instruction {
+import wasm.writer.Opcode
+
+abstract class SimpleInstr(val name: String, val opcode: Opcode) : Instruction {
     init {
         simpleInstructions[name] = this
     }
@@ -9,6 +11,7 @@ abstract class SimpleInstr(val name: String) : Instruction {
 
     companion object {
         val simpleInstructions = HashMap<String, SimpleInstr>(64)
+
         init {
             // ensure all instructions are loaded
             Instructions.I64_ROTR

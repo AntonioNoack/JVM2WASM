@@ -1,3 +1,5 @@
 package wasm.writer
 
-class Global(val initExpr: List<Expr>, val type: Type, val mutable: Boolean)
+import wasm.instr.Instruction
+
+class Global(val initExpr: List<Instruction>, val type: Type, val mutable: Boolean)

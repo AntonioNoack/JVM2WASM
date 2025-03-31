@@ -1,20 +1,22 @@
 package wasm.writer
 
 enum class TypeKind(val id: Int) {
-    I32(0x7f),
-    I64(0x7e),
-    F32(0x7d),
-    F64(0x7c),
-    V128(0x7b),
-    I8(0x7a),
-    I16(0x79),
-    FUNC_REF(0x70),
-    EXTERN_REF(0x6f),
-    REFERENCE(0x6b),
-    FUNC(0x60),
-    STRUCT(0x5f),
-    ARRAY(0x5e),
-    VOID(0x40),
+    I32(-1),
+    I64(-2),
+    F32(-3),
+    F64(-4),
+
+    V128(-5),
+    I8(-6),
+    I16(-7),
+    EXN_REF(-0x17),
+    FUNC_REF(-0x10),
+    EXTERN_REF(-0x11),
+    REFERENCE(-0x15),
+    FUNC(-0x20),
+    STRUCT(-0x21),
+    ARRAY(-0x22),
+    VOID(-0x40),
 
     ;
 

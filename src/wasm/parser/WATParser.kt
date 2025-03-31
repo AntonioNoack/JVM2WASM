@@ -18,7 +18,7 @@ import kotlin.math.min
 
 class WATParser {
 
-    private var memorySizeInBlocks = -1
+    var memorySizeInBlocks = -1
     val imports = ArrayList<Import>()
     val dataSections = ArrayList<DataSection>()
     val functionTable = ArrayList<String>()

@@ -1,14 +1,24 @@
 package wasm.writer
 
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
+import utils.WASMTypes.*
+import wasm.instr.*
+import wasm.instr.Const.Companion.i32Const0
+import wasm.parser.FunctionImpl
+import wasm.parser.LocalVariable
 
+/**
+ * Valid source code: https://github.com/WebAssembly/wabt/blob/main/src/binary-writer.cc
+ *
+ * */
 class BinaryWriter(
     val stream: ByteArrayList,
-    val module: Module
+    val module: Module,
 ) {
 
     companion object {
@@ -32,42 +42,36 @@ class BinaryWriter(
         addUnsafe((v ushr 24).toByte())
     }
 
+    private fun ByteArrayList.writeLE64(v: Long) {
+        ensureExtra(8)
+        addUnsafe(v.toByte())
+        addUnsafe((v ushr 8).toByte())
+        addUnsafe((v ushr 16).toByte())
+        addUnsafe((v ushr 24).toByte())
+        addUnsafe((v ushr 32).toByte())
+        addUnsafe((v ushr 40).toByte())
+        addUnsafe((v ushr 48).toByte())
+        addUnsafe((v ushr 56).toByte())
+    }
+
     private val BINARY_MAGIC = 0x6d736100 // \0asm
     private val BINARY_VERSION = 1
 
     var lastSectionPayloadOffset = 0
-    val LEB_SECTION_SIZE_GUESS = 1
     val MAX_U32_LEB128_BYTES = 5
 
     fun writeSectionHeader(type: SectionType) {
-        if (lastSectionLebSizeGuess != 0) throw IllegalStateException()
-        // writeHeader()
         stream.write(type.ordinal)
-        lastSectionType = type
-        lastSectionLebSizeGuess = LEB_SECTION_SIZE_GUESS
-        lastSectionOffset = writeU32Leb128Space(LEB_SECTION_SIZE_GUESS)
+        lastSectionOffset = writeU32Leb128Space()
         lastSectionPayloadOffset = stream.size
     }
 
-    val canonicalize_lebs = false
-    fun writeU32Leb128Space(lebSizeGuess: Int): Int {
-        val result = stream.size
-        val bytesToWrite = if (canonicalize_lebs) lebSizeGuess else MAX_U32_LEB128_BYTES
-        stream.ensureExtra(bytesToWrite)
-        for (i in 0 until bytesToWrite) {
-            stream.addUnsafe(0)
+    fun writeU32Leb128Space(): Int {
+        val startAddress = stream.size
+        for (i in 0 until MAX_U32_LEB128_BYTES) {
+            stream.add(0)
         }
-        return result
-    }
-
-    private fun u32Leb128Length(i: Int): Int {
-        var size = 0
-        var x = i
-        do {
-            x = x ushr 7
-            size++
-        } while (x != 0)
-        return size
+        return startAddress
     }
 
     private fun writeU32Leb128(v: Int) {
@@ -80,6 +84,7 @@ class BinaryWriter(
     }
 
     private fun writeU64Leb128(v: Long) {
+        println("U --- writing $v (0x${v.toString(16)}) @${stream.size.toString(16)}")
         stream.ensureExtra(MAX_U32_LEB128_BYTES)
         var x = v
         do {
@@ -88,34 +93,10 @@ class BinaryWriter(
         } while (x != 0L)
     }
 
-    private fun writeU32Leb128At(o: Int, v: Int) {
-        stream.ensureExtra(MAX_U32_LEB128_BYTES)
-        var x = v
-        var i = o
-        do {
-            stream[i++] = x.toByte()
-            x = x ushr 7
-        } while (x != 0)
-    }
-
-    private fun writeFixupU32Leb128Size(offset: Int, lebSizeGuess: Int): Int {
-        if (canonicalize_lebs) {
-            val size = stream.size - offset - lebSizeGuess
-            val lebSize = u32Leb128Length(size)
-            val delta = lebSize - lebSizeGuess
-            if (delta != 0) {
-                val srcOffset = offset + lebSizeGuess
-                val dstOffset = offset + lebSize
-                System.arraycopy(stream.values, srcOffset, stream.values, dstOffset, size)
-            }
-            writeU32Leb128At(offset, size)
-            stream.size += delta
-            return delta
-        } else {
-            val size = stream.size - offset - MAX_U32_LEB128_BYTES
-            writeFixedU32Leb128At(offset, size)
-            return 0
-        }
+    private fun writeFixupU32Leb128Size(offset: Int) {
+        val size = stream.size - offset - MAX_U32_LEB128_BYTES
+        assertTrue(size > 0)
+        writeFixedU32Leb128At(offset, size)
     }
 
     private fun writeFixedU32Leb128At(offset: Int, x: Int) {
@@ -125,9 +106,8 @@ class BinaryWriter(
         stream[offset + 2] = ((x ushr 14) or 0x80).toByte()
         stream[offset + 3] = ((x ushr 21) or 0x80).toByte()
         stream[offset + 4] = (x ushr 28).and(0x7f).toByte()
+        assertEquals(5, MAX_U32_LEB128_BYTES)
     }
-
-    var lastSectionType = SectionType.CUSTOM
 
     fun beginKnownSection(type: SectionType) {
         writeSectionHeader(type)
@@ -136,16 +116,13 @@ class BinaryWriter(
     fun beginSection(type: SectionType, numElements: Int) {
         LOGGER.info("Writing section $type, x$numElements @${stream.size}")
         beginKnownSection(type)
-        writeU32Leb128(numElements)
+        writeS32Leb128(numElements)
     }
 
     var lastSectionOffset = 0
-    var lastSectionLebSizeGuess = 0
 
     fun endSection() {
-        if (lastSectionLebSizeGuess == 0) throw IllegalStateException()
-        writeFixupU32Leb128Size(lastSectionOffset, lastSectionLebSizeGuess)
-        lastSectionLebSizeGuess = 0
+        writeFixupU32Leb128Size(lastSectionOffset)
     }
 
     fun writeStr(name: String) {
@@ -155,12 +132,16 @@ class BinaryWriter(
     }
 
     fun writeS32Leb128(v: Int) {
+        writeS64Leb128(v.toLong())
+    }
+
+    fun writeS64Leb128(v: Long) {
         var value = v
         if (v < 0) {
             while (true) {
                 val byte = value.and(0x7f)
                 value = value shr 7
-                if (value == -1 && byte.hasFlag(0x40)) {
+                if (value == -1L && byte.hasFlag(0x40)) {
                     stream.add(byte.toByte())
                     break
                 } else {
@@ -171,7 +152,7 @@ class BinaryWriter(
             while (true) {
                 val byte = value.and(0x7f)
                 value = value shr 7
-                if (value == 0 && !byte.hasFlag(0x40)) {
+                if (value == 0L && !byte.hasFlag(0x40)) {
                     stream.add(byte.toByte())
                     break
                 } else {
@@ -186,9 +167,9 @@ class BinaryWriter(
     }
 
     fun writeType(type: Type) {
-        writeS32Leb128(type.kind.id)
+        writeType(type.kind)
         if (type.kind == TypeKind.REFERENCE) {
-            writeS32Leb128(type.index)
+            writeS32Leb128(type.referenceIndex)
         }
     }
 
@@ -201,7 +182,7 @@ class BinaryWriter(
         if (limits.hasMax) flags = flags or BINARY_LIMITS_HAS_MAX_FLAG
         if (limits.isShared) flags = flags or BINARY_LIMITS_IS_SHARED_FLAG
         if (limits.is64Bit) flags = flags or BINARY_LIMITS_IS_64_FLAG
-        writeU32Leb128(flags)
+        writeS32Leb128(flags)
         if (limits.is64Bit) {
             writeU64Leb128(limits.initial)
             if (limits.hasMax) writeU64Leb128(limits.max)
@@ -229,26 +210,116 @@ class BinaryWriter(
         TODO()
     }
 
-    fun writeExpr(func: Func?, expr: Expr) {
-        when (expr) {
-            is Unary -> writeOpcode(expr.opcode)
-            is Binary -> writeOpcode(expr.opcode)
-            is Ternary -> writeOpcode(expr.opcode)
-            is Block -> {
-                writeOpcode(Opcode.BLOCK)
-                writeBlockDecl(expr.declIndex)
-                writeExprList(func, expr.expr)
+    fun writeExpr(func: FunctionImpl?, instr: Instruction) {
+        when (instr) {
+            is Comment -> {}
+            is LoadInstr, is StoreInstr -> {
+                // must be handled differently than SimpleInstr
+                writeOpcode((instr as SimpleInstr).opcode)
+                val alignment = when(instr){
+                    is LoadInstr -> instr.numBytes
+                    is StoreInstr -> instr.numBytes
+                    else -> 0
+                }.countTrailingZeroBits()
+                writeU32Leb128(alignment) // todo is this alignment ok???
+                writeU32Leb128(0) // todo is this address/offset ok???
+            }
+            is SimpleInstr -> writeOpcode(instr.opcode)
+            is ParamGet -> {
+                writeOpcode(Opcode.LOCAL_GET)
+                writeS32Leb128(instr.index)
+            }
+            is ParamSet -> {
+                writeOpcode(Opcode.LOCAL_SET)
+                writeS32Leb128(instr.index)
+            }
+            is GlobalGet -> {
+                assertTrue(instr.index >= 0)
+                writeOpcode(Opcode.GLOBAL_GET)
+                writeS32Leb128(instr.index)
+            }
+            is GlobalSet -> {
+                assertTrue(instr.index >= 0)
+                writeOpcode(Opcode.GLOBAL_GET)
+                writeS32Leb128(instr.index)
+            }
+            is LocalGet -> {
+                writeOpcode(Opcode.LOCAL_GET)
+                val index = func!!.params.size +
+                        func.locals.indexOfFirst { it.name == instr.name }
+                writeS32Leb128(index)
+            }
+            is LocalSet -> {
+                writeOpcode(Opcode.LOCAL_SET)
+                val index = func!!.params.size +
+                        func.locals.indexOfFirst { it.name == instr.name }
+                writeS32Leb128(index)
+            }
+            is Const -> {
+                when (instr.type) {
+                    ConstType.I32 -> {
+                        writeOpcode(Opcode.I32_CONST)
+                        writeS32Leb128(instr.value as Int)
+                    }
+                    ConstType.I64 -> {
+                        writeOpcode(Opcode.I64_CONST)
+                        writeS64Leb128(instr.value as Long)
+                    }
+                    ConstType.F32 -> {
+                        writeOpcode(Opcode.F32_CONST)
+                        stream.writeLE32((instr.value as Float).toRawBits())
+                    }
+                    ConstType.F64 -> {
+                        writeOpcode(Opcode.F64_CONST)
+                        stream.writeLE64((instr.value as Double).toRawBits())
+                    }
+                    else -> throw NotImplementedError()
+                }
+            }
+            is Call -> {
+                assertTrue(instr.index >= 0)
+                writeOpcode(Opcode.CALL)
+                writeS32Leb128(instr.index)
+            }
+            is CallIndirect -> {
+                assertTrue(instr.typeIndex >= 0)
+                writeOpcode(Opcode.CALL_INDIRECT)
+                writeS32Leb128(instr.typeIndex)
+                writeS32Leb128(0) // table index
+            }
+            is IfBranch -> {
+                assertTrue(instr.typeIndex >= 0)
+                writeOpcode(Opcode.IF)
+                writeS32Leb128(instr.typeIndex)
+                writeExprList(func, instr.ifTrue)
+                if (instr.ifFalse.isNotEmpty()) {
+                    writeOpcode(Opcode.ELSE)
+                    writeExprList(func, instr.ifFalse)
+                    writeOpcode(Opcode.END)
+                } else writeOpcode(Opcode.END)
+            }
+            is LoopInstr -> {
+                assertTrue(instr.typeIndex >= 0)
+                writeOpcode(Opcode.LOOP)
+                writeS32Leb128(instr.typeIndex)
+                writeExprList(func, instr.body)
                 writeOpcode(Opcode.END)
             }
-            Return -> writeOpcode(Opcode.RETURN)
-            // is Br -> {}
-            else -> {
-                TODO()
+            is Jump -> {
+                assertTrue(instr.depth >= 0)
+                writeOpcode(Opcode.BR)
+                writeS32Leb128(instr.depth)
             }
+            is JumpIf -> {
+                assertTrue(instr.depth >= 0)
+                writeOpcode(Opcode.BR_IF)
+                writeS32Leb128(instr.depth)
+            }
+            else -> throw NotImplementedError("Unknown instruction $instr")
         }
     }
 
-    private fun writeExprList(func: Func?, expressions: List<Expr>) {
+    private fun writeExprList(func: FunctionImpl?, expressions: List<Instruction>) {
         for (i in expressions.indices) {
             writeExpr(func, expressions[i])
         }
@@ -258,7 +329,7 @@ class BinaryWriter(
         stream.write(opcode.opcode)
     }
 
-    fun writeInitExpr(expr: List<Expr>) {
+    fun writeInitExpr(expr: List<Instruction>) {
         writeExprList(null, expr)
         writeOpcode(Opcode.END)
     }
@@ -299,7 +370,7 @@ class BinaryWriter(
                     writeType(type2.field.type)
                     stream.write(type2.field.mutable.toInt())
                 }
-                else -> {}
+                else -> throw NotImplementedError()
             }
         }
         endSection()
@@ -346,7 +417,7 @@ class BinaryWriter(
         if (numFunctions == 0) return
         beginSection(SectionType.FUNCTION, numFunctions)
         for (i in numFuncImports until module.functions.size) {
-            writeU32Leb128(module.functions[i].typeIndex)
+            writeS32Leb128(module.functions[i].typeIndex)
         }
         endSection()
     }
@@ -356,7 +427,7 @@ class BinaryWriter(
         assertTrue(numTables >= 0)
         if (numTables == 0) return
         beginSection(SectionType.TABLE, numTables)
-        for (i in numMemoryImports until module.tables.size) {
+        for (i in numTableImports until module.tables.size) {
             writeTable(module.tables[i])
         }
         endSection()
@@ -401,8 +472,66 @@ class BinaryWriter(
         if (module.exports.isEmpty()) return
         beginSection(SectionType.EXPORT, module.exports.size)
         for (export in module.exports) {
+            writeStr(export.name)
             stream.write(export.kind.ordinal)
-            writeU32Leb128(export.valueIndex)
+            writeS32Leb128(export.valueIndex)
+        }
+        endSection()
+    }
+
+    fun writeElemSection() {
+        if (module.elemSegments.isEmpty()) return
+        beginSection(SectionType.ELEM, module.elemSegments.size)
+        for (elemSegment in module.elemSegments) {
+            stream.write(elemSegment.flags)
+            assertEquals(0, elemSegment.flags) // nothing else was implemented
+            writeInitExpr(listOf(i32Const0))
+            writeU32Leb128(elemSegment.functionTable.size)
+            for (i in elemSegment.functionTable.indices) {
+                writeS32Leb128(elemSegment.functionTable[i])
+            }
+        }
+        endSection()
+    }
+
+    private fun writeFuncLocals(locals: List<LocalVariable>) {
+        writeS32Leb128(locals.size)
+        // todo could be compressed by using local-type-count
+        //   when we do that, sort the local variables by type
+        for (i in locals.indices) {
+            val local = locals[i]
+            writeU32Leb128(1)
+            writeType(
+                when (local.type) {
+                    i32 -> TypeKind.I32
+                    i64 -> TypeKind.I64
+                    f32 -> TypeKind.F32
+                    f64 -> TypeKind.F64
+                    else -> throw NotImplementedError()
+                }
+            )
+        }
+    }
+
+    private fun writeFunc(func: FunctionImpl) {
+        writeFuncLocals(func.locals)
+        try {
+            writeExprList(func, func.body)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        writeOpcode(Opcode.END)
+    }
+
+    fun writeCodeSection() {
+        if (module.code.isEmpty()) return
+        beginSection(SectionType.CODE, module.code.size)
+        for (func in module.code) {
+            val start = writeU32Leb128Space()
+            writeFunc(func)
+            writeFixupU32Leb128Size(start)
+
+            // todo relocations???
         }
         endSection()
     }
@@ -428,6 +557,10 @@ class BinaryWriter(
         writeTagsSection()
         writeGlobalsSection()
         writeExportsSection()
+        // writeStartsSection()
+        writeElemSection()
+        // bulk-memory-DataCount-section
+        writeCodeSection()
     }
 
 }

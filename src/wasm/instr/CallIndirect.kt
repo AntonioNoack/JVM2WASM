@@ -1,10 +1,12 @@
 package wasm.instr
 
 import interpreter.WASMEngine
-import me.anno.utils.structures.lists.Lists.pop
 import utils.StringBuilder2
 
 data class CallIndirect(val type: FuncType) : Instruction {
+
+    var typeIndex = -1
+
     override fun toString(): String {
         val builder = StringBuilder2()
         toString(0, builder)

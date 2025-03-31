@@ -19,14 +19,18 @@ public class RandomAccessFile {
         position = newPosition;
     }
 
+    // There indeed are two functions. I'm not sure, why
     @SuppressWarnings("unused")
+    public void write(byte[] srcBytes, int readOffset, int length) {
+        writeBytes(srcBytes, readOffset, length);
+    }
+
     public void writeBytes(byte[] srcBytes, int readOffset, int length) {
         JavaIO.FileInfo fi = JavaIO.files.get(path);
         if (fi == null) {
             log("Missing file for RandomAccessFile.writeBytes", path);
             return;
         }
-
         byte[] dstBytes = fi.content;
         System.arraycopy(srcBytes, readOffset, dstBytes, (int) position, length);
     }

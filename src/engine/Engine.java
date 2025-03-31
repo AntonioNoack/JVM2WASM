@@ -24,10 +24,7 @@ import me.anno.engine.ui.render.SuperMaterial;
 import me.anno.fonts.Font;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
-import me.anno.gpu.GFX;
-import me.anno.gpu.OSWindow;
-import me.anno.gpu.RenderStep;
-import me.anno.gpu.WindowManagement;
+import me.anno.gpu.*;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.gpu.texture.TextureCache;
@@ -59,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -772,8 +770,30 @@ public class Engine {
     }
 
     @NoThrow
+    @JavaScript(code = "" +
+            "for(let key in gl) { if(typeof(gl[key]) == 'number') {\n" +
+            "   window.lib.GLNames_pushName(arg0, arg1, fill(arg0,key), gl[key]); }}")
+    public static native void discoverGLNamesImpl(char[] buffer, HashMap<Integer, String> dst);
+
+    @NoThrow
     @Alias(names = "me_anno_gpu_GLNames_discoverOpenGLNames_V")
-    public static void GLNames_discoverOpenGLNames() {
+    public static void GLNames_discoverOpenGLNames() throws NoSuchFieldException, IllegalAccessException {
         // engine will be shipped, so nothing to discover here
+        // would be good for debugging though...
+        Object dstNames0 = GLNames.class.getDeclaredField("glConstants").get(null);
+        if (!(dstNames0 instanceof HashMap)) return;
+        @SuppressWarnings("unchecked")
+        HashMap<Integer, String> dstNames = (HashMap<Integer, String>) dstNames0;
+        discoverGLNamesImpl(FillBuffer.getBuffer(), dstNames);
+    }
+
+    @Export
+    @NoThrow
+    @UsedIfIndexed
+    @Alias(names = "GLNames_pushName")
+    public static void GLNames_pushName(char[] buffer, HashMap<Integer, String> dst, int length, int value) {
+        if (length <= 0) return;
+        String glName = new String(buffer, 0, length);
+        dst.put(Integer.valueOf(value), glName);
     }
 }

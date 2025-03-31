@@ -5,6 +5,8 @@ import me.anno.utils.structures.lists.Lists.createList
 
 data class Call(val name: String) : Instruction {
 
+    var index = -1
+
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)
         if (name == "Ajava_lang_Object_clone_Ljava_lang_Object")

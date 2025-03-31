@@ -11,6 +11,8 @@ data class IfBranch(
     val params: List<String>, val results: List<String>
 ) : Instruction {
 
+    var typeIndex = -1
+
     constructor(ifTrue: List<Instruction>) : this(ifTrue, emptyList(), emptyList(), emptyList())
 
     override fun toString(): String {

@@ -432,7 +432,7 @@ class FunctionWriter(
             is GlobalGet -> {
                 val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
-                writeGetInstruction(global.type, global.fullName, k, assignments)
+                writeGetInstruction(global.wasmType, global.fullName, k, assignments)
             }
             is ParamSet -> {
                 val index = i.index
@@ -454,7 +454,7 @@ class FunctionWriter(
             is GlobalSet -> {
                 val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
-                beginSetEnd(global.fullName, global.type)
+                beginSetEnd(global.fullName, global.wasmType)
             }
             // loading
             I32Load8S -> load(i32, "int8_t")
