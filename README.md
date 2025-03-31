@@ -1,24 +1,14 @@
 # JVM2WASM / JVM2CPP
 
-This project is a compiler from Java/Kotlin/JVM to WASM and C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
+This is a compiler from Java, Kotlin and any other JVM-language to WebAssembly (WASM) and C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
 It has a [garbage collector](src/jvm/GC.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
 The target JVM language is Java 8 (lambdas).
 
-This project now has a second target with [WASM2CPP](#WASM2Cpp): Native desktop, compiling the generated WASM into C++.
+With optional exception handling, a manual stack is created, where the stack-trace is tracked.
+This decreases performance if enabled.
 
-The generated code relies heavily on switch-statements, because structural analysis is hard, and I haven't implemented "pattern-independent structuring" (a paper, that solves it) yet.
-This makes it much slower than native code (50x-100x in [SciMark2](https://math.nist.gov/scimark2/)).
-
-Also, there are lots of redundant if-statements for error handling, and currently error handling is implemented using two return values.
-This probably decreases performance a lot, too.
-Error handling could be implemented using WASM-exceptions.
-
-Currently, since I generate text-wasm instead of binary-wasm, I cannot map binary instructions to line numbers.
-Therefore, with optional exception handling, a manual stack is created, where the stack-trace is tracked.
-This probably decreases performance as well.
-
-The resulting file is quite large at the moment, partially because a lot of unnecessary functions are encoded,
-and because they take up quite a bit of space.
+The generated C++ currently is more focussed on working than being beautiful.
+It's a planned feature to use structs and such.
 
 ## Demos
 - [Snake](https://remsengine.phychi.com/jvm2wasm/snake/) (on a repeating, infinite grid)
