@@ -176,7 +176,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         writeS32Leb128(type.id)
     }
 
-    fun writeType(type: Type) {
+    private fun writeType(type: Type) {
         writeType(type.kind)
         if (type.kind == TypeKind.REFERENCE) {
             writeS32Leb128(type.referenceIndex)
@@ -548,23 +548,23 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         stream.writeLE32(BINARY_VERSION)
     }
 
-    private fun writeNames(type: NameSectionSubsectionType, names: List<String>) {
+    private fun writeNames(type: NameSectionSubsectionType, names: List<String>, offset: Int = 0) {
         if (names.none2 { it.isNotEmpty() }) return
         stream.write(type.ordinal)
         val ptr = beginSubSection()
-        writeU32Leb128(names.size)
-        val maxNameLength = 16
+        writeS32Leb128(names.size)
+        val maxNameLength = 120
         for (i in names.indices) {
             var name = names[i]
             if (name.isEmpty()) continue
             if (name.length > maxNameLength) name = name.substring(0, maxNameLength)
-            writeS32Leb128(i)
+            writeS32Leb128(i + offset)
             writeStr(name)
         }
         endSubSection(ptr)
     }
 
-    private fun writeFuncNameSection() {
+    private fun writeDebugNamesSection() {
         /** name-subsections:
          * 0: "module",
          * 1: "function",
@@ -579,22 +579,30 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
          * a: "field",
          * b: "tag",
          * */
+
         val ptr = beginCustomSection("name")
 
         // todo writing these names is broken... why/how???
-        if (false) writeNames(
-            NameSectionSubsectionType.FUNCTION,
-            module.imports.filter { it.kind == ExternalKind.FUNC }.map { it.fieldName } +
-                    module.code.map { it.funcName }
-        )
+        if (true) {
+            writeNames(
+                NameSectionSubsectionType.FUNCTION,
+                module.code.map { it.funcName },
+                numFuncImports
+            )
+        }
 
-        if (false) {
-            writeU32Leb128(NameSectionSubsectionType.LABEL.ordinal) // local name type
+        if (true) {
+            // todo this isn't shown, so we're probably using it incorrectly...
+            stream.write(NameSectionSubsectionType.LABEL.ordinal) // local name type
             val ptr1 = beginSubSection()
-            writeU32Leb128(module.code.size)
-            for (i in module.code.indices) {
-                val func = module.code[i]
-                writeU32Leb128(i + numFuncImports)
+            val code = module.code
+                .withIndex()
+                .filter { it.value.locals.isNotEmpty() }
+                .subList(0, 10)
+            writeU32Leb128(code.size)
+            for (i in code.indices) {
+                val (idx, func) = code[i]
+                writeU32Leb128(idx + numFuncImports)
                 writeU32Leb128(func.locals.size)
                 for ((j, local) in func.locals.withIndex()) {
                     writeU32Leb128(j)
@@ -607,6 +615,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         // types? we have names for some of them...
         // writeNames()
 
+        // this works :), and the next one, too :)
         writeNames(NameSectionSubsectionType.TYPE, module.types.map { (it as? FuncTypeI)?.name ?: "" })
         writeNames(NameSectionSubsectionType.GLOBAL, module.globals.map { it.name })
 
@@ -644,7 +653,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         writeCodeSection()
         writeDataSections()
         // append code metadata?
-        writeFuncNameSection()
+        writeDebugNamesSection() // must be after data-section
     }
 
 }
