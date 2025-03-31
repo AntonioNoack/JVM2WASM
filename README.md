@@ -15,7 +15,8 @@ It's a planned feature to use structs and such.
 - [Rem's Engine](https://remsengine.phychi.com/jvm2wasm/editor/) (mainly interesting for render modes at the moment)
 
 ## Main class
-The main class for translation is [JVM2WASM.kt](src/JVM2WASM.kt). It controls, where class indexing should start,
+The main class for translation is [JVM2WASM.kt](src/JVM2WASM.kt) and [JVM2CPP.kt](src/wasm2cpp/JVM2CPP.kt).
+[JVM2WASM](src/JVM2WASM.kt) controls, where class indexing should start,
 and which classes shall be replaced by others (to reduce total executable size).
 
 ## Quirks
@@ -27,6 +28,7 @@ and which classes shall be replaced by others (to reduce total executable size).
 - Reflection is partially supported: constructors, methods and fields exist if they are used. Methods only if they have few arguments (because I haven't solved it programmatically yet). Annotations for anything else but fields aren't supported yet.
 - The Java standard library is only available in parts. Native methods have to be implemented by hand.
 - Like the creators of Zig and Rust, I find the complexity of Throwables problematic. Since this is meant for shipping games, you should implement your methods without Throwables, and then just keep them disabled.
+- I disabled Regex and replaced Kotlin's reflection library, because they are huge, and I only use fractions of them. Regex is badly readable anyway ^^. If you want Regex back, best use the JS-implementation to save on extra code.
 
 ## Runtime
 The runtime is defined in [index.js](src/index.js). It is defined like that for Rem's Engine.
