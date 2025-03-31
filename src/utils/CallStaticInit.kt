@@ -101,7 +101,7 @@ object CallStaticInit {
         assertTrue(globals.isNotEmpty()) // should not be empty
         engine.registerGlobals(globals)
         engine.registerSpecialFunctions()
-        engine.registerMemorySections(segments)
+        engine.registerMemorySections(dataSections)
         assertTrue(translatedMethods.isNotEmpty()) // should not be empty
         engine.registerFunctions(translatedMethods.values)
         engine.registerFunctions(helperFunctions.values)

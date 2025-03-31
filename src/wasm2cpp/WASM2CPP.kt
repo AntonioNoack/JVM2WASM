@@ -139,17 +139,9 @@ fun printBody(label: String, instructions: List<Instruction>) {
 
 fun wasm2cppFromMemory() {
     val clock = Clock("WASM2CPP-FromMemory")
-    compactBinaryData(segments)
+    compactBinaryData(dataSections)
+    val functions = collectAllMethods(clock)
     clock.stop("Compacting Binary Data")
-    val normalMethods = GeneratorIndex.translatedMethods.values
-    val helperMethods = helperFunctions.values
-    val getNthMethods = GeneratorIndex.nthGetterMethods.values
-    val size = normalMethods.size + helperMethods.size + getNthMethods.size
-    val functions = ArrayList<FunctionImpl>(size)
-    functions.addAll(normalMethods)
-    functions.addAll(helperMethods)
-    functions.addAll(getNthMethods)
-    clock.stop("Collecting Methods")
     wasm2cpp(functions, functionTable, imports, globals)
     clock.stop("WASM2CPP")
 }

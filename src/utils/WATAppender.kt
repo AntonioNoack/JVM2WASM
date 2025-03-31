@@ -562,7 +562,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
     return staticFieldsEndPtr
 }
 
-val segments = ArrayList<DataSection>()
+val dataSections = ArrayList<DataSection>()
 
 fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArrayOutputStream2): Int {
     alignBuffer(data)
@@ -573,7 +573,7 @@ private fun checkNoOtherSectionOverlaps(startIndex: Int, dataSize: Int) {
     val segment = startIndex until (startIndex + dataSize)
     val mid1 = segment.first + segment.last
     val length1 = segment.last - segment.first
-    for (seg in segments) {
+    for (seg in dataSections) {
         val first = seg.startIndex
         val last = seg.startIndex + seg.content.size
         val mid2 = first + last
@@ -590,7 +590,7 @@ fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
 
     checkNoOtherSectionOverlaps(startIndex, data.size)
 
-    segments.add(DataSection(startIndex, data))
+    dataSections.add(DataSection(startIndex, data))
     printer.append("(data ($ptrType.const ${startIndex}) \"")
     writeData(printer, data)
     printer.append("\")\n")

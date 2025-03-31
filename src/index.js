@@ -338,7 +338,7 @@ try {
 
     window.ec = 0
     window.lib = 0
-    var fetched = fetch("wasm/jvm2wasm.test.wasm")
+    var fetched = fetch("wasm/jvm2wasm.wasm")
 	fetched
         .then(response => response.arrayBuffer())
         .then(buffer => WebAssembly.instantiate(buffer, imports))

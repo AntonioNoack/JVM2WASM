@@ -242,7 +242,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
             }
             is GlobalSet -> {
                 assertTrue(instr.index >= 0)
-                writeOpcode(Opcode.GLOBAL_GET)
+                writeOpcode(Opcode.GLOBAL_SET)
                 writeS32Leb128(instr.index)
             }
             is LocalGet -> {
@@ -581,31 +581,26 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
          * */
 
         val ptr = beginCustomSection("name")
+        writeNames(
+            NameSectionSubsectionType.FUNCTION,
+            module.code.map { it.funcName },
+            numFuncImports
+        )
 
-        // todo writing these names is broken... why/how???
-        if (true) {
-            writeNames(
-                NameSectionSubsectionType.FUNCTION,
-                module.code.map { it.funcName },
-                numFuncImports
-            )
-        }
-
-        if (true) {
+        if (false) {
             // todo this isn't shown, so we're probably using it incorrectly...
             stream.write(NameSectionSubsectionType.LABEL.ordinal) // local name type
             val ptr1 = beginSubSection()
             val code = module.code
                 .withIndex()
                 .filter { it.value.locals.isNotEmpty() }
-                .subList(0, 10)
-            writeU32Leb128(code.size)
+            writeS32Leb128(code.size)
             for (i in code.indices) {
                 val (idx, func) = code[i]
-                writeU32Leb128(idx + numFuncImports)
-                writeU32Leb128(func.locals.size)
+                writeS32Leb128(idx + numFuncImports)
+                writeS32Leb128(func.locals.size)
                 for ((j, local) in func.locals.withIndex()) {
-                    writeU32Leb128(j)
+                    writeS32Leb128(j)
                     writeStr(local.name)
                 }
             }

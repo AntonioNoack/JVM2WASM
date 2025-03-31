@@ -1,65 +1,46 @@
 package utils
 
-import clock
-import dependency.DependencyIndex.constructableClasses
-import gIndex
-import me.anno.utils.OS
+import me.anno.utils.Clock
 import me.anno.utils.OS.documents
-import me.anno.utils.files.Files.formatFileSize
 import org.apache.logging.log4j.LogManager
-import translator.GeneratorIndex.classNamesByIndex
-import java.io.InputStream
-import kotlin.concurrent.thread
+import translator.GeneratorIndex
+import wasm.parser.FunctionImpl
+import wasm.parser.WATParser
+import wasm.writer.WASMWriter.writeWASM
 
 private val LOGGER = LogManager.getLogger("CompileInvoker")
 
 val wasmFolder = documents.getChild("IdeaProjects/JVM2WASM/wasm")
 val wasmTextFile = wasmFolder.getChild("jvm2wasm.wat")
+val wasmOutputFile = wasmFolder.getChild("jvm2wasm.wasm")
 val debugFolder = wasmFolder.getChild("debug").apply {
     delete()
     mkdirs()
 }
 
-fun compileToWASM(printer: StringBuilder2) {
-
-    LOGGER.info("[compileToWASM]")
+fun compileToWASM(printer: StringBuilder2, clock: Clock) {
+    LOGGER.info("[Writing Output]")
     wasmTextFile.writeBytes(printer.values, 0, printer.size)
-    clock.total("Kotlin")
+    clock.stop("Write WAT")
 
-    when {
-        OS.isWindows -> {
-            if (false) {
-                clock.start()
-                val process = Runtime.getRuntime().exec("wsl")
-                printAsync(process.inputStream, false)
-                printAsync(process.errorStream, true)
-                val stream = process.outputStream
-                stream.write("cd ~ && ./comp.sh\n".toByteArray())
-                stream.close()
-                process.waitFor()
-                clock.stop("WAT2WASM")
-            } else {
-                LOGGER.warn("Compiling via WSL is broken :/")
-            }
-        }
-        else -> {
-            LOGGER.warn("Automatic compilation hasn't been implemented yet for this platform")
-        }
-    }
-
+    // todo why/how is there a difference between using the values directly, and parsing them????
+    val parser = WATParser()
+    parser.parse(printer.toString())
+    val wasmBytes = writeWASM(parser)
+    wasmOutputFile.writeBytes(wasmBytes.values, 0, wasmBytes.size)
+    clock.stop("Write WASM")
 }
 
-private fun printAsync(input: InputStream, err: Boolean) {
-    thread(name = "CompilerInvoker-async") {
-        val reader = input.bufferedReader()
-        while (true) {
-            var line = reader.readLine() ?: break
-            line = " - $line"
-            if (err) {
-                LOGGER.warn(line)
-            } else {
-                LOGGER.info(line)
-            }
-        }
-    }
+fun collectAllMethods(clock: Clock): ArrayList<FunctionImpl> {
+    val normalMethods = GeneratorIndex.translatedMethods.values
+    val helperMethods = helperFunctions.values
+    val getNthMethods = GeneratorIndex.nthGetterMethods.values
+    val size = normalMethods.size + helperMethods.size + getNthMethods.size
+    val functions = ArrayList<FunctionImpl>(size)
+    functions.addAll(normalMethods)
+    functions.addAll(helperMethods)
+    functions.addAll(getNthMethods)
+    clock.stop("Collecting Methods")
+    return functions
 }
+

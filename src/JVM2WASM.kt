@@ -593,18 +593,23 @@ fun jvm2wasm() {
     printMethodImplementations(bodyPrinter, usedMethods)
     printInterfaceIndex()
 
-    val sizeInPages = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
+    memorySizeInBlocks = ceilDiv(ptr, 65536) + 1 // number of 64 kiB pages
 
-    writeJavaScriptImportsFile(jsImplemented, jsPseudoImplemented, sizeInPages)
+    writeJavaScriptImportsFile(jsImplemented, jsPseudoImplemented, memorySizeInBlocks)
 
     val joined = joinPrinters(
-        sizeInPages, headerPrinter,
+        memorySizeInBlocks, headerPrinter,
         importPrinter, dataPrinter, bodyPrinter
     )
 
     printStats(joined)
-    compileToWASM(joined)
+    clock.stop("Print Stats, etc")
+
+    compileToWASM(joined, clock)
+    clock.total("Kotlin")
 }
+
+var memorySizeInBlocks = -1
 
 private fun cleanupJVMImplemented() {
     hIndex.notImplementedMethods.removeAll(hIndex.jvmImplementedMethods)
