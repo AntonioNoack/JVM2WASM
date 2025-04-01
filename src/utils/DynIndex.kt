@@ -114,7 +114,7 @@ object DynIndex {
         if (pic != null) return pic
         if (clazz == 0) throw IllegalStateException("java/lang/Object must have dynamic function table!")
         val superClazz = hIndex.superClass[gIndex.classNamesByIndex[clazz]] ?: "java/lang/Object"
-        return getDynamicMethodsByClassIndex(gIndex.getClassIndex(superClazz))
+        return getDynamicMethodsByClassIndex(gIndex.getClassId(superClazz))
     }
 
     private fun remapDynamicMethods(dynamicMethods: Map<InterfaceSig, Int>): Array<InterfaceSig?> {
@@ -334,14 +334,14 @@ object DynIndex {
                 // #functions
                 // ... [interfaceId, methodId]
 
-                instanceTableData.writeLE32(if (superClass != null) gIndex.getClassIndex(superClass) else 0)
+                instanceTableData.writeLE32(if (superClass != null) gIndex.getClassId(superClass) else 0)
                 val interfaces = getInterfaces(clazz, numClasses)
                 val fieldOffsets = gIndex.getFieldOffsets(clazz, false)
                 val clazzSize = gIndex.getInstanceSize(clazz)
                 instanceTableData.writeLE32(clazzSize)
                 instanceTableData.writeLE32(interfaces.size)
                 for (j in interfaces) {
-                    instanceTableData.writeLE32(gIndex.getClassIndex(j))
+                    instanceTableData.writeLE32(gIndex.getClassId(j))
                 }
                 ptr += interfaces.size * 4 + 12
 
@@ -463,7 +463,7 @@ object DynIndex {
             if (superClass != null) remaining.add(superClass)
         }
         interfaces.removeIf { interfaceName ->
-            if (gIndex.getClassIndex(interfaceName) >= numClasses) {
+            if (gIndex.getClassId(interfaceName) >= numClasses) {
                 LOGGER.warn("$interfaceName got index too late (interface)")
                 true
             } else false

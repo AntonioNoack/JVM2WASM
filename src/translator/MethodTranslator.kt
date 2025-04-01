@@ -44,6 +44,8 @@ import translator.LoadStoreHelper.getStoreInstr
 import translator.LoadStoreHelper.getStoreInstr2
 import translator.LoadStoreHelper.getVIOStoreCall
 import translator.ResolveIndirect.resolveIndirect
+import translator.TranslatorNode.Companion.convertTypeToWASM
+import translator.TranslatorNode.Companion.convertTypesToWASM
 import useResultForThrowables
 import useWASMExceptions
 import utils.*
@@ -63,7 +65,7 @@ import utils.CommonInstructions.SET_FIELD
 import utils.CommonInstructions.SET_STATIC
 import utils.PrintUsed.printUsed
 import utils.ReplaceOptimizer.optimizeUsingReplacements
-import utils.WASMTypes.*
+import utils.StaticFieldOffsets.OFFSET_CLASS_ENUM_CONSTANTS
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f32Const0
@@ -85,9 +87,7 @@ import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Const.Companion.i64Const1
 import wasm.instr.Instructions.F32Add
 import wasm.instr.Instructions.F32Div
-import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Mul
-import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F32Sub
 import wasm.instr.Instructions.F32_CONVERT_I32S
 import wasm.instr.Instructions.F32_CONVERT_I64S
@@ -96,9 +96,7 @@ import wasm.instr.Instructions.F32_NEG
 import wasm.instr.Instructions.F32_REINTERPRET_I32
 import wasm.instr.Instructions.F64Add
 import wasm.instr.Instructions.F64Div
-import wasm.instr.Instructions.F64Load
 import wasm.instr.Instructions.F64Mul
-import wasm.instr.Instructions.F64Store
 import wasm.instr.Instructions.F64Sub
 import wasm.instr.Instructions.F64_CONVERT_I32S
 import wasm.instr.Instructions.F64_CONVERT_I64S
@@ -114,9 +112,6 @@ import wasm.instr.Instructions.I32GTS
 import wasm.instr.Instructions.I32LES
 import wasm.instr.Instructions.I32LTS
 import wasm.instr.Instructions.I32Load
-import wasm.instr.Instructions.I32Load16S
-import wasm.instr.Instructions.I32Load16U
-import wasm.instr.Instructions.I32Load8S
 import wasm.instr.Instructions.I32Mul
 import wasm.instr.Instructions.I32NE
 import wasm.instr.Instructions.I32Or
@@ -124,8 +119,6 @@ import wasm.instr.Instructions.I32Shl
 import wasm.instr.Instructions.I32ShrS
 import wasm.instr.Instructions.I32ShrU
 import wasm.instr.Instructions.I32Store
-import wasm.instr.Instructions.I32Store16
-import wasm.instr.Instructions.I32Store8
 import wasm.instr.Instructions.I32Sub
 import wasm.instr.Instructions.I32XOr
 import wasm.instr.Instructions.I32_DIVS
@@ -135,14 +128,12 @@ import wasm.instr.Instructions.I64Add
 import wasm.instr.Instructions.I64And
 import wasm.instr.Instructions.I64EQ
 import wasm.instr.Instructions.I64EQZ
-import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Mul
 import wasm.instr.Instructions.I64NE
 import wasm.instr.Instructions.I64Or
 import wasm.instr.Instructions.I64Shl
 import wasm.instr.Instructions.I64ShrS
 import wasm.instr.Instructions.I64ShrU
-import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.I64Sub
 import wasm.instr.Instructions.I64XOr
 import wasm.instr.Instructions.I64_DIVS
@@ -167,6 +158,14 @@ class MethodTranslator(
     companion object {
 
         private val LOGGER = LogManager.getLogger(MethodTranslator::class)
+
+        // todo make this work
+        val useJavaTypes = false
+        val i32 = if (useJavaTypes) "int" else WASMTypes.i32
+        val i64 = if (useJavaTypes) "long" else WASMTypes.i64
+        val f32 = if (useJavaTypes) "float" else WASMTypes.f32
+        val f64 = if (useJavaTypes) "double" else WASMTypes.f64
+        val ptrType = if (useJavaTypes) "java/lang/Object" else utils.ptrType
 
         val stackTraceTable = ByteArrayOutputStream2(1024)
         val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
@@ -262,8 +261,8 @@ class MethodTranslator(
             variables.defineParamVariables(clazz, descriptor, isStatic)
             if (name == STATIC_INIT) {
                 // check whether this class was already inited
-                val clazz1 = gIndex.getClassIndex(clazz)
-                printer.append(i32Const(clazz1))
+                val classId = gIndex.getClassId(clazz)
+                printer.append(i32Const(classId))
                     .append(Call("wasStaticInited"))
                     .append(
                         IfBranch(
@@ -319,11 +318,9 @@ class MethodTranslator(
     }
 
     override fun visitFrame(
-        type: Int,
-        numLocal: Int,
-        local: Array<Any?>,
-        numStack: Int,
-        stack: Array<Any?>
+        type: Int, numLocal: Int,
+        local: Array<Any?>, numStack: Int,
+        typeStack: Array<Any?>
     ) {
         // describes types of stack and local variables;
         // in Java >= 1.6, always before jump, so if/else is easier to create and verify :)
@@ -338,28 +335,34 @@ class MethodTranslator(
                 else -> "?$type"
             } // , local={$numLocal, [${local.joinToString { "\"$it\"" }}]}
         }=[${
-            stack.toList().subList(0, numStack)
+            typeStack.toList().subList(0, numStack)
         }]"
         // if (printOps) println(data)
         if (type == F_NEW) {
 
             // replace stack with the given one
-            if (printOps) println("old stack: ${this.stack}")
-            this.stack.clear()
-            for ((idx, si) in stack.withIndex()) {
+            if (printOps) println("old stack: $stack")
+            stack.clear()
+            for (idx in typeStack.indices) {
+                val si = typeStack[idx]
                 if (idx >= numStack) break
-                this.stack.add(
+                stack.add(
                     when (si) {
                         INTEGER -> i32
                         LONG -> i64
                         FLOAT -> f32
                         DOUBLE -> f64
+                        NULL -> if (useJavaTypes) "null" else ptrType
+                        UNINITIALIZED_THIS -> if (useJavaTypes) clazz else ptrType
+                        TOP -> if (useJavaTypes) "null" else ptrType // invalid or uninitialized (???)
                         null -> break
-                        else -> ptrType
+                        is String -> if (useJavaTypes) si else ptrType
+                        is Label -> ptrType // uninitialized instance (before new)
+                        else -> throw NotImplementedError("$si,${si.javaClass}")
                     }
                 )
             }
-            if (printOps) println("new stack: ${this.stack}")
+            if (printOps) println("new stack: $stack")
 
             // if current label has incorrect stack, correct it
             // (but only, if it has no code -> frame always follows a label, so nothing to worry about, I think)
@@ -367,7 +370,7 @@ class MethodTranslator(
             // never happens
             // if (i32 in currentNode.printer) throw IllegalStateException()
 
-            currentNode.inputStack = ArrayList(this.stack)
+            currentNode.inputStack = ArrayList(stack)
 
         } else throw NotImplementedError()
         if (printOps) printer.comment(data)
@@ -376,7 +379,7 @@ class MethodTranslator(
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         // increment the variable at that index
         if (printOps) println("  [$varIndex] += $increment")
-        val type = variables.findOrDefineLocalVar(varIndex, i32, "int")
+        val type = variables.findOrDefineLocalVar(varIndex, WASMTypes.i32, "int")
         printer
             .append(type.localGet).append(i32Const(increment)).append(I32Add)
             .append(type.localSet)
@@ -398,28 +401,31 @@ class MethodTranslator(
     override fun visitCode() {
     }
 
-    private fun Builder.poppush(x: String): Builder {
+    private fun Builder.poppush(expectedType: String): Builder {
         // ensure we got the correct type
-        if (printOps) println("// $stack = $x")
-        if (comments && commentStackOps) printer.comment("$stack = $x")
-        assertFalse(stack.isEmpty()) { "Expected $x, but stack was empty; $clazz, $name, $descriptor" }
-        assertEquals(x, stack.last())
+        if (printOps) println("// $stack = $expectedType")
+        if (comments && commentStackOps) printer.comment("$stack = $expectedType")
+        assertFalse(stack.isEmpty()) { "Expected $expectedType, but stack was empty; $clazz, $name, $descriptor" }
+        assertEquals(convertTypeToWASM(expectedType), convertTypeToWASM(stack.last()))
         return this
     }
 
-    private fun Builder.pop(x: String): Builder {
+    private fun Builder.pop(expectedType: String): Builder {
         // ensure we got the correct type
-        if (printOps) println("// $stack -= $x")
-        if (comments && commentStackOps) printer.comment("$stack -= $x")
-        assertFalse(stack.isEmpty()) { "Expected $x, but stack was empty; $clazz, $name, $descriptor" }
-        assertEquals(x, stack.pop())
+        if (printOps) println("// $stack -= $expectedType")
+        if (comments && commentStackOps) printer.comment("$stack -= $expectedType")
+        assertFalse(stack.isEmpty()) { "Expected $expectedType, but stack was empty; $clazz, $name, $descriptor" }
+        assertEquals(convertTypeToWASM(expectedType), convertTypeToWASM(stack.removeLast()))
         return this
     }
 
-    private fun Builder.push(x: String): Builder {
-        if (printOps) println("// $stack += $x")
-        if (comments && commentStackOps) printer.comment("$stack += $x")
-        stack.add(x)
+    private fun Builder.push(type: String): Builder {
+        if (!useJavaTypes && !(type == i32 || type == i64 || type == f32 || type == f64)) {
+            throw IllegalStateException(type)
+        }
+        if (printOps) println("// $stack += $type")
+        if (comments && commentStackOps) printer.comment("$stack += $type")
+        stack.add(type)
         return this
     }
 
@@ -613,7 +619,7 @@ class MethodTranslator(
                 if (isDuplicable(lastInstr)) {
                     printer.append(lastInstr!!)
                 } else {
-                    printer.append(Call("dup$type1"))
+                    printer.append(Call("dup${convertTypeToWASM(type1)}"))
                 }
             }
             0x5a -> {
@@ -622,7 +628,9 @@ class MethodTranslator(
                 stack.add(v0)
                 stack.add(v1)
                 stack.add(v0)
-                printer.append(Call("dup_x1$v0$v1"))
+                val v0i = convertTypeToWASM(v0)
+                val v1i = convertTypeToWASM(v1)
+                printer.append(Call("dup_x1$v0i$v1i"))
                 // value2, value1 →
                 // value1, value2, value1
             }
@@ -634,7 +642,10 @@ class MethodTranslator(
                 stack.add(v2)
                 stack.add(v1)
                 stack.add(v0)
-                printer.append(Call("dup_x2$v0$v1$v2"))
+                val v0i = convertTypeToWASM(v0)
+                val v1i = convertTypeToWASM(v1)
+                val v2i = convertTypeToWASM(v2)
+                printer.append(Call("dup_x2$v0i$v1i$v2i"))
             }
             0x5c -> {
                 val v1 = stack[stack.size - 1]
@@ -645,11 +656,14 @@ class MethodTranslator(
                     val v0 = stack[stack.size - 2]
                     stack.add(v0)
                     stack.add(v1)
-                    printer.append(Call("dup2$v0$v1"))
+                    val v0i = convertTypeToWASM(v0)
+                    val v1i = convertTypeToWASM(v1)
+                    printer.append(Call("dup2$v0i$v1i"))
                 } else {
                     // dup
                     stack.add(v1)
-                    printer.append(Call("dup$v1"))
+                    val v1i = convertTypeToWASM(v1)
+                    printer.append(Call("dup$v1i"))
                 }
             }
             0x5d -> {
@@ -667,7 +681,10 @@ class MethodTranslator(
                     stack.add(v3)
                     stack.add(v2)
                     stack.add(v1)
-                    printer.append(Call("dup2_x1$v1$v2$v3"))
+                    val v1i = convertTypeToWASM(v1)
+                    val v2i = convertTypeToWASM(v2)
+                    val v3i = convertTypeToWASM(v3)
+                    printer.append(Call("dup2_x1$v1i$v2i$v3i"))
                 } else {
                     // value2, value1 ->
                     // value1, value2, value1
@@ -676,16 +693,17 @@ class MethodTranslator(
                 }
             }
             0x5e -> {
+                // didn't appear yet...
                 printer.append(Call("dup2_x2"))
-                // if (x != null) log("mouseX", x[0] = getMouseX());
-                // if (y != null) log("mouseY", y[0] = getMouseY());
-                TODO("Implement dup2_x2 instruction")
+                throw NotImplementedError("Implement dup2_x2 instruction")
             }
             0x5f -> { // swap
-                val type1 = stack.last()
-                val type2 = stack[stack.size - 2]
-                if (type1 != type2) printer.pop(type1).pop(type2).push(type1).push(type2)
-                printer.append(Call("swap$type1$type2"))
+                val v0 = stack.last()
+                val v1 = stack[stack.size - 2]
+                if (v0 != v1) printer.pop(v0).pop(v1).push(v0).push(v1)
+                val v0i = convertTypeToWASM(v0)
+                val v1i = convertTypeToWASM(v1)
+                printer.append(Call("swap$v0i$v1i"))
             }
             0x60 -> printer.pop(i32).poppush(i32).append(I32Add)
             0x61 -> printer.pop(i64).poppush(i64).append(I64Add)
@@ -799,13 +817,11 @@ class MethodTranslator(
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             ATHROW_INSTR -> {// athrow, easy :3
-                printer.pop(ptrType).push(ptrType)
-                printer.dupPtr() // todo why are we duplicating the error???
+                printer.poppush(ptrType)
                 handleThrowable(true)
-                printer.pop(ptrType)
             }
-            // MONITOR_ENTER -> printer.pop(ptrType).append("  call \$monitorEnter\n") // monitor enter
-            // MONITOR_EXIT -> printer.pop(ptrType).append("  call \$monitorExit\n") // monitor exit
+            // MONITOR_ENTER -> printer.pop(ptrType).append(Call.monitorEnter) // monitor enter
+            // MONITOR_EXIT -> printer.pop(ptrType).append(Call.monitorExit) // monitor exit
             MONITOR_ENTER -> printer.pop(ptrType).drop() // monitor enter
             MONITOR_EXIT -> printer.pop(ptrType).drop() // monitor exit
             else -> throw NotImplementedError("unknown op ${OpCode[opcode]}\n")
@@ -838,7 +854,7 @@ class MethodTranslator(
         val fields = dlu.descriptor.params
 
         // register new class (not visitable)
-        printer.append(i32Const(gIndex.getClassIndex(synthClassName)))
+        printer.append(i32Const(gIndex.getClassId(synthClassName)))
         if (fields.isEmpty() && !dlu.usesSelf) {
             // no instance is needed 😁:
             //  we create a four-byte pseudo instance from just the class index value
@@ -853,7 +869,8 @@ class MethodTranslator(
         }
 
         if (fields.isNotEmpty()) {
-            val createdInstance = variables.defineLocalVar(ptrType, synthClassName)
+            val createdInstance =
+                variables.defineLocalVar(utils.ptrType, synthClassName)
             printer.pop(ptrType)
             printer.append(createdInstance.setter)
 
@@ -897,7 +914,7 @@ class MethodTranslator(
         visitJumpInsn(opcode, label)
     }
 
-    fun visitJumpInsn(opcode: Int, label: Int) {
+    private fun visitJumpInsn(opcode: Int, label: Int) {
         if (printOps) println("  [jump] ${OpCode[opcode]} -> [L$label]")
         when (opcode) {
             // consume two args for comparison
@@ -984,7 +1001,7 @@ class MethodTranslator(
                 printer.push(i32)
                 // used for assert() with getClassLoader()
                 val type = Descriptor.parseType(value.descriptor)
-                printer.append(i32Const(gIndex.getClassIndex(type)))
+                printer.append(i32Const(gIndex.getClassId(type)))
                 printer.append(Call.findClass)
                 if (comments) printer.comment("class $value")
             }
@@ -1081,7 +1098,8 @@ class MethodTranslator(
 
         fun getCaller(printer: Builder) {
             if (splitArgs.isNotEmpty()) {
-                printer.append(Call(gIndex.getNth(listOf(ptrType) + splitArgs)))
+                val wasmTypes = convertTypesToWASM(listOf(ptrType) + splitArgs)
+                printer.append(Call(gIndex.getNth(wasmTypes)))
             } else printer.dupPtr()
         }
 
@@ -1129,13 +1147,7 @@ class MethodTranslator(
                     pop(splitArgs, false, ret)
                     stackPop()
 
-                } else if (
-                    hIndex.isFinal(sig0) &&
-                    // todo a method that is final should always pass this, but somehow,
-                    //  me/anno/utils/hpc/WorkSplitter/processUnbalanced(IIILme_anno_utils_hpc_WorkSplitterXTask1d;)V
-                    //  doesn't pass the test
-                    findConstructableChildImplementations(sig0).size < 2
-                ) {
+                } else if (hIndex.isFinal(sig0)) {
 
                     val methods = findConstructableChildImplementations(sig0)
                     if (methods.size > 1) {
@@ -1145,7 +1157,7 @@ class MethodTranslator(
                         for (option in methods) {
                             println("  - $option")
                         }
-                        assertFail("Unclear candidates")
+                        assertFail("Multiple candidates for final method")
                     }
                     val sig2 = methods.firstOrNull() ?: sig1
 
@@ -1358,7 +1370,7 @@ class MethodTranslator(
         stackPush()
         for (i in 0 until numDimensions) printer.pop(i32)
         printer.push(ptrType)
-            .append(i32Const(gIndex.getClassIndex(type)))
+            .append(i32Const(gIndex.getClassId(type)))
             .append(Call.createNativeArray[numDimensions])
 
         stackPop()
@@ -1397,7 +1409,7 @@ class MethodTranslator(
         val default = getLabel(default0)
         val labels = labels0.map { getLabel(it) }
         if (printOps) println("  [lookup] switch [$default], [${keys.joinToString()}], [${labels.joinToString()}]")
-        val helper = variables.defineLocalVar(i32, "int")
+        val helper = variables.defineLocalVar(WASMTypes.i32, "int")
         printer.pop(i32)
         printer.append(helper.localSet)
         for (i in keys.indices) {
@@ -1622,7 +1634,7 @@ class MethodTranslator(
                 // new instance
                 stackPush()
                 printer.push(ptrType)
-                    .append(i32Const(gIndex.getClassIndex(type)))
+                    .append(i32Const(gIndex.getClassId(type)))
                     .append(Call.createInstance)
                 if (comments) printer.comment(type)
                 stackPop()
@@ -1659,13 +1671,13 @@ class MethodTranslator(
     }
 
     private fun Builder.printCastClass(clazz: String) {
-        append(i32Const(gIndex.getClassIndex(clazz)))
+        append(i32Const(gIndex.getClassId(clazz)))
         append(if (hasConstructableChildClasses(clazz)) Call.checkCast else Call.checkCastExact)
     }
 
     private fun Builder.appendInstanceOf(clazz: String) {
         if (clazz in dIndex.constructableClasses) {
-            append(i32Const(gIndex.getClassIndex(clazz)))
+            append(i32Const(gIndex.getClassId(clazz)))
             append(
                 if (hasConstructableChildClasses(clazz)) {
                     if (hIndex.isInterfaceClass(clazz)) Call.instanceOf
@@ -1716,9 +1728,10 @@ class MethodTranslator(
         val type = getVarWASMType(opcode)
         if (isPush) printer.push(type)
         else printer.pop(type)
+        val wasmType = convertTypeToWASM(type)
         val variable = paramVariable
-            ?: variables.findOrDefineLocalVar(varIndex, type, "?")
-        assertEquals(type, variable.wasmType)
+            ?: variables.findOrDefineLocalVar(varIndex, wasmType, type)
+        assertEquals(wasmType, variable.wasmType)
         printer.append(if (isPush) variable.localGet else variable.localSet)
     }
 
@@ -1747,7 +1760,7 @@ class MethodTranslator(
                 stackPush()
                 printer
                     .pop(i32).push(ptrType)
-                    .append(i32Const(gIndex.getClassIndex(type)))
+                    .append(i32Const(gIndex.getClassId(type)))
                     .append(Call.createNativeArray[1])
                 if (comments) printer.comment(type)
                 stackPop()
@@ -1862,7 +1875,7 @@ class MethodTranslator(
             GET_STATIC -> {
                 if (name in enumFieldsNames) {
                     callStaticInit(owner)
-                    val clazzIndex = gIndex.getClassIndex(owner)
+                    val clazzIndex = gIndex.getClassId(owner)
                     val fieldOffset1 = gIndex.getFieldOffset(
                         "java/lang/Class", "enumConstants",
                         "java/lang/Object", false
@@ -1883,7 +1896,7 @@ class MethodTranslator(
                         printer.append(i32Const(staticPtr))
                     } else {
                         printer
-                            .append(i32Const(gIndex.getClassIndex(owner)))
+                            .append(i32Const(gIndex.getClassId(owner)))
                             .append(i32Const(fieldOffset))
                             // class index, field offset -> static value
                             .append(Call.findStatic)
@@ -1900,15 +1913,11 @@ class MethodTranslator(
             }
             SET_STATIC -> {
                 if (name in enumFieldsNames) {
-                    val clazzIndex = gIndex.getClassIndex(owner)
-                    val fieldOffset1 = gIndex.getFieldOffset(
-                        "java/lang/Class", "enumConstants",
-                        "java/lang/Object", false
-                    )!!
+                    val clazzIndex = gIndex.getClassId(owner)
                     printer
                         .append(i32Const(clazzIndex))
                         .append(Call.findClass)
-                        .append(i32Const(fieldOffset1))
+                        .append(i32Const(OFFSET_CLASS_ENUM_CONSTANTS))
                     printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
                     if (comments) printer.comment("enum values")
                     printer.pop(wasmType)
@@ -1920,7 +1929,7 @@ class MethodTranslator(
                         printer.append(i32Const(staticPtr))
                     } else {
                         printer
-                            .append(i32Const(gIndex.getClassIndex(owner)))
+                            .append(i32Const(gIndex.getClassId(owner)))
                             .append(i32Const(fieldOffset))
                             // ;; class index, field offset -> static value
                             .append(Call.findStatic)

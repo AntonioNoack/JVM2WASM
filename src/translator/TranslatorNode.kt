@@ -4,11 +4,13 @@ import graphing.BranchNode
 import graphing.GraphingNode
 import graphing.ReturnNode
 import graphing.SequenceNode
-import me.anno.utils.assertions.assertTrue
 import me.anno.utils.algorithms.Recursion
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.createArrayList
 import utils.Builder
+import utils.WASMTypes.*
+import utils.ptrType
 import wasm.instr.Comment
 
 class TranslatorNode(val label: Int) {
@@ -52,6 +54,23 @@ class TranslatorNode(val label: Int) {
             override val outputs: List<GraphingNode> = emptyList()
         }
 
+        fun convertTypeToWASM(type: String): String {
+            if (!MethodTranslator.useJavaTypes) return type
+            return when (type) {
+                i32, i64, f32, f64 -> type
+                "int", "byte", "boolean", "char", "short" -> i32
+                "long" -> i64
+                "float" -> f32
+                "double" -> f64
+                else -> ptrType
+            }
+        }
+
+        fun convertTypesToWASM(types: List<String>): List<String> {
+            if (!MethodTranslator.useJavaTypes) return types
+            return types.map(::convertTypeToWASM)
+        }
+
         fun convertNodes(nodes: List<TranslatorNode>): ArrayList<GraphingNode> {
             val newNodes = createArrayList(nodes.size) { i ->
                 val node = nodes[i]
@@ -76,8 +95,8 @@ class TranslatorNode(val label: Int) {
             for (i in nodes.indices) {
                 val node = nodes[i]
                 val newNode = newNodes[i]
-                newNode.inputStack = node.inputStack
-                newNode.outputStack = node.outputStack
+                newNode.inputStack = convertTypesToWASM(node.inputStack)
+                newNode.outputStack = convertTypesToWASM(node.outputStack)
             }
 
             // link all new nodes

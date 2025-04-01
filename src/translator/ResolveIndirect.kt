@@ -81,7 +81,7 @@ object ResolveIndirect {
         val result = ArrayList<Instruction>(classes2.size * 5)
         for (k in classes2.indices) {
             result.add(tmpI32.getter)
-            result.add(i32Const(gIndex.getClassIndex(classes2[k])))
+            result.add(i32Const(gIndex.getClassId(classes2[k])))
             result.add(I32EQ)
             if (k > 0) result.add(I32Or)
             if (comments) result.add(Comment(classes2[k]))

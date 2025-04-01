@@ -137,7 +137,7 @@ private fun fillInFields(
 
     checkAlignment(indexStartPtr)
 
-    val fieldClassIndex = gIndex.getClassIndex("java/lang/reflect/Field")
+    val fieldClassIndex = gIndex.getClassId("java/lang/reflect/Field")
     val fieldSize = gIndex.getInstanceSize("java/lang/reflect/Field")
     val fieldCache = HashMap<FieldEntry, Int>()
     for (classIndex in 0 until numClasses) {
@@ -199,17 +199,17 @@ private fun fillInFields(
 
 private fun getTypeClassIndex(typeName: String): Int {
     return when (typeName) {
-        in NativeTypes.nativeTypes -> gIndex.getClassIndex(typeName)
-        "[]" -> gIndex.getClassIndex("[]")
+        in NativeTypes.nativeTypes -> gIndex.getClassId(typeName)
+        "[]" -> gIndex.getClassId("[]")
         else -> {
             if (
                 typeName.startsWith("[") &&
                 typeName.length == 2 &&
                 typeName[1] in NativeTypes.joined
             ) { // native array
-                gIndex.getClassIndex(typeName)
+                gIndex.getClassId(typeName)
             } else if (typeName.startsWith("[")) {
-                gIndex.getClassIndex("[]")
+                gIndex.getClassId("[]")
             } else {
                 gIndex.getClassIndexOrParents(typeName)
             }
@@ -259,7 +259,7 @@ fun appendClassInstanceTable(printer: StringBuilder2, ptr: Int, numClasses: Int)
     val indexStartPtr = alignPointer(ptr)
     classInstanceTablePtr = indexStartPtr
 
-    val classClassIndex = gIndex.getClassIndex("java/lang/Class")
+    val classClassIndex = gIndex.getClassId("java/lang/Class")
     val classSize = gIndex.getInstanceSize("java/lang/Class")
 
     val classData = ByteArrayOutputStream2(classSize * numClasses)
@@ -304,7 +304,7 @@ private fun fillInMethods(
     val methodCache = HashMap<MethodSig, Int>()
 
     val className = if (writeConstructors) "java/lang/reflect/Constructor" else "java/lang/reflect/Method"
-    val methodClassIndex = gIndex.getClassIndex(className)
+    val methodClassIndex = gIndex.getClassId(className)
     val methodSize = gIndex.getInstanceSize(className)
 
     fun isConstructableOrStatic(sig: MethodSig): Boolean {
@@ -329,7 +329,7 @@ private fun fillInMethods(
         // find all methods with valid call signature
         val clazzName = gIndex.classNamesByIndex[classId]
         val superClass = hIndex.superClass[clazzName]
-        val superClassIdx = if (superClass != null) gIndex.getClassIndex(superClass) else -1
+        val superClassIdx = if (superClass != null) gIndex.getClassId(superClass) else -1
         val superMethods =
             if (superClass != null) methodsForClass.getOrNull(superClassIdx)
                 ?: throw IllegalStateException(

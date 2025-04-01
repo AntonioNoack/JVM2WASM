@@ -52,7 +52,7 @@ object Annotations {
         return annotationCache.getOrPut(annota) {
             val className = annota.implClass
             val fields = gIndex.getFieldOffsets(className, false)
-            val classId = gIndex.getClassIndex(className)
+            val classId = gIndex.getClassId(className)
             if (fields.hasFields()) {
                 alignBuffer(classData)
                 val ptr = indexStartPtr + classData.size()

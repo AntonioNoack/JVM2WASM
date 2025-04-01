@@ -328,7 +328,7 @@ fun printMethodFieldStats() {
 
         LOGGER.info("classes:")
         for (clazz in dIndex.constructableClasses) {
-            LOGGER.info("[${gIndex.getClassIndex(clazz)}] $clazz")
+            LOGGER.info("[${gIndex.getClassId(clazz)}] $clazz")
         }
         LOGGER.info()
 

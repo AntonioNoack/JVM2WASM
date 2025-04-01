@@ -47,7 +47,7 @@ public class StaticClassIndices {
     public static final int NUM_ARRAYS = LAST_ARRAY - FIRST_ARRAY + 1;
 
     private static int getClassIndex(String className) {
-        return GeneratorIndex.INSTANCE.getClassIndex(className);
+        return GeneratorIndex.INSTANCE.getClassId(className);
     }
 
     public static void validateClassIndices() {

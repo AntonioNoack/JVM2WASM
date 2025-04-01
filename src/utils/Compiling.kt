@@ -537,7 +537,7 @@ fun ensureIndexForConstructableClasses() {
     for (clazz in dIndex.constructableClasses) {
         val interfaces = hIndex.interfaces[clazz] ?: continue
         for (interfaceI in interfaces) {
-            gIndex.getClassIndex(interfaceI)
+            gIndex.getClassId(interfaceI)
         }
     }
 }
@@ -551,10 +551,10 @@ fun ensureIndexForInterfacesAndSuperClasses() {
     while (i < gIndex.classNamesByIndex.size) {
         val clazzName = gIndex.classNamesByIndex[i++]
         val superClass = hIndex.superClass[clazzName]
-        if (superClass != null) gIndex.getClassIndex(superClass)
+        if (superClass != null) gIndex.getClassId(superClass)
         val interfaces = hIndex.interfaces[clazzName]
         if (interfaces != null) for (interfaceI in interfaces) {
-            gIndex.getClassIndex(interfaceI)
+            gIndex.getClassId(interfaceI)
         }
     }
 }
@@ -566,8 +566,8 @@ fun ensureIndexForInterfacesAndSuperClasses() {
 fun ensureIndexForAnnotations() {
     LOGGER.info("[ensureIndexForAnnotations]")
     for (annotationClass in dIndex.constructableAnnotations) {
-        gIndex.getClassIndex(annotationClass)
-        gIndex.getClassIndex(Annotations.getAnnotaImplClass(annotationClass))
+        gIndex.getClassId(annotationClass)
+        gIndex.getClassId(Annotations.getAnnotaImplClass(annotationClass))
     }
 }
 
@@ -732,13 +732,13 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     val dst = args[1] as Handle
                                     val synthClassName = getSynthClassName(sig1, dst)
                                     // println("lambda: $sig1 -> $synthClassName")
-                                    gIndex.getClassIndex(synthClassName) // add class to index
+                                    gIndex.getClassId(synthClassName) // add class to index
                                     val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
                                     dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
                                 }
 
                                 override fun visitTypeInsn(opcode: Int, type: String) {
-                                    gIndex.getClassIndex(Descriptor.parseTypeMixed(type)) // add class to index
+                                    gIndex.getClassId(Descriptor.parseTypeMixed(type)) // add class to index
                                 }
 
                                 override fun visitTryCatchBlock(
@@ -748,13 +748,13 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     type: String?
                                 ) {
                                     if (type != null) {
-                                        gIndex.getClassIndex(replaceClass(type)) // add class to index
+                                        gIndex.getClassId(replaceClass(type)) // add class to index
                                     }
                                 }
 
                                 override fun visitLdcInsn(value: Any?) {
                                     if (value is Type) { // add class to index
-                                        gIndex.getClassIndex(Descriptor.parseType(value.descriptor))
+                                        gIndex.getClassId(Descriptor.parseType(value.descriptor))
                                     }
                                 }
 

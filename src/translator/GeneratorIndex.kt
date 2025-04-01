@@ -58,7 +58,7 @@ object GeneratorIndex {
     var stringInstanceSize = -1
     fun getString(str: String, ptr0: Int, buffer: ByteArrayOutputStream2): Int {
         val stringClassName = "java/lang/String"
-        val stringClass = getClassIndex(stringClassName)
+        val stringClass = getClassId(stringClassName)
         val stringInstanceSize = getInstanceSize(stringClassName)
         return stringSet.getOrPut(str) {
 
@@ -140,7 +140,7 @@ object GeneratorIndex {
 
     var lockClasses = false
 
-    fun getClassIndex(name0: String): Int {
+    fun getClassId(name0: String): Int {
         val name = replaceClass(name0)
         assertFalse('.' in name)
         if (name in classIndex) return classIndex[name]!!
@@ -151,7 +151,7 @@ object GeneratorIndex {
             val superClass = replaceClassNullable(hIndex.superClass[name])
             if (superClass != null && superClass !in classIndex) {
                 // ensure classes are ordered
-                getClassIndex(superClass)
+                getClassId(superClass)
             }
 
             addClassIndex(name)
@@ -181,7 +181,7 @@ object GeneratorIndex {
                 hIndex.superClass[name]
                     ?: "java/lang/Object"
             )
-            else getClassIndex(name)
+            else getClassId(name)
         } else classIndex["[]"]!!
     }
 
@@ -191,10 +191,10 @@ object GeneratorIndex {
         if (clazz.startsWith("[L") || clazz.startsWith("[["))
             return getDynMethodIdx("[]")
         if (lockedDynIndex) {
-            return dynMethodIndices[getClassIndex(clazz)]
+            return dynMethodIndices[getClassId(clazz)]
                 ?: emptyMap()
         } else {
-            val clazzMap = dynMethodIndices.getOrPut(getClassIndex(clazz)) {
+            val clazzMap = dynMethodIndices.getOrPut(getClassId(clazz)) {
                 // find parent class, and index all their functions!!
                 if (isRootType(clazz)) {
                     HashMap()
@@ -206,7 +206,7 @@ object GeneratorIndex {
                 }
             }
             if (!isRootType(clazz)) {
-                val superIdx = getClassIndex(hIndex.superClass[clazz]!!)
+                val superIdx = getClassId(hIndex.superClass[clazz]!!)
                 val superTable = dynMethodIndices[superIdx]
                     ?: throw IllegalStateException("Missing table for ${hIndex.superClass[clazz]}")
                 if (clazzMap.size < superTable.size) {
@@ -381,7 +381,7 @@ object GeneratorIndex {
     fun getFieldOffsets(clazz0: String, static: Boolean): ClassOffsets {
         val clazz = replaceClass(clazz0)
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
-        return fieldOffsets.getOrPut(getClassIndex(clazz) * 2 + static.toInt()) {
+        return fieldOffsets.getOrPut(getClassId(clazz) * 2 + static.toInt()) {
             if (static) {
                 ClassOffsets(0, null)
             } else {

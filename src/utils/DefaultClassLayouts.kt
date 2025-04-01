@@ -46,8 +46,8 @@ object DefaultClassLayouts {
         eq(gIndex.getType(true, voidDescriptor, true), FuncType(listOf(), listOf(ptrType)))
 
         // prepare String properties
-        gIndex.stringClass = gIndex.getClassIndex(string)
-        gIndex.stringArrayClass = gIndex.getClassIndex(if (byteStrings) "[B" else "[C")
+        gIndex.stringClass = gIndex.getClassId(string)
+        gIndex.stringArrayClass = gIndex.getClassId(if (byteStrings) "[B" else "[C")
 
         // instance arrays
         eq("[]", "length", "int", 0, OFFSET_ARRAY_LENGTH)
