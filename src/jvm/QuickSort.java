@@ -2,8 +2,8 @@ package jvm;
 
 import annotations.NoThrow;
 
-import static jvm.JVM32.unsignedGreaterThan;
-import static jvm.JVM32.unsignedLessThanEqual;
+import static jvm.JVMShared.unsignedGreaterThan;
+import static jvm.JVMShared.unsignedLessThanEqual;
 
 /**
  * QuickSort for unsigned-int-arrays, in-place, stable and fast
@@ -11,6 +11,7 @@ import static jvm.JVM32.unsignedLessThanEqual;
 public class QuickSort {
 
     @NoThrow
+    @SuppressWarnings("TailRecursion") // we build a large tree, so not really worth it, I think
     public static void quickSort(int[] values, int begin, int endIncl) {
         if (begin + 12 < endIncl) {
             int partitionIndex = partition(values, begin, endIncl);

@@ -1,8 +1,8 @@
 package utils;
 
-import static jvm.JVM32.objectOverhead;
 import static jvm.JVM32.ptrSize;
 import static jvm.JVMShared.intSize;
+import static jvm.JVMShared.objectOverhead;
 
 // todo hardcode all fields that need hardcoding;
 //  verify them, so everything is still secure
@@ -38,7 +38,7 @@ public class StaticFieldOffsets {
     public static final int OFFSET_METHOD_MODIFIERS = objectOverhead + intSize + 5 * ptrSize;
 
     public static final int OFFSET_CONSTRUCTOR_SLOT = objectOverhead;
-    public static final int OFFSET_CONSTRUCTOR_PARAMETER_TYPES = objectOverhead + intSize ;
+    public static final int OFFSET_CONSTRUCTOR_PARAMETER_TYPES = objectOverhead + intSize;
     public static final int OFFSET_CONSTRUCTOR_CALL_SIGNATURE = objectOverhead + intSize + ptrSize;
     public static final int OFFSET_CONSTRUCTOR_DECLARING_CLASS = objectOverhead + intSize + 2 * ptrSize;
     public static final int OFFSET_CONSTRUCTOR_MODIFIERS = objectOverhead + intSize + 3 * ptrSize;

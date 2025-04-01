@@ -5,8 +5,9 @@ import org.jetbrains.annotations.NotNull;
 import java.nio.charset.Charset;
 import java.util.Locale;
 
-import static jvm.JVM32.*;
+import static jvm.JVM32.isDynamicInstance;
 import static jvm.JVMShared.unsafeCast;
+import static jvm.JVMShared.unsignedLessThan;
 import static jvm.JavaUtil.String_format;
 
 @SuppressWarnings("unused")

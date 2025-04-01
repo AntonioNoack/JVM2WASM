@@ -1,6 +1,9 @@
 package jvm;
 
-import annotations.*;
+import annotations.Alias;
+import annotations.JavaScript;
+import annotations.NoThrow;
+import annotations.WASM;
 
 import static jvm.GCGapFinder.getInstanceSize;
 import static jvm.GarbageCollector.largestGaps;
@@ -9,36 +12,14 @@ import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
-import static utils.StaticClassIndices.FIRST_ARRAY;
-import static utils.StaticClassIndices.LAST_ARRAY;
+import static utils.StaticClassIndices.*;
 import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 
 @SuppressWarnings("unused")
 public class JVM32 {
 
-    public static final int objectOverhead = 4;// 3x class, 1x GC
-    public static final int arrayOverhead = objectOverhead + 4;// length
     public static final int ptrSizeBits = 2; // this is JVM32, so this is correct
     public static final int ptrSize = 1 << ptrSizeBits;
-    public static boolean trackAllocations = true;
-
-    // public static int fieldTableOffset = getFieldTableOffset(); // for GC
-
-    @NoThrow
-    @WASM(code = "global.get $inheritanceTable")
-    public static native int inheritanceTable();
-
-    @Export
-    @NoThrow
-    @UsedIfIndexed
-    @Alias(names = "oo")
-    public static int getObjectOverhead() {
-        return objectOverhead;
-    }
-
-    @NoThrow
-    @WASM(code = "global.get $staticTable")
-    public static native int staticInstancesOffset();
 
     @NoThrow
     @WASM(code = "") // todo this method shall only be used by JVM32
@@ -54,14 +35,6 @@ public class JVM32 {
     public static native int getAddr(Object obj);
 
     @NoThrow
-    @WASM(code = "global.get $classSize")
-    public static native int getClassSize();
-
-    @NoThrow
-    @WASM(code = "global.get $classInstanceTable")
-    public static native int getClassInstanceTable();
-
-    @NoThrow
     @Alias(names = "findClass")
     public static Class<Object> classIdToInstance(int classId) {
         return ptrTo(classIdToInstancePtr(classId));
@@ -70,20 +43,6 @@ public class JVM32 {
     @NoThrow
     public static int classIdToInstancePtr(int classId) {
         return classId * getClassSize() + getClassInstanceTable();
-    }
-
-    @NoThrow
-    @Alias(names = "findStatic")
-    public static int findStatic(int classId, int offset) {
-        // log("finding static", clazz, offset);
-        return read32(staticInstancesOffset() + (classId << 2)) + offset;
-    }
-
-    static void failCastCheck(Object instance, int clazz) {
-        Class<Object> isClass = classIdToInstance(readClassId(instance));
-        Class<Object> checkClass = classIdToInstance(clazz);
-        log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
-        throw new ClassCastException();
     }
 
     @Alias(names = "resolveIndirectFail")
@@ -117,14 +76,6 @@ public class JVM32 {
         return newInstance;
     }
 
-    @NoThrow
-    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
-    private static native void trackCalloc(int clazz);
-
-    @NoThrow
-    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
-    private static native void trackCalloc(int clazz, int size);
-
     @Alias(names = "createObjectArray")
     public static Object[] createObjectArray(int length) {
         // probably a bit illegal; should be fine for us, saving allocations :)
@@ -134,7 +85,7 @@ public class JVM32 {
             // else awkward, probably recursive trap
         }
         // log("creating array", length);
-        return (Object[]) createNativeArray1(length, 1);
+        return (Object[]) createNativeArray1(length, OBJECT_ARRAY);
     }
 
     @Alias(names = "createNativeArray1")
@@ -180,16 +131,6 @@ public class JVM32 {
     public static native int getNextPtr();
 
     @NoThrow
-    public static int queryGCed() {
-        int sum = 0;
-        int[] data = largestGaps;
-        for (int i = 0, l = data.length; i < l; i += 2) {
-            sum += data[i];
-        }
-        return sum;
-    }
-
-    @NoThrow
     @WASM(code = "global.set $allocationPointer")
     public static native void setNextPtr(int value);
 
@@ -199,11 +140,6 @@ public class JVM32 {
     public static native int getAllocatedSize();
 
     @NoThrow
-    @JavaScript(code = "console.log('Growing by ' + (arg0<<6) + ' kiB, total: '+(memory.buffer.byteLength>>20)+' MiB'); try { memory.grow(arg0); return true; } catch(e) { console.error(e.stack); return false; }")
-    public static native boolean grow(int numPages);
-
-    @NoThrow
-
     public static int adjustCallocSize(int size) {
         // 4 is needed for GPU stuff, or we'd have to reallocate it on the JS side
         // 8 is needed for x86
@@ -253,18 +189,6 @@ public class JVM32 {
         long value1 = ((long) value) & 0xffffffffL;
         fill64(start, end, (value1 << 32) | value1);
     }
-
-    @NoThrow
-    @WASM(code = "i64.ne")
-    private static native boolean neq(long a, long b);
-
-    @NoThrow
-    @WASM(code = "i32.and")
-    private static native boolean and(boolean a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.and")
-    private static native boolean and(boolean a, boolean b);
 
     /**
      * finds the position of the next different byte;
@@ -383,77 +307,9 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "i32.lt_u")
-    public static native boolean unsignedLessThan(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.le_u")
-    public static native boolean unsignedLessThanEqual(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.gt_u")
-    public static native boolean unsignedGreaterThan(int a, int b);
-
-    @NoThrow
-    @WASM(code = "i32.ge_u")
-    public static native boolean unsignedGreaterThanEqual(int a, int b);
-
-    @NoThrow
     public static boolean isDynamicInstance(Object instance) {
         return unsignedGreaterThanEqual(getAddr(instance), getAllocationStart());
     }
-
-    @NoThrow
-    @Alias(names = "f2i")
-    public static int f2i(float v) {
-        if (v < -2147483648f) return Integer.MIN_VALUE;
-        if (v > 2147483647f) return Integer.MAX_VALUE;
-        if (Float.isNaN(v)) return 0;
-        return f2iNative(v);
-    }
-
-    @NoThrow
-    @WASM(code = "i32.trunc_f32_s")
-    public static native int f2iNative(float v);
-
-    @NoThrow
-    @Alias(names = "f2l")
-    public static long f2l(float v) {
-        if (v < -9223372036854775808f) return Long.MIN_VALUE;
-        if (v > 9223372036854775807f) return Long.MAX_VALUE;
-        if (Float.isNaN(v)) return 0L;
-        return f2lNative(v);
-    }
-
-    @NoThrow
-    @WASM(code = "i64.trunc_f32_s")
-    public static native long f2lNative(float v);
-
-    @NoThrow
-    @Alias(names = "d2i")
-    public static int d2i(double v) {
-        if (v < -2147483648.0) return Integer.MIN_VALUE;
-        if (v > 2147483647.0) return Integer.MAX_VALUE;
-        if (Double.isNaN(v)) return 0;
-        return d2iNative(v);
-    }
-
-    @NoThrow
-    @WASM(code = "i32.trunc_f64_s")
-    public static native int d2iNative(double v);
-
-    @NoThrow
-    @Alias(names = "d2l")
-    public static long d2l(double v) {
-        if (v < -9223372036854775808.0) return Long.MIN_VALUE;
-        if (v > 9223372036854775807.0) return Long.MAX_VALUE;
-        if (Double.isNaN(v)) return 0L;
-        return _d2l(v);
-    }
-
-    @NoThrow
-    @WASM(code = "i64.trunc_f64_s")
-    public static native long _d2l(double v);
 
     /**
      * returns the class index for the given instance
@@ -560,26 +416,26 @@ public class JVM32 {
 
     @NoThrow
     @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
-    private static native void printStackTraceLine(int depth, String clazz, String method, int line);
+    private static native void printStackTraceLine(int depth, String className, String methodName, int lineNumber);
 
     @NoThrow
     @Alias(names = "getClassIdPtr")
-    public static <V> Object getClassIdPtr(int classIndex) {
-        validateClassId(classIndex);
-        int classIdPtr = classIdToInstancePtr(classIndex) + OFFSET_CLASS_INDEX;
+    public static <V> Object getClassIdPtr(int classId) {
+        validateClassId(classId);
+        int classIdPtr = classIdToInstancePtr(classId) + OFFSET_CLASS_INDEX;
 
         int actualIndex = read32(classIdPtr);
-        // log("getClassIndexPtr", classIndex, addr, actualIndex);
-        if (actualIndex != classIndex) {
-            log("addr = {} * {}", classIndex, getClassSize());
+        if (actualIndex != classId) {
+            log("addr = {} * {}", classId, getClassSize());
             log("+ {} + {}", getClassInstanceTable(), OFFSET_CLASS_INDEX);
-            throwJs("Expected {} at {}, got {}", classIndex, classIdPtr, actualIndex);
+            throwJs("Expected {} at {}, got {}", classId, classIdPtr, actualIndex);
         }
         return ptrTo(classIdPtr);
     }
 
     @NoThrow
     @Alias(names = "checkWrite")
+    @Deprecated /* no longer used */
     public static void checkWrite(int addr0, int offset, int length) {
         int fieldAddr = addr0 + offset;
         if (addr0 > 0) {

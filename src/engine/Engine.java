@@ -62,8 +62,7 @@ import java.util.Objects;
 
 import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
-import static jvm.JVMShared.getInstanceSizeNonArray;
-import static jvm.JVMShared.numClasses;
+import static jvm.JVMShared.*;
 import static jvm.JavaLang.Object_toString;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;

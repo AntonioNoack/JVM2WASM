@@ -3,7 +3,7 @@ package jvm;
 import annotations.Alias;
 import annotations.NoThrow;
 
-import static jvm.JVM32.unsignedLessThan;
+import static jvm.JVMShared.unsignedLessThan;
 
 public class Chars {
 

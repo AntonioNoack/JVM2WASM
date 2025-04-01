@@ -5,6 +5,8 @@ import gIndex
 import globals
 import interpreter.WASMEngine
 import jvm.JVM32.*
+import jvm.JVMShared.arrayOverhead
+import jvm.JVMShared.objectOverhead
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
@@ -82,7 +84,7 @@ object MemoryOptimizer {
 
         val memory = engine.buffer
         // access baked data from GCTraversal
-        val staticFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "staticFields", "[I", true)!!
+        val staticFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "staticFieldOffsets", "[I", true)!!
         val staticFields1 = lookupStaticVariable("jvm/GCTraversal", staticFields0)
         staticFields = readIntArray(memory, memory.getInt(staticFields1))
 
@@ -91,7 +93,7 @@ object MemoryOptimizer {
         // val classSizes = readIntArray(memory, memory.getInt(classSizes1))
         classSizes = gIndex.classNamesByIndex.map(gIndex::getInstanceSize).toIntArray()
 
-        val instanceFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "fieldOffsetsByClass", "[I", true)!!
+        val instanceFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "instanceFieldOffsets", "[I", true)!!
         val instanceFields1 = lookupStaticVariable("jvm/GCTraversal", instanceFields0)
         val instanceFields = readArrayOfIntArrays(memory, memory.getInt(instanceFields1))
 

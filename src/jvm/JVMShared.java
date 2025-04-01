@@ -17,8 +17,137 @@ import static utils.StaticClassIndices.*;
  */
 public class JVMShared {
 
+    public static final int objectOverhead = 4;// 3x class, 1x GC
+    public static final int arrayOverhead = objectOverhead + 4;// length
+
     public static final int intSize = 4;
     public static final int longSize = 8;
+    public static boolean trackAllocations = true;
+
+    @NoThrow
+    @WASM(code = "global.get $inheritanceTable")
+    public static native int inheritanceTable();
+
+    @NoThrow
+    @WASM(code = "global.get $staticTable")
+    public static native int staticInstancesOffset();
+
+    @NoThrow
+    @Alias(names = "findStatic")
+    public static int findStatic(int classId, int offset) {
+        return read32(staticInstancesOffset() + (classId << 2)) + offset;
+    }
+
+    @NoThrow
+    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
+    public static native void trackCalloc(int classId);
+
+    @NoThrow
+    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
+    public static native void trackCalloc(int classId, int arrayLength);
+
+    @NoThrow
+    @WASM(code = "i32.lt_u")
+    public static native boolean unsignedLessThan(int a, int b);
+
+    @NoThrow
+    @WASM(code = "i32.le_u")
+    public static native boolean unsignedLessThanEqual(int a, int b);
+
+    @NoThrow
+    @WASM(code = "i32.gt_u")
+    public static native boolean unsignedGreaterThan(int a, int b);
+
+    @NoThrow
+    @WASM(code = "i32.ge_u")
+    public static native boolean unsignedGreaterThanEqual(int a, int b);
+
+    @NoThrow
+    @WASM(code = "i64.ne")
+    public static native boolean neq(long a, long b);
+
+    @NoThrow
+    @WASM(code = "i32.and")
+    public static native boolean and(boolean a, int b);
+
+    @NoThrow
+    @WASM(code = "i32.and")
+    public static native boolean and(boolean a, boolean b);
+
+    @NoThrow
+    @Alias(names = "f2i")
+    public static int f2i(float v) {
+        if (v < -2147483648f) return Integer.MIN_VALUE;
+        if (v > 2147483647f) return Integer.MAX_VALUE;
+        if (Float.isNaN(v)) return 0;
+        return f2iNative(v);
+    }
+
+    @NoThrow
+    @WASM(code = "i32.trunc_f32_s")
+    public static native int f2iNative(float v);
+
+    @NoThrow
+    @Alias(names = "f2l")
+    public static long f2l(float v) {
+        if (v < -9223372036854775808f) return Long.MIN_VALUE;
+        if (v > 9223372036854775807f) return Long.MAX_VALUE;
+        if (Float.isNaN(v)) return 0L;
+        return f2lNative(v);
+    }
+
+    @NoThrow
+    @WASM(code = "i64.trunc_f32_s")
+    public static native long f2lNative(float v);
+
+    @NoThrow
+    @Alias(names = "d2i")
+    public static int d2i(double v) {
+        if (v < -2147483648.0) return Integer.MIN_VALUE;
+        if (v > 2147483647.0) return Integer.MAX_VALUE;
+        if (Double.isNaN(v)) return 0;
+        return d2iNative(v);
+    }
+
+    @NoThrow
+    @WASM(code = "i32.trunc_f64_s")
+    public static native int d2iNative(double v);
+
+    @NoThrow
+    @Alias(names = "d2l")
+    public static long d2l(double v) {
+        if (v < -9223372036854775808.0) return Long.MIN_VALUE;
+        if (v > 9223372036854775807.0) return Long.MAX_VALUE;
+        if (Double.isNaN(v)) return 0L;
+        return _d2l(v);
+    }
+
+    @NoThrow
+    @WASM(code = "i64.trunc_f64_s")
+    public static native long _d2l(double v);
+
+    @Export
+    @NoThrow
+    @UsedIfIndexed
+    @Alias(names = "oo")
+    public static int getObjectOverhead() {
+        return objectOverhead;
+    }
+
+    @NoThrow
+    @WASM(code = "global.get $classSize")
+    public static native int getClassSize();
+
+    @NoThrow
+    @WASM(code = "global.get $classInstanceTable")
+    public static native int getClassInstanceTable();
+
+    static void failCastCheck(Object instance, int classId) {
+        Class<Object> isClass = classIdToInstance(readClassId(instance));
+        Class<Object> checkClass = classIdToInstance(classId);
+        log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
+        throw new ClassCastException();
+    }
 
     @NoThrow
     @Alias(names = "stackPop")
@@ -500,6 +629,13 @@ public class JVMShared {
         }
         return resolveIndirectByClass(readClassId(instance), signatureId);
     }
+
+    @NoThrow
+    @JavaScript(code = "" +
+            "console.log('Growing by ' + (arg0<<6) + ' kiB, total: '+(memory.buffer.byteLength>>20)+' MiB');\n" +
+            "try { memory.grow(arg0); return true; }\n" +
+            "catch(e) { console.error(e.stack); return false; }")
+    public static native boolean grow(int numPages);
 
     @NoThrow
     @WASM(code = "") // auto

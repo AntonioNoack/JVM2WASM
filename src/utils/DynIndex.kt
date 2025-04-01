@@ -5,7 +5,7 @@ import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import implementedMethods
-import jvm.JVM32.objectOverhead
+import jvm.JVMShared.objectOverhead
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.algorithms.Recursion
 import me.anno.utils.assertions.assertFalse

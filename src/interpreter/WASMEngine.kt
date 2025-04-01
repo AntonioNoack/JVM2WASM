@@ -2,7 +2,7 @@ package interpreter
 
 import gIndex
 import interpreter.functions.*
-import jvm.JVM32.objectOverhead
+import jvm.JVMShared.objectOverhead
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertSame
@@ -160,11 +160,11 @@ class WASMEngine(memorySize: Int) {
             listOf(ptrType, i32), emptyList(), PrintString
         )
         registerFunction(
-            "jvm_JVM32_trackCalloc_IV", listOf(i32), emptyList(),
+            "jvm_JVMShared_trackCalloc_IV", listOf(i32), emptyList(),
             if (printCallocSummary) listOf(ParamGet[0], Const.i32Const0, TrackCallocInstr, Return) else listOf(Return)
         )
         registerFunction(
-            "jvm_JVM32_trackCalloc_IIV", listOf(i32, i32), emptyList(),
+            "jvm_JVMShared_trackCalloc_IIV", listOf(i32, i32), emptyList(),
             if (printCallocSummary) listOf(ParamGet[0], ParamGet[1], TrackCallocInstr, Return) else listOf(Return)
         )
         registerFunction("fcmpg", listOf(f32, f32), listOf(i32), FloatCompare(+1))

@@ -17,9 +17,8 @@ import java.nio.*;
 import java.util.function.Consumer;
 
 import static engine.Engine.runsInBrowser;
-import static jvm.JVM32.*;
-import static jvm.JVMShared.read32;
-import static jvm.JVMShared.write32;
+import static jvm.JVM32.getAddr;
+import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 import static org.lwjgl.opengl.GL46C.*;
 
@@ -212,9 +211,9 @@ public class LWJGLxOpenGL {
     @JavaScript(code = "gl.deleteProgram(unmap(arg0))")
     public static native void glDeleteProgram_IV(int program);
 
-    // if statement for WebGL, because it doesn't have GL_TEXTURE_2D_MULTISAMPLE
+
     @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glBindTexture_IIV")
+    @Alias(names = "org_lwjgl_opengl_GL46C_glBindTexture_IIV") // if statement for WebGL, because it doesn't have GL_TEXTURE_2D_MULTISAMPLE
     @JavaScript(code = "if(arg0 == 37120) arg0 = 3553; gl.bindTexture(arg0,unmap(arg1))")
     public static native void glBindTexture_IIV(int mode, int tex);
 

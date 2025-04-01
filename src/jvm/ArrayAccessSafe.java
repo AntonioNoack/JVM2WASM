@@ -3,7 +3,7 @@ package jvm;
 import annotations.Alias;
 
 import static jvm.JVM32.*;
-import static jvm.JVMShared.ge_ub;
+import static jvm.JVMShared.*;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticClassIndices.*;
 

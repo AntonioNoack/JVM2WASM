@@ -2,6 +2,7 @@ package wasm.instr
 
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.LazyList
+import utils.is32Bits
 
 data class Const(val type: ConstType, val value: Number) : Instruction {
 
@@ -16,6 +17,10 @@ data class Const(val type: ConstType, val value: Number) : Instruction {
 
         private val i32ConstCache = LazyList(512) { value ->
             Const(ConstType.I32, value)
+        }
+
+        fun ptrConst(value: Int): Const {
+            return if (is32Bits) i32Const(value) else i64Const(value.toLong())
         }
 
         fun i32Const(value: Int): Const = i32ConstCache.getOrNull(value) ?: Const(ConstType.I32, value)

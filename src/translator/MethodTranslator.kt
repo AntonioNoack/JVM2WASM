@@ -1834,7 +1834,6 @@ class MethodTranslator(
         }
     }
 
-    private val precalculateStaticFields = true
     override fun visitFieldInsn(opcode: Int, owner0: String, name: String, descriptor: String) {
         val type = Descriptor.parseType(descriptor)
         visitFieldInsn2(opcode, replaceClass(owner0), name, type, true)
@@ -1876,10 +1875,7 @@ class MethodTranslator(
                 if (name in enumFieldsNames) {
                     callStaticInit(owner)
                     val clazzIndex = gIndex.getClassId(owner)
-                    val fieldOffset1 = gIndex.getFieldOffset(
-                        "java/lang/Class", "enumConstants",
-                        "java/lang/Object", false
-                    )!!
+                    val fieldOffset1 = OFFSET_CLASS_ENUM_CONSTANTS
                     printer
                         .append(i32Const(clazzIndex))
                         .append(Call.findClass)
@@ -1891,16 +1887,8 @@ class MethodTranslator(
                     callStaticInit(owner)
                     printer.push(wasmType)
                     // load class index
-                    if (precalculateStaticFields) {
-                        val staticPtr = lookupStaticVariable(owner, fieldOffset)
-                        printer.append(i32Const(staticPtr))
-                    } else {
-                        printer
-                            .append(i32Const(gIndex.getClassId(owner)))
-                            .append(i32Const(fieldOffset))
-                            // class index, field offset -> static value
-                            .append(Call.findStatic)
-                    }
+                    val staticPtr = lookupStaticVariable(owner, fieldOffset)
+                    printer.append(i32Const(staticPtr))
                     if (alwaysUseFieldCalls) {
                         printer.append(getStaticLoadCall(type))
                     } else {
@@ -1913,9 +1901,9 @@ class MethodTranslator(
             }
             SET_STATIC -> {
                 if (name in enumFieldsNames) {
-                    val clazzIndex = gIndex.getClassId(owner)
+                    val classId = gIndex.getClassId(owner)
                     printer
-                        .append(i32Const(clazzIndex))
+                        .append(i32Const(classId))
                         .append(Call.findClass)
                         .append(i32Const(OFFSET_CLASS_ENUM_CONSTANTS))
                     printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
@@ -1924,16 +1912,8 @@ class MethodTranslator(
                 } else if (fieldOffset != null) {
                     callStaticInit(owner)
                     printer.pop(wasmType)
-                    if (precalculateStaticFields) {
-                        val staticPtr = lookupStaticVariable(owner, fieldOffset)
-                        printer.append(i32Const(staticPtr))
-                    } else {
-                        printer
-                            .append(i32Const(gIndex.getClassId(owner)))
-                            .append(i32Const(fieldOffset))
-                            // ;; class index, field offset -> static value
-                            .append(Call.findStatic)
-                    }
+                    val staticPtr = lookupStaticVariable(owner, fieldOffset)
+                    printer.append(i32Const(staticPtr))
                     printer.append(getStaticStoreCall(type))
                     if (comments) printer.comment("put static '$owner.$name'")
                 } else {

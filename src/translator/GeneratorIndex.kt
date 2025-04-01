@@ -7,7 +7,7 @@ import dependency.ActuallyUsedIndex
 import hIndex
 import isRootType
 import jvm.JVM32.*
-import jvm.JVMShared.intSize
+import jvm.JVMShared.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -395,6 +395,10 @@ object GeneratorIndex {
                 }
             }
         }
+    }
+
+    fun getFieldOffset(fieldSig: FieldSig): Int? {
+        return getFieldOffset(fieldSig.clazz, fieldSig.name, fieldSig.descriptor, fieldSig.isStatic)
     }
 
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {

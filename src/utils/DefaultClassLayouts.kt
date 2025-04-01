@@ -4,7 +4,7 @@ import byteStrings
 import gIndex
 import hIndex
 import jvm.JVM32.*
-import jvm.JVMShared.intSize
+import jvm.JVMShared.*
 import me.anno.utils.assertions.assertEquals
 import utils.Descriptor.Companion.voidDescriptor
 import utils.StaticFieldOffsets.*
@@ -110,9 +110,9 @@ object DefaultClassLayouts {
         gIndex.getFieldOffset(thread, "threadLocalRandomProbe", "int", false)
 
         // reduce number of requests to <clinit> (was using 11% CPU time according to profiler)
-        hIndex.finalFields[FieldSig("jvm/JVM32", "objectOverhead", "int", true)] = objectOverhead
-        hIndex.finalFields[FieldSig("jvm/JVM32", "arrayOverhead", "int", true)] = arrayOverhead
-        hIndex.finalFields[FieldSig("jvm/JVM32", "trackAllocations", "boolean", true)] = trackAllocations
+        hIndex.finalFields[FieldSig("jvm/JVMShared", "objectOverhead", "int", true)] = objectOverhead
+        hIndex.finalFields[FieldSig("jvm/JVMShared", "arrayOverhead", "int", true)] = arrayOverhead
+        hIndex.finalFields[FieldSig("jvm/JVMShared", "trackAllocations", "boolean", true)] = trackAllocations
 
         eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, voidDescriptor)), 0)
         gIndex.getFieldOffset(constructor, "clazz", clazz, false)

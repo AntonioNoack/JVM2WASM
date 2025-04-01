@@ -3,7 +3,7 @@ package utils
 import gIndex
 import hIndex
 import hierarchy.Annota
-import jvm.JVM32.objectOverhead
+import jvm.JVMShared.objectOverhead
 import me.anno.io.Streams.writeLE32
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.ACC_FINAL

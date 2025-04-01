@@ -4,7 +4,7 @@ import annotations.Alias;
 
 import java.util.Locale;
 
-import static jvm.JVM32.unsignedLessThan;
+import static jvm.JVMShared.unsignedLessThan;
 
 public class StringsUTF16 {
 
