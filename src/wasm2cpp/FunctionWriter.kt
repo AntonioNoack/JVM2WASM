@@ -206,22 +206,19 @@ class FunctionWriter(
             .appendExpr(ptr).append("))[0] = ").append(value).end()
     }
 
-    private fun writeCall(funcName: String, params: List<String>, results: List<String>, afterInstr: Instruction?) {
+    private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
 
         if (funcName.startsWith("getNth_")) {
-            assertNull(afterInstr)
             stack.add(stack[stack.size - params.size])
             return
         }
 
         if (funcName == "wasStaticInited") {
-            assertNull(afterInstr)
             beginNew(i32).append("0").end()
             return
         }
 
         if (!enableCppTracing) {
-            assertNull(afterInstr)
             if (funcName == "stackPush" || funcName == "stackPop") {
                 if (funcName == "stackPush") pop(i32)
                 return
@@ -229,63 +226,35 @@ class FunctionWriter(
         }
 
         if (funcName.startsWith("swap")) {
-            assertNull(afterInstr)
             stack.add(stack.size - 2, stack.removeLast())
             return
         }
 
         if (funcName.startsWith("dupi") || funcName.startsWith("dupf")) {
-            assertNull(afterInstr)
             stack.add(stack.last())
             return
         }
 
-        when (afterInstr) {
-            null -> {
-                val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
-                begin()
-                if (results.isNotEmpty()) {
-                    for (i in results.indices) {
-                        writer.append(results[i])
-                    }
-                    writer.append(" ").append(tmp).append(" = ")
-                }
+        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
+        begin()
+        if (results.isNotEmpty()) {
+            for (i in results.indices) {
+                writer.append(results[i])
+            }
+            writer.append(" ").append(tmp).append(" = ")
+        }
 
-                writePureCall(funcName, params)
-                writer.end()
+        writePureCall(funcName, params)
+        writer.end()
 
-                when (results.size) {
-                    0 -> {}
-                    1 -> push(results[0], tmp)
-                    else -> {
-                        for (j in results.indices) {
-                            beginNew(results[j]).append(tmp).append(".v").append(j).end()
-                        }
-                    }
+        when (results.size) {
+            0 -> {}
+            1 -> push(results[0], tmp)
+            else -> {
+                for (j in results.indices) {
+                    beginNew(results[j]).append(tmp).append(".v").append(j).end()
                 }
             }
-            Return -> {
-                begin().append("return ")
-                writePureCall(funcName, params)
-                pushInvalidResults(results)
-                writer.end()
-            }
-            is LocalSet -> {
-                begin().append(afterInstr.name).append(" = ")
-                writePureCall(funcName, params)
-                writer.end()
-            }
-            is ParamSet -> {
-                begin().append(afterInstr.name).append(" = ")
-                writePureCall(funcName, params)
-                writer.end()
-            }
-            is GlobalSet -> {
-                begin().append("global_").append(afterInstr.name).append(" = ")
-                writePureCall(funcName, params)
-                writer.end()
-            }
-            else -> throw NotImplementedError()
         }
     }
 
@@ -317,35 +286,12 @@ class FunctionWriter(
         }
     }
 
-    private fun isReturningOneItem(call: Instruction): Boolean {
-        return getNumReturned(call) == 1
-    }
-
-    private fun isReturningAsMuchAsSelf(call: Instruction): Boolean {
-        return getNumReturned(call) == function.results.size
-    }
-
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
         val assignments = Assignments.findAssignments(instructions)
-        var i = i0
-        while (i < i1) {
+        for(i in i0 until i1) {
             val instr = instructions[i]
-            var afterInstr: Instruction? = null
-            var ni = i + 1
-            if (instr is Call || instr is CallIndirect) {
-                // check whether next one is drop or return
-                // check if call returns a value
-                ni = nextInstr(instructions, i)
-                val next = instructions.getOrNull(ni)
-                if (next == Return && isReturningAsMuchAsSelf(instr)) {
-                    afterInstr = next
-                } else if (next is ValueSet && isReturningOneItem(instr)) {
-                    afterInstr = next
-                }
-            }
-            writeInstruction(instr, i, assignments, afterInstr)
-            if (instr.isReturning() || afterInstr is ReturnInstr) return true
-            i = if (afterInstr != null) ni + 1 else i + 1
+            writeInstruction(instr, i, assignments)
+            if (instr.isReturning()) return true
         }
         return false
     }
@@ -359,7 +305,7 @@ class FunctionWriter(
     }
 
     private fun writeInstruction(i: Instruction) {
-        writeInstruction(i, Int.MAX_VALUE, null, null)
+        writeInstruction(i, Int.MAX_VALUE, null)
     }
 
     private fun isNameOrNumber(expression: String): Boolean {
@@ -498,10 +444,7 @@ class FunctionWriter(
         }
     }
 
-    private fun writeInstruction(
-        i: Instruction, k: Int, assignments: Map<String, Int>?,
-        afterInstr: Instruction?
-    ) {
+    private fun writeInstruction(i: Instruction, k: Int, assignments: Map<String, Int>?) {
         when (i) {
             is ParamGet -> {
                 val index = i.index
@@ -768,7 +711,7 @@ class FunctionWriter(
             is Call -> {
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
-                writeCall(func.funcName, func.params.map { it.wasmType }, func.results, afterInstr)
+                writeCall(func.funcName, func.params.map { it.wasmType }, func.results)
             }
             is CallIndirect -> {
                 val type = i.type
@@ -792,7 +735,7 @@ class FunctionWriter(
                 // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
                 begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
                     .append(tmpType).append(">(indirect[").append(pop("i32")).append("])").end()
-                writeCall(tmpVar, type.params, type.results, afterInstr)
+                writeCall(tmpVar, type.params, type.results)
             }
             is BlockInstr -> {
                 // write body
