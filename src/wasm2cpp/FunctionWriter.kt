@@ -35,6 +35,16 @@ import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
 
+// todo inherit from this class and...
+//  - using HighLevel getters, setters and local-variables, pass around true structs
+//  - using that, generate JavaScript
+
+// todo enable all warnings, and clear them all for truly clean code
+//  - ignore not-used outputs from functions
+//  - mark functions as pure (compile-time constant)
+//  - inline pure functions (incl. potential reordering) into expressions
+//  - discard unused expressions
+
 class FunctionWriter(
     val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>
