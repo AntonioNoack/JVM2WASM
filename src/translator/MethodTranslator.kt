@@ -21,6 +21,7 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
+import highlevel.FieldGetInstr
 import highlevel.FieldSetInstr
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
@@ -1858,6 +1859,7 @@ class MethodTranslator(
         val value = hIndex.finalFields[sig]
         val setter = opcode == SET_FIELD || opcode == SET_STATIC
         if (value != null) {
+            // get/set a final value
             if (!checkNull) throw IllegalStateException("Field $owner,$name,$type is final")
             if (setter) {
                 printer.pop(stack.last()) // pop value
@@ -1878,11 +1880,10 @@ class MethodTranslator(
                 if (name in enumFieldsNames) {
                     callStaticInit(owner)
                     val clazzIndex = gIndex.getClassId(owner)
-                    val fieldOffset1 = OFFSET_CLASS_ENUM_CONSTANTS
                     printer
                         .append(i32Const(clazzIndex))
                         .append(Call.findClass)
-                        .append(i32Const(fieldOffset1))
+                        .append(i32Const(OFFSET_CLASS_ENUM_CONSTANTS))
                     printer.append(I32Add).append(I32Load)
                     if (comments) printer.comment("enum values")
                     printer.push(wasmType)
@@ -1891,11 +1892,17 @@ class MethodTranslator(
                     printer.push(wasmType)
                     // load class index
                     val staticPtr = lookupStaticVariable(owner, fieldOffset)
-                    printer.append(i32Const(staticPtr))
-                    if (alwaysUseFieldCalls) {
-                        printer.append(getStaticLoadCall(type))
+                    val loadCall = getStaticLoadCall(type)
+                    val loadInstr = getLoadInstr(type)
+                    if (useHighLevelInstructions) {
+                        printer.append(FieldGetInstr(sig, loadInstr, loadCall))
                     } else {
-                        printer.append(getLoadInstr(type))
+                        printer.append(i32Const(staticPtr))
+                        if (alwaysUseFieldCalls) {
+                            printer.append(loadCall)
+                        } else {
+                            printer.append(loadInstr)
+                        }
                     }
                     if (comments) printer.comment("get static '$owner.$name'")
                 } else {
@@ -1916,12 +1923,17 @@ class MethodTranslator(
                     callStaticInit(owner)
                     printer.pop(wasmType)
                     val staticPtr = lookupStaticVariable(owner, fieldOffset)
-                    printer.append(i32Const(staticPtr))
-                    printer.append(getStaticStoreCall(type))
+                    val storeCall = getStaticStoreCall(type)
+                    if (useHighLevelInstructions) {
+                        val storeInstr = getStoreInstr(type)
+                        printer.append(FieldSetInstr(sig, storeInstr, storeCall))
+                    } else {
+                        printer.append(i32Const(staticPtr))
+                        printer.append(storeCall)
+                    }
                     if (comments) printer.comment("put static '$owner.$name'")
                 } else {
-                    printer.pop(wasmType)
-                    printer.drop()
+                    printer.pop(wasmType).drop()
                 }
             }
             GET_FIELD -> {
@@ -1941,18 +1953,17 @@ class MethodTranslator(
                 }
                 printer.pop(ptrType).push(wasmType)
                 if (fieldOffset != null) {
-                    printer.append(i32Const(fieldOffset))
-                    if (alwaysUseFieldCalls) {
-                        printer.append(getLoadCall(type))
+                    val loadCall = getLoadCall(type)
+                    if (useHighLevelInstructions) {
+                        val loadInstr = getLoadInstr(type)
+                        printer.append(FieldGetInstr(sig, loadInstr, loadCall))
                     } else {
                         printer
-                            .append(I32Add)
-                            .append(getLoadInstr(type))
+                            .append(i32Const(fieldOffset))
+                            .append(loadCall)
                     }
                 } else {
-                    printer
-                        .drop()
-                        .append(Const.zero[wasmType]!!)
+                    printer.drop().append(Const.zero[wasmType]!!)
                 }
             }
             SET_FIELD -> {
@@ -1978,10 +1989,11 @@ class MethodTranslator(
                     val storeCall = getStoreCall(type)
                     // we'd need to call a function twice, so call a generic functions for this
                     if (useHighLevelInstructions) {
-                        val storeInstr = getStoreInstr(sig.descriptor)
+                        val storeInstr = getStoreInstr(type)
                         printer.append(FieldSetInstr(sig, storeInstr, storeCall))
                     } else {
-                        printer.append(i32Const(fieldOffset))
+                        printer
+                            .append(i32Const(fieldOffset))
                             .append(storeCall)
                     }
                 } else {

@@ -8,6 +8,7 @@ import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.StringBuilder2
 import utils.WASMTypes.*
+import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
@@ -198,16 +199,20 @@ class FunctionWriter(
     }
 
     private fun load(type: String, memoryType: String = type) {
-        val ptr = popElement(i32)
+        val ptr = popElement(ptrType)
         beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
             .appendExpr(ptr).append("))[0]").end()
     }
 
     private fun store(type: String, memoryType: String = type) {
         val value = pop(type)
-        val ptr = popElement(i32)
+        val ptr = popElement(ptrType)
         begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
-            .appendExpr(ptr).append("))[0] = ").append(value).end()
+            .appendExpr(ptr).append("))[0] = ")
+        if (type != memoryType) {
+            writer.append('(').append(memoryType).append(") ")
+        }
+        writer.append(value).end()
     }
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
@@ -756,7 +761,6 @@ class FunctionWriter(
                         begin().append(i.results[j]).append(' ')
                             .append(resultNames[j]).append(" = 0").end()
                     }
-                    // to do check if the label is used
                     begin().append(i.label).append(": while (true) {\n")
                     val stackSave = ArrayList(stack)
                     stack.clear()
@@ -789,8 +793,8 @@ class FunctionWriter(
             }
             is JumpIf -> {
                 // C++ doesn't have proper continue@label/break@label, so use goto
-                val condition = pop("i32")
-                begin().append("if (").append(condition).append(" != 0) { goto ").append(i.label).append("; }\n")
+                val condition = popElement("i32")
+                begin().append("if (").appendExpr(condition).append(" != 0) { goto ").append(i.label).append("; }\n")
             }
             is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
@@ -802,7 +806,7 @@ class FunctionWriter(
     }
 
     /**
-     * find the next instruction after i
+     * find the next instruction after i; or return -1
      * */
     private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
         for (j in i + 1 until instructions.size) {

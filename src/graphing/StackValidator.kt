@@ -4,6 +4,7 @@ import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
 import hIndex
 import hierarchy.HierarchyIndex.methodAliases
+import highlevel.FieldGetInstr
 import highlevel.FieldSetInstr
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
@@ -271,6 +272,10 @@ object StackValidator {
                             localVarTypes, paramsTypes
                         )
                     }
+                }
+                is FieldGetInstr -> {
+                    if (!i.fieldSig.isStatic) stack.pop(ptrType)
+                    stack.push(i.loadInstr.wasmType)
                 }
                 is FieldSetInstr -> {
                     stack.pop(i.storeInstr.wasmType)

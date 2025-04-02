@@ -2,17 +2,12 @@ package wasm.instr
 
 import interpreter.WASMEngine
 
-class Jump(var owner: BreakableInstruction) : Instruction {
+class Jump(owner: BreakableInstruction) : Jumping(owner) {
 
-    var depth = -1
-
-    init {
-        if (label.startsWith('$')) throw IllegalArgumentException(label)
-    }
-
-    val label get() = owner.label
     override fun toString(): String = "br \$$label"
     override fun isReturning(): Boolean = true
+
+    override fun execute(engine: WASMEngine) = label
 
     override fun equals(other: Any?): Boolean {
         return other is Jump && other.label == label
@@ -21,7 +16,4 @@ class Jump(var owner: BreakableInstruction) : Instruction {
     override fun hashCode(): Int {
         return label.hashCode()
     }
-
-    override fun execute(engine: WASMEngine) = label
-
 }
