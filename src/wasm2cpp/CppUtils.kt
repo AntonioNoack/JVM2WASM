@@ -34,12 +34,14 @@ fun defineFunctionImplementations(
 ) {
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
-    val functionWriter = FunctionWriter(globals, functionsByName)
+    val stackToDeclarative = StackToDeclarative(globals, functionsByName)
+    val functionWriter = FunctionWriter(globals)
     for (fi in functions.indices) {
         val function = functions[fi]
         val pos0 = writer.size
         try {
-            functionWriter.write(function)
+            val declarative = stackToDeclarative.write(function)
+            functionWriter.write(function.withBody(declarative))
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)

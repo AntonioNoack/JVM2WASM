@@ -26,10 +26,7 @@ fun main() {
 fun testCppWriter(func0: FunctionImpl) {
     assertEquals(0, writer.length)
     FunctionWriter(
-        emptyMap(), mapOf(
-            "AfterSwitch" to Import("AfterSwitch", emptyList(), emptyList()),
-            "AfterLoop" to Import("AfterLoop", emptyList(), emptyList())
-        )
+        emptyMap()
     ).write(func0)
     println(writer.toString())
     // confirm everything correct
