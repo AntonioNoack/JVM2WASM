@@ -62,6 +62,8 @@ roid engine_Engine_mouseDown_IV(i32);
 roid engine_Engine_mouseMove_FFV(f32,f32);
 roid engine_Engine_mouseWheel_FFV(f32,f32);
 roid engine_Engine_charTyped_IIV(i32,i32);
+roid engine_Engine_focusState_ZV(i32);
+roid engine_Engine_minimizedState_ZV(i32);
 roid java_lang_Throwable_printStackTrace_V(i32);
 roid engine_Engine_update_IIFV(i32, i32, f32);
 roid new_java_lang_Throwable_V(i32);
@@ -163,13 +165,13 @@ void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringIIV(i32 a, i32 b, i32 c
 void jvm_NativeLog_log_Ljava_lang_StringLjava_lang_StringIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { std::cout << strToCpp(a) << ", " << strToCpp(b) << ", " << c << ", " << d << ", " << e << std::endl; }
 
 std::vector<i32> callocStatistics;
-void jvm_JVM32_trackCalloc_IV(i32 classId) {
+void jvm_JVMShared_trackCalloc_IV(i32 classId) {
     if (countAllocations && classId >= 0 && classId < callocStatistics.size()) {
         callocStatistics[classId]++;
     }
 }
 
-void jvm_JVM32_trackCalloc_IIV(i32 classId, i32 arraySize) {
+void jvm_JVMShared_trackCalloc_IIV(i32 classId, i32 arraySize) {
     if (countAllocations && classId >= 0 && classId < callocStatistics.size()) {
         callocStatistics[classId]++;
     }
@@ -338,7 +340,7 @@ void org_lwjgl_opengl_GL46C_glDrawElementsInstanced_IIIJIV(i32 x, i32 y, i32 z, 
 void org_lwjgl_opengl_GL46C_glDrawElements_IIIJV(i32 x, i32 y, i32 z, i64 w) { glDrawElements(x,y,z,(void*)w); }
 void org_lwjgl_opengl_GL46C_glEnableVertexAttribArray_IV(i32 x) { glEnableVertexAttribArray(x); }
 void org_lwjgl_opengl_GL46C_glEnable_IV(i32 x) { glEnable(x); }
-void org_lwjgl_opengl_GL11C_glPolygonMode_IIV(i32 x, i32 y) { /*glPolygonMode(x,y);*/ } // causes segfault?
+void org_lwjgl_opengl_GL11C_glPolygonMode_IIV(i32 x, i32 y) { glPolygonMode(x,y); } // causes segfault?
 void org_lwjgl_opengl_GL46C_glFinish_V() { glFinish(); }
 void org_lwjgl_opengl_GL46C_glFlush_V() { glFlush(); }
 void org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV(i32 x, i32 y, i32 z, i32 w) { glFramebufferRenderbuffer(x,y,z,w); }
@@ -526,7 +528,7 @@ void engine_Engine_discoverGLNamesImpl_ACLjava_util_HashMapV(i32,i32) {} // not 
 
 std::vector<void*> garbageWhileGC;
 i32 jvm_JVM32_getAllocatedSize_I() { return allocatedSize; }
-i32 jvm_JVM32_grow_IZ(i32 numExtraPages) { 
+i32 jvm_JVMShared_grow_IZ(i32 numExtraPages) {
     size_t extraSize = numExtraPages << 16;
     if(parallelGCStage == 1) {
         std::cerr << "Reallocating during GC!!" << std::endl;
@@ -895,6 +897,14 @@ void APIENTRY debugCallback(GLenum source,
     }
 }
 
+void handleFocus(GLFWwindow* window, int focus) {
+    handleError(engine_Engine_focusState_ZV(focus ? 1 : 0));
+}
+
+void handleMinimized(GLFWwindow* window, int minimized) {
+    handleError(engine_Engine_minimizedState_ZV(minimized ? 1 : 0));
+}
+
 void attachGLFWListeners() {
     glfwSetFramebufferSizeCallback(window, handleResize);
     glfwSetKeyCallback(window, handleKey);
@@ -902,6 +912,11 @@ void attachGLFWListeners() {
     glfwSetCursorPosCallback(window, handleCursorPos);
     glfwSetScrollCallback(window, handleScroll);
     glfwSetCharModsCallback(window, handleChar);
+    glfwSetWindowFocusCallback(window, handleFocus);
+    glfwSetWindowIconifyCallback(window, handleMinimized);
+
+    handleError(engine_Engine_focusState_ZV(1));
+    handleError(engine_Engine_minimizedState_ZV(0));
 
     // (GLDEBUGPROC callback, const void * userParam)
     glDebugMessageCallback(debugCallback, NULL);

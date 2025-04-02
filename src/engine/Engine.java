@@ -2,7 +2,6 @@ package engine;
 
 import annotations.*;
 import jvm.FillBuffer;
-import jvm.JVM32;
 import jvm.JavaLang;
 import jvm.custom.ThreadLocalRandom;
 import kotlin.Unit;
@@ -60,14 +59,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
-import static jvm.ArrayAccessSafe.arrayLength;
-import static jvm.JVM32.*;
-import static jvm.JVMShared.*;
 import static jvm.JavaLang.Object_toString;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
-import static utils.StaticClassIndices.*;
 
 @SuppressWarnings("unused")
 public class Engine {
@@ -184,18 +179,17 @@ public class Engine {
     public static void update(int width, int height, float dt) {
         window.setWidth(width);
         window.setHeight(height);
-        // todo vsync is enabled when calling this (good), but when I "toggle Vsync" via the menu, it doesn't get toggled
-        // window.updateVsync();
-        if (runsInBrowser()) {
-            window.setFramesSinceLastInteraction(0);// redraw is required to prevent flickering
-        }
+        window.updateVsync();
         WindowManagement.updateWindows();
         Time.updateTime(dt, System.nanoTime());
 
         GFX.activeWindow = window;
         RenderStep.beforeRenderSteps();
         RenderStep.renderStep(window, true);
-        Input.INSTANCE.resetFrameSpecificKeyStates();
+
+        if (Input.INSTANCE.isShiftDown()) {
+            SpinningCube.renderSpinningCube((float) Time.getGameTime(), (float) width / (float) height);
+        }
     }
 
     private static void addEvent(Runnable runnable) {
@@ -258,6 +252,16 @@ public class Engine {
     public static void keyModState(int state) {
         // shift: 1, control: 2, alt: 4, super: 8, capslock: 16
         addEvent(() -> Input.INSTANCE.setKeyModState(state));
+    }
+
+    @Export
+    public static void focusState(boolean inFocus) {
+        addEvent(() -> window.setInFocus(inFocus));
+    }
+
+    @Export
+    public static void minimizedState(boolean isMinimized) {
+        addEvent(() -> window.setMinimized(isMinimized));
     }
 
     @NoThrow
@@ -434,7 +438,7 @@ public class Engine {
 
     // todo remove all methods related to Regex, and see how much the effect is
     /*@Alias(name = "java_util_regex_Pattern_compile_Ljava_lang_StringLjava_util_regex_Pattern")
-    public static Pattern java_util_regex_Pattern_compile_Ljava_lang_StringLjava_util_regex_Pattern(String str) {
+    public static Pattern Pattern_compile_Ljava_lang_StringLjava_util_regex_Pattern(String str) {
         throw new NotImplementedError("Regex was removed from Rem's Engine/Web, because it's huge");
     }
 
@@ -450,29 +454,29 @@ public class Engine {
 
     @NoThrow
     @Alias(names = "me_anno_engine_ui_render_MovingGrid_drawTextMesh_DIV")
-    public static void me_anno_engine_ui_render_MovingGrid_drawTextMesh_DIV(Object self, double baseSize, int factor) {
+    public static void MovingGrid_drawTextMesh_DIV(Object self, double baseSize, int factor) {
         // todo support text meshes, and implement this :)
     }
 
     @Alias(names = "me_anno_audio_openal_AudioManager_checkIsDestroyed_V")
-    public static void me_anno_audio_openal_AudioManager_checkIsDestroyed_V() {
+    public static void AudioManager_checkIsDestroyed_V() {
         // cannot be destroyed, as far as I know :)
     }
 
     @Alias(names = "me_anno_gpu_OSWindow_addCallbacks_V")
-    public static void me_anno_gpu_OSWindow_addCallbacks_V(OSWindow self) {
+    public static void OSWindow_addCallbacks_V(OSWindow self) {
         // not needed
     }
 
     @Alias(names = "me_anno_image_exr_EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image")
-    public static Object me_anno_image_exr_EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
+    public static Object EXRReader_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
         log("EXR is not supported!");
         stream.close();
         return null;
     }
 
     @Alias(names = "me_anno_image_exr_EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image")
-    public static Object me_anno_image_exr_EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image(ByteBuffer buffer) {
+    public static Object EXRReader_read_Ljava_nio_ByteBufferLme_anno_image_Image(ByteBuffer buffer) {
         log("EXR is not supported!");
         return null;
     }
@@ -484,7 +488,7 @@ public class Engine {
 	}*/
 
     @Alias(names = "me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image")
-    public static Object me_anno_image_gimp_GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
+    public static Object GimpImageXCompanion_read_Ljava_io_InputStreamLme_anno_image_Image(InputStream stream) throws IOException {
         stream.close();
         throw new IOException("Gimp Image files are not supported in Web!");
     }
@@ -515,7 +519,7 @@ public class Engine {
     // only needs to be re-enabled, when we have controller support; until then, we can save space
     @NoThrow
     @Alias(names = "me_anno_input_Input_pollControllers_Lme_anno_gpu_OSWindowV")
-    public static void me_anno_input_Input_pollControllers_Lme_anno_gpu_OSWindowV(Object self, Object window) {
+    public static void Input_pollControllers_Lme_anno_gpu_OSWindowV(Object self, Object window) {
     }
 
     // to save space for now
@@ -555,37 +559,37 @@ public class Engine {
 
     // removing spellchecking for now (600 kiB wasm text)
     @Alias(names = "me_anno_language_spellcheck_Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List")
-    public static Object me_anno_language_spellcheck_Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List(
+    public static Object Spellchecking_check_Ljava_lang_CharSequenceZZLjava_util_List(
             CharSequence t, boolean allowFirstLowerCase, boolean async) {
         return null;
     }
 
     @Alias(names = "me_anno_ui_input_components_CorrectingTextInput_getSuggestions_Ljava_util_List")
-    public static Object me_anno_ui_input_components_CorrectingTextInput_getSuggestions_Ljava_util_List(Object self) {
+    public static Object CorrectingTextInput_getSuggestions_Ljava_util_List(Object self) {
         return null;
     }
 
     @NoThrow
     @JavaScript(code = "try { return BigInt(window.performance.memory.usedJSHeapSize); } catch(e){ return 0n; }")
     @Alias(names = "me_anno_ui_debug_JSMemory_jsUsedMemory_J")
-    public static native long me_anno_ui_debug_JSMemory_jsUsedMemory_J();
+    public static native long JSMemory_jsUsedMemory_J();
 
     @NoThrow
     @Alias(names = "me_anno_extensions_ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo")
-    public static Object me_anno_extensions_ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo(Object file) {
+    public static Object ExtensionLoader_loadInfoFromZip_Lme_anno_io_files_FileReferenceLme_anno_extensions_ExtensionInfo(Object file) {
         // there is no Zip, extensions should be loaded directly ^^
         return null;
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_LogoKt_drawLogo_IIZZ")
-    public static boolean me_anno_gpu_LogoKt_drawLogo(int a, int b, boolean c) {
+    public static boolean LogoKt_drawLogo(int a, int b, boolean c) {
         return true;
     }
 
     @NoThrow
     @Alias(names = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image")
-    public static Image me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(FileReference path, long timeout, boolean async) {
+    public static Image ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(FileReference path, long timeout, boolean async) {
         // todo create image async using JavaScript
         log("Todo: create image async using JS", path.getAbsolutePath());
         return null;
@@ -593,72 +597,72 @@ public class Engine {
 
     @NoThrow
     @Alias(names = "me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image")
-    public static Image me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image(FileReference path, boolean async) {
-        return me_anno_image_ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(path, 10_000, async);
+    public static Image ImageCPUCache_get_Lme_anno_io_files_FileReferenceZLme_anno_image_Image(FileReference path, boolean async) {
+        return ImageCPUCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_image_Image(path, 10_000, async);
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV")
-    public static void me_anno_gpu_GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV(Object window) {
+    public static void GFXBase_addCallbacks_Lme_anno_gpu_OSWindowV(Object window) {
         // we'll call it directly, no need for callbacks
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_GFXBase_close_Lme_anno_gpu_OSWindowV")
-    public static void me_anno_gpu_GFXBase_close_Lme_anno_gpu_OSWindowV(Object window) {
+    public static void GFXBase_close_Lme_anno_gpu_OSWindowV(Object window) {
         // not really supported
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_GFXBase_loadRenderDoc_V")
-    public static void me_anno_gpu_GFXBase_loadRenderDoc_V() {
+    public static void GFXBase_loadRenderDoc_V() {
         // not supported
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_OSWindow_forceUpdateVsync_V")
-    public static void me_anno_gpu_OSWindow_forceUpdateVsync_V(Object self) {
+    public static void OSWindow_forceUpdateVsync_V(Object self) {
         // not supported
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_OSWindow_toggleFullscreen_V")
-    public static void me_anno_gpu_OSWindow_toggleFullscreen_V(Object self) {
+    public static void OSWindow_toggleFullscreen_V(Object self) {
         disableCursor();
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_OSWindow_updateMousePosition_V")
-    public static void me_anno_gpu_OSWindow_updateMousePosition_V(Object self) {
+    public static void OSWindow_updateMousePosition_V(Object self) {
         // done automatically
     }
 
     @NoThrow
     @Alias(names = "me_anno_gpu_GFXBase_handleClose_Lme_anno_gpu_OSWindowV")
-    public static void me_anno_gpu_GFXBase_handleClose_Lme_anno_gpu_OSWindowV(Object window) {
+    public static void GFXBase_handleClose_Lme_anno_gpu_OSWindowV(Object window) {
         // idc really, should not be callable
     }
 
     @NoThrow
     @Alias(names = "me_anno_input_Input_setClipboardContent_Ljava_lang_StringV")
     @JavaScript(code = "if(arg1) navigator.clipboard.writeText(str(arg1))")
-    public static native void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(Object self, String txt);
+    public static native void Input_setClipboardContent_Ljava_lang_StringV(Object self, String txt);
 
     @NoThrow
     @Alias(names = "me_anno_gpu_monitor_SubpixelLayout_detect_V")
-    public static void me_anno_gpu_monitor_SubpixelLayout_detect_V(Object self) {
+    public static void SubpixelLayout_detect_V(Object self) {
         // todo implement this
         log("Todo: detect subpixel layout");
     }
 
     @NoThrow
     @Alias(names = "me_anno_extensions_ExtensionLoader_load_V")
-    public static void me_anno_extensions_ExtensionLoader_load_V() {
+    public static void ExtensionLoader_load_V() {
         // just skip for now 😄, 8k lines (out of 236k)
     }
 
     @Alias(names = "me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process")
-    public static Process me_anno_utils_process_BetterProcessBuilder_start_Ljava_lang_Process(Object self) {
+    public static Process BetterProcessBuilder_start_Ljava_lang_Process(Object self) {
         throw new RuntimeException("Starting processes is not possible in WASM");
     }
 
@@ -666,63 +670,6 @@ public class Engine {
     public static Object waitUntilDefined(boolean killable, Object func) {
         throwJs("Cannot wait in Browser");
         return null;
-    }
-
-    /**
-     * for debugging, prints all strings that were generated at runtime
-     */
-    @NoThrow
-    private static void printDynamicStrings(int firstPrintedStringId, int numPrintedStringIds) {
-        int instancePtr = getAllocationStart();
-        final int endPtr = getNextPtr();
-        int stringId = 0;
-        final int nc = numClasses();
-        int maxStringId = firstPrintedStringId + numPrintedStringIds;
-        int lastClass = -1;
-        int lastSize = 0;
-        int instanceCtr = 0;
-        while (unsignedLessThan(instancePtr, endPtr) && stringId < maxStringId) {
-
-            // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
-            final int classId = readClassIdImpl(instancePtr);
-            if (unsignedGreaterThanEqual(classId, nc)) {
-                log("Handling", instancePtr, classId);
-                log("Illegal class index {} >= {} at {}!", classId, nc, instancePtr);
-                return;
-            }
-
-            int size;
-            if (classId >= FIRST_ARRAY && classId <= LAST_ARRAY) { // clazz > 0 && clazz < 10
-                // handle arrays by size
-                size = getArraySizeInBytes(arrayLength(JVM32.ptrTo(instancePtr)), classId);
-                size = adjustCallocSize(size);
-            } else {
-                // handle class instance
-                size = getInstanceSizeNonArray(classId);
-            }
-
-            if (classId == STRING) {
-                log("found instance", stringId, instancePtr);
-                if (unsignedLessThan(stringId - firstPrintedStringId, numPrintedStringIds)) {
-                    log((String) ptrTo(instancePtr));
-                }
-                stringId++;
-            } else {
-                if (classId == lastClass) {
-                    lastSize += size;
-                    instanceCtr++;
-                } else {
-                    if (lastClass >= 0) {
-                        log("clazz", lastClass, lastSize, instanceCtr);
-                    }
-                    lastClass = classId;
-                    lastSize = size;
-                    instanceCtr = 1;
-                }
-            }
-            instancePtr += size;
-        }
-        log("clazz (last)", lastClass, lastSize, instanceCtr);
     }
 
     @NoThrow
@@ -745,7 +692,7 @@ public class Engine {
     }
 
     @Alias(names = "me_anno_engine_OfficialExtensions_register_V")
-    private static void me_anno_engine_OfficialExtensions_register_V(Object self) {
+    private static void OfficialExtensions_register_V(Object self) {
     }
 
     @Alias(names = "org_apache_logging_log4j_LoggerImpl_print_Ljava_lang_StringLjava_lang_StringV")

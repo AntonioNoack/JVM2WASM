@@ -482,11 +482,15 @@ class FunctionWriter(
             }
             is ShiftInstr -> {
                 binaryInstr(i.type, i.type, i.type, k, assignments, false) { i0, i1, dst ->
-                    if (i.isRight && i.isUnsigned) {
-                        dst.append(if (i.type == i32) "(u32) " else "(u64) ")
+                    val needsCast = i.isRight && i.isUnsigned
+                    if (needsCast) {
+                        dst.append(if (i.type == i32) "(i32)((u32) " else "(i64)((u64) ")
                     }
                     val operator = if (i.isRight) " >> " else " << "
                     dst.appendExpr(i0).append(operator).appendExpr(i1)
+                    if (needsCast) {
+                        dst.append(')')
+                    }
                 }
             }
             Return -> {

@@ -409,7 +409,6 @@ public class LWJGLxOpenGL {
             "if(arg0 == 0x8D57) return 1;\n" + // multisampled texture aren't supported, multisampled renderbuffers would be
             "if(arg0 == 0x826E) return 1024;\n" + // max uniform locations; not defined in WebGL
             "if(arg0 == 0x821B || arg0 == 0x821C) return 0;\n" + // 0x821B, 0x821C = major, minor version
-            "// if(arg0 == 0x8CDF) return 1;\n" + // max color attachments
             "return gl.getParameter(arg0)")
     public static native int glGetIntegerImpl(int i);
 
