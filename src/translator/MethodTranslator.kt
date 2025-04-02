@@ -21,6 +21,7 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
+import highlevel.FieldSetInstr
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -43,11 +44,11 @@ import translator.LoadStoreHelper.getStaticLoadCall
 import translator.LoadStoreHelper.getStaticStoreCall
 import translator.LoadStoreHelper.getStoreCall
 import translator.LoadStoreHelper.getStoreInstr
-import translator.LoadStoreHelper.getStoreInstr2
 import translator.LoadStoreHelper.getVIOStoreCall
 import translator.ResolveIndirect.resolveIndirect
 import translator.TranslatorNode.Companion.convertTypeToWASM
 import translator.TranslatorNode.Companion.convertTypesToWASM
+import useHighLevelInstructions
 import useResultForThrowables
 import useWASMExceptions
 import utils.*
@@ -899,7 +900,7 @@ class MethodTranslator(
                         .append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
                         .append(if (is32Bits) I32Add else I64Add)
                         .append(Call("swap${jvm2wasmTyped(type)}$ptrType")) // swap ptr and value
-                        .append(getStoreInstr2(type))
+                        .append(getStoreInstr(type))
                 }
                 printer.pop(jvm2wasmTyped(type))
             }
@@ -1974,18 +1975,14 @@ class MethodTranslator(
                 }
                 printer.pop(wasmType).pop(ptrType)
                 if (fieldOffset != null) {
-                    // if endsWith local.get x2,
-                    //  then optimize this to not use swaps
-                    if (!alwaysUseFieldCalls && printer.endsWith(localGetX2Suffix)) {
-                        printer.drop().drop()
-                        printer.append(ParamGet[0])
-                            .append(i32Const(fieldOffset))
-                            .append(I32Add).append(ParamGet[1])
-                            .append(getStoreInstr(type))
+                    val storeCall = getStoreCall(type)
+                    // we'd need to call a function twice, so call a generic functions for this
+                    if (useHighLevelInstructions) {
+                        val storeInstr = getStoreInstr(sig.descriptor)
+                        printer.append(FieldSetInstr(sig, storeInstr, storeCall))
                     } else {
-                        // we'd need to call a function twice, so call a generic functions for this
                         printer.append(i32Const(fieldOffset))
-                            .append(getStoreCall(type))
+                            .append(storeCall)
                     }
                 } else {
                     printer.drop().drop()
@@ -1994,8 +1991,6 @@ class MethodTranslator(
             else -> throw NotImplementedError(OpCode[opcode])
         }
     }
-
-    private val localGetX2Suffix = listOf(ParamGet[0], ParamGet[1])
 
     override fun visitEnd() {
         if (!isAbstract) {

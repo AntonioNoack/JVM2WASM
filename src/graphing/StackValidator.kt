@@ -4,6 +4,7 @@ import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
 import hIndex
 import hierarchy.HierarchyIndex.methodAliases
+import highlevel.FieldSetInstr
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
@@ -260,14 +261,8 @@ object StackValidator {
                     stack.pop(i32)
                     // todo check results match stack
                 }
-                I32Load8U, I32Load8S, I32Load16U, I32Load16S, I32Load -> stack.pop(ptrType).push(i32)
-                I64Load -> stack.pop(ptrType).push(i64)
-                F32Load -> stack.pop(ptrType).push(f32)
-                F64Load -> stack.pop(ptrType).push(f64)
-                I32Store8, I32Store16, I32Store -> stack.pop(i32).pop(i32)
-                I64Store -> stack.pop(i64).pop(ptrType)
-                F32Store -> stack.pop(f32).pop(ptrType)
-                F64Store -> stack.pop(f64).pop(ptrType)
+                is LoadInstr -> stack.pop(ptrType).push(i.wasmType)
+                is StoreInstr -> stack.pop(i.wasmType).pop(ptrType)
                 is SwitchCase -> {
                     assertTrue(stack.isEmpty())
                     for (case in i.cases) {
@@ -276,6 +271,10 @@ object StackValidator {
                             localVarTypes, paramsTypes
                         )
                     }
+                }
+                is FieldSetInstr -> {
+                    stack.pop(i.storeInstr.wasmType)
+                    if (!i.fieldSig.isStatic) stack.pop(ptrType)
                 }
                 else -> throw NotImplementedError(i.toString())
             }

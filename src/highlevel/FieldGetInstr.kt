@@ -1,14 +1,13 @@
-package translator
+package highlevel
 
 import alwaysUseFieldCalls
 import interpreter.WASMEngine
-import translator.FieldSetInstr.Companion.getFieldAddr
+import highlevel.FieldSetInstr.Companion.getFieldAddr
 import utils.FieldSig
 import utils.is32Bits
 import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.ptrConst
-import wasm.instr.HighLevelInstruction
 import wasm.instr.Instruction
 import wasm.instr.Instructions.I32Add
 import wasm.instr.Instructions.I64Add

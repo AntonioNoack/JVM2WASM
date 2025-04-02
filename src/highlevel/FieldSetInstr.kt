@@ -1,7 +1,6 @@
-package translator
+package highlevel
 
 import alwaysUseFieldCalls
-import gIndex
 import interpreter.WASMEngine
 import utils.FieldSig
 import utils.is32Bits
@@ -9,7 +8,7 @@ import utils.lookupStaticVariable
 import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.ptrConst
-import wasm.instr.HighLevelInstruction
+import translator.GeneratorIndex
 import wasm.instr.Instruction
 import wasm.instr.Instructions.I32Add
 import wasm.instr.Instructions.I64Add
@@ -23,11 +22,11 @@ class FieldSetInstr(
 
     companion object {
         fun getFieldAddr(self: Number?, fieldSig: FieldSig): Int {
-            val fieldOffset = gIndex.getFieldOffset(fieldSig)!!
-            return if (fieldSig.isStatic) {
+            val fieldOffset = GeneratorIndex.getFieldOffset(fieldSig)!!
+            return if (self == null) {
                 lookupStaticVariable(fieldSig.clazz, fieldOffset)
             } else {
-                self!!.toInt() + fieldOffset
+                self.toInt() + fieldOffset
             }
         }
     }

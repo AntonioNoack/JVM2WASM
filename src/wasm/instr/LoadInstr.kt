@@ -4,7 +4,7 @@ import interpreter.WASMEngine
 import wasm.writer.Opcode
 import java.nio.ByteBuffer
 
-class LoadInstr(name: String, val numBytes: Int, opcode: Opcode, val impl: (ByteBuffer) -> Number) :
+class LoadInstr(name: String, val wasmType: String, val numBytes: Int, opcode: Opcode, val impl: (ByteBuffer) -> Number) :
     SimpleInstr(name, opcode) {
 
     override fun execute(engine: WASMEngine): String? {

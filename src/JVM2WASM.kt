@@ -97,6 +97,7 @@ var useKotlynReflect = true
 var useDefaultKotlinReflection = false
 
 var alignFieldsProperly = true
+var useHighLevelInstructions = true
 
 // not supported, because there is lots of cyclic dependencies (24 cycles)
 // var callStaticInitOnce = false

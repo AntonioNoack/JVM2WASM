@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import highlevel.HighLevelInstruction
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
@@ -38,6 +39,9 @@ import wasm.parser.LocalVariable
 // todo inherit from this class and...
 //  - using HighLevel getters, setters and local-variables, pass around true structs
 //  - using that, generate JavaScript
+// todo new highLevel instructions for instanceOf and indirect calls
+
+// todo intermediate stack-less representation with assignments and complex expressions
 
 // todo enable all warnings, and clear them all for truly clean code
 //  - ignore not-used outputs from functions
@@ -278,19 +282,16 @@ class FunctionWriter(
         return writeInstructions(instructions, 0, instructions.size)
     }
 
-    private fun getNumReturned(call: Instruction): Int {
-        return when (call) {
-            is Call -> functionsByName[call.name]!!.results.size
-            is CallIndirect -> call.type.results.size
-            else -> -1
-        }
-    }
-
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
         val assignments = Assignments.findAssignments(instructions)
-        for(i in i0 until i1) {
+        for (i in i0 until i1) {
             val instr = instructions[i]
-            writeInstruction(instr, i, assignments)
+            if (instr is HighLevelInstruction) {
+                // good enough???
+                writeInstructions(instr.toLowLevel())
+            } else {
+                writeInstruction(instr, i, assignments)
+            }
             if (instr.isReturning()) return true
         }
         return false

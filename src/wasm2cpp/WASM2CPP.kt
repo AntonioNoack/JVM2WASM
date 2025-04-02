@@ -5,13 +5,10 @@ import globals
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
-import me.anno.utils.assertions.assertEquals
-import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
-import translator.GeneratorIndex
 import utils.*
-import wasm.instr.Instruction
 import wasm.parser.*
+import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
@@ -40,16 +37,10 @@ fun validate() {
     clock.start()
     val text = wasmTextFile.readTextSync()
     clock.stop("Loading WAT")
-    val parser = parseWAT(text)
+    val module = parseWAT(text)
     clock.stop("Parsing")
-    validate(parser)
+    ParserValidation.validate(module)
     clock.stop("Validating")
-}
-
-fun validate(parser: Module) {
-    validateParsedFunctionsWithOriginals(parser.functions)
-    validateFunctionTable(parser.functionTable)
-    validateGlobals(parser.globals)
 }
 
 fun wasm2cpp() {
@@ -58,83 +49,17 @@ fun wasm2cpp() {
     clock.start()
     val text = wasmTextFile.readTextSync()
     clock.stop("Loading WAT")
-    val parser = parseWAT(text)
+    val module = parseWAT(text)
     clock.stop("Parsing")
-    validate(parser)
+    ParserValidation.validate(module)
     clock.stop("Validating")
 
-    compactBinaryData(parser.dataSections)
+    compactBinaryData(module.dataSections)
     clock.stop("Compacting Binary Data")
-    wasm2cpp(parser.functions, parser.functionTable, parser.imports, parser.globals)
+    wasm2cpp(module.functions, module.functionTable, module.imports, module.globals)
     clock.stop("Transpiling")
 
     clock.total("WASM2CPP")
-}
-
-fun validateGlobals(parsed1: Map<String, GlobalVariable>) {
-    if (globals.isEmpty()) return
-    var passed = 0
-    for ((name, parsed) in parsed1) {
-        val original = globals[name] ?: continue
-        assertEquals(original.name, parsed.name)
-        assertEquals(original.wasmType, parsed.wasmType)
-        assertEquals(original.initialValue, parsed.initialValue)
-        assertEquals(original.isMutable, parsed.isMutable)
-        passed++
-    }
-    LOGGER.info("Validated $passed/${parsed1.size} globals")
-}
-
-fun validateFunctionTable(parsed: List<String>) {
-    if (functionTable.isEmpty()) return
-    assertEquals(functionTable, parsed)
-    LOGGER.info("Validated function table, ${parsed.size} entries")
-}
-
-fun validateParsedFunctionsWithOriginals(parsed1: Collection<FunctionImpl>) {
-    val originalByName = GeneratorIndex.translatedMethods
-        .values.associateBy { it.funcName }
-    var passed = 0
-    for (parsed in parsed1) {
-        val original = originalByName[parsed.funcName] ?: continue
-        validateEqual(original, parsed)
-        passed++
-    }
-    LOGGER.info("Validated $passed/${parsed1.size} functions")
-}
-
-fun validateEqual(original: FunctionImpl, parsed: FunctionImpl) {
-    assertEquals(original.funcName, parsed.funcName)
-    assertEquals(original.params, parsed.params)
-    assertEquals(original.results, parsed.results)
-    assertEquals(original.locals, parsed.locals)
-    validateEqual(original.body, parsed.body, original.funcName)
-}
-
-fun validateEqual(original: List<Instruction>, parsed: List<Instruction>, funcName: String) {
-    assertTrue(original == parsed) {
-        printBodies(original, parsed)
-        "Expected equal bodies in '$funcName'"
-    }
-}
-
-fun printBodies(original: List<Instruction>, parsed: List<Instruction>) {
-    val diff = original.indices
-        .filter { original[it] != parsed[it] }
-    println("diff: $diff")
-    for (i in diff) {
-        println("[$i] ${original[i]} != ${parsed[i]}")
-    }
-}
-
-fun printBody(label: String, instructions: List<Instruction>) {
-    val builder = StringBuilder2()
-    builder.append(label).append(":\n")
-    for (instr in instructions) {
-        instr.toString(1, builder)
-        builder.append('\n')
-    }
-    println(builder)
 }
 
 fun wasm2cppFromMemory() {
