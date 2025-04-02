@@ -31,6 +31,8 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.shorten
+import optimizer.ReplaceOptimizer.optimizeUsingReplacements
+import optimizer.VariableValidator
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
@@ -64,7 +66,6 @@ import utils.CommonInstructions.NEW_INSTR
 import utils.CommonInstructions.SET_FIELD
 import utils.CommonInstructions.SET_STATIC
 import utils.PrintUsed.printUsed
-import utils.ReplaceOptimizer.optimizeUsingReplacements
 import utils.StaticFieldOffsets.OFFSET_CLASS_ENUM_CONSTANTS
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
@@ -85,6 +86,7 @@ import wasm.instr.Const.Companion.i32ConstM1
 import wasm.instr.Const.Companion.i64Const
 import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Const.Companion.i64Const1
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.F32Add
 import wasm.instr.Instructions.F32Div
 import wasm.instr.Instructions.F32Mul
@@ -266,8 +268,8 @@ class MethodTranslator(
                     .append(Call("wasStaticInited"))
                     .append(
                         IfBranch(
-                            if (canThrowError) listOf(i32Const0, Return)
-                            else listOf(Return), emptyList(),
+                            if (canThrowError) arrayListOf(i32Const0, Return)
+                            else arrayListOf(Return), emptyArrayList,
                             emptyList(), emptyList()
                         )
                     )
@@ -291,7 +293,7 @@ class MethodTranslator(
         assertTrue(params.all { it.isParam })
         return FunctionImpl(
             name2, params.map { Param(it.wasmType, it.name) },
-            results, variables.localVars.map { LocalVariable(it.name, it.wasmType) }, emptyList(), exported
+            results, variables.localVars.map { LocalVariable(it.name, it.wasmType) }, emptyArrayList, exported
         )
     }
 
@@ -1606,12 +1608,12 @@ class MethodTranslator(
             printer.append(tmp.localSet)
             printer.append(tmp.localGet)
             val ifTrue = if (retType == null) {
-                listOf(tmp.localGet, Return)
+                arrayListOf(tmp.localGet, Return)
             } else {
                 val zeroResult = Const.zero[retType]!!
-                listOf(zeroResult, tmp.localGet, Return)
+                arrayListOf(zeroResult, tmp.localGet, Return)
             }
-            printer.append(IfBranch(ifTrue, emptyList(), emptyList(), emptyList()))
+            printer.append(IfBranch(ifTrue, emptyArrayList, emptyList(), emptyList()))
         }
     }
 
@@ -2011,14 +2013,17 @@ class MethodTranslator(
                 validateInputOutputStacks(nodes, sig)
                 validateStack(nodes, this)
                 val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
+                val variableValidator = VariableValidator.INSTANCE
+                val funcHead = createFuncHead()
+                variableValidator.validate(jointBuilder.instrs, funcHead.locals)
                 optimizeUsingReplacements(jointBuilder)
 
-                val funcHead = createFuncHead()
-                gIndex.translatedMethods[sig] = FunctionImpl(
+                val impl = FunctionImpl(
                     funcHead.funcName, funcHead.params, funcHead.results,
-                    funcHead.locals, jointBuilder.instrs,
+                    funcHead.locals.filter { it.name in variableValidator.both }, jointBuilder.instrs,
                     funcHead.isExported
                 )
+                gIndex.translatedMethods[sig] = impl
                 if (isLookingAtSpecial) {
                     throw IllegalStateException("Looking at special '$sig'")
                 }

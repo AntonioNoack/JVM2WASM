@@ -66,9 +66,9 @@ class WASMEngine(memorySize: Int) {
     }
 
     private fun resolveCalls(
-        instructions: List<Instruction>,
+        instructions: ArrayList<Instruction>,
         byLabel: HashMap<String, BreakableInstruction>
-    ): List<Instruction> {
+    ): ArrayList<Instruction> {
         val newInstr = ArrayList<Instruction>(instructions.size)
         for (i in instructions.indices) {
             val instr = instructions[i]
@@ -238,7 +238,7 @@ class WASMEngine(memorySize: Int) {
     ) {
         customFunctions[name] = FunctionImpl(
             name, params.toParams(),
-            results, emptyList(), body, false
+            results, emptyList(), ArrayList(body), false
         )
     }
 
@@ -290,7 +290,7 @@ class WASMEngine(memorySize: Int) {
     }
 
     private fun createMissingFunction(name: String): FunctionImpl {
-        val body = listOf(LogInstruction(LOGGER, "Missing $name"), Unreachable)
+        val body = arrayListOf(LogInstruction(LOGGER, "Missing $name"), Unreachable)
         // is empty params and result ok??? should be, because it never finishes
         return FunctionImpl(name, emptyList(), emptyList(), emptyList(), body, false)
     }

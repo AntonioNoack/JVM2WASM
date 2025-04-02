@@ -10,7 +10,7 @@ import wasm.instr.Instruction.Companion.appendResults
  * */
 @Deprecated("Hard to handle in C++ regarding the stack, and hard to handle regarding isReturning()")
 data class BlockInstr(
-    override val label: String, var body: List<Instruction>,
+    override val label: String, var body: ArrayList<Instruction>,
     override val params: List<String>, override val results: List<String>
 ) : Instruction, BreakableInstruction {
 

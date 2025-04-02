@@ -5,15 +5,16 @@ import me.anno.utils.structures.lists.Lists.pop
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
+import wasm.instr.Instruction.Companion.emptyArrayList
 
 data class IfBranch(
-    var ifTrue: List<Instruction>, var ifFalse: List<Instruction>,
+    var ifTrue: ArrayList<Instruction>, var ifFalse: ArrayList<Instruction>,
     val params: List<String>, val results: List<String>
 ) : Instruction {
 
     var typeIndex = -1
 
-    constructor(ifTrue: List<Instruction>) : this(ifTrue, emptyList(), emptyList(), emptyList())
+    constructor(ifTrue: ArrayList<Instruction>) : this(ifTrue, emptyArrayList, emptyList(), emptyList())
 
     override fun toString(): String {
         val builder = StringBuilder2()
@@ -67,7 +68,7 @@ data class IfBranch(
 
     override fun execute(engine: WASMEngine): String? {
         val condition = engine.stack.pop()!! as Int
-        val continuation = if(condition != 0) ifTrue else ifFalse
+        val continuation = if (condition != 0) ifTrue else ifFalse
         // todo validate params and results???
         return engine.executeInstructions(continuation)
     }

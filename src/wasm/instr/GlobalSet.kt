@@ -3,7 +3,7 @@ package wasm.instr
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 
-data class GlobalSet(val name: String) : Instruction {
+data class GlobalSet(override val name: String) : ValueSet {
 
     var index = -1
 

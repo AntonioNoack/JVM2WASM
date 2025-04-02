@@ -2,7 +2,7 @@ package wasm.instr
 
 import interpreter.WASMEngine
 
-data class LocalSet(var name: String) : Instruction {
+data class LocalSet(override var name: String) : ValueSet {
 
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)

@@ -13,6 +13,7 @@ import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
 import translator.MethodTranslator
 import utils.Builder
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
 import wasm.instr.LoopInstr
@@ -144,7 +145,7 @@ object ExtractBigLoop {
 
         val mt = sa.methodTranslator
         val loopLabel = "bigLoop${mt.bigLoopExtractorIndex++}"
-        val loopInstr = LoopInstr(loopLabel, emptyList(), emptyList(), emptyList())
+        val loopInstr = LoopInstr(loopLabel, emptyArrayList, emptyList(), emptyList())
         val jumpBack = Jump(loopInstr)
 
         val stackToSave = loopStart.inputStack

@@ -45,6 +45,13 @@ add_executable(JVM2CPP jvm2wasm-base.cpp jvm2wasm-funcTable.cpp
     jvm2wasm-part15.cpp jvm2wasm-part16.cpp jvm2wasm-part17.cpp jvm2wasm-part18.cpp jvm2wasm-part19.cpp
 )
 
+# Be pendantic about warnings to force truly clean, nice-looking code
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(JVM2CPP PRIVATE -Wall -Wextra -Wpedantic)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(JVM2CPP PRIVATE /W4)
+endif()
+
 # Link GLFW and glad with the project
 target_link_libraries(JVM2CPP PRIVATE glfw glad stbi)
 

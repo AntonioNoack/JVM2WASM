@@ -2,7 +2,7 @@ package wasm.instr
 
 import interpreter.WASMEngine
 
-data class GlobalGet(val name: String) : Instruction {
+data class GlobalGet(override val name: String) : ValueGet {
 
     var index = -1
 

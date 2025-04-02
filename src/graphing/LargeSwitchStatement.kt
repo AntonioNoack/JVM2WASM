@@ -12,6 +12,7 @@ import utils.Builder
 import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.Unreachable
 
 object LargeSwitchStatement {
@@ -70,8 +71,8 @@ object LargeSwitchStatement {
                     val falseIndex = node.ifFalse.index
                     printer1.append(
                         IfBranch(
-                            listOf(i32Const(trueIndex)),
-                            listOf(i32Const(falseIndex)),
+                            arrayListOf(i32Const(trueIndex)),
+                            arrayListOf(i32Const(falseIndex)),
                             emptyList(), listOf(i32)
                         )
                     ).append(lblSet)
@@ -90,7 +91,7 @@ object LargeSwitchStatement {
         }
 
         val loopName = "b${sa.methodTranslator.nextLoopIndex++}"
-        val loopInstr = LoopInstr(loopName, emptyList(), emptyList(), emptyList())
+        val loopInstr = LoopInstr(loopName, emptyArrayList, emptyList(), emptyList())
         val jump = Jump(loopInstr)
 
         val printer = Builder()
@@ -123,7 +124,7 @@ object LargeSwitchStatement {
 
         // good like that???
         val switch = SwitchCase(label, nodes.map { it.printer.instrs }, emptyList(), emptyList())
-        loopInstr.body = listOf(switch)
+        loopInstr.body = arrayListOf(switch)
         printer.append(loopInstr)
 
         // close loop

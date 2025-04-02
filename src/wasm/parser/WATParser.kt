@@ -13,23 +13,16 @@ import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f64Const
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i64Const
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.SimpleInstr.Companion.simpleInstructions
 import kotlin.math.min
 
-class WATParser {
-
-    var memorySizeInBlocks = -1
-    val imports = ArrayList<Import>()
-    val dataSections = ArrayList<DataSection>()
-    val functionTable = ArrayList<String>()
-    val functions = ArrayList<FunctionImpl>()
-    val types = HashMap<String, FuncType>()
-    val globals = HashMap<String, GlobalVariable>()
+class WATParser : Module() {
 
     private val params = ArrayList<String>()
     private val results = ArrayList<String>()
 
-    val breakableByLabel = HashMap<String, BreakableInstruction>()
+    private val breakableByLabel = HashMap<String, BreakableInstruction>()
 
     fun parse(text: String) {
         val tokens = parseTokens(text)
@@ -368,7 +361,7 @@ class WATParser {
                                 val (k, ifFalse) = parseFunctionBlock(list, i)
                                 i = k
                                 ifFalse
-                            } else emptyList()
+                            } else emptyArrayList
                             result.add(IfBranch(ifTrue, ifFalse, params, results))
                         }
                         "loop" -> {
@@ -377,7 +370,7 @@ class WATParser {
                             val (k0, params) = readParams(list, i)
                             val (k1, results) = readResults(list, k0)
                             i = k1
-                            val instr = LoopInstr(label, emptyList(), params, results)
+                            val instr = LoopInstr(label, emptyArrayList, params, results)
                             breakableByLabel[label] = instr
                             val (j, body) = parseFunctionBlock(list, i)
                             assertEquals(instr, breakableByLabel.remove(label))
@@ -411,7 +404,7 @@ class WATParser {
                                 val label = list.consume(TokenType.DOLLAR, i++)
                                 val (k0, params) = readParams(list, i)
                                 val (k1, results) = readResults(list, k0)
-                                val block = BlockInstr(label, emptyList(), params, results)
+                                val block = BlockInstr(label, emptyArrayList, params, results)
                                 breakableByLabel[label] = block
                                 val (k2, instructions) = parseFunctionBlock(list, k1)
                                 assertEquals(block, breakableByLabel.remove(label))
@@ -429,7 +422,7 @@ class WATParser {
                                 }
                                 list.consume(TokenType.CLOSE_BRACKET, i++)
                                 list.consume(TokenType.CLOSE_BRACKET, i++)
-                                val cases = ArrayList<List<Instruction>>()
+                                val cases = ArrayList<ArrayList<Instruction>>()
                                 val instr = SwitchCase(label, cases, emptyList(), emptyList())
                                 breakableByLabel[label] = instr
                                 for (j in 0 until depth) {

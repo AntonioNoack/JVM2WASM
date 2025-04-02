@@ -6,7 +6,7 @@ import crashOnAllExceptions
 import dependency.ActuallyUsedIndex
 import hIndex
 import isRootType
-import jvm.JVM32.*
+import jvm.JVM32.ptrSize
 import jvm.JVMShared.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32
@@ -24,6 +24,7 @@ import utils.Param.Companion.toParams
 import utils.PrintUsed.printUsed
 import utils.WASMTypes.*
 import wasm.instr.FuncType
+import wasm.instr.Instruction
 import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
@@ -127,9 +128,15 @@ object GeneratorIndex {
                 }
             }
             val name = "getNth_$name0"
+            val instructions = ArrayList<Instruction>(typeStack.size + 2)
+            for (i in typeStack.indices) {
+                instructions.add(ParamGet[i])
+            }
+            instructions.add(ParamGet[0])
+            instructions.add(Return)
             FunctionImpl(
                 name, typeStack.toParams(), typeStack + typeStack.first(),
-                emptyList(), typeStack.indices.map { ParamGet[it] } + ParamGet[0] + Return,
+                emptyList(), instructions,
                 false
             )
         }.funcName

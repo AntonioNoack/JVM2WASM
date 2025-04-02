@@ -7,7 +7,7 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 
 // typealias Builder = StringBuilder2
-class Builder(val instrs: MutableList<Instruction>) {
+class Builder(val instrs: ArrayList<Instruction>) {
 
     companion object {
         fun isDuplicable(lastInstr: Instruction?): Boolean {

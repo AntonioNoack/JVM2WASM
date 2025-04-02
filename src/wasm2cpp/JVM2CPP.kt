@@ -10,6 +10,7 @@ import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.Const.Companion.i32Const2
 import wasm.instr.Const.Companion.i32ConstM1
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.parser.FunctionImpl
 import wasm.parser.Import
 import wasm.parser.LocalVariable
@@ -79,16 +80,16 @@ fun testFunction(): FunctionImpl {
     val label = "lbl"
     val loopName = "loop"
     val loopInstr = LoopInstr(
-        loopName, emptyList(),
+        loopName, emptyArrayList,
         emptyList(), emptyList()
     )
-    loopInstr.body = listOf(
+    loopInstr.body = arrayListOf(
         SwitchCase(
             label,
             listOf(
-                listOf(i32Const1, LocalSet(label), Jump(loopInstr)),
-                listOf(i32Const2, LocalSet(label), Jump(loopInstr)),
-                emptyList()
+                arrayListOf(i32Const1, LocalSet(label), Jump(loopInstr)),
+                arrayListOf(i32Const2, LocalSet(label), Jump(loopInstr)),
+                emptyArrayList
             ), emptyList(), emptyList()
         ),
         Call("AfterSwitch")
@@ -96,7 +97,7 @@ fun testFunction(): FunctionImpl {
     return FunctionImpl(
         "testFunc", listOf(i32, i32).toParams(), listOf(i32),
         listOf(LocalVariable(label, i32)),
-        listOf(
+        arrayListOf(
             i32Const0, LocalSet(label),
             loopInstr,
             Call("AfterLoop"),

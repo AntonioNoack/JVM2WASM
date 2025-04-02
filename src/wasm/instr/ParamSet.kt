@@ -4,7 +4,7 @@ import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.createList
 import utils.Param.Companion.names
 
-class ParamSet(val index: Int, var name: String) : Instruction {
+class ParamSet(val index: Int, override var name: String) : ValueSet {
 
     override fun toString(): String = "local.set $index"
 

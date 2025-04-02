@@ -13,7 +13,7 @@ import wasm.parser.FunctionImpl
 object StaticInitRemover {
 
     private val initSig = MethodSig.c("jvm/JVMShared", "init", voidDescriptor)
-    private val emptyInitBody = listOf(Return)
+    private val emptyInitBody = arrayListOf<Instruction>(Return)
 
     fun removeStaticInit() {
         removeInitFunction()
@@ -44,12 +44,11 @@ object StaticInitRemover {
             sig.name == STATIC_INIT || func.funcName.startsWith("static_")
         }
         for (func in gIndex.translatedMethods.values) {
-            func.body = removeStaticInit(func.body)
+            removeStaticInit(func.body)
         }
     }
 
-    private fun removeStaticInit(instr0: List<Instruction>): List<Instruction> {
-        val instr1 = instr0 as? MutableList<Instruction> ?: ArrayList(instr0)
+    private fun removeStaticInit(instr1: ArrayList<Instruction>) {
         var i = 0
         while (i < instr1.size) {
             when (val instr = instr1[i]) {
@@ -71,22 +70,20 @@ object StaticInitRemover {
                     }
                 }
                 is IfBranch -> {
-                    instr.ifTrue = removeStaticInit(instr.ifTrue)
-                    instr.ifFalse = removeStaticInit(instr.ifFalse)
+                    removeStaticInit(instr.ifTrue)
+                    removeStaticInit(instr.ifFalse)
                 }
                 is LoopInstr -> {
-                    instr.body = removeStaticInit(instr.body)
+                    removeStaticInit(instr.body)
                 }
                 is SwitchCase -> {
-                    instr.cases = instr.cases.map { caseI ->
+                    instr.cases.forEach { caseI ->
                         removeStaticInit(caseI)
                     }
                 }
             }
             i++
         }
-
-        return instr1
     }
 
 }

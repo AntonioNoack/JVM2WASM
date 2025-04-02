@@ -1,8 +1,9 @@
-package utils
+package optimizer
 
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.none2
+import utils.Builder
 import utils.Builder.Companion.canBeDropped
 import utils.WASMTypes.i32
 import wasm.instr.*
@@ -118,28 +119,24 @@ object ReplaceOptimizer {
         optimizeUsingReplacements2(printer.instrs)
     }
 
-    private fun optimizeUsingReplacements2(instructions0: List<Instruction>): List<Instruction> {
-        if (instructions0.isEmpty()) return instructions0
-        var instructions = instructions0
+    private fun optimizeUsingReplacements2(instructions: ArrayList<Instruction>) {
+        if (instructions.isEmpty()) return
 
         var changed: Boolean
-        fun makeMutable(): ArrayList<Instruction> {
+        fun onChange(): ArrayList<Instruction> {
             changed = true
-            if (instructions !is ArrayList) {
-                instructions = ArrayList(instructions)
-            }
-            return (instructions as ArrayList)
+            return instructions
         }
 
         fun runReplacements() {
             for (offset in instructions.lastIndex downTo 0) {
                 val instr = instructions.getOrNull(offset) ?: continue
-                when(instr) {
+                when (instr) {
                     Drop -> {
                         val prevIdx = instructions.prevIndex(offset)
                         val prev = instructions.getOrNull(prevIdx)
                         if (canBeDropped(prev)) {
-                            val list = makeMutable()
+                            val list = onChange()
                             val remainder = ArrayList(list.subList(offset + 1, list.size))
                             list.subList(offset, list.size).clear() // clear remainder including "drop"
                             val tmp = Builder(list)
@@ -159,18 +156,18 @@ object ReplaceOptimizer {
                             }
                             when (prevInstr) {
                                 I32EQZ -> {
-                                    makeMutable().removeAt(prevIdx)
+                                    onChange().removeAt(prevIdx)
                                     swap()
                                     i--
                                 }
                                 Call.fcmpl, Call.fcmpg -> {
                                     // NaN-signedness doesn't matter here
-                                    makeMutable()[prevIdx] = F32EQ
+                                    onChange()[prevIdx] = F32EQ
                                     swap()
                                 }
                                 Call.dcmpl, Call.dcmpg -> {
                                     // NaN-signedness doesn't matter here
-                                    makeMutable()[prevIdx] = F64EQ
+                                    onChange()[prevIdx] = F64EQ
                                     swap()
                                 }
                             }
@@ -178,13 +175,13 @@ object ReplaceOptimizer {
                                 matchContents(instr.ifFalse, i32Const1)
                             ) {
                                 // pure negation, remove if-branch
-                                makeMutable()[i] = I32EQZ
+                                onChange()[i] = I32EQZ
                             } else if (
                                 matchContents(instr.ifTrue, i32Const1) &&
                                 matchContents(instr.ifFalse, i32Const0)
                             ) {
                                 // int to bool, remove if-branch
-                                val mutable = makeMutable()
+                                val mutable = onChange()
                                 mutable[i] = I32EQZ
                                 mutable.add(i, I32EQZ)
                                 // i--
@@ -193,21 +190,22 @@ object ReplaceOptimizer {
                                 matchContents(instr.ifFalse, listOf(i32Const1, Return))
                             ) {
                                 // return reverse
-                                val mutable = makeMutable()
+                                val mutable = onChange()
                                 mutable[i] = Return
                                 mutable.add(i, I32EQZ)
                                 // i--
                             }
                         }
-                        instr.ifTrue = optimizeUsingReplacements2(instr.ifTrue)
-                        instr.ifFalse = optimizeUsingReplacements2(instr.ifFalse)
+                        optimizeUsingReplacements2(instr.ifTrue)
+                        optimizeUsingReplacements2(instr.ifFalse)
                     }
                     is LoopInstr -> {
-                        instr.body = optimizeUsingReplacements2(instr.body)
+                        optimizeUsingReplacements2(instr.body)
                     }
                     is SwitchCase -> {
-                        instr.cases = instr.cases.map { instructions1 ->
-                            optimizeUsingReplacements2(instructions1)
+                        val cases = instr.cases
+                        for (i in cases.indices) {
+                            optimizeUsingReplacements2(cases[i])
                         }
                     }
                     else -> {
@@ -215,7 +213,7 @@ object ReplaceOptimizer {
                             ?: continue
                         for ((old, new) in replacements) {
                             val li = instructions.startsWith(old, offset)
-                            if (li >= 0) makeMutable().replace(new, offset, li)
+                            if (li >= 0) onChange().replace(new, offset, li)
                         }
                     }
                 }
@@ -226,8 +224,6 @@ object ReplaceOptimizer {
             changed = false
             runReplacements()
         } while (changed)
-
-        return instructions
     }
 
     private fun matchContents(a: List<Instruction>, b: List<Instruction>): Boolean {
@@ -312,26 +308,26 @@ object ReplaceOptimizer {
             )
             testOptimize(
                 listOf(I32EQZ, I32EQZ),
-                listOf(I32EQZ, IfBranch(listOf(i32Const0), listOf(i32Const1), emptyList(), listOf(i32)))
+                listOf(I32EQZ, IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32)))
             )
             testOptimize(
                 listOf(I32EQZ),
-                listOf(I32EQZ, I32EQZ, IfBranch(listOf(i32Const0), listOf(i32Const1), emptyList(), listOf(i32)))
+                listOf(I32EQZ, I32EQZ, IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32)))
             )
             testOptimize(
                 listOf(I32NE),
-                listOf(I32EQ, IfBranch(listOf(i32Const0), listOf(i32Const1), emptyList(), listOf(i32)))
+                listOf(I32EQ, IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32)))
             )
             testOptimize(
                 listOf(I32EQ),
-                listOf(I32NE, IfBranch(listOf(i32Const0), listOf(i32Const1), emptyList(), listOf(i32)))
+                listOf(I32NE, IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32)))
             )
             testOptimize(listOf(Return), listOf(Return, Unreachable))
             testOptimize(listOf(I32LTS), listOf(I32GES, I32EQZ))
         }
 
         val a = Comment("a")
-        assertEquals(3, listOf(I32LTS, a, I32EQZ, IfBranch(emptyList())).startsWith(listOf(I32LTS, I32EQZ), 0))
+        assertEquals(3, listOf(I32LTS, a, I32EQZ, IfBranch(ArrayList(0))).startsWith(listOf(I32LTS, I32EQZ), 0))
         assertEquals(2, listOf(I32LES, I32EQZ).startsWith(listOf(I32LES, I32EQZ), 0))
         assertEquals(3, listOf(a, I32LES, I32EQZ).startsWith(listOf(I32LES, I32EQZ), 1))
 

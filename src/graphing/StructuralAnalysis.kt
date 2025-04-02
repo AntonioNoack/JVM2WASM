@@ -15,9 +15,10 @@ import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
-import utils.StaticInitOptimizer.optimizeStaticInit
+import optimizer.StaticInitOptimizer.optimizeStaticInit
 import utils.WASMTypes.i32
 import wasm.instr.*
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32GES
@@ -601,7 +602,7 @@ class StructuralAnalysis(
         if (negate) nodeA.printer.append(I32EQZ) // negate condition
         nodeA.printer.append(
             IfBranch(
-                ArrayList(nodeB.printer.instrs), emptyList(),
+                ArrayList(nodeB.printer.instrs), emptyArrayList,
                 blockParamsGetParams(nodeB),
                 blockParamsGetResult(nodeB, null)
             )
@@ -743,7 +744,7 @@ class StructuralAnalysis(
                     node.printer.append(I32EQZ)
                     node.printer.append(
                         IfBranch(
-                            ArrayList(b0.printer.instrs), emptyList(),
+                            ArrayList(b0.printer.instrs), emptyArrayList,
                             blockParamsGetParams(b0),
                             blockParamsGetResult(b0, null)
                         )
@@ -759,7 +760,7 @@ class StructuralAnalysis(
                     // merge exit into this node
                     node.printer.append(
                         IfBranch(
-                            ArrayList(b1.printer.instrs), emptyList(),
+                            ArrayList(b1.printer.instrs), emptyArrayList,
                             blockParamsGetParams(b1),
                             blockParamsGetResult(b1, null)
                         )
@@ -824,7 +825,7 @@ class StructuralAnalysis(
             if (negate) nodeA.printer.append(I32EQZ)
             nodeA.printer.append(
                 IfBranch(
-                    nodeB.printer.instrs, emptyList(),
+                    nodeB.printer.instrs, emptyArrayList,
                     blockParamsGetParams(nodeB),
                     blockParamsGetResult(nodeB, null)
                 )
@@ -891,7 +892,7 @@ class StructuralAnalysis(
             if (ifFalseIsB) nodeA.printer.append(I32EQZ)
             nodeA.printer.append(
                 IfBranch(
-                    nodeB.printer.instrs, emptyList(),
+                    nodeB.printer.instrs, emptyArrayList,
                     blockParamsGetParams(nodeB),
                     blockParamsGetResult(nodeB, null)
                 )

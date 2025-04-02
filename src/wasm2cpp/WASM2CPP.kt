@@ -46,7 +46,7 @@ fun validate() {
     clock.stop("Validating")
 }
 
-fun validate(parser: WATParser) {
+fun validate(parser: Module) {
     validateParsedFunctionsWithOriginals(parser.functions)
     validateFunctionTable(parser.functionTable)
     validateGlobals(parser.globals)
@@ -247,7 +247,7 @@ fun compactBinaryData(dataSections: List<DataSection>) {
         .writeBytes(data)
 }
 
-fun parseWAT(text: String): WATParser {
+fun parseWAT(text: String): Module {
     val parser = WATParser()
     parser.parse(text)
     return parser

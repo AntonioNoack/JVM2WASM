@@ -18,6 +18,7 @@ import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
@@ -111,7 +112,7 @@ object ExtractEndNodes {
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
         val firstRunVariable = mt.variables.addLocalVariable("${firstRunLabel}v", i32, "I")
-        val loopInstr = LoopInstr(firstRunLabel, emptyList(), emptyList(), emptyList())
+        val loopInstr = LoopInstr(firstRunLabel, emptyArrayList, emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 
         val extraInputs = HashMap<GraphingNode, List<LocalVariableOrParam>>()
@@ -162,7 +163,7 @@ object ExtractEndNodes {
         }
         val endNodeCode = endNodesList.first().printer.instrs
 
-        loopInstr.body = listOf(
+        loopInstr.body = arrayListOf(
             firstRunVariable.getter,
             IfBranch(startCode.instrs, endNodeCode, emptyList(), emptyList()),
             Unreachable // should be unreachable, too
@@ -230,7 +231,7 @@ object ExtractEndNodes {
                         val endNode = if (endTrue) node.ifTrue else node.ifFalse
                         node.printer.append(
                             IfBranch(
-                                getJumpInstructions(node, endNode).instrs, emptyList(),
+                                getJumpInstructions(node, endNode).instrs, emptyArrayList,
                                 node.outputStack, node.outputStack
                             )
                         )

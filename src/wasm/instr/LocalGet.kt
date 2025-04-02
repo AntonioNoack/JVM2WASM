@@ -2,7 +2,7 @@ package wasm.instr
 
 import interpreter.WASMEngine
 
-data class LocalGet(var name: String) : Instruction {
+data class LocalGet(override var name: String) : ValueGet {
 
     init {
         if (name.startsWith('$')) throw IllegalArgumentException(name)

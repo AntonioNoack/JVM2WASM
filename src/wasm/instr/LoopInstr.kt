@@ -8,7 +8,7 @@ import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
 
 data class LoopInstr(
-    override val label: String, var body: List<Instruction>,
+    override val label: String, var body: ArrayList<Instruction>,
     override val params: List<String>, override val results: List<String>
 ) : Instruction, BreakableInstruction {
 

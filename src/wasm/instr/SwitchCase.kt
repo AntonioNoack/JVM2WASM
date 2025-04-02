@@ -7,7 +7,7 @@ import me.anno.utils.structures.lists.Lists.any2
 import utils.StringBuilder2
 
 data class SwitchCase(
-    override val label: String, var cases: List<List<Instruction>>,
+    override val label: String, var cases: List<ArrayList<Instruction>>,
     override val params: List<String>, override val results: List<String>,
 ) : Instruction, BreakableInstruction {
 

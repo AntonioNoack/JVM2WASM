@@ -206,19 +206,22 @@ class FunctionWriter(
             .appendExpr(ptr).append("))[0] = ").append(value).end()
     }
 
-    private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
+    private fun writeCall(funcName: String, params: List<String>, results: List<String>, afterInstr: Instruction?) {
 
         if (funcName.startsWith("getNth_")) {
+            assertNull(afterInstr)
             stack.add(stack[stack.size - params.size])
             return
         }
 
         if (funcName == "wasStaticInited") {
+            assertNull(afterInstr)
             beginNew(i32).append("0").end()
             return
         }
 
         if (!enableCppTracing) {
+            assertNull(afterInstr)
             if (funcName == "stackPush" || funcName == "stackPop") {
                 if (funcName == "stackPush") pop(i32)
                 return
@@ -226,40 +229,79 @@ class FunctionWriter(
         }
 
         if (funcName.startsWith("swap")) {
+            assertNull(afterInstr)
             stack.add(stack.size - 2, stack.removeLast())
             return
         }
 
         if (funcName.startsWith("dupi") || funcName.startsWith("dupf")) {
+            assertNull(afterInstr)
             stack.add(stack.last())
             return
         }
 
-        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
-        begin()
-        if (results.isNotEmpty()) {
-            for (i in results.indices) {
-                writer.append(results[i])
-            }
-            writer.append(" ").append(tmp).append(" = ")
-        }
+        when (afterInstr) {
+            null -> {
+                val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
+                begin()
+                if (results.isNotEmpty()) {
+                    for (i in results.indices) {
+                        writer.append(results[i])
+                    }
+                    writer.append(" ").append(tmp).append(" = ")
+                }
 
+                writePureCall(funcName, params)
+                writer.end()
+
+                when (results.size) {
+                    0 -> {}
+                    1 -> push(results[0], tmp)
+                    else -> {
+                        for (j in results.indices) {
+                            beginNew(results[j]).append(tmp).append(".v").append(j).end()
+                        }
+                    }
+                }
+            }
+            Return -> {
+                begin().append("return ")
+                writePureCall(funcName, params)
+                pushInvalidResults(results)
+                writer.end()
+            }
+            is LocalSet -> {
+                begin().append(afterInstr.name).append(" = ")
+                writePureCall(funcName, params)
+                writer.end()
+            }
+            is ParamSet -> {
+                begin().append(afterInstr.name).append(" = ")
+                writePureCall(funcName, params)
+                writer.end()
+            }
+            is GlobalSet -> {
+                begin().append("global_").append(afterInstr.name).append(" = ")
+                writePureCall(funcName, params)
+                writer.end()
+            }
+            else -> throw NotImplementedError()
+        }
+    }
+
+    private fun writePureCall(funcName: String, params: List<String>) {
         writer.append(funcName).append('(')
         val popped = popInReverse(funcName, params)
         for (i in popped.indices) {
             if (!writer.endsWith("(")) writer.append(", ")
             writer.append(popped[i])
         }
-        writer.append(')').end()
+        writer.append(')')
+    }
 
-        when (results.size) {
-            0 -> {}
-            1 -> push(results[0], tmp)
-            else -> {
-                for (j in results.indices) {
-                    beginNew(results[j]).append(tmp).append(".v").append(j).end()
-                }
-            }
+    private fun pushInvalidResults(results: List<String>) {
+        for (i in results.indices) {
+            push(results[i], "undefined")
         }
     }
 
@@ -267,12 +309,43 @@ class FunctionWriter(
         return writeInstructions(instructions, 0, instructions.size)
     }
 
+    private fun getNumReturned(call: Instruction): Int {
+        return when (call) {
+            is Call -> functionsByName[call.name]!!.results.size
+            is CallIndirect -> call.type.results.size
+            else -> -1
+        }
+    }
+
+    private fun isReturningOneItem(call: Instruction): Boolean {
+        return getNumReturned(call) == 1
+    }
+
+    private fun isReturningAsMuchAsSelf(call: Instruction): Boolean {
+        return getNumReturned(call) == function.results.size
+    }
+
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
         val assignments = Assignments.findAssignments(instructions)
-        for (i in i0 until i1) {
+        var i = i0
+        while (i < i1) {
             val instr = instructions[i]
-            writeInstruction(instr, i, assignments)
-            if (instr.isReturning()) return true
+            var afterInstr: Instruction? = null
+            var ni = i + 1
+            if (instr is Call || instr is CallIndirect) {
+                // check whether next one is drop or return
+                // check if call returns a value
+                ni = nextInstr(instructions, i)
+                val next = instructions.getOrNull(ni)
+                if (next == Return && isReturningAsMuchAsSelf(instr)) {
+                    afterInstr = next
+                } else if (next is ValueSet && isReturningOneItem(instr)) {
+                    afterInstr = next
+                }
+            }
+            writeInstruction(instr, i, assignments, afterInstr)
+            if (instr.isReturning() || afterInstr is ReturnInstr) return true
+            i = if (afterInstr != null) ni + 1 else i + 1
         }
         return false
     }
@@ -286,7 +359,7 @@ class FunctionWriter(
     }
 
     private fun writeInstruction(i: Instruction) {
-        writeInstruction(i, Int.MAX_VALUE, null)
+        writeInstruction(i, Int.MAX_VALUE, null, null)
     }
 
     private fun isNameOrNumber(expression: String): Boolean {
@@ -425,7 +498,10 @@ class FunctionWriter(
         }
     }
 
-    private fun writeInstruction(i: Instruction, k: Int, assignments: Map<String, Int>?) {
+    private fun writeInstruction(
+        i: Instruction, k: Int, assignments: Map<String, Int>?,
+        afterInstr: Instruction?
+    ) {
         when (i) {
             is ParamGet -> {
                 val index = i.index
@@ -595,10 +671,28 @@ class FunctionWriter(
                 // get running parameters...
                 val condition = pop(i32)
                 val baseSize = stack.size - i.params.size
-                val paramPopped = popInReverse(function.funcName, i.params)
+
+                // confirm parameters to branch are correct
+                for (j in i.params.indices) {
+                    assertEquals(stack[baseSize + j].type, i.params[j])
+                }
+
+                // only pop them, if their content is complicated expressions
+                // then only replace specifically those in the stack
+                for (j in i.params.indices) {
+                    val j1 = baseSize + j
+                    val stackJ = stack[j1]
+                    val code = stackJ.expr
+                    if (!isNameOrNumber(code)) {
+                        val name = nextTemporaryVariable()
+                        begin().append(stackJ.type).append(' ').append(name).append(" = ")
+                            .append(code).end()
+                    }
+                }
+                /*val paramPopped = popInReverse(function.funcName, i.params)
                 for (j in i.params.indices) {
                     beginNew(i.params[j]).append(paramPopped[j]).end()
-                }
+                }*/
 
                 if (i.ifFalse.isEmpty()) {
                     assertEquals(i.params.size, i.results.size) {
@@ -606,8 +700,11 @@ class FunctionWriter(
                     }
                 }
 
-                val resultVars = i.results.map { nextTemporaryVariable() }
-                for (ri in resultVars.indices) {
+                val needsResults = !i.isReturning()
+                val resultVars = if (needsResults) {
+                    i.results.map { nextTemporaryVariable() }
+                } else emptyList()
+                if (needsResults) for (ri in resultVars.indices) {
                     begin().append(i.results[ri]).append(' ')
                         .append(resultVars[ri]).append(" = 0").end()
                 }
@@ -625,10 +722,12 @@ class FunctionWriter(
                     }
                     // pack results into our stack somehow...
                     // resultVars[i] = stack[i].name
-                    for (j in i.results.lastIndex downTo 0) {
-                        val srcVar = pop(i.results[j])
-                        val dstVar = resultVars[j]
-                        begin().append(dstVar).append(" = ").append(srcVar).end()
+                    if (needsResults) {
+                        for (j in i.results.lastIndex downTo 0) {
+                            val srcVar = pop(i.results[j])
+                            val dstVar = resultVars[j]
+                            begin().append(dstVar).append(" = ").append(srcVar).end()
+                        }
                     }
                 }
 
@@ -658,14 +757,18 @@ class FunctionWriter(
                 // rescue stack
                 stack.clear()
                 stack.addAll(stackSave)
-                for (j in i.results.indices) {
-                    push(i.results[j], resultVars[j])
+                if (needsResults) {
+                    for (j in resultVars.indices) {
+                        push(i.results[j], resultVars[j])
+                    }
+                } else {
+                    pushInvalidResults(i.results)
                 }
             }
             is Call -> {
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
-                writeCall(func.funcName, func.params.map { it.wasmType }, func.results)
+                writeCall(func.funcName, func.params.map { it.wasmType }, func.results, afterInstr)
             }
             is CallIndirect -> {
                 val type = i.type
@@ -689,7 +792,7 @@ class FunctionWriter(
                 // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
                 begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
                     .append(tmpType).append(">(indirect[").append(pop("i32")).append("])").end()
-                writeCall(tmpVar, type.params, type.results)
+                writeCall(tmpVar, type.params, type.results, afterInstr)
             }
             is BlockInstr -> {
                 // write body
@@ -754,6 +857,9 @@ class FunctionWriter(
         }
     }
 
+    /**
+     * find the next instruction after i
+     * */
     private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
         for (j in i + 1 until instructions.size) {
             val instr = instructions[j]

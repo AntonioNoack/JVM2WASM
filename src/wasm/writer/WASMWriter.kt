@@ -62,7 +62,7 @@ object WASMWriter {
         }
     }
 
-    fun writeWASM(parser: WATParser): ByteArrayList {
+    fun writeWASM(parser: wasm.parser.Module): ByteArrayList {
         return writeWASM(
             parser.functions, parser.functionTable, parser.globals,
             parser.imports, parser.memorySizeInBlocks, parser.dataSections

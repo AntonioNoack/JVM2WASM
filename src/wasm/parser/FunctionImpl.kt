@@ -9,7 +9,7 @@ import wasm.instr.Instruction.Companion.appendResults
 open class FunctionImpl(
     val funcName: String, val params: List<Param>, val results: List<String>,
     var locals: List<LocalVariable>,
-    var body: List<Instruction>,
+    var body: ArrayList<Instruction>,
     val isExported: Boolean
 ) {
 
@@ -35,7 +35,7 @@ open class FunctionImpl(
         return builder.toString()
     }
 
-    fun withBody(newBody: List<Instruction>): FunctionImpl {
+    fun withBody(newBody: ArrayList<Instruction>): FunctionImpl {
         return FunctionImpl(
             funcName, params, results,
             locals, newBody, isExported

@@ -46,7 +46,7 @@ object NativeHelperFunctions {
     }
 
     fun register(name: String, params: List<String>, results: List<String>, instructions: List<Instruction>) {
-        register(FunctionImpl(name, params.toParams(), results, emptyList(), instructions, exportHelpers))
+        register(FunctionImpl(name, params.toParams(), results, emptyList(), ArrayList(instructions), exportHelpers))
     }
 
     private fun forAll(callback: (String) -> Unit) {

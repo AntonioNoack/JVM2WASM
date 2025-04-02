@@ -101,10 +101,11 @@ object ResolveIndirect {
         return result
     }
 
-    private fun createBody(sigJ: MethodSig, calledCanThrow: Boolean): List<Instruction> {
-        val printer = Builder()
+    private fun createBody(sigJ: MethodSig, calledCanThrow: Boolean, returnAtEnd: Boolean): ArrayList<Instruction> {
+        val printer = Builder(3)
         printer.append(Call(methodName(sigJ)))
         printer.fixThrowable(calledCanThrow, sigJ)
+        if (returnAtEnd) printer.append(Return)
         return printer.instrs
     }
 
@@ -163,7 +164,7 @@ object ResolveIndirect {
         val numTests = countTests(groupedByClass)
         if (numTests >= maxOptionsInTree) return false
 
-        fun printCallPyramid(printer: Builder) {
+        fun printCallPyramid(printer: Builder, returnInBranch: Boolean) {
 
             val checkForInvalidClasses = false
 
@@ -174,9 +175,9 @@ object ResolveIndirect {
                     .append(tmpI32.setter)
             }
 
-            var lastBranch: List<Instruction> =
-                if (checkForInvalidClasses) listOf(Call("jvm_JVM32_throwJs_V"), Unreachable)
-                else createBody(groupedByClass.last().first, calledCanThrow)
+            var lastBranch: ArrayList<Instruction> =
+                if (checkForInvalidClasses) arrayListOf(Call("jvm_JVM32_throwJs_V"), Unreachable)
+                else createBody(groupedByClass.last().first, calledCanThrow, returnInBranch)
 
             val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
             for (j in jMax - 1 downTo 0) {
@@ -184,7 +185,7 @@ object ResolveIndirect {
                 val nextBranch = createPyramidCondition(classes2, tmpI32)
                 nextBranch.add(
                     IfBranch(
-                        createBody(toBeCalled, calledCanThrow),
+                        createBody(toBeCalled, calledCanThrow, returnInBranch),
                         lastBranch, getArgs(splitArgs), getResult(ret, calledCanThrow)
                     )
                 )
@@ -198,7 +199,7 @@ object ResolveIndirect {
 
         if (numTests < 3) {
             if (comments) printer.comment("small pyramid")
-            printCallPyramid(printer)
+            printCallPyramid(printer, false)
         } else {
             val helperName = "tree_${sig0.toString().escapeChars()}"
             helperFunctions.getOrPut(helperName) {
@@ -212,7 +213,7 @@ object ResolveIndirect {
                 for (k in 0 until splitArgs.size + 1) {
                     printer.append(ParamGet[k])
                 }
-                printCallPyramid(printer)
+                printCallPyramid(printer, true)
                 printer.append(Return)
 
                 FunctionImpl(

@@ -15,6 +15,9 @@ interface Instruction {
     fun execute(engine: WASMEngine): String?
 
     companion object {
+
+        val emptyArrayList = ArrayList<Instruction>(0)
+
         fun appendParams(params: List<String>, builder: StringBuilder2) {
             if (params.isNotEmpty()) {
                 builder.append(" (param")

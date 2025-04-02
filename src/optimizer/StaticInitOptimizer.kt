@@ -1,4 +1,4 @@
-package utils
+package optimizer
 
 import graphing.GraphingNode
 import graphing.StructuralAnalysis.Companion.renumberForReading

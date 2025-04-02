@@ -140,7 +140,7 @@ object Annotations {
             val selfParam = Param(ptrType, "self")
             gIndex.translatedMethods[sig] = FunctionImpl(
                 funcName, listOf(selfParam), listOf(wasmType),
-                emptyList(), listOf(
+                emptyList(), arrayListOf(
                     ParamGet(0, selfParam.name),
                     i32Const(fieldOffset),
                     getLoadCall(fieldType),
