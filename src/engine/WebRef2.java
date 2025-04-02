@@ -199,49 +199,21 @@ public class WebRef2 extends FileReference {
     }
 
     @Override
-    public void inputStream(long l, boolean shallClose, @NotNull Callback<InputStream> callback) {
+    public void inputStream(long l, boolean b, @NotNull Callback<? super InputStream> callback) {
         if (false) invoke2(null, createByteStream(createBytes(0)), null); // ignore
         readStream(getAbsolutePath(), callback);
     }
 
     @Override
-    public void readText(@NotNull Callback<String> callback) {
+    public void readText(@NotNull Callback<? super String> callback) {
         if (false) invoke2(null, createString(createBytes(0)), null); // ignore
         readText(getAbsolutePath(), callback);
     }
 
     @Override
-    public void readBytes(@NotNull Callback<byte[]> callback) {
+    public void readBytes(@NotNull Callback<? super byte[]> callback) {
         if (false) invoke2(null, createBytes(0), null);
         readBytes(getAbsolutePath(), callback);
-    }
-
-    @NotNull
-    @Override
-    public InputStream inputStreamSync() {
-        throw warnSyncAccess();
-    }
-
-    private RuntimeException warnSyncAccess() {
-        return new RuntimeException("Web cannot request files synchronously: " + getAbsolutePath());
-    }
-
-    @NotNull
-    @Override
-    public String readTextSync() {
-        throw warnSyncAccess();
-    }
-
-    @NotNull
-    @Override
-    public byte[] readBytesSync() {
-        throw warnSyncAccess();
-    }
-
-    @NotNull
-    @Override
-    public ByteBuffer readByteBufferSync(boolean b) {
-        throw warnSyncAccess();
     }
 
     @Override

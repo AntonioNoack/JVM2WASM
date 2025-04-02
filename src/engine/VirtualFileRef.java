@@ -76,7 +76,7 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
-	public void inputStream(long lengthLimit, boolean close, @NotNull Callback<InputStream> callback) {
+	public void inputStream(long l, boolean b, @NotNull Callback<? super InputStream> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
@@ -127,7 +127,7 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
-	public void readText(@NotNull Callback<String> callback) {
+	public void readText(@NotNull Callback<? super String> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
@@ -165,7 +165,7 @@ public class VirtualFileRef extends FileReference {
 	}
 
 	@Override
-	public void readBytes(@NotNull Callback<byte[]> callback) {
+	public void readBytes(@NotNull Callback<? super byte[]> callback) {
 		String path = getAbsolutePath();
 		JavaIO.FileInfo fi = JavaIO.files.get(path);
 		if (fi != null) {
