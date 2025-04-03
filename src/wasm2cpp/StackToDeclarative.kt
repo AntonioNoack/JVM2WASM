@@ -41,7 +41,6 @@ import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
 import wasm2cpp.Assignments.MEMORY_DEPENDENCY
-import wasm2cpp.FunctionWriterOld.Companion.nextInstr
 import wasm2cpp.instr.*
 
 /**
@@ -57,6 +56,44 @@ class StackToDeclarative(
 
         private const val SYMBOLS = "+-*/:&|%<=>!"
         private val zeroForStaticInited = StackElement(i32, "0", emptyList(), true)
+
+        /**
+         * find the next instruction after i
+         * */
+        fun nextInstr(instructions: List<Instruction>, i: Int): Int {
+            for (j in i + 1 until instructions.size) {
+                val instr = instructions[j]
+                if (instr !is Comment) return j
+            }
+            return -1
+        }
+
+        private fun isNameOrNumber(expression: String): Boolean {
+            return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
+                    expression.toDoubleOrNull() != null
+        }
+
+        private fun isNumber(expression: String): Boolean {
+            for (i in expression.indices) {
+                val char = expression[i]
+                when (char) {
+                    in '0'..'9' -> {} // ok
+                    // difficult -> just use built-in, even if a little slow
+                    '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
+                    else -> return false
+                }
+            }
+            return true // all digits -> a number
+        }
+
+        fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
+            if (isNameOrNumber(expression.expr)) {
+                append(expression.expr)
+            } else {
+                append('(').append(expression.expr).append(')')
+            }
+            return this
+        }
     }
 
     private var localsByName: Map<String, LocalVariable> = emptyMap()
@@ -175,6 +212,25 @@ class StackToDeclarative(
             stack.add(stack.last())
             return
         }
+
+        if (funcName.startsWith("dup2i") || funcName.startsWith("dup2f")) {
+            val v0 = stack[stack.size - 2]
+            val v1 = stack.last()
+            stack.add(v0)
+            stack.add(v1)
+            return
+        }
+
+        // these aren't correct yet, because they cause a segfault :/
+        /*if (funcName.startsWith("dup_x1")) {
+            stack.add(stack.size - 2, stack.last())
+            return
+        }
+
+        if (funcName.startsWith("dup_x2")) {
+            stack.add(stack.size - 3, stack.last())
+            return
+        }*/
 
         val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else null
         val popped = popInReverse(funcName, params)
@@ -722,7 +778,7 @@ class StackToDeclarative(
         tmp.append(FieldSetInstr.getFieldAddr(if (isStatic) null else 0, i.fieldSig))
         tmp.append(')')
         val newValue = tmp.toString()
-        val combinedDependencies = if(self != null) self.names + MEMORY_DEPENDENCY else listOf(MEMORY_DEPENDENCY)
+        val combinedDependencies = if (self != null) self.names + MEMORY_DEPENDENCY else listOf(MEMORY_DEPENDENCY)
         if (self != null && self.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
             val newName = nextTemporaryVariable()
             append(Declaration(rType, newName, StackElement(rType, newValue, combinedDependencies, false)))

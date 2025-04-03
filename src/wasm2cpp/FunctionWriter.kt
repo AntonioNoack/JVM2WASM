@@ -8,8 +8,8 @@ import wasm.instr.*
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
-import wasm2cpp.FunctionWriterOld.Companion.appendExpr
-import wasm2cpp.FunctionWriterOld.Companion.nextInstr
+import wasm2cpp.StackToDeclarative.Companion.appendExpr
+import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import wasm2cpp.instr.*
 
 // todo inherit from this class and...
@@ -141,7 +141,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         }
 
         joinRedundantNullDeclarationsWithAssignments(function.body)
-        writeInstructions(function.body)
+        writeInstructions(function.body, true)
         writer.append("}\n")
     }
 
@@ -181,18 +181,22 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         append(";\n")
     }
 
-    private fun writeInstructions(instructions: List<Instruction>) {
+    private fun writeInstructions(instructions: List<Instruction>, isLastInstr: Boolean) {
         if (instructions.isEmpty()) return
         var i = 0
         while (i >= 0) {
             val ni = nextInstr(instructions, i)
             val pos0 = writer.size
-            val skipped = writeInstruction(instructions[i], instructions.getOrNull(ni))
+            val skipped = writeInstruction(
+                instructions[i],
+                instructions.getOrNull(ni),
+                isLastInstr && i == instructions.lastIndex
+            )
             if (skipped) {
                 // restore comments in-between, so file length stays comparable
                 val pos1 = writer.size
                 for (j in i + 1 until ni) {
-                    writeInstruction(instructions[j], null)
+                    writeInstruction(instructions[j], null, false)
                 }
                 // these should be inserted before, not after
                 swap(pos0, pos1)
@@ -215,7 +219,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         return name !in usageCounts
     }
 
-    private fun writeInstruction(instr: Instruction, nextInstr: Instruction?): Boolean {
+    private fun writeInstruction(instr: Instruction, nextInstr: Instruction?, isLastInstr: Boolean): Boolean {
         if (false) {
             begin().append("/* ").append(instr.javaClass.simpleName)
             if (instr is Declaration) writer.append(", ").append(instr.initialValue.names)
@@ -251,9 +255,18 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             }
             is Declaration -> {
                 begin()
-                if (isUnused(instr.name)) writer.append("// unused: ")
-                writer.append(instr.type).append(' ').append(instr.name)
-                    .append(" = ").append(instr.initialValue.expr).end()
+                val unused = isUnused(instr.name)
+                if (unused) writer.append("// unused: ")
+                val inlineReturn = !unused &&
+                        nextInstr is ExprReturn && nextInstr.results.size == 1 &&
+                        nextInstr.results[0].expr == instr.name
+                if (inlineReturn) {
+                    writer.append("return ")
+                } else {
+                    writer.append(instr.type).append(' ').append(instr.name).append(" = ")
+                }
+                writer.append(instr.initialValue.expr).end()
+                return inlineReturn
             }
             is Assignment -> {
                 begin()
@@ -267,26 +280,27 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             is ExprReturn -> {
                 val results = instr.results
                 assertEquals(function.results.size, results.size)
-                begin().append("return")
                 when (results.size) {
-                    0 -> {}
-                    1 -> writer.append(' ').append(results.first().expr)
+                    0 -> {
+                        if (!isLastInstr) begin().append("return").end()
+                        // else skipped return
+                    }
+                    1 -> begin().append("return ").append(results.first().expr).end()
                     else -> {
-                        writer.append(" { ")
+                        begin().append("return { ")
                         for (ri in results.indices) {
                             if (ri > 0) writer.append(", ")
                             writer.append(results[ri].expr)
                         }
-                        writer.append(" }")
+                        writer.append(" }").end()
                     }
                 }
-                writer.end()
             }
             Unreachable -> {
                 begin().append("unreachable(\"")
                     .append(function.funcName).append("\")").end()
             }
-            is ExprIfBranch -> writeIfBranch(instr, emptyList())
+            is ExprIfBranch -> writeIfBranch(instr, emptyList(), isLastInstr)
             is ExprCall -> {
 
                 val returnsImmediately =
@@ -364,27 +378,27 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             }
             is BlockInstr -> {
                 // write body
-                writeInstructions(instr.body)
+                writeInstructions(instr.body, isLastInstr)
                 // write label at end as jump target
                 begin().append(instr.label).append(":\n")
             }
             is LoopInstr -> {
                 begin().append(instr.label).append(": while (true) {\n")
                 depth++
-                writeInstructions(instr.body)
+                writeInstructions(instr.body, false)
                 depth--
                 begin().append("}\n")
             }
             is GotoInstr -> begin().append("goto ").append(instr.label).end()
             is BreakInstr -> begin().append("break").end()
-            is SwitchCase -> writeSwitchCase(instr)
+            is SwitchCase -> writeSwitchCase(instr, isLastInstr)
             is Comment -> begin().append("// ").append(instr.name).append('\n')
             else -> assertFail("Unknown instruction type ${instr.javaClass}")
         }
         return false
     }
 
-    private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>) {
+    private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>, isLastInstr: Boolean) {
         if (!writer.endsWith("else if(")) begin().append("if (")
         writer.append(instr.expr.expr).append(") {")
         for (i in extraComments.indices) {
@@ -393,7 +407,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         }
         writer.append('\n')
         depth++
-        writeInstructions(instr.ifTrue)
+        writeInstructions(instr.ifTrue, isLastInstr)
         depth--
         val ifFalse = instr.ifFalse
         if (ifFalse.isNotEmpty()) {
@@ -402,24 +416,26 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             val instrI = ifFalse.getOrNull(i)
             if (ni == -1 && instrI is ExprIfBranch) {
                 begin().append("} else if(")
-                writeIfBranch(instrI, ifFalse.subList(0, i))
-                writeInstructions(ifFalse.subList(i + 1, ifFalse.size))
+                // continue if-else-cascade
+                writeIfBranch(instrI, ifFalse.subList(0, i), isLastInstr)
+                // append any additional comments
+                writeInstructions(ifFalse.subList(i + 1, ifFalse.size), false)
             } else {
                 begin().append("} else {\n")
                 depth++
-                writeInstructions(ifFalse)
+                writeInstructions(ifFalse, isLastInstr)
                 depth--
                 begin().append("}\n")
             }
         } else begin().append("}\n")
     }
 
-    private fun writeSwitchCase(switchCase: SwitchCase) {
+    private fun writeSwitchCase(switchCase: SwitchCase, isLastInstr: Boolean) {
         val cases = switchCase.cases
         for (j in cases.indices) {
             begin().append("case").append(j).append(": {\n")
             depth++
-            writeInstructions(cases[j])
+            writeInstructions(cases[j], isLastInstr)
             depth--
             begin().append("}\n")
         }
