@@ -8,7 +8,6 @@ import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import utils.StringBuilder2
 import utils.WASMTypes.*
-import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
@@ -36,56 +35,92 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
-import wasm2cpp.instr.*
 
-/**
- * Converts stack-based style from WASM into the typical declarative style with inline expressions
- * */
-class StackToDeclarative(
+// todo inherit from this class and...
+//  - using HighLevel getters, setters and local-variables, pass around true structs
+//  - using that, generate JavaScript
+
+// todo enable all warnings, and clear them all for truly clean code
+//  - ignore not-used outputs from functions
+//  - mark functions as pure (compile-time constant)
+//  - inline pure functions (incl. potential reordering) into expressions
+//  - discard unused expressions
+
+class FunctionWriterOld(
     val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>
 ) {
 
     companion object {
-        private val LOGGER = LogManager.getLogger(StackToDeclarative::class)
-
+        private val LOGGER = LogManager.getLogger(FunctionWriterOld::class)
         private const val SYMBOLS = "+-*/:&|%<=>!"
-        private val zeroForStaticInited = StackElement(i32, "0", emptyList(), true)
+
+
+        private fun isNameOrNumber(expression: String): Boolean {
+            return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
+                    expression.toDoubleOrNull() != null
+        }
+
+        private fun isNumber(expression: String): Boolean {
+            for (i in expression.indices) {
+                val char = expression[i]
+                when (char) {
+                    in '0'..'9' -> {} // ok
+                    // difficult -> just use built-in, even if a little slow
+                    '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
+                    else -> return false
+                }
+            }
+            return true // all digits -> a number
+        }
+
+        fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
+            if (isNameOrNumber(expression.expr)) {
+                append(expression.expr)
+            } else {
+                append('(').append(expression.expr).append(')')
+            }
+            return this
+        }
     }
 
+    private var depth = 1
     private var localsByName: Map<String, LocalVariable> = emptyMap()
     private val tmpExprBuilder = StringBuilder2()
 
     private val stack = ArrayList<StackElement>()
     private var genI = 0
 
-    private val writer = ArrayList<ArrayList<Instruction>>()
-
-    fun append(instruction: Instruction) {
-        writer.last().add(instruction)
-    }
-
     lateinit var function: FunctionImpl
 
     private fun init(function: FunctionImpl) {
         this.function = function
+        depth = 1
         localsByName = function.locals
             .associateBy { it.name }
         stack.clear()
         genI = 0
     }
 
-    fun write(function: FunctionImpl): ArrayList<Instruction> {
+    fun write(function: FunctionImpl) {
 
         init(function)
 
-        writer.add(ArrayList())
+        defineFunctionHead(function, true)
+        writer.append(" {\n")
 
+        if (function.funcName.startsWith("static_")) {
+            begin().append("static bool wasCalled = false").end()
+            begin().append(
+                if (function.results.isEmpty()) "if(wasCalled) return"
+                else "if(wasCalled) return 0"
+            ).end()
+            begin().append("wasCalled = true").end()
+        }
         for (local in function.locals) {
             if (local.name == "lbl") continue
-            append(NullDeclaration(local.type, local.name))
+            begin().append(local.type).append(' ').append(local.name).append(" = 0").end()
         }
-
         // find first instruction worth writing:
         // we can skip all instructions just setting local variables to zero at the start, because we do that anyway
         var startI = 0
@@ -94,33 +129,39 @@ class StackToDeclarative(
             body[startI] is Const && (body[startI] as Const).value.toDouble() == 0.0 &&
             body[startI + 1] is LocalSet
         ) startI += 2
-
         if (!writeInstructions(body, startI, body.size)) {
             LOGGER.warn("Appended return to ${function.funcName}")
             writeInstruction(Return)
         }
-
-        assertEquals(1, writer.size)
-        return writer.removeLast()
+        writer.append("}\n")
     }
 
-    @Deprecated("")
-    private fun begin() {
+    private fun begin(): StringBuilder2 {
+        for (i in 0 until depth) writer.append("  ")
+        return writer
+    }
+
+    private fun StringBuilder2.end() {
+        append(";\n")
     }
 
     private fun nextTemporaryVariable(): String = "tmp${genI++}"
 
-    private fun popInReverse(funcName: String, types: List<String>): List<StackElement> {
+    private fun popInReverse(funcName: String, types: List<String>): List<String> {
         assertTrue(stack.size >= types.size) { "Expected $types for $funcName, got $stack" }
         val hasMismatch = types.indices.any { i -> types[i] != stack[i + stack.size - types.size].type }
         assertFalse(hasMismatch) { "Expected $types for $funcName, got $stack" }
-        val result = ArrayList<StackElement>(types.size)
+        val result = ArrayList<String>(types.size)
         for (ti in types.lastIndex downTo 0) {
-            val name = popElement(types[ti])
+            val name = pop(types[ti])
             result.add(name)
         }
         result.reverse()
         return result
+    }
+
+    private fun pop(type: String): String {
+        return popElement(type).expr
     }
 
     private fun popElement(type: String): StackElement {
@@ -154,8 +195,36 @@ class StackToDeclarative(
         // println("push -> $stack")
     }
 
-    private fun beginSetPoppedEnd(name: String, type: String) {
-        append(Assignment(name, popElement(type)))
+    private fun pushNew(type: String): String {
+        val name = nextTemporaryVariable()
+        push(type, name)
+        return name
+    }
+
+    private fun beginNew(type: String): StringBuilder2 {
+        val name = pushNew(type)
+        return begin().append(type).append(' ').append(name).append(" = ")
+    }
+
+    private fun beginSetEnd(name: String, type: String) {
+        begin().append(name).append(" = ").append(pop(type)).end()
+    }
+
+    private fun load(type: String, memoryType: String = type) {
+        val ptr = popElement(i32)
+        beginNew(type).append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
+            .appendExpr(ptr).append("))[0]").end()
+    }
+
+    private fun store(type: String, memoryType: String = type) {
+        val value = pop(type)
+        val ptr = popElement(i32)
+        begin().append("((").append(memoryType).append("*) ((uint8_t*) memory + (u32)")
+            .appendExpr(ptr).append("))[0] = ")
+        if (type != memoryType) {
+            writer.append('(').append(memoryType).append(") ")
+        }
+        writer.append(value).end()
     }
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
@@ -166,17 +235,13 @@ class StackToDeclarative(
         }
 
         if (funcName == "wasStaticInited") {
-            popElement(i32)
-            val newName = nextTemporaryVariable()
-            // kind of like NullDeclaration, except that we do want a value every time
-            append(Declaration(i32, newName, zeroForStaticInited))
-            push(i32, newName) // todo mark this as 0, so it can be immedately skipped
+            beginNew(i32).append("0").end()
             return
         }
 
         if (!enableCppTracing) {
             if (funcName == "stackPush" || funcName == "stackPop") {
-                if (funcName == "stackPush") popElement(i32)
+                if (funcName == "stackPush") pop(i32)
                 return
             }
         }
@@ -191,23 +256,37 @@ class StackToDeclarative(
             return
         }
 
-        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else null
-        val popped = popInReverse(funcName, params)
-        append(ExprCall(funcName, popped, results, tmp))
+        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else ""
+        begin()
+        if (results.isNotEmpty()) {
+            for (i in results.indices) {
+                writer.append(results[i])
+            }
+            writer.append(" ").append(tmp).append(" = ")
+        }
+
+        writePureCall(funcName, params)
+        writer.end()
 
         when (results.size) {
             0 -> {}
-            1 -> push(results[0], tmp!!)
+            1 -> push(results[0], tmp)
             else -> {
-                tmp!!
                 for (j in results.indices) {
-                    val newName = nextTemporaryVariable()
-                    val typeJ = results[j]
-                    append(Declaration(typeJ, newName, StackElement(typeJ, "$tmp.v$j", listOf(tmp), false)))
-                    push(typeJ, newName)
+                    beginNew(results[j]).append(tmp).append(".v").append(j).end()
                 }
             }
         }
+    }
+
+    private fun writePureCall(funcName: String, params: List<String>) {
+        writer.append(funcName).append('(')
+        val popped = popInReverse(funcName, params)
+        for (i in popped.indices) {
+            if (!writer.endsWith("(")) writer.append(", ")
+            writer.append(popped[i])
+        }
+        writer.append(')')
     }
 
     private fun pushInvalidResults(results: List<String>) {
@@ -220,16 +299,19 @@ class StackToDeclarative(
         return writeInstructions(instructions, 0, instructions.size)
     }
 
+    private fun getNumReturned(call: Instruction): Int {
+        return when (call) {
+            is Call -> functionsByName[call.name]!!.results.size
+            is CallIndirect -> call.type.results.size
+            else -> -1
+        }
+    }
+
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
         val assignments = Assignments.findAssignments(instructions)
         for (i in i0 until i1) {
             val instr = instructions[i]
-            if (instr is HighLevelInstruction) {
-                // good enough???
-                writeInstructions(instr.toLowLevel())
-            } else {
-                writeInstruction(instr, i, assignments)
-            }
+            writeInstruction(instr, i, assignments)
             if (instr.isReturning()) return true
         }
         return false
@@ -247,54 +329,23 @@ class StackToDeclarative(
         writeInstruction(i, Int.MAX_VALUE, null)
     }
 
-    private fun isNameOrNumber(expression: StackElement): Boolean {
-        return isNameOrNumber(expression.expr)
-    }
-
-    private fun isNameOrNumber(expression: String): Boolean {
-        return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
-                expression.toDoubleOrNull() != null
-    }
-
-    private fun isNumber(expression: String): Boolean {
-        for (i in expression.indices) {
-            val char = expression[i]
-            when (char) {
-                in '0'..'9' -> {} // ok
-                // difficult -> just use built-in, even if a little slow
-                '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
-                else -> return false
-            }
-        }
-        return true // all digits -> a number
-    }
-
-    private fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
-        if (isNameOrNumber(expression)) {
-            append(expression.expr)
-        } else {
-            append('(').append(expression.expr).append(')')
-        }
-        return this
-    }
-
     private fun unaryInstr(
         aType: String, rType: String,
         k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
         combine: (StackElement, StringBuilder2) -> Unit,
     ) {
         val a = popElement(aType)
-        val tmp = tmpExprBuilder
-        combine(a, tmp)
-        val newValue = tmp.toString()
         if (a.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
-            val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, emptyList(), false)))
-            push(rType, newName)
+            beginNew(rType)
+            combine(a, writer)
+            writer.end()
         } else {
-            pushWithNames(rType, newValue, a.names, isBoolean)
+            val tmp = tmpExprBuilder
+            combine(a, tmp)
+            val combined = tmp.toString()
+            tmp.clear()
+            pushWithNames(rType, combined, a.names, isBoolean)
         }
-        tmp.clear()
     }
 
     private fun binaryInstr(
@@ -304,19 +355,19 @@ class StackToDeclarative(
     ) {
         val i1 = popElement(aType)
         val i0 = popElement(bType)
-        val tmp = tmpExprBuilder
-        combine(i0, i1, tmp)
-        val newValue = tmp.toString()
         if (needsNewVariable(i0.names, assignments, k) ||
             needsNewVariable(i1.names, assignments, k)
         ) {
-            val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, emptyList(), false)))
-            push(rType, newName)
+            beginNew(rType)
+            combine(i0, i1, writer)
+            writer.end()
         } else {
-            pushElements(rType, newValue, listOf(i0, i1), isBoolean)
+            val tmp = tmpExprBuilder
+            combine(i0, i1, tmp)
+            val combined = tmp.toString()
+            tmp.clear()
+            pushElements(rType, combined, listOf(i0, i1), isBoolean)
         }
-        tmp.clear()
     }
 
     private fun writeGetInstruction(
@@ -324,9 +375,7 @@ class StackToDeclarative(
         k: Int, assignments: Map<String, Int>?
     ) {
         if (needsNewVariable(name, assignments, k)) {
-            val newName = nextTemporaryVariable()
-            append(Declaration(type, newName, StackElement(type, name, emptyList(), false)))
-            push(type, newName)
+            beginNew(type).append(name).end()
         } else {
             push(type, name)
         }
@@ -389,19 +438,6 @@ class StackToDeclarative(
         }
     }
 
-    private fun load(type: String, memoryType: String = type) {
-        val ptr = popElement(ptrType)
-        val newName = nextTemporaryVariable()
-        append(CppLoadInstr(type, newName, memoryType, ptr))
-        push(type, newName)
-    }
-
-    private fun store(type: String, memoryType: String = type) {
-        val value = popElement(type)
-        val ptr = popElement(ptrType)
-        append(CppStoreInstr(type, memoryType, ptr, value))
-    }
-
     private fun writeInstruction(i: Instruction, k: Int, assignments: Map<String, Int>?) {
         when (i) {
             is ParamGet -> {
@@ -425,26 +461,25 @@ class StackToDeclarative(
                 val index = i.index
                 val type = function.params[index]
                 // assertEquals(i.name, type.name) // todo why is the name incorrect???
-                beginSetPoppedEnd(type.name, type.wasmType)
+                beginSetEnd(type.name, type.wasmType)
             }
             is LocalSet -> {
                 val local = localsByName[i.name]
                     ?: throw IllegalStateException("Missing local '${i.name}'")
                 if (i.name != "lbl") {
-                    beginSetPoppedEnd(local.name, local.type)
+                    beginSetEnd(local.name, local.type)
                 } else {
                     // unfortunately can still happen
-                    val value = popElement(i32).expr
-                    append(Comment("// skipping lbl = $value"))
+                    val value = pop(i32)
+                    begin().append("// skipping lbl = $value").append('\n')
                 }
             }
             is GlobalSet -> {
                 val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
-                beginSetPoppedEnd(global.fullName, global.wasmType)
+                beginSetEnd(global.fullName, global.wasmType)
             }
-            // loading and storing
-            // loading and storing
+            // loading
             I32Load8S -> load(i32, "int8_t")
             I32Load8U -> load(i32, "uint8_t")
             I32Load16S -> load(i32, "int16_t")
@@ -482,16 +517,28 @@ class StackToDeclarative(
                 }
             }
             Return -> {
-                val results = function.results
-                if (results.isNotEmpty()) {
-                    append(ExprReturn(popInReverse(function.funcName, results)))
-                } else {
-                    append(Return)
+                val offset = stack.size - function.results.size
+                assertTrue(offset >= 0) { "Missing ${-offset} return values" }
+                begin().append("return")
+                when (function.results.size) {
+                    0 -> {}
+                    1 -> writer.append(' ').append(stack[offset].expr)
+                    else -> {
+                        writer.append(" { ")
+                        for (ri in function.results.indices) {
+                            if (ri > 0) writer.append(", ")
+                            writer.append(stack[ri + offset].expr)
+                        }
+                        writer.append(" }")
+                    }
                 }
+                writer.end()
             }
-            Unreachable -> append(i)
+            Unreachable -> {
+                begin().append("unreachable(\"")
+                    .append(function.funcName).append("\")").end()
+            }
             is Const -> {
-                // will be integrated into expressions
                 when (i.type) {
                     ConstType.F32 -> pushConstant(i.type.wasmType, i.value.toString() + "f")
                     ConstType.F64 -> pushConstant(i.type.wasmType, i.value.toString())
@@ -558,7 +605,7 @@ class StackToDeclarative(
             is IfBranch -> {
 
                 // get running parameters...
-                val condition = popElement(i32)
+                val condition = pop(i32)
                 val baseSize = stack.size - i.params.size
 
                 // confirm parameters to branch are correct
@@ -571,10 +618,12 @@ class StackToDeclarative(
                 for (j in i.params.indices) {
                     val j1 = baseSize + j
                     val stackJ = stack[j1]
-                    if (!isNameOrNumber(stackJ)) {
-                        val newName = nextTemporaryVariable()
-                        append(Declaration(stackJ.type, newName, stackJ))
-                        stack[j1] = StackElement(stackJ.type, newName, emptyList(), false)
+                    val code = stackJ.expr
+                    if (!isNameOrNumber(code)) {
+                        val name = nextTemporaryVariable()
+                        begin().append(stackJ.type).append(' ').append(name).append(" = ")
+                            .append(code).end()
+                        stack[j1] = StackElement(stackJ.type, name, emptyList(), false)
                     }
                 }
                 /*val paramPopped = popInReverse(function.funcName, i.params)
@@ -593,9 +642,11 @@ class StackToDeclarative(
                     i.results.map { nextTemporaryVariable() }
                 } else emptyList()
                 if (needsResults) for (ri in resultVars.indices) {
-                    append(NullDeclaration(i.results[ri], resultVars[ri]))
+                    begin().append(i.results[ri]).append(' ')
+                        .append(resultVars[ri]).append(" = 0").end()
                 }
 
+                begin().append("if (").append(condition).append(") {\n")
                 val stackSave = ArrayList(stack)
                 stackSave.subList(baseSize, stackSave.size).clear()
                 stack.subList(0, baseSize).clear()
@@ -610,35 +661,35 @@ class StackToDeclarative(
                     // resultVars[i] = stack[i].name
                     if (needsResults) {
                         for (j in i.results.lastIndex downTo 0) {
-                            val srcVar = popElement(i.results[j])
+                            val srcVar = pop(i.results[j])
                             val dstVar = resultVars[j]
-                            append(Assignment(dstVar, srcVar))
+                            begin().append(dstVar).append(" = ").append(srcVar).end()
                         }
                     }
                 }
 
                 fun writeBranchContents(instructions: List<Instruction>) {
+                    depth++
                     writeInstructions(instructions)
                     packResultsIntoOurStack(instructions)
+                    depth--
                 }
-
-                val newIfTrue = ArrayList<Instruction>()
-                writer.add(newIfTrue)
 
                 writeBranchContents(i.ifTrue)
 
-                writer.removeLast()
-                val newIfFalse = ArrayList<Instruction>()
-                writer.add(newIfFalse)
+                if (i.results.isEmpty() && i.ifFalse.isEmpty()) {
+                    begin().append("}\n")
+                } else {
+                    begin().append("} else {\n")
 
-                // reset stack to before "if"
-                stack.clear()
-                stack.addAll(stackForReset)
+                    // reset stack to before "if"
+                    stack.clear()
+                    stack.addAll(stackForReset)
 
-                writeBranchContents(i.ifFalse)
+                    writeBranchContents(i.ifFalse)
 
-                writer.removeLast()
-                append(ExprIfBranch(condition, newIfTrue, newIfFalse))
+                    begin().append("}\n")
+                }
 
                 // rescue stack
                 stack.clear()
@@ -652,8 +703,6 @@ class StackToDeclarative(
                 }
             }
             is Call -> {
-                // todo function calls can be inlined into expressions, if they aren't native, and they don't write (recursively)
-                //  -> find these methods, so we can inline them
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
                 writeCall(func.funcName, func.params.map { it.wasmType }, func.results)
@@ -662,10 +711,32 @@ class StackToDeclarative(
                 val type = i.type
                 val tmpType = nextTemporaryVariable()
                 val tmpVar = nextTemporaryVariable()
-                append(FunctionTypeDefinition(type, tmpType, tmpVar, popElement(i32)))
+                // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
+                begin().append("using ").append(tmpType).append(" = ")
+                if (type.results.isEmpty()) {
+                    writer.append("void")
+                } else {
+                    for (ri in type.results.indices) {
+                        writer.append(type.results[ri])
+                    }
+                }
+                writer.append("(*)(")
+                for (pi in type.params.indices) {
+                    if (pi > 0) writer.append(", ")
+                    writer.append(type.params[pi])
+                }
+                writer.append(")").end()
+                // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
+                begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
+                    .append(tmpType).append(">(indirect[").append(pop("i32")).append("])").end()
                 writeCall(tmpVar, type.params, type.results)
             }
-            is BlockInstr -> append(i)
+            is BlockInstr -> {
+                // write body
+                writeInstructions(i.body)
+                // write label at end as jump target
+                begin().append(i.label).append(":\n")
+            }
             is LoopInstr -> {
                 val firstInstr = i.body.firstOrNull()
                 if (i.body.size == 1 && firstInstr is SwitchCase &&
@@ -675,14 +746,14 @@ class StackToDeclarative(
                 } else {
                     val resultNames = i.results.map { nextTemporaryVariable() }
                     for (j in i.results.indices) {
-                        append(NullDeclaration(i.results[j], resultNames[j]))
+                        begin().append(i.results[j]).append(' ')
+                            .append(resultNames[j]).append(" = 0").end()
                     }
-
-                    val newLoop = ArrayList<Instruction>()
-                    writer.add(newLoop)
-
+                    // to do check if the label is used
+                    begin().append(i.label).append(": while (true) {\n")
                     val stackSave = ArrayList(stack)
                     stack.clear()
+                    depth++
                     val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
                     val i1 = i.body.size - lastIsContinue.toInt()
                     writeInstructions(i.body, 0, i1)
@@ -690,39 +761,50 @@ class StackToDeclarative(
                     if (!lastIsContinue) {
                         // save results
                         for (j in i.results.lastIndex downTo 0) {
-                            append(Assignment(resultNames[j], popElement(i.results[j])))
+                            begin().append(resultNames[j]).append(" = ")
+                                .append(pop(i.results[j])).end()
                         }
-                        append(BreakInstr)
+                        begin().append("break").end()
                     } else assertTrue(i.results.isEmpty())
 
+                    depth--
                     stack.clear()
                     stack.addAll(stackSave)
                     for (j in i.results.indices) {
                         push(i.results[j], resultNames[j])
                     }
-
-                    writer.removeLast()
-                    append(LoopInstr(i.label, newLoop, i.params, i.results))
+                    begin().append("}\n")
                 }
             }
             is Jump -> {
                 // C++ doesn't have proper continue@label/break@label, so use goto
-                append(GotoInstr(i.label))
+                begin().append("goto ").append(i.label).end()
             }
             is JumpIf -> {
                 // C++ doesn't have proper continue@label/break@label, so use goto
-                val condition = popElement("i32")
-                append(ExprIfBranch(condition, listOf(GotoInstr(i.label)), emptyList()))
+                val condition = pop("i32")
+                begin().append("if (").append(condition).append(") {\n")
+                depth++
+                begin().append("goto ").append(i.label).end()
+                depth--
+                begin().append("}\n")
             }
             is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
-            is Comment -> append(i)
+            is Comment -> {
+                begin().append("// ").append(i.name).append('\n')
+            }
+            is HighLevelInstruction -> {
+                for (low in i.toLowLevel()) {
+                    writeInstruction(low)
+                }
+            }
             else -> assertFail("Unknown instruction type ${i.javaClass}")
         }
     }
 
     /**
-     * find the next instruction after i; or return -1
+     * find the next instruction after i
      * */
     private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
         for (j in i + 1 until instructions.size) {
@@ -737,6 +819,7 @@ class StackToDeclarative(
         val cases = switchCase.cases
         val label = switchCase.label
         assertTrue(stack.isEmpty()) { "Expected empty stack, got $stack" }
+        depth++
 
         fun getBranchIdx(instructions: List<Instruction>): Int {
             val first = instructions.firstOrNull()
@@ -745,12 +828,11 @@ class StackToDeclarative(
             ) first.value as Int else assertFail()
         }
 
-        val newCases = ArrayList<ArrayList<Instruction>>()
         for (j in cases.indices) {
             stack.clear()
-            val newCase = ArrayList<Instruction>()
-            writer.add(newCase)
-            newCases.add(newCase)
+            depth--
+            begin().append("case").append(j).append(": {\n")
+            depth++
 
             var hadReturn = false
             val instructions = cases[j]
@@ -781,32 +863,29 @@ class StackToDeclarative(
                             // implement branch-goto
                             val trueCase = getBranchIdx(instr.ifTrue)
                             val falseCase = getBranchIdx(instr.ifFalse)
-                            val branch = popElement(i32)
+                            val branch = pop(i32)
                             saveStack()
-                            append(
-                                ExprIfBranch(
-                                    branch,
-                                    listOf(GotoInstr("case$trueCase")),
-                                    listOf(GotoInstr("case$falseCase"))
-                                )
-                            )
+                            begin().append("if (").append(branch).append(") {\n")
+                            begin().append("  goto case").append(trueCase).end()
+                            begin().append("} else {\n")
+                            begin().append("  goto case").append(falseCase).end()
+                            begin().append("}\n")
                         }
                         is Const -> {
                             // implement simple goto
                             saveStack()
                             val targetCase = getBranchIdx(listOf(instr))
-                            append(GotoInstr("case$targetCase"))
+                            begin().append("goto case").append(targetCase).end()
                         }
                         I32EQ, I32NE, I32EQZ,
                         I32LES, I32LTS, I32GTS, I32GES -> {
                             writeInstruction(instr)
-                            append(
-                                ExprIfBranch(
-                                    popElement(i32),
-                                    listOf(GotoInstr("case1")),
-                                    listOf(GotoInstr("case0"))
-                                )
-                            )
+                            val branch = pop(i32)
+                            begin().append("if (").append(branch).append(") {\n")
+                            begin().append("  goto case1").end()
+                            begin().append("} else {\n")
+                            begin().append("  goto case0").end()
+                            begin().append("}\n")
                         }
                         else -> throw NotImplementedError("Unknown symbol before switch-label: $instr")
                     }
@@ -824,8 +903,10 @@ class StackToDeclarative(
 
             assertTrue(hadReturn)
 
-            writer.removeLast()
+            depth--
+            begin().append("}\n")
+            depth++
         }
-        append(SwitchCase(switchCase.label, newCases, switchCase.params, switchCase.results))
+        depth--
     }
 }

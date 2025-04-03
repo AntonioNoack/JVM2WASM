@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import me.anno.utils.assertions.assertEquals
 import utils.Param
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
@@ -36,12 +37,25 @@ fun defineFunctionImplementations(
     writer.append("#include <cmath> // trunc, ...\n")
     val stackToDeclarative = StackToDeclarative(globals, functionsByName)
     val functionWriter = FunctionWriter(globals)
+    val functionWriterOld = FunctionWriterOld(globals, functionsByName)
     for (fi in functions.indices) {
         val function = functions[fi]
         val pos0 = writer.size
         try {
             val declarative = stackToDeclarative.write(function)
             functionWriter.write(function.withBody(declarative))
+
+            val pos1 = writer.size
+            functionWriterOld.write(function)
+            val pos2 = writer.size
+
+            assertEquals(
+                writer.toString(pos1, pos2),
+                writer.toString(pos0, pos1),
+            )
+
+            writer.size = pos1
+
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)

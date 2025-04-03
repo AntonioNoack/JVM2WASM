@@ -9,6 +9,7 @@ import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
+import wasm2cpp.FunctionWriterOld.Companion.appendExpr
 import wasm2cpp.instr.*
 
 // todo inherit from this class and...
@@ -88,11 +89,11 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             is CppLoadInstr -> {
                 begin().append(i.type).append(' ').append(i.newName).append(" = ")
                     .append("((").append(i.memoryType).append("*) ((uint8_t*) memory + (u32)")
-                    .append(i.addrExpr.expr).append("))[0]").end()
+                    .appendExpr(i.addrExpr).append("))[0]").end()
             }
             is CppStoreInstr -> {
                 begin().append("((").append(i.memoryType).append("*) ((uint8_t*) memory + (u32)")
-                    .append(i.addrExpr.expr).append("))[0] = ")
+                    .appendExpr(i.addrExpr).append("))[0] = ")
                 if (i.type != i.memoryType) {
                     writer.append('(').append(i.memoryType).append(") ")
                 }
