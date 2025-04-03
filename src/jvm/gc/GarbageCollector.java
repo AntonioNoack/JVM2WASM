@@ -245,7 +245,7 @@ public class GarbageCollector {
         boolean wasReferenced = weakRef != null;
         unlockMallocMutex();
         while (weakRef != null) {
-            weakRef.address = 0;
+            weakRef.address = null;
             @SuppressWarnings("rawtypes")
             WeakRef nextRef = weakRef.next;
             weakRef.next = null; // doesn't matter anymore, so unlink them for GC

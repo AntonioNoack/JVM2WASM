@@ -714,8 +714,22 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
-    public static Annotation Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Object self, Object annotClass) {
-        // todo implement properly
+    public static Annotation Class_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Class<?> self, Class<?> annotationClass) {
+        for (Annotation instance : self.getAnnotations()) {
+            if (annotationClass.isInstance(instance)) {
+                return instance;
+            }
+        }
+        return null;
+    }
+
+    @Alias(names = "java_lang_reflect_Field_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation")
+    public static Annotation Field_getAnnotation_Ljava_lang_ClassLjava_lang_annotation_Annotation(Field self, Class<?> annotationClass) {
+        for (Annotation instance : self.getAnnotations()) {
+            if (annotationClass.isInstance(instance)) {
+                return instance;
+            }
+        }
         return null;
     }
 

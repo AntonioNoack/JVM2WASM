@@ -746,7 +746,6 @@ void jvm_LWJGLxGLFW_setTitle_Ljava_lang_StringV(i32 str) {
 }
 
 void org_lwjgl_glfw_GLFW_glfwSwapInterval_IV(i32 interval) {
-    std::cout << "calling swapInterval(" << interval << ")" << std::endl;
     glfwSwapInterval(interval);
 }
 

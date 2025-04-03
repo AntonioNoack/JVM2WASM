@@ -3,17 +3,18 @@ package jvm.gc;
 import annotations.Alias;
 import annotations.Export;
 import annotations.NoThrow;
+import annotations.UnsafePointerField;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.gc.GarbageCollector.GC_OFFSET;
-import static jvm.gc.GarbageCollector.iteration;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.JavaReflect.getFields;
 import static jvm.NativeLog.log;
+import static jvm.gc.GarbageCollector.GC_OFFSET;
+import static jvm.gc.GarbageCollector.iteration;
 import static utils.StaticClassIndices.OBJECT_ARRAY;
 
 /**
@@ -69,6 +70,15 @@ public class GCTraversal {
         }
     }
 
+    private static boolean isCollectable(Field field) {
+        return !Modifier.isNative(field.getModifiers()) &&
+                field.getAnnotation(UnsafePointerField.class) == null;
+    }
+
+    private static boolean isStatic(Field field) {
+        return Modifier.isStatic(field.getModifiers());
+    }
+
     @NoThrow
     private static int findFieldsByClass(Class<Object> clazz, int classId) {
 
@@ -77,10 +87,8 @@ public class GCTraversal {
         int staticFieldCtr = 0;
 
         for (Field field : fields) {
-            int mods = field.getModifiers();
-            // check if type is relevant
-            if (!Modifier.isNative(mods)) {
-                if (Modifier.isStatic(mods)) {
+            if (isCollectable(field)) {
+                if (isStatic(field)) {
                     staticFieldCtr++;
                 } else {
                     instanceFieldCtr++;
@@ -105,9 +113,7 @@ public class GCTraversal {
                 instanceFieldCtr += parentFieldsLength;
             }
             for (Field field : fields) {
-                int mods = field.getModifiers();
-                // check if type is relevant
-                if (!Modifier.isNative(mods) && !Modifier.isStatic(mods)) {// masking could be optimized
+                if (isCollectable(field) && !isStatic(field)) {
                     fieldOffsets[instanceFieldCtr++] = getFieldOffset(field);
                 }
             }
@@ -137,9 +143,7 @@ public class GCTraversal {
             // count fields
             int staticOffset = findStatic(classId, 0);
             for (Field field : fields) {
-                int mods = field.getModifiers();
-                // check if type is relevant
-                if (!Modifier.isNative(mods) && Modifier.isStatic(mods)) {
+                if (isCollectable(field) && isStatic(field)) {
                     staticFields[staticFieldCtr++] = staticOffset + getFieldOffset(field);
                 }
             }

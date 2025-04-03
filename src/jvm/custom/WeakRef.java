@@ -1,5 +1,7 @@
 package jvm.custom;
 
+import annotations.UnsafePointerField;
+
 import java.lang.ref.ReferenceQueue;
 
 import static jvm.gc.GarbageCollector.lockMallocMutex;
@@ -11,21 +13,22 @@ public class WeakRef<V> {
 
     public static final LongHashMap<WeakRef> weakRefInstances = new LongHashMap<>(256);
 
-    // todo this address needs to become a long for 64-bit support...
-    public long address;
+    @UnsafePointerField
+    public V address;
+
     public WeakRef next; // linked-list of references to that instance
 
     public WeakRef(V instance) {
-        address = getAddr(instance);
+        address = instance;
         if (isAfterAllocationStart()) {
             lockMallocMutex();
-            next = weakRefInstances.put(address, this);
+            next = weakRefInstances.put(getAddr(address), this);
             unlockMallocMutex();
         } // else don't register, because instance isn't tracked
     }
 
     private boolean isAfterAllocationStart() {
-        return isDynamicInstance(ptrTo(address));
+        return isDynamicInstance(address);
     }
 
     @SuppressWarnings("unused")
@@ -35,7 +38,7 @@ public class WeakRef<V> {
     }
 
     public V get() {
-        return ptrTo(address);
+        return address;
     }
 
 }

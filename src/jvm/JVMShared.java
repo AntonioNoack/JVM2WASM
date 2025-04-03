@@ -55,10 +55,6 @@ public class JVMShared {
     public static native boolean unsignedLessThanEqual(int a, int b);
 
     @NoThrow
-    @WASM(code = "i32.gt_u")
-    public static native boolean unsignedGreaterThan(int a, int b);
-
-    @NoThrow
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(int a, int b);
 
