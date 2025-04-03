@@ -56,10 +56,6 @@ fun jvm2wasmTyped(d: String): String = when (d) {
     else -> ptrType
 }
 
-fun jvm2wasmTypedNullable(d: String?): String? =
-    if (d != null) jvm2wasmTyped(d) else null
-
-
 fun storageSize(d: String): Int = when (d) {
     "boolean", "byte" -> 1
     "char", "short" -> 2

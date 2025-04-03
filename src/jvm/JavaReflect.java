@@ -83,12 +83,6 @@ public class JavaReflect {
         return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
     }
 
-    @Alias(names = "java_lang_Class_getName0_Ljava_lang_String")
-    public static String Class_getName0_Ljava_lang_String() {
-        // should never be called, because classes get set their name at compile-time
-        return "?";
-    }
-
     @Alias(names = "java_lang_Class_isInterface_Z")
     public static boolean Class_isInterface_Z(Class<Object> self) {
         // todo confirm this flag is saved like that
@@ -762,7 +756,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Executable_isSynthetic_Z")
-    public static boolean Executable_isSynthetic_Z(Object self) {
+    public static boolean Executable_isSynthetic_Z(Executable self) {
         // we could return here true for lambdas...
         return false;
     }
@@ -785,6 +779,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_reflect_AccessibleObject_isAccessible_Z")
     public static boolean AccessibleObject_isAccessibleZ(Object self) {
+        // Safety? What's that??? 😆
         return true;
     }
 
