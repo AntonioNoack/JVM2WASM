@@ -36,16 +36,9 @@ import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
 
-// todo inherit from this class and...
-//  - using HighLevel getters, setters and local-variables, pass around true structs
-//  - using that, generate JavaScript
-
-// todo enable all warnings, and clear them all for truly clean code
-//  - ignore not-used outputs from functions
-//  - mark functions as pure (compile-time constant)
-//  - inline pure functions (incl. potential reordering) into expressions
-//  - discard unused expressions
-
+/**
+ * Was used for validating C++-correctness.
+ * */
 class FunctionWriterOld(
     val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>
@@ -54,7 +47,6 @@ class FunctionWriterOld(
     companion object {
         private val LOGGER = LogManager.getLogger(FunctionWriterOld::class)
         private const val SYMBOLS = "+-*/:&|%<=>!"
-
 
         private fun isNameOrNumber(expression: String): Boolean {
             return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||

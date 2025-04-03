@@ -1,8 +1,8 @@
 package highlevel
 
 import alwaysUseFieldCalls
-import interpreter.WASMEngine
 import highlevel.FieldSetInstr.Companion.getFieldAddr
+import interpreter.WASMEngine
 import utils.FieldSig
 import utils.is32Bits
 import wasm.instr.Call
@@ -26,7 +26,7 @@ class FieldGetInstr(
     }
 
     override fun toLowLevel(): List<Instruction> {
-        val offset = getFieldAddr(null, fieldSig)
+        val offset = getFieldAddr(if (fieldSig.isStatic) null else 0, fieldSig)
         return when {
             alwaysUseFieldCalls -> listOf(i32Const(offset), loadCall)
             fieldSig.isStatic -> listOf(ptrConst(offset), loadInstr)

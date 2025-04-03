@@ -4,8 +4,7 @@ import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
 import hIndex
 import hierarchy.HierarchyIndex.methodAliases
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
+import highlevel.HighLevelInstruction
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
@@ -18,24 +17,10 @@ import translator.MethodTranslator.Companion.isLookingAtSpecial
 import useWASMExceptions
 import utils.Builder
 import utils.MethodSig
-import utils.WASMTypes.*
+import utils.WASMTypes.i32
 import utils.helperFunctions
 import utils.ptrType
 import wasm.instr.*
-import wasm.instr.Instructions.F32Load
-import wasm.instr.Instructions.F32Store
-import wasm.instr.Instructions.F64Load
-import wasm.instr.Instructions.F64Store
-import wasm.instr.Instructions.I32Load
-import wasm.instr.Instructions.I32Load16S
-import wasm.instr.Instructions.I32Load16U
-import wasm.instr.Instructions.I32Load8S
-import wasm.instr.Instructions.I32Load8U
-import wasm.instr.Instructions.I32Store
-import wasm.instr.Instructions.I32Store16
-import wasm.instr.Instructions.I32Store8
-import wasm.instr.Instructions.I64Load
-import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
@@ -157,134 +142,148 @@ object StackValidator {
             if (print && i !is IfBranch && i !is LoopInstr && i !is SwitchCase) {
                 println("  $stack, $i")
             }
-            when (i) {
-                is LocalGet -> stack.push(
-                    localVarTypes[i.name]
-                        ?: throw IllegalStateException("Missing $i")
-                )
-                is LocalSet -> stack.pop(
-                    localVarTypes[i.name]
-                        ?: throw IllegalStateException("Missing $i"),
-                    i.name
-                )
-                is ParamGet -> stack.push(paramsTypes[i.index])
-                is ParamSet -> stack.pop(paramsTypes[i.index])
-                is GlobalGet -> stack.push(i32)
-                is GlobalSet -> stack.pop(i32)
-                Return -> {
-                    assertTrue(stack.endsWith(returnResults), "Stack incorrect, $returnResults vs $stack")
-                    return // done :)
-                }
-                Unreachable -> {
-                    return // done :)
-                }
-                is IfBranch -> {
-                    stack.pop(i32)
-                    for (param in i.params.reversed()) {
-                        stack.pop(param)
-                    }
-                    validateStack3(sig, i.ifTrue, i.params, i.results, returnResults, localVarTypes, paramsTypes)
-                    validateStack3(sig, i.ifFalse, i.params, i.results, returnResults, localVarTypes, paramsTypes)
-                    if (i.isReturning()) {
-                        // done :)
-                        return
-                    } else {
-                        stack.addAll(i.results)
-                    }
-                }
-                is Const -> stack.push(i.type.wasmType)
-                is Comment -> {} // ignored
-                is UnaryInstruction -> {
-                    if (stack.lastOrNull() != i.popType) {
-                        throw IllegalStateException("Cannot pop #$j $i from $stack")
-                    }
-                    stack.pop(i.popType).push(i.pushType)
-                }
-                is BinaryInstruction -> stack.pop(i.popType).pop(i.popType).push(i.pushType)
-                is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)
-                Drop -> stack.removeLast()
-                is NumberCastInstruction -> stack.pop(i.popType).push(i.pushType)
-                is Call -> {
-                    // println("Calling $i on $stack")
-                    val func =
-                        methodAliases[i.name]
-                            ?: implementedMethods[i.name]
-                            ?: helperFunctions[i.name]
-                            ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == i.name }
-                    if (func == null) {
-                        LOGGER.warn("Missing ${i.name}, skipping validation")
-                        return
-                    }
-                    // drop all arguments in reverse order
-                    val callParams = getCallParams(func)
-                    for (j in callParams.lastIndex downTo 0) { // last one is return type
-                        stack.pop(callParams[j])
-                    }
-                    // drop "self"
-                    if (hasSelfParam(func)) {
-                        stack.pop(ptrType)
-                    }
-                    // push return values
-                    val canThrow = !useWASMExceptions && canThrowError1(func)
-                    val retTypes = getRetType(func, canThrow)
-                    if (print) println("call ${i.name} -> $func -> $retTypes")
-                    stack.addAll(retTypes)
-                }
-                is CallIndirect -> {
-                    stack.pop(i32) // pop method pointer
-                    val params1 = i.type.params
-                    for (k in params1.lastIndex downTo 0) {
-                        stack.pop(params1[k])
-                    }
-                    stack.addAll(i.type.results)
-                }
-                is BlockInstr -> {
-                    // to do confirm Jump[If](BlockInstr) has correct stack
-                    assertTrue(stack.endsWith(params))
-                    validateStack3(
-                        sig, i.body, stack, i.results, returnResults,
-                        localVarTypes, paramsTypes
-                    )
-                    if (i.isReturning()) return // done
-                }
-                is LoopInstr -> {
-                    validateStack3(
-                        sig, i.body, stack, i.results, returnResults,
-                        localVarTypes, paramsTypes
-                    )
-                    if (i.isReturning()) return // done
-                }
-                is Jump -> {
-                    // todo check results match stack
-                    return
-                }
-                is JumpIf -> {
-                    stack.pop(i32)
-                    // todo check results match stack
-                }
-                is LoadInstr -> stack.pop(ptrType).push(i.wasmType)
-                is StoreInstr -> stack.pop(i.wasmType).pop(ptrType)
-                is SwitchCase -> {
-                    assertTrue(stack.isEmpty())
-                    for (case in i.cases) {
-                        validateStack3(
-                            sig, case, emptyList(), emptyList(), returnResults,
-                            localVarTypes, paramsTypes
-                        )
-                    }
-                }
-                is FieldGetInstr -> {
-                    if (!i.fieldSig.isStatic) stack.pop(ptrType)
-                    stack.push(i.loadInstr.wasmType)
-                }
-                is FieldSetInstr -> {
-                    stack.pop(i.storeInstr.wasmType)
-                    if (!i.fieldSig.isStatic) stack.pop(ptrType)
-                }
-                else -> throw NotImplementedError(i.toString())
+            if (validateStackStep(sig, params, returnResults, localVarTypes, paramsTypes, stack, print, j, i)) {
+                return
             }
         }
         assertTrue(stack.endsWith(normalResults), "Stack incorrect, $normalResults vs $stack")
+    }
+
+    private fun validateStackStep(
+        sig: MethodSig,
+        params: List<String>,
+        returnResults: List<String>,
+        localVarTypes: Map<String, String>, paramsTypes: List<String>,
+        stack: ArrayList<String>, print: Boolean, j: Int, i: Instruction
+    ): Boolean {
+        when (i) {
+            is LocalGet -> stack.push(
+                localVarTypes[i.name]
+                    ?: throw IllegalStateException("Missing $i")
+            )
+            is LocalSet -> stack.pop(
+                localVarTypes[i.name]
+                    ?: throw IllegalStateException("Missing $i"),
+                i.name
+            )
+            is ParamGet -> stack.push(paramsTypes[i.index])
+            is ParamSet -> stack.pop(paramsTypes[i.index])
+            is GlobalGet -> stack.push(i32)
+            is GlobalSet -> stack.pop(i32)
+            Return -> {
+                assertTrue(stack.endsWith(returnResults), "Stack incorrect, $returnResults vs $stack")
+                return true// done :)
+            }
+            Unreachable -> {
+                return true// done :)
+            }
+            is IfBranch -> {
+                stack.pop(i32)
+                for (param in i.params.reversed()) {
+                    stack.pop(param)
+                }
+                validateStack3(sig, i.ifTrue, i.params, i.results, returnResults, localVarTypes, paramsTypes)
+                validateStack3(sig, i.ifFalse, i.params, i.results, returnResults, localVarTypes, paramsTypes)
+                if (i.isReturning()) {
+                    // done :)
+                    return true
+                } else {
+                    stack.addAll(i.results)
+                }
+            }
+            is Const -> stack.push(i.type.wasmType)
+            is Comment -> {} // ignored
+            is UnaryInstruction -> {
+                if (stack.lastOrNull() != i.popType) {
+                    throw IllegalStateException("Cannot pop #$j $i from $stack")
+                }
+                stack.pop(i.popType).push(i.pushType)
+            }
+            is BinaryInstruction -> stack.pop(i.popType).pop(i.popType).push(i.pushType)
+            is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)
+            Drop -> stack.removeLast()
+            is NumberCastInstruction -> stack.pop(i.popType).push(i.pushType)
+            is Call -> {
+                // println("Calling $i on $stack")
+                val func =
+                    methodAliases[i.name]
+                        ?: implementedMethods[i.name]
+                        ?: helperFunctions[i.name]
+                        ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == i.name }
+                if (func == null) {
+                    LOGGER.warn("Missing ${i.name}, skipping validation")
+                    return true
+                }
+                // drop all arguments in reverse order
+                val callParams = getCallParams(func)
+                for (j in callParams.lastIndex downTo 0) { // last one is return type
+                    stack.pop(callParams[j])
+                }
+                // drop "self"
+                if (hasSelfParam(func)) {
+                    stack.pop(ptrType)
+                }
+                // push return values
+                val canThrow = !useWASMExceptions && canThrowError1(func)
+                val retTypes = getRetType(func, canThrow)
+                if (print) println("call ${i.name} -> $func -> $retTypes")
+                stack.addAll(retTypes)
+            }
+            is CallIndirect -> {
+                stack.pop(i32) // pop method pointer
+                val params1 = i.type.params
+                for (k in params1.lastIndex downTo 0) {
+                    stack.pop(params1[k])
+                }
+                stack.addAll(i.type.results)
+            }
+            is BlockInstr -> {
+                // to do confirm Jump[If](BlockInstr) has correct stack
+                assertTrue(stack.endsWith(params))
+                validateStack3(
+                    sig, i.body, stack, i.results, returnResults,
+                    localVarTypes, paramsTypes
+                )
+                if (i.isReturning()) return true// done
+            }
+            is LoopInstr -> {
+                validateStack3(
+                    sig, i.body, stack, i.results, returnResults,
+                    localVarTypes, paramsTypes
+                )
+                if (i.isReturning()) return true// done
+            }
+            is Jump -> {
+                // todo check results match stack
+                return true
+            }
+            is JumpIf -> {
+                stack.pop(i32)
+                // todo check results match stack
+            }
+            is LoadInstr -> stack.pop(ptrType).push(i.wasmType)
+            is StoreInstr -> stack.pop(i.wasmType).pop(ptrType)
+            is SwitchCase -> {
+                assertTrue(stack.isEmpty())
+                for (case in i.cases) {
+                    validateStack3(
+                        sig, case, emptyList(), emptyList(), returnResults,
+                        localVarTypes, paramsTypes
+                    )
+                }
+            }
+            is HighLevelInstruction -> {
+                for (instr in i.toLowLevel()) {
+                    val returning = validateStackStep(
+                        sig, params, returnResults, localVarTypes,
+                        paramsTypes, stack, print, j, instr
+                    )
+                    if (returning) return true
+                }
+            }
+            else -> throw NotImplementedError(i.toString())
+        }
+        return false
     }
 
     private fun getCallParams(func: Any): List<String> {

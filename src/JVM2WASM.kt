@@ -118,7 +118,7 @@ var crashOnAllExceptions = true
 val useResultForThrowables = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
-var enableTracing = false
+var enableTracing = true
 var ignoreNonCriticalNullPointers = true
 var checkArrayAccess = false
 var checkNullPointers = false

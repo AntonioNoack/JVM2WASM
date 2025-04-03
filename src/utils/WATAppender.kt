@@ -4,7 +4,7 @@ import dIndex
 import gIndex
 import hIndex
 import implementedMethods
-import jvm.JVM32.*
+import jvm.JVM32.ptrSize
 import jvm.JVMShared.*
 import me.anno.io.Streams.writeLE32
 import me.anno.io.Streams.writeLE64

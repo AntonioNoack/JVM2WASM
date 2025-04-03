@@ -412,13 +412,13 @@ public class JavaLang {
         return clone;
     }
 
-    @Alias(names = "java_lang_System_setOut0_Ljava_io_PrintStreamV")
-    public static void System_setOut0(PrintStream v) throws NoSuchFieldException, IllegalAccessException {
+    @Alias(names = "java_lang_System_setOut_Ljava_io_PrintStreamV")
+    public static void System_setOut(PrintStream v) throws NoSuchFieldException, IllegalAccessException {
         System.class.getField("out").set(null, v);
     }
 
-    @Alias(names = "java_lang_System_setErr0_Ljava_io_PrintStreamV")
-    public static void System_setErr0(PrintStream v) throws NoSuchFieldException, IllegalAccessException {
+    @Alias(names = "java_lang_System_setErr_Ljava_io_PrintStreamV")
+    public static void System_setErr(PrintStream v) throws NoSuchFieldException, IllegalAccessException {
         System.class.getField("err").set(null, v);
     }
 

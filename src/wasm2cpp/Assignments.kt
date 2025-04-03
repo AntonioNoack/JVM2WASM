@@ -1,7 +1,6 @@
 package wasm2cpp
 
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
+import highlevel.HighLevelInstruction
 import wasm.instr.*
 
 object Assignments {
@@ -41,8 +40,10 @@ object Assignments {
             is Call, is CallIndirect, is LocalGet, is ParamGet, is GlobalGet -> {
                 // nothing to do
             }
-            is FieldSetInstr, is FieldGetInstr -> {
-                // nothing to do
+            is HighLevelInstruction -> {
+                for (child in instr.toLowLevel()) {
+                    insertAssignments(child, i, result)
+                }
             }
             else -> throw NotImplementedError("Unknown instruction ${instr.javaClass}")
         }

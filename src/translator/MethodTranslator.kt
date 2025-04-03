@@ -188,8 +188,9 @@ class MethodTranslator(
             "instanceOfExact", "instanceOfNonInterface", "isChildOrSameClassNonInterface",
             "resolveInterface", "resolveInterfaceByClass",
             "readPtrAtOffset",
-            "new_java_lang_String_ACIIV"
-        )
+            "new_java_lang_String_ACIIV", "rCl", "r8", "r16", "r32", "r64", "r32f", "r64f",
+            "w8", "w16", "w32", "w64", "w32f", "w64f"
+        ).toSet()
 
         @Suppress("UNUSED_PARAMETER")
         fun isLookingAtSpecial(sig: MethodSig): Boolean {

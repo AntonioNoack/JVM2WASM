@@ -46,15 +46,14 @@ public class JavaReflect {
         // using class instance, find fields
         if (clazz == null || name == null) throw new NullPointerException("Class.getField()");
         Class originalClass = clazz;
+        // log("looking for field", name);
         while (true) {
             Field[] fields = getFields(clazz);
-            // log("class for fields", getAddr(clazz));
-            // log("fields*, length", fields, length);
-            // log("looking for field", searchedField);
+            // log("class for fields", Class_getName_Ljava_lang_String(clazz));
+            // log("fields*, length", getAddr(fields), fields.length);
             for (Field field : fields) {
                 String fieldName = field.getName();
-                // log("field[i]:", fieldName);
-                // log("field[i].offset:", getFieldOffset(field));
+                // log("field[i].name,offset:", fieldName, getFieldOffset(field));
                 if (name.equals(fieldName)) {
                     // log("Found field", clazz.getName(), name);
                     return field;
