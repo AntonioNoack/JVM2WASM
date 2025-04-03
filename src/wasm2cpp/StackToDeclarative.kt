@@ -1,6 +1,9 @@
 package wasm2cpp
 
+import highlevel.FieldGetInstr
+import highlevel.FieldSetInstr
 import highlevel.HighLevelInstruction
+import highlevel.PtrDupInstr
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
@@ -10,6 +13,7 @@ import utils.StringBuilder2
 import utils.WASMTypes.*
 import utils.ptrType
 import wasm.instr.*
+import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
@@ -36,6 +40,8 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
+import wasm2cpp.Assignments.MEMORY_DEPENDENCY
+import wasm2cpp.FunctionWriterOld.Companion.nextInstr
 import wasm2cpp.instr.*
 
 /**
@@ -86,26 +92,13 @@ class StackToDeclarative(
             append(NullDeclaration(local.type, local.name))
         }
 
-        // find first instruction worth writing:
-        // we can skip all instructions just setting local variables to zero at the start, because we do that anyway
-        var startI = 0
-        val body = function.body
-        while (startI + 1 < body.size &&
-            body[startI] is Const && (body[startI] as Const).value.toDouble() == 0.0 &&
-            body[startI + 1] is LocalSet
-        ) startI += 2
-
-        if (!writeInstructions(body, startI, body.size)) {
+        if (!writeInstructions(function.body)) {
             LOGGER.warn("Appended return to ${function.funcName}")
             writeInstruction(Return)
         }
 
         assertEquals(1, writer.size)
         return writer.removeLast()
-    }
-
-    @Deprecated("")
-    private fun begin() {
     }
 
     private fun nextTemporaryVariable(): String = "tmp${genI++}"
@@ -131,18 +124,13 @@ class StackToDeclarative(
         return i0
     }
 
-    private fun isTemporaryVariable(name: String): Boolean {
-        return name.startsWith("tmp")
-    }
-
     private fun push(type: String, name: String) {
-        val names = if (isTemporaryVariable(name)) emptyList() else listOf(name)
+        val names = listOf(name)
         pushWithNames(type, name, names, false)
     }
 
-    private fun pushElements(type: String, expression: String, sources: List<StackElement>, isBoolean: Boolean) {
-        val names = sources.flatMap { it.names }.distinct()
-        pushWithNames(type, expression, names, isBoolean)
+    private fun joinNames(a: StackElement, b: StackElement): List<String> {
+        return (a.names + b.names).distinct()
     }
 
     private fun pushConstant(type: String, expression: String) {
@@ -167,10 +155,7 @@ class StackToDeclarative(
 
         if (funcName == "wasStaticInited") {
             popElement(i32)
-            val newName = nextTemporaryVariable()
-            // kind of like NullDeclaration, except that we do want a value every time
-            append(Declaration(i32, newName, zeroForStaticInited))
-            push(i32, newName) // todo mark this as 0, so it can be immedately skipped
+            stack.add(zeroForStaticInited)
             return
         }
 
@@ -224,12 +209,7 @@ class StackToDeclarative(
         val assignments = Assignments.findAssignments(instructions)
         for (i in i0 until i1) {
             val instr = instructions[i]
-            if (instr is HighLevelInstruction) {
-                // good enough???
-                writeInstructions(instr.toLowLevel())
-            } else {
-                writeInstruction(instr, i, assignments)
-            }
+            writeInstruction(instr, i, assignments)
             if (instr.isReturning()) return true
         }
         return false
@@ -289,7 +269,7 @@ class StackToDeclarative(
         val newValue = tmp.toString()
         if (a.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
             val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, emptyList(), false)))
+            append(Declaration(rType, newName, StackElement(rType, newValue, a.names, isBoolean)))
             push(rType, newName)
         } else {
             pushWithNames(rType, newValue, a.names, isBoolean)
@@ -307,14 +287,15 @@ class StackToDeclarative(
         val tmp = tmpExprBuilder
         combine(i0, i1, tmp)
         val newValue = tmp.toString()
+        val dependencies = joinNames(i0, i1)
         if (needsNewVariable(i0.names, assignments, k) ||
             needsNewVariable(i1.names, assignments, k)
         ) {
             val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, emptyList(), false)))
+            append(Declaration(rType, newName, StackElement(rType, newValue, dependencies, false)))
             push(rType, newName)
         } else {
-            pushElements(rType, newValue, listOf(i0, i1), isBoolean)
+            pushWithNames(rType, newValue, dependencies, isBoolean)
         }
         tmp.clear()
     }
@@ -325,7 +306,7 @@ class StackToDeclarative(
     ) {
         if (needsNewVariable(name, assignments, k)) {
             val newName = nextTemporaryVariable()
-            append(Declaration(type, newName, StackElement(type, name, emptyList(), false)))
+            append(Declaration(type, newName, StackElement(type, name, listOf(name), false)))
             push(type, newName)
         } else {
             push(type, name)
@@ -483,11 +464,7 @@ class StackToDeclarative(
             }
             Return -> {
                 val results = function.results
-                if (results.isNotEmpty()) {
-                    append(ExprReturn(popInReverse(function.funcName, results)))
-                } else {
-                    append(Return)
-                }
+                append(ExprReturn(popInReverse(function.funcName, results)))
             }
             Unreachable -> append(i)
             is Const -> {
@@ -574,7 +551,7 @@ class StackToDeclarative(
                     if (!isNameOrNumber(stackJ)) {
                         val newName = nextTemporaryVariable()
                         append(Declaration(stackJ.type, newName, stackJ))
-                        stack[j1] = StackElement(stackJ.type, newName, emptyList(), false)
+                        stack[j1] = StackElement(stackJ.type, newName, listOf(newName), false)
                     }
                 }
                 /*val paramPopped = popInReverse(function.funcName, i.params)
@@ -622,23 +599,29 @@ class StackToDeclarative(
                     packResultsIntoOurStack(instructions)
                 }
 
-                val newIfTrue = ArrayList<Instruction>()
-                writer.add(newIfTrue)
+                when (condition.expr) {
+                    "1" -> writeBranchContents(i.ifTrue)
+                    "0" -> writeBranchContents(i.ifFalse)
+                    else -> {
+                        val newIfTrue = ArrayList<Instruction>()
+                        writer.add(newIfTrue)
 
-                writeBranchContents(i.ifTrue)
+                        writeBranchContents(i.ifTrue)
 
-                writer.removeLast()
-                val newIfFalse = ArrayList<Instruction>()
-                writer.add(newIfFalse)
+                        writer.removeLast()
+                        val newIfFalse = ArrayList<Instruction>()
+                        writer.add(newIfFalse)
 
-                // reset stack to before "if"
-                stack.clear()
-                stack.addAll(stackForReset)
+                        // reset stack to before "if"
+                        stack.clear()
+                        stack.addAll(stackForReset)
 
-                writeBranchContents(i.ifFalse)
+                        writeBranchContents(i.ifFalse)
 
-                writer.removeLast()
-                append(ExprIfBranch(condition, newIfTrue, newIfFalse))
+                        writer.removeLast()
+                        append(ExprIfBranch(condition, newIfTrue, newIfFalse))
+                    }
+                }
 
                 // rescue stack
                 stack.clear()
@@ -712,24 +695,42 @@ class StackToDeclarative(
             is JumpIf -> {
                 // C++ doesn't have proper continue@label/break@label, so use goto
                 val condition = popElement("i32")
-                append(ExprIfBranch(condition, listOf(GotoInstr(i.label)), emptyList()))
+                append(ExprIfBranch(condition, arrayListOf(GotoInstr(i.label)), emptyArrayList))
             }
             is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
             is Comment -> append(i)
+            is FieldGetInstr -> writeReadInstr(i, k, assignments)
+            PtrDupInstr -> stack.add(stack.last())
+            is HighLevelInstruction -> writeInstructions(i.toLowLevel())
             else -> assertFail("Unknown instruction type ${i.javaClass}")
         }
     }
 
-    /**
-     * find the next instruction after i; or return -1
-     * */
-    private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
-        for (j in i + 1 until instructions.size) {
-            val instr = instructions[j]
-            if (instr !is Comment) return j
+    private fun writeReadInstr(i: FieldGetInstr, k: Int, assignments: Map<String, Int>?) {
+        // append to expression, if possible -> inline more things;
+        // -> will be especially good for future, high-level code
+        //  - we need a dependency/name for "memory", or special addresses even
+        //  - and non-pure functions invalidate that, too
+        val rType = i.loadInstr.wasmType
+        val isStatic = i.fieldSig.isStatic
+        val self = if (isStatic) null else popElement(ptrType)
+        val tmp = tmpExprBuilder
+        assertTrue(tmp.size == 0)
+        tmp.append(i.loadCall.name).append('(')
+        if (self != null) tmp.append(self.expr).append(", ")
+        tmp.append(FieldSetInstr.getFieldAddr(if (isStatic) null else 0, i.fieldSig))
+        tmp.append(')')
+        val newValue = tmp.toString()
+        val combinedDependencies = if(self != null) self.names + MEMORY_DEPENDENCY else listOf(MEMORY_DEPENDENCY)
+        if (self != null && self.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
+            val newName = nextTemporaryVariable()
+            append(Declaration(rType, newName, StackElement(rType, newValue, combinedDependencies, false)))
+            push(rType, newName)
+        } else {
+            pushWithNames(rType, newValue, combinedDependencies, false)
         }
-        return -1
+        tmp.clear()
     }
 
     private fun writeSwitchCase(switchCase: SwitchCase) {
@@ -786,8 +787,8 @@ class StackToDeclarative(
                             append(
                                 ExprIfBranch(
                                     branch,
-                                    listOf(GotoInstr("case$trueCase")),
-                                    listOf(GotoInstr("case$falseCase"))
+                                    arrayListOf(GotoInstr("case$trueCase")),
+                                    arrayListOf(GotoInstr("case$falseCase"))
                                 )
                             )
                         }
@@ -803,8 +804,8 @@ class StackToDeclarative(
                             append(
                                 ExprIfBranch(
                                     popElement(i32),
-                                    listOf(GotoInstr("case1")),
-                                    listOf(GotoInstr("case0"))
+                                    arrayListOf(GotoInstr("case1")),
+                                    arrayListOf(GotoInstr("case0"))
                                 )
                             )
                         }

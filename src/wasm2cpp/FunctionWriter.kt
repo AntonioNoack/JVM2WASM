@@ -2,14 +2,14 @@ package wasm2cpp
 
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
-import me.anno.utils.assertions.assertTrue
+import optimizer.InstructionProcessor
 import utils.StringBuilder2
 import wasm.instr.*
-import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionWriterOld.Companion.appendExpr
+import wasm2cpp.FunctionWriterOld.Companion.nextInstr
 import wasm2cpp.instr.*
 
 // todo inherit from this class and...
@@ -41,17 +41,87 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private var depth = 1
-
     lateinit var function: FunctionImpl
 
-    private fun init(function: FunctionImpl) {
-        this.function = function
-        depth = 1
+    private val usageCounts = HashMap<String, Int>()
+    private val assignCounts = HashMap<String, Int>()
+    private val declarationBlocker = HashSet<String>()
+
+    private fun incAssign(name: String) {
+        val delta = if (name in declarationBlocker) 10 else 1
+        assignCounts[name] = (assignCounts[name] ?: 0) + delta
+        declarationBlocker.add(name)
     }
+
+    private fun incUsage(name: String) {
+        usageCounts[name] = (usageCounts[name] ?: 0) + 1
+        declarationBlocker.add(name)
+    }
+
+    private fun incUsages(names: List<String>) {
+        for (i in names.indices) {
+            incUsage(names[i])
+        }
+    }
+
+    private fun incUsages(expr: StackElement) {
+        incUsages(expr.names)
+    }
+
+    private fun getAssignCount(name: String): Int {
+        return assignCounts[name] ?: 0
+    }
+
+    private fun getUsageCount(name: String): Int {
+        return usageCounts[name] ?: 0
+    }
+
+    private val usageCounter = InstructionProcessor { instr ->
+        when (instr) {
+            is Assignment -> {
+                incUsages(instr.newValue)
+                incAssign(instr.name)
+            }
+            is Declaration -> {
+                incUsages(instr.initialValue)
+                incAssign(instr.name)
+            }
+            is CppLoadInstr -> incUsages(instr.addrExpr)
+            is CppStoreInstr -> {
+                incUsages(instr.addrExpr)
+                incUsages(instr.valueExpr)
+            }
+            is ExprReturn -> {
+                for (expr in instr.results) incUsages(expr)
+            }
+            is ExprCall -> {
+                for (expr in instr.params) incUsages(expr)
+                if (instr.resultName != null) incAssign(instr.resultName)
+            }
+            is FunctionTypeDefinition -> {
+                incUsages(instr.indexExpr)
+                incAssign(instr.instanceName)
+            }
+            is ExprIfBranch -> incUsages(instr.expr)
+            BreakInstr, is GotoInstr, Unreachable, is NullDeclaration, is Comment, is LoopInstr -> {
+                // nothing to do
+            }
+            else -> throw NotImplementedError("Unknown instruction $instr")
+        }
+    }
+
+    // todo if a variable is written only once (except null-declaration),
+    //  and only read afterward
+    //  declare it in-place instead of previously, if possible
 
     fun write(function: FunctionImpl) {
 
-        init(function)
+        this.function = function
+        assignCounts.clear()
+        usageCounts.clear()
+        declarationBlocker.clear()
+        usageCounter.process(function)
+        depth = 1
 
         defineFunctionHead(function, true)
         writer.append(" {\n")
@@ -65,8 +135,41 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             begin().append("wasCalled = true").end()
         }
 
+        if (false) {
+            begin().append("// usages: ").append(usageCounts).append('\n')
+            begin().append("// assigns: ").append(assignCounts).append('\n')
+        }
+
+        joinRedundantNullDeclarationsWithAssignments(function.body)
         writeInstructions(function.body)
         writer.append("}\n")
+    }
+
+    private val nullDeclNameToIndex = HashMap<String, Int>()
+    private fun joinRedundantNullDeclarationsWithAssignments(body: ArrayList<Instruction>) {
+        var i1 = 0
+        val nameToIndex = nullDeclNameToIndex
+        nameToIndex.clear()
+        while (i1 < body.size) {
+            val instr = body[i1]
+            if (instr is NullDeclaration) {
+                nameToIndex[instr.name] = i1
+                i1++
+            } else break
+        }
+        if (i1 == 0) return
+        // replace all null-declarations with declarations with actual values
+        var i2 = i1
+        while (i2 < body.size) {
+            val instr = body[i2]
+            if (instr is Assignment) {
+                val index = nameToIndex[instr.name]!!
+                body[index] = Declaration(instr.type, instr.name, instr.newValue)
+                i2++
+            } else break
+        }
+        // then remove all the assignments, that are no longer needed
+        body.subList(i1, i2).clear()
     }
 
     private fun begin(): StringBuilder2 {
@@ -79,37 +182,94 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun writeInstructions(instructions: List<Instruction>) {
-        for (i in instructions.indices) {
-            writeInstruction(instructions[i])
+        if (instructions.isEmpty()) return
+        var i = 0
+        while (i >= 0) {
+            val ni = nextInstr(instructions, i)
+            val pos0 = writer.size
+            val skipped = writeInstruction(instructions[i], instructions.getOrNull(ni))
+            if (skipped) {
+                // restore comments in-between, so file length stays comparable
+                val pos1 = writer.size
+                for (j in i + 1 until ni) {
+                    writeInstruction(instructions[j], null)
+                }
+                // these should be inserted before, not after
+                swap(pos0, pos1)
+            }
+            i = if (skipped) nextInstr(instructions, ni) else ni
         }
     }
 
-    private fun writeInstruction(i: Instruction) {
-        when (i) {
+    private fun swap(pos0: Int, pos1: Int) {
+        val writer = writer
+        writer.append(writer, pos0, pos1)
+        writer.remove(pos0, pos1)
+    }
+
+    private fun canInlineDeclaration(name: String): Boolean {
+        return getAssignCount(name) == 1 // todo also verify that all usages are after/below the assignment
+    }
+
+    private fun isUnused(name: String): Boolean {
+        return name !in usageCounts
+    }
+
+    private fun writeInstruction(instr: Instruction, nextInstr: Instruction?): Boolean {
+        if (false) {
+            begin().append("/* ").append(instr.javaClass.simpleName)
+            if (instr is Declaration) writer.append(", ").append(instr.initialValue.names)
+            writer.append(" */\n")
+        }
+        when (instr) {
             is CppLoadInstr -> {
-                begin().append(i.type).append(' ').append(i.newName).append(" = ")
-                    .append("((").append(i.memoryType).append("*) ((uint8_t*) memory + (u32)")
-                    .appendExpr(i.addrExpr).append("))[0]").end()
+                begin().append(instr.type).append(' ').append(instr.newName).append(" = ")
+                    .append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + (u32)")
+                    .appendExpr(instr.addrExpr).append("))[0]").end()
             }
             is CppStoreInstr -> {
-                begin().append("((").append(i.memoryType).append("*) ((uint8_t*) memory + (u32)")
-                    .appendExpr(i.addrExpr).append("))[0] = ")
-                if (i.type != i.memoryType) {
-                    writer.append('(').append(i.memoryType).append(") ")
+                begin().append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + (u32)")
+                    .appendExpr(instr.addrExpr).append("))[0] = ")
+                if (instr.type != instr.memoryType) {
+                    writer.append('(').append(instr.memoryType).append(") ")
                 }
-                writer.append(i.valueExpr.expr).end()
+                writer.append(instr.valueExpr.expr).end()
             }
-            is NullDeclaration -> begin().append(i.type).append(' ').append(i.name)
-                .append(" = 0").end()
-            is Declaration -> begin().append(i.type).append(' ').append(i.name)
-                .append(" = ").append(i.initialValue.expr).end()
-            is Assignment -> begin().append(i.name)
-                .append(" = ").append(i.newValue.expr).end()
+            is NullDeclaration -> {
+                begin()
+                if (!canInlineDeclaration(instr.name)) {
+                    if (isUnused(instr.name)) writer.append("// unused: ")
+                } else {
+                    if (isUnused(instr.name)) {
+                        writer.append("// unused, inlined: ")
+                    } else {
+                        writer.append("// inlined: ")
+                    }
+                }
+                writer.append(instr.type).append(' ').append(instr.name)
+                    .append(" = 0").end()
+            }
+            is Declaration -> {
+                begin()
+                if (isUnused(instr.name)) writer.append("// unused: ")
+                writer.append(instr.type).append(' ').append(instr.name)
+                    .append(" = ").append(instr.initialValue.expr).end()
+            }
+            is Assignment -> {
+                begin()
+                if (isUnused(instr.name)) writer.append("// unused: ")
+                if (canInlineDeclaration(instr.name)) {
+                    writer.append(instr.type).append(' ')
+                }
+                writer.append(instr.name)
+                    .append(" = ").append(instr.newValue.expr).end()
+            }
             is ExprReturn -> {
-                val results = i.results
+                val results = instr.results
                 assertEquals(function.results.size, results.size)
                 begin().append("return")
                 when (results.size) {
+                    0 -> {}
                     1 -> writer.append(' ').append(results.first().expr)
                     else -> {
                         writer.append(" { ")
@@ -122,46 +282,67 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                 }
                 writer.end()
             }
-            Return -> {
-                assertTrue(function.results.isEmpty())
-                begin().append("return").end()
-            }
             Unreachable -> {
                 begin().append("unreachable(\"")
                     .append(function.funcName).append("\")").end()
             }
-            is ExprIfBranch -> {
-                begin().append("if (").append(i.expr.expr).append(") {\n")
-                depth++
-                writeInstructions(i.ifTrue)
-                depth--
-                if (i.ifFalse.isNotEmpty()) {
-                    begin().append("} else {\n")
-                    depth++
-                    writeInstructions(i.ifFalse)
-                    depth--
-                }
-                begin().append("}\n")
-            }
+            is ExprIfBranch -> writeIfBranch(instr, emptyList())
             is ExprCall -> {
+
+                val returnsImmediately =
+                    if (nextInstr is ExprReturn) {
+                        if (nextInstr.results.isEmpty() && instr.resultName == null) true
+                        else if (nextInstr.results.size == 1 && nextInstr.results[0].expr == instr.resultName) true
+                        else false
+                    } else false
+
+                val assignsImmediately =
+                    instr.resultTypes.size == 1 && usageCounts[instr.resultName] == 1 &&
+                            when (nextInstr) {
+                                is Assignment -> nextInstr.newValue.expr == instr.resultName
+                                is Declaration -> nextInstr.initialValue.expr == instr.resultName
+                                else -> false
+                            }
+
                 begin()
-                if (i.resultName != null) {
-                    for (r in i.resultTypes) { // combine result types into struct name
-                        writer.append(r)
+
+                if (returnsImmediately) {
+                    writer.append("return ")
+                } else if (instr.resultName != null && getUsageCount(instr.resultName) > 0) {
+                    if (assignsImmediately) {
+                        val variableName = when (nextInstr) {
+                            is Assignment -> nextInstr.name
+                            is Declaration -> nextInstr.name
+                            else -> throw NotImplementedError()
+                        }
+                        val unused = isUnused(variableName)
+                        if (unused) writer.append("/* unused: ")
+                        if (nextInstr is Declaration || canInlineDeclaration(variableName)) {
+                            writer.append(instr.resultTypes[0]).append(' ')
+                        }
+                        writer.append(variableName).append(" = ")
+                        if (unused) writer.append(" */")
+                    } else {
+                        for (r in instr.resultTypes) { // combine result types into struct name
+                            writer.append(r)
+                        }
+                        writer.append(' ').append(instr.resultName).append(" = ")
                     }
-                    writer.append(' ').append(i.resultName).append(" = ")
                 }
-                writer.append(i.funcName).append('(')
-                for (param in i.params) {
+
+                writer.append(instr.funcName).append('(')
+                for (param in instr.params) {
                     if (!writer.endsWith("(")) writer.append(", ")
                     writer.append(param.expr)
                 }
                 writer.append(")").end()
+
+                return returnsImmediately || assignsImmediately
             }
             is FunctionTypeDefinition -> {
-                val type = i.funcType
-                val tmpType = i.typeName
-                val tmpVar = i.instanceName
+                val type = instr.funcType
+                val tmpType = instr.typeName
+                val tmpVar = instr.instanceName
                 // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
                 begin().append("using ").append(tmpType).append(" = ")
                 if (type.results.isEmpty()) {
@@ -179,27 +360,58 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                 writer.append(")").end()
                 // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
                 begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
-                    .append(tmpType).append(">(indirect[").append(i.indexExpr.expr).append("])").end()
+                    .append(tmpType).append(">(indirect[").append(instr.indexExpr.expr).append("])").end()
             }
             is BlockInstr -> {
                 // write body
-                writeInstructions(i.body)
+                writeInstructions(instr.body)
                 // write label at end as jump target
-                begin().append(i.label).append(":\n")
+                begin().append(instr.label).append(":\n")
             }
             is LoopInstr -> {
-                begin().append(i.label).append(": while (true) {\n")
+                begin().append(instr.label).append(": while (true) {\n")
                 depth++
-                writeInstructions(i.body)
+                writeInstructions(instr.body)
                 depth--
                 begin().append("}\n")
             }
-            is GotoInstr -> begin().append("goto ").append(i.label).end()
+            is GotoInstr -> begin().append("goto ").append(instr.label).end()
             is BreakInstr -> begin().append("break").end()
-            is SwitchCase -> writeSwitchCase(i)
-            is Comment -> begin().append("// ").append(i.name).append('\n')
-            else -> assertFail("Unknown instruction type ${i.javaClass}")
+            is SwitchCase -> writeSwitchCase(instr)
+            is Comment -> begin().append("// ").append(instr.name).append('\n')
+            else -> assertFail("Unknown instruction type ${instr.javaClass}")
         }
+        return false
+    }
+
+    private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>) {
+        if (!writer.endsWith("else if(")) begin().append("if (")
+        writer.append(instr.expr.expr).append(") {")
+        for (i in extraComments.indices) {
+            val comment = extraComments[i] as Comment
+            writer.append(if (i == 0) " // " else ", ").append(comment.name)
+        }
+        writer.append('\n')
+        depth++
+        writeInstructions(instr.ifTrue)
+        depth--
+        val ifFalse = instr.ifFalse
+        if (ifFalse.isNotEmpty()) {
+            val i = nextInstr(ifFalse, -1)
+            val ni = nextInstr(ifFalse, i)
+            val instrI = ifFalse.getOrNull(i)
+            if (ni == -1 && instrI is ExprIfBranch) {
+                begin().append("} else if(")
+                writeIfBranch(instrI, ifFalse.subList(0, i))
+                writeInstructions(ifFalse.subList(i + 1, ifFalse.size))
+            } else {
+                begin().append("} else {\n")
+                depth++
+                writeInstructions(ifFalse)
+                depth--
+                begin().append("}\n")
+            }
+        } else begin().append("}\n")
     }
 
     private fun writeSwitchCase(switchCase: SwitchCase) {

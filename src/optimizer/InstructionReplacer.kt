@@ -3,6 +3,7 @@ package optimizer
 import me.anno.utils.algorithms.Recursion
 import wasm.instr.*
 import wasm.parser.FunctionImpl
+import wasm2cpp.instr.ExprIfBranch
 
 fun interface InstructionReplacer {
 
@@ -16,6 +17,10 @@ fun interface InstructionReplacer {
             for (i in instructions.indices) {
                 when (val instr = instructions[i]) {
                     is IfBranch -> {
+                        remaining.add(instr.ifTrue)
+                        remaining.add(instr.ifFalse)
+                    }
+                    is ExprIfBranch -> {
                         remaining.add(instr.ifTrue)
                         remaining.add(instr.ifFalse)
                     }

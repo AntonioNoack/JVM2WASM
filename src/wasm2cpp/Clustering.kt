@@ -101,9 +101,7 @@ class Clustering(val functions: List<FunctionImpl>, var complexity: Int) {
                     val func = funcByName[instr.name]
                     if (func != null) dst.add(func)
                 }
-                is CallIndirect -> {
-
-                }
+                is CallIndirect -> {}
                 is HighLevelInstruction -> {
                     findDependencies(instr.toLowLevel(), funcByName, dst)
                 }

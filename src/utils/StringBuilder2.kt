@@ -1,5 +1,6 @@
 package utils
 
+import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 
 class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
@@ -75,14 +76,31 @@ class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
         return this
     }
 
-    fun append(str: StringBuilder2, s0: Int = 0): StringBuilder2 {
-        if (str === this) throw IllegalArgumentException()
-        addAll(str, s0, str.length - s0)
+    fun append(str: StringBuilder2): StringBuilder2 {
+        return append(str, 0, str.length)
+    }
+
+    fun append(str: StringBuilder2, s0: Int): StringBuilder2 {
+        return append(str, s0, str.length)
+    }
+
+    fun append(str: StringBuilder2, s0: Int, s1: Int): StringBuilder2 {
+        assertTrue(s1 <= size || this !== str)
+        addAll(str, s0, s1 - s0)
         return this
     }
 
     fun append(any: Any): StringBuilder2 {
         return append(any.toString())
+    }
+
+    fun remove(i0: Int, i1: Int): StringBuilder2 {
+        assertTrue(i0 <= i1)
+        assertTrue(i0 >= 0)
+        assertTrue(i1 <= size)
+        System.arraycopy(values, i1, values, i0, size - i1)
+        size -= i1 - i0
+        return this
     }
 
     fun split(sep: Char): List<String> {

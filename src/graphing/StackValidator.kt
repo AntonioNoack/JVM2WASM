@@ -5,6 +5,7 @@ import graphing.StructuralAnalysis.Companion.printState
 import hIndex
 import hierarchy.HierarchyIndex.methodAliases
 import highlevel.HighLevelInstruction
+import highlevel.PtrDupInstr
 import implementedMethods
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
@@ -272,6 +273,7 @@ object StackValidator {
                     )
                 }
             }
+            PtrDupInstr -> stack.pop(ptrType).push(ptrType).push(ptrType)
             is HighLevelInstruction -> {
                 for (instr in i.toLowLevel()) {
                     val returning = validateStackStep(

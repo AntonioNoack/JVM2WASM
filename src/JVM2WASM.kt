@@ -97,7 +97,7 @@ var useKotlynReflect = true
 var useDefaultKotlinReflection = false
 
 var alignFieldsProperly = true
-var useHighLevelInstructions = false
+var useHighLevelInstructions = true
 
 // not supported, because there is lots of cyclic dependencies (24 cycles)
 // var callStaticInitOnce = false
@@ -118,7 +118,7 @@ var crashOnAllExceptions = true
 val useResultForThrowables = !useWASMExceptions && !crashOnAllExceptions
 
 // experimental, not really JVM conform; might work anyway 😄, and be faster or use less memory
-var enableTracing = true
+var enableTracing = false
 var ignoreNonCriticalNullPointers = true
 var checkArrayAccess = false
 var checkNullPointers = false

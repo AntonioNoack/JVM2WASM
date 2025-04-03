@@ -1,6 +1,5 @@
 package utils
 
-import translator.LocalVariableOrParam
 import wasm.instr.*
 import wasm.instr.Drop
 import wasm.instr.Instructions.Return
@@ -122,18 +121,6 @@ class Builder(val instrs: ArrayList<Instruction>) {
 
     fun clear() {
         instrs.clear()
-    }
-
-    fun dupIXX(tmp: LocalVariableOrParam): Builder {
-        val lastInstr = instrs.lastOrNull()
-        if (isDuplicable(lastInstr)) {
-            append(lastInstr!!)
-        } else {
-            append(tmp.setter)
-            append(tmp.getter)
-            append(tmp.getter)
-        }
-        return this
     }
 
     override fun equals(other: Any?): Boolean {

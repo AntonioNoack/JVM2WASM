@@ -6,8 +6,8 @@ import wasm2cpp.StackElement
 
 class ExprIfBranch(
     val expr: StackElement,
-    val ifTrue: List<Instruction>,
-    val ifFalse: List<Instruction>
+    val ifTrue: ArrayList<Instruction>,
+    val ifFalse: ArrayList<Instruction>
 ) : CppInstruction {
 
     override fun isReturning(): Boolean {

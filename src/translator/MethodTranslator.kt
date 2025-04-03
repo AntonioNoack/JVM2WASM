@@ -23,6 +23,7 @@ import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
 import highlevel.FieldGetInstr
 import highlevel.FieldSetInstr
+import highlevel.PtrDupInstr
 import ignoreNonCriticalNullPointers
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
@@ -1105,7 +1106,7 @@ class MethodTranslator(
             if (splitArgs.isNotEmpty()) {
                 val wasmTypes = convertTypesToWASM(listOf(ptrType) + splitArgs)
                 printer.append(Call(gIndex.getNth(wasmTypes)))
-            } else printer.dupPtr()
+            } else printer.append(PtrDupInstr)
         }
 
         when (opcode0) {
@@ -1616,7 +1617,7 @@ class MethodTranslator(
                 val zeroResult = Const.zero[retType]!!
                 arrayListOf(zeroResult, tmp.localGet, Return)
             }
-            printer.append(IfBranch(ifTrue, emptyArrayList, emptyList(), emptyList()))
+            printer.append(IfBranch(ifTrue))
         }
     }
 
@@ -1845,7 +1846,13 @@ class MethodTranslator(
     }
 
     private fun Builder.dupPtr(): Builder {
-        return dupIXX(variables.tmpPtr)
+        val lastInstr = instrs.lastOrNull()
+        if (isDuplicable(lastInstr)) {
+            append(lastInstr!!)
+        } else {
+            append(PtrDupInstr)
+        }
+        return this
     }
 
     fun visitFieldInsn2(opcode: Int, owner: String, name: String, type: String, checkNull: Boolean) {
@@ -2044,6 +2051,7 @@ class MethodTranslator(
 
     private var lastLine = -1
     private fun getCallIndex(): Int {
+        val stackTraceTable = stackTraceTable
         if (line != lastLine) {
             lastLine = line
             stackTraceTable.writeLE32(gIndex.getString(sig.clazz))

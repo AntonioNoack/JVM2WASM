@@ -2,6 +2,7 @@ package highlevel
 
 import alwaysUseFieldCalls
 import interpreter.WASMEngine
+import me.anno.utils.assertions.assertEquals
 import translator.GeneratorIndex
 import utils.FieldSig
 import utils.is32Bits
@@ -22,6 +23,7 @@ class FieldSetInstr(
 
     companion object {
         fun getFieldAddr(self: Number?, fieldSig: FieldSig): Int {
+            assertEquals(self == null, fieldSig.isStatic)
             val fieldOffset = GeneratorIndex.getFieldOffset(fieldSig)!!
             return if (self == null) {
                 lookupStaticVariable(fieldSig.clazz, fieldOffset)

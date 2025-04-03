@@ -74,6 +74,17 @@ class FunctionWriterOld(
             }
             return this
         }
+        
+        /**
+         * find the next instruction after i
+         * */
+        fun nextInstr(instructions: List<Instruction>, i: Int): Int {
+            for (j in i + 1 until instructions.size) {
+                val instr = instructions[j]
+                if (instr !is Comment) return j
+            }
+            return -1
+        }
     }
 
     private var depth = 1
@@ -289,14 +300,6 @@ class FunctionWriterOld(
 
     private fun writeInstructions(instructions: List<Instruction>): Boolean {
         return writeInstructions(instructions, 0, instructions.size)
-    }
-
-    private fun getNumReturned(call: Instruction): Int {
-        return when (call) {
-            is Call -> functionsByName[call.name]!!.results.size
-            is CallIndirect -> call.type.results.size
-            else -> -1
-        }
     }
 
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
@@ -793,17 +796,6 @@ class FunctionWriterOld(
             }
             else -> assertFail("Unknown instruction type ${i.javaClass}")
         }
-    }
-
-    /**
-     * find the next instruction after i
-     * */
-    private fun nextInstr(instructions: List<Instruction>, i: Int): Int {
-        for (j in i + 1 until instructions.size) {
-            val instr = instructions[j]
-            if (instr !is Comment) return j
-        }
-        return -1
     }
 
     private fun writeSwitchCase(switchCase: SwitchCase) {

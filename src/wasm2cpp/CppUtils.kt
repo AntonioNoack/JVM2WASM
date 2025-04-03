@@ -36,25 +36,13 @@ fun defineFunctionImplementations(
     writer.append("#include <cmath> // trunc, ...\n")
     val stackToDeclarative = StackToDeclarative(globals, functionsByName)
     val functionWriter = FunctionWriter(globals)
-    // val functionWriterOld = FunctionWriterOld(globals, functionsByName)
     for (fi in functions.indices) {
         val function = functions[fi]
+        // if (function.funcName != "me_anno_engine_ui_control_ControlScheme_zoom_FV") continue
         val pos0 = writer.size
         try {
             val declarative = stackToDeclarative.write(function)
             functionWriter.write(function.withBody(declarative))
-
-            /*val pos1 = writer.size
-            functionWriterOld.write(function)
-            val pos2 = writer.size
-
-            assertEquals(
-                writer.toString(pos1, pos2),
-                writer.toString(pos0, pos1),
-            )
-
-            writer.size = pos1*/
-
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)

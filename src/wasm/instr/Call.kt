@@ -135,5 +135,8 @@ data class Call(val name: String) : Instruction {
         val dcmpg = Call("dcmpg") // +1 if NaN
 
         val checkWrite = Call("checkWrite")
+
+        val dupI32 = Call("dupi32")
+        val dupI64 = Call("dupi64")
     }
 }

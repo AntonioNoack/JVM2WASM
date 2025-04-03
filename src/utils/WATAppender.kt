@@ -11,6 +11,7 @@ import me.anno.io.Streams.writeLE64
 import me.anno.utils.Color
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
+import me.anno.utils.files.Files.formatFileSize
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.Opcodes.*
@@ -451,7 +452,7 @@ fun appendMethodInstance(
 
 var stackTraceTablePtr = 0
 fun appendStackTraceTable(printer: StringBuilder2, ptr0: Int): Int {
-    LOGGER.info("[appendThrowableLookup]")
+    LOGGER.info("[appendStackTraceTable]: ${MethodTranslator.stackTraceTable.size().formatFileSize()}")
     stackTraceTablePtr = ptr0
     return appendData(printer, ptr0, MethodTranslator.stackTraceTable)
 }
@@ -584,6 +585,7 @@ private fun checkNoOtherSectionOverlaps(startIndex: Int, dataSize: Int) {
 }
 
 fun appendData(printer: StringBuilder2, startIndex: Int, data: ByteArray): Int {
+    if (data.isEmpty()) return startIndex // skipped
 
     checkAlignment(startIndex)
     checkAlignment(data.size)

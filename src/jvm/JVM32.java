@@ -18,8 +18,8 @@ import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 @SuppressWarnings("unused")
 public class JVM32 {
 
-    public static final int ptrSizeBits = 2; // this is JVM32, so this is correct
-    public static final int ptrSize = 1 << ptrSizeBits;
+    public static int ptrSizeBits = 2; // this is JVM32, so this is correct
+    public static int ptrSize = 1 << ptrSizeBits;
 
     @NoThrow
     @WASM(code = "") // todo this method shall only be used by JVM32
@@ -180,8 +180,8 @@ public class JVM32 {
 
     @NoThrow
     public static void fill16(int start, int end, short value) {
-        int value1 = ((int) value) & 0xffff;
-        fill32(start, end, (value1 << 16) | value1);
+        long value1 = ((long) value) & 0xffff;
+        fill64(start, end, (value1 << 48) | (value1 << 32) | (value1 << 16) | value1);
     }
 
     @NoThrow
@@ -421,6 +421,7 @@ public class JVM32 {
     @NoThrow
     @Alias(names = "getClassIdPtr")
     public static <V> Object getClassIdPtr(int classId) {
+        // todo this won't be supported in a JavaScript implementation...
         validateClassId(classId);
         int classIdPtr = classIdToInstancePtr(classId) + OFFSET_CLASS_INDEX;
 
@@ -432,29 +433,4 @@ public class JVM32 {
         }
         return ptrTo(classIdPtr);
     }
-
-    @NoThrow
-    @Alias(names = "checkWrite")
-    @Deprecated /* no longer used */
-    public static void checkWrite(int addr0, int offset, int length) {
-        int fieldAddr = addr0 + offset;
-        if (addr0 > 0) {
-            // not static
-            int classId = readClassIdImpl(addr0);
-            int instanceSize = getInstanceSize(addr0, classId);
-            if (instanceSize < offset + length || offset < 0) {
-                log("Invalid write!!!", addr0, classId, offset);
-                throwJs();
-            }
-        }
-
-        int magicAddress = 10386896;
-        int magicLength = 8;
-        if (fieldAddr < magicAddress + magicLength &&
-                fieldAddr + length > magicAddress) {
-            log("Invalid Write???", addr0, offset, length);
-            new RuntimeException("Invalid Write???").printStackTrace();
-        }
-    }
-
 }
