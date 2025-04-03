@@ -8,7 +8,6 @@ import jvm.custom.WeakRef;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.gc.GCGapFinder.findLargestGaps;
-import static jvm.gc.GCGapFinder.insertGapMaybe;
 import static jvm.gc.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
@@ -121,16 +120,6 @@ public class GarbageCollector {
         int[] tmp = largestGapsTmp;
         largestGapsTmp = largestGaps;
         largestGaps = tmp;
-    }
-
-    @NoThrow
-    private static void mergeGaps() {
-        for (int gap : largestGapsTmp) {
-            if (instanceOf(ptrTo(gap), BYTE_ARRAY_CLASS)) {
-                int available = arrayLength(gap) + arrayOverhead;
-                insertGapMaybe(gap, available, largestGaps);
-            }
-        }
     }
 
     @NoThrow
@@ -249,10 +238,10 @@ public class GarbageCollector {
     static native boolean isParallelGC();
 
     @NoThrow
-    static boolean unregisterWeakRef(int instance) {
+    static boolean unregisterWeakRef(Object instance) {
         lockMallocMutex();
         @SuppressWarnings("rawtypes")
-        WeakRef weakRef = WeakRef.weakRefInstances.remove(instance);
+        WeakRef weakRef = WeakRef.weakRefInstances.remove(getAddr(instance));
         boolean wasReferenced = weakRef != null;
         unlockMallocMutex();
         while (weakRef != null) {

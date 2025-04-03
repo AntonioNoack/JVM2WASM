@@ -1,9 +1,9 @@
 package jvm.gc;
 
 import annotations.NoThrow;
-import jvm.QuickSort;
 import jvm.custom.WeakRef;
-import me.anno.utils.structures.arrays.IntArrayList;
+
+import java.util.ArrayList;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.gc.GCTraversal.instanceFieldOffsets;
@@ -20,9 +20,11 @@ import static utils.StaticClassIndices.LAST_ARRAY;
  */
 public class GCGapFinder {
 
-    private static final IntArrayList sortedWeakRefInstances = new IntArrayList(64, null);
+    private static final ArrayList<Object> nextWeakRef = new ArrayList<>(64);
+    private static int nextWeakRefIndex;
+    private static Object nextWeakRefInstance;
 
-    private static int smallestSize, smallestSizeIndex;
+    private static int smallestGapSize, smallestGapSizeIndex;
 
     @NoThrow
     private static void fillZeros(int[] largestGaps) {
@@ -32,11 +34,7 @@ public class GCGapFinder {
         }
     }
 
-    private static int[] nextWeakRef;
-    private static int nextWeakRefIndex;
-    private static int nextWeakRefInstance;
-
-    private static boolean handleWeakRefs(int instance) {
+    private static boolean handleWeakRefs(Object instance) {
 
         // log("handleWeakRefs");
 
@@ -44,28 +42,26 @@ public class GCGapFinder {
         // WeakRef-references need to be deleted in ordinary and parallel GC
 
         // jump to next entry; zero iterations in most cases
-        while (unsignedLessThan(instance, nextWeakRefInstance)) {
-            nextWeakRefInstance = nextWeakRef[nextWeakRefIndex++];
+        while (nextWeakRefInstance != null && unsignedLessThanI(instance, nextWeakRefInstance)) {
+            nextWeakRefInstance = nextWeakRef.get(nextWeakRefIndex++);
         }
 
         if (instance == nextWeakRefInstance) {
-            nextWeakRefInstance = nextWeakRef[nextWeakRefIndex++];
+            nextWeakRefInstance = nextWeakRef.get(nextWeakRefIndex++);
             return unregisterWeakRef(instance) & isParallelGC();
         } else return false;
     }
 
     private static void prepareWeakRefs() {
-        IntArrayList nextWeakRef0 = sortedWeakRefInstances;
         lockMallocMutex();// is it ok to set this once for parallel GC? I think so
-        WeakRef.weakRefInstances.collectKeys(nextWeakRef0);
+        WeakRef.weakRefInstances.collectKeys(nextWeakRef);
         unlockMallocMutex();
 
-        int[] nwr = nextWeakRef = nextWeakRef0.getValues();
-        QuickSort.quickSort(nwr, 0, nextWeakRef0.getSize() - 1);
-        nextWeakRef0.addUnsafe(-1);
+        nextWeakRef.sort(AddressComparator.INSTANCE);
+        nextWeakRef.add(null);
 
         nextWeakRefIndex = 1;
-        nextWeakRefInstance = nextWeakRef0.get(0);
+        nextWeakRefInstance = nextWeakRef.get(0);
     }
 
     private static void checkStatistics() {
@@ -84,8 +80,8 @@ public class GCGapFinder {
         // log("Scanning", instance, endPtr, iter);
         checkStatistics();
 
-        smallestSize = arrayOverhead << 1;
-        smallestSizeIndex = 0;
+        smallestGapSize = arrayOverhead << 1;
+        smallestGapSizeIndex = 0;
         freeMemory = 0;
         currPtr = getAllocationStart();
         endPtr = getNextPtr();
@@ -120,7 +116,7 @@ public class GCGapFinder {
 
             boolean isUsed = read8(instancePtr + GC_OFFSET) == iteration;
             if (!isUsed) {
-                isUsed = handleWeakRefs(instancePtr);
+                isUsed = handleWeakRefs(ptrTo(instancePtr));
             }
 
             if (!isUsed && contains(instancePtr, gapsInUse)) {
@@ -161,6 +157,7 @@ public class GCGapFinder {
         // log("Done Scanning :), instances:", numInstances);
         // log("Gaps:", gapCounter);
         // we're finally done :)
+        nextWeakRef.clear(); // to prevent them from being GCed
         return true;
     }
 
@@ -209,12 +206,12 @@ public class GCGapFinder {
     @NoThrow
     static void insertGapMaybe(int gapStart, int available, int[] largestGaps) {
 
-        if (unsignedLessThanEqual(available, smallestSize)) {
+        if (unsignedLessThanEqual(available, smallestGapSize)) {
             // gap too small for us to care for
             return;
         }
 
-        int smallestSizeIndex = GCGapFinder.smallestSizeIndex;
+        int smallestSizeIndex = GCGapFinder.smallestGapSizeIndex;
         largestGaps[smallestSizeIndex] = gapStart;
 
         // reevaluate smallest size
@@ -228,8 +225,8 @@ public class GCGapFinder {
             }
         }
 
-        GCGapFinder.smallestSize = smallestSize;
-        GCGapFinder.smallestSizeIndex = smallestSizeIndex;
+        GCGapFinder.smallestGapSize = smallestSize;
+        GCGapFinder.smallestGapSizeIndex = smallestSizeIndex;
 
     }
 

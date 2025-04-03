@@ -3,9 +3,11 @@ package jvm.custom;
 import annotations.NoThrow;
 import me.anno.utils.structures.arrays.IntArrayList;
 
+import java.util.ArrayList;
 import java.util.Objects;
 
 import static jvm.JVM32.ptrSize;
+import static jvm.JVM32.ptrTo;
 
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This
@@ -347,14 +349,14 @@ public class LongHashMap<V> {
     }
 
     @NoThrow
-    public void collectKeys(IntArrayList dst) {
+    public void collectKeys(ArrayList<Object> dst) {
         if (ptrSize == 8) throw new IllegalStateException("Please implement GC for 64-bits");
 
         dst.clear();
         dst.ensureCapacity(size() + 1);
         for (IEntry entry : table) {
             if (entry != null) {
-                dst.addUnsafe((int) entry.key);
+                dst.add(ptrTo(entry.key));
             }
         }
     }

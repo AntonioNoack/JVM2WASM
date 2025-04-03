@@ -7,7 +7,6 @@ import annotations.NoThrow;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.gc.GCGapFinder.getInstanceSize;
 import static jvm.gc.GarbageCollector.GC_OFFSET;
 import static jvm.gc.GarbageCollector.iteration;
 import static jvm.JVM32.*;
@@ -22,6 +21,9 @@ import static utils.StaticClassIndices.OBJECT_ARRAY;
  */
 public class GCTraversal {
 
+    public static final int[][] instanceFieldOffsets = new int[numClasses()][];
+    private static int[] staticFieldOffsets;
+
     @NoThrow
     static void traverseStaticInstances() {
         int numStaticFields = staticFieldOffsets.length;
@@ -31,24 +33,6 @@ public class GCTraversal {
             traverse(readPtrAtOffset(null, offset));
         }
         log("Finished traversing static instances");
-    }
-
-    @NoThrow
-    public static void validateAllClassIds() {
-        int ptr = getAllocationStart();
-        int end = getNextPtr();
-        // log("Validating all dynamic instances", ptr, end, getStackDepth());
-        while (unsignedLessThan(ptr, end)) {
-            int size = getInstanceSize(ptr);
-            // String className = classIdToInstance(readClassIdImpl(ptr)).getName();
-            // log(className, ptr, size);
-            ptr += size;
-        }
-        if (ptr != end) {
-            log("Invalid end", ptr, end);
-            throw new IllegalStateException();
-        }
-        // log("Finished validation");
     }
 
     @Export
@@ -84,10 +68,6 @@ public class GCTraversal {
             }
         }
     }
-
-    public static int[][] instanceFieldOffsets;
-    private static int[] staticFieldOffsets;
-    private static final int[] emptyArray = new int[0];
 
     @NoThrow
     private static int findFieldsByClass(Class<Object> clazz, int classId) {
@@ -138,9 +118,9 @@ public class GCTraversal {
 
     @NoThrow
     private static void createGCFieldTable() {
+        final int[][] instanceFieldOffsets = GCTraversal.instanceFieldOffsets;
+        final int[] emptyArray = new int[0];
         int numClasses = numClasses();
-        int[][] instanceFieldOffsets = GCTraversal.instanceFieldOffsets = new int[numClasses][];
-        int[] emptyArray = GCTraversal.emptyArray;
         for (int i = 0; i < numClasses; i++) {
             instanceFieldOffsets[i] = emptyArray;
         }

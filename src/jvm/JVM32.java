@@ -416,6 +416,10 @@ public class JVM32 {
     }
 
     @NoThrow
+    @WASM(code = "i32.lt_u")
+    public static native boolean unsignedLessThanI(Object a, Object b);
+
+    @NoThrow
     @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
     private static native void printStackTraceLine(int depth, String className, String methodName, int lineNumber);
 
