@@ -1,4 +1,4 @@
-package jvm;
+package jvm.gc;
 
 import annotations.Alias;
 import annotations.Export;
@@ -7,9 +7,9 @@ import annotations.NoThrow;
 import jvm.custom.WeakRef;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.GCGapFinder.findLargestGaps;
-import static jvm.GCGapFinder.insertGapMaybe;
-import static jvm.GCTraversal.traverseStaticInstances;
+import static jvm.gc.GCGapFinder.findLargestGaps;
+import static jvm.gc.GCGapFinder.insertGapMaybe;
+import static jvm.gc.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.failedToAllocateMemory;

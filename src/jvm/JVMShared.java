@@ -445,7 +445,7 @@ public class JVMShared {
     }
 
     @NoThrow
-    static void validateClassId(int childClassIdx) {
+    public static void validateClassId(int childClassIdx) {
         if (ge_ub(childClassIdx, numClasses())) {
             log("class index out of bounds", childClassIdx, numClasses());
             throwJs();

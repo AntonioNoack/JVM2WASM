@@ -140,7 +140,7 @@ void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
 void java_lang_System_gc_V() { gcCtr = 1000000; }
-void jvm_GarbageCollector_markJSReferences_V() { }
+void jvm_gc_GarbageCollector_markJSReferences_V() { }
 void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
 
 i32 jvm_NativeLog_log_III(i32 code, i32 r) { std::cout << code << ", " << r << std::endl; return r; }

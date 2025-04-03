@@ -252,7 +252,7 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
     clazz("jvm/JVM32")
     clazz("jvm/JVMShared")
-    clazz("jvm/GarbageCollector")
+    clazz("jvm/gc/GarbageCollector")
     clazz("jvm/MemDebug")
     clazz("jvm/ThrowJS")
 

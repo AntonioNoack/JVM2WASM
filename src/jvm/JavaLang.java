@@ -5,6 +5,7 @@ import annotations.JavaScript;
 import annotations.NoThrow;
 import annotations.WASM;
 import jvm.custom.ThreadLocalRandom;
+import jvm.gc.GarbageCollector;
 import jvm.lang.Bean;
 import org.jetbrains.annotations.NotNull;
 

@@ -1,4 +1,4 @@
-package jvm;
+package jvm.gc;
 
 import annotations.Alias;
 import annotations.Export;
@@ -7,9 +7,9 @@ import annotations.NoThrow;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.GCGapFinder.getInstanceSize;
-import static jvm.GarbageCollector.GC_OFFSET;
-import static jvm.GarbageCollector.iteration;
+import static jvm.gc.GCGapFinder.getInstanceSize;
+import static jvm.gc.GarbageCollector.GC_OFFSET;
+import static jvm.gc.GarbageCollector.iteration;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getFieldOffset;

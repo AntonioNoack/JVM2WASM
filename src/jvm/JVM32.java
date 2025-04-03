@@ -4,9 +4,10 @@ import annotations.Alias;
 import annotations.JavaScript;
 import annotations.NoThrow;
 import annotations.WASM;
+import jvm.gc.GarbageCollector;
+import jvm.gc.GarbageCollectorFlags;
 
-import static jvm.GCGapFinder.getInstanceSize;
-import static jvm.GarbageCollector.largestGaps;
+import static jvm.gc.GCGapFinder.getInstanceSize;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
