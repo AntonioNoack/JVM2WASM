@@ -152,7 +152,7 @@ class WASMEngine(memorySize: Int) {
         registerEmptyFunction("lockMallocMutex")
         registerEmptyFunction("unlockMallocMutex")
         registerFunction(
-            "jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV",
+            "jvm_JVMShared_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV",
             listOf(i32, ptrType, ptrType, i32), emptyList(), if (printStackPush) PrintStackTraceLine else Return
         )
         registerFunction(

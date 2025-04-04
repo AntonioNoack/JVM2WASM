@@ -6,11 +6,9 @@ import annotations.NoThrow;
 import org.lwjgl.glfw.*;
 
 import java.nio.Buffer;
-import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 import static jvm.JVM32.getAddr;
-import static jvm.JVM32.ptrTo;
 import static jvm.NativeLog.log;
 
 public class LWJGLxGLFW {
@@ -202,15 +200,8 @@ public class LWJGLxGLFW {
     @JavaScript(code = "return canvas.height")
     public static native int getWindowHeight();
 
-    @Alias(names = "org_lwjgl_glfw_GLFW_nglfwGetFramebufferSize_JJJV")
-    public static void nglfwGetFramebufferSize(long window, long width, long height) {
-        IntBuffer buffer = ptrTo((int) width);
-        buffer.put(0, getWindowWidth());
-        buffer.put(1, getWindowHeight());
-    }
-
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwGetFramebufferSize_JAIAIV")
-    public static void org_lwjgl_glfw_GLFW_glfwGetFramebufferSize_JAIAIV(long window, int[] w, int[] h) {
+    public static void GLFW_glfwGetFramebufferSize_JAIAIV(long window, int[] w, int[] h) {
         if (w != null && w.length > 0) w[0] = getWindowWidth();
         if (h != null && h.length > 0) h[0] = getWindowHeight();
     }

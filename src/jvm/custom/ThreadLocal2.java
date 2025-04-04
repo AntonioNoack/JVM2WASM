@@ -4,9 +4,7 @@ import annotations.NoThrow;
 
 import java.util.function.Supplier;
 
-import static jvm.JVM32.getAddr;
 import static jvm.JVMShared.unsafeCast;
-import static jvm.NativeLog.log;
 
 // in theory, we could replace all instances of this with the immediate result...
 @SuppressWarnings("unused")

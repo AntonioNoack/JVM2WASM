@@ -500,7 +500,7 @@ void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isErro
 }
 
 i64 instrCtr = 0;
-void jvm_JVM32_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
+void jvm_JVMShared_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
     if (instrCtr++ > -1) {
         std::cout << instrCtr << ":";
         printStackTraceLine(depth, clazz, method, line, false);

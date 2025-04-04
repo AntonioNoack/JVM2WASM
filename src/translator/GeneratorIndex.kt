@@ -332,12 +332,7 @@ object GeneratorIndex {
         }
 
         fun hasFields(): Boolean {
-            var offsets = this
-            while (true) {
-                if (offsets.fields.isNotEmpty()) return true
-                offsets = offsets.parentFields ?: break
-            }
-            return false
+            return offset > objectOverhead
         }
 
         fun get(name: String): FieldData? {
@@ -398,7 +393,7 @@ object GeneratorIndex {
                     val parentOffset = getFieldOffsets(parentClass, false).lock(clazz)
                     ClassOffsets(parentOffset.offset, parentOffset)
                 } else {
-                    ClassOffsets(objectOverhead, null)
+                    ClassOffsets(0, null)
                 }
             }
         }

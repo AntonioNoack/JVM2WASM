@@ -330,7 +330,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
             defineCallIndirectWASM(listOf(ptrType), if (throws) listOf(ptrType) else emptyList())
-        } else if (sig.clazz == "jvm/lang/JavaLangAccessImpl" && sig.name == "callStaticInit") {
+        } else if (sig.clazz == "jvm/JavaReflect" && sig.name == "callStaticInit") {
             defineCallIndirectWASM(emptyList(), if (throws) listOf(ptrType) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
             // confirm that the method is native???

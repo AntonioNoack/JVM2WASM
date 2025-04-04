@@ -69,7 +69,6 @@ import utils.CommonInstructions.NEW_INSTR
 import utils.CommonInstructions.SET_FIELD
 import utils.CommonInstructions.SET_STATIC
 import utils.PrintUsed.printUsed
-import utils.StaticFieldOffsets.OFFSET_CLASS_ENUM_CONSTANTS
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f32Const0
@@ -116,14 +115,12 @@ import wasm.instr.Instructions.I32GES
 import wasm.instr.Instructions.I32GTS
 import wasm.instr.Instructions.I32LES
 import wasm.instr.Instructions.I32LTS
-import wasm.instr.Instructions.I32Load
 import wasm.instr.Instructions.I32Mul
 import wasm.instr.Instructions.I32NE
 import wasm.instr.Instructions.I32Or
 import wasm.instr.Instructions.I32Shl
 import wasm.instr.Instructions.I32ShrS
 import wasm.instr.Instructions.I32ShrU
-import wasm.instr.Instructions.I32Store
 import wasm.instr.Instructions.I32Sub
 import wasm.instr.Instructions.I32XOr
 import wasm.instr.Instructions.I32_DIVS
@@ -173,7 +170,6 @@ class MethodTranslator(
         val ptrType = if (useJavaTypes) "java/lang/Object" else utils.ptrType
 
         val stackTraceTable = ByteArrayOutputStream2(1024)
-        val enumFieldsNames = listOf("\$VALUES", "ENUM\$VALUES")
 
         var comments = true
         var renameVariables = true
@@ -1885,17 +1881,7 @@ class MethodTranslator(
             }
         } else when (opcode) {
             GET_STATIC -> {
-                if (name in enumFieldsNames) {
-                    callStaticInit(owner)
-                    val clazzIndex = gIndex.getClassId(owner)
-                    printer
-                        .append(i32Const(clazzIndex))
-                        .append(Call.findClass)
-                        .append(i32Const(OFFSET_CLASS_ENUM_CONSTANTS))
-                    printer.append(I32Add).append(I32Load)
-                    if (comments) printer.comment("enum values")
-                    printer.push(wasmType)
-                } else if (fieldOffset != null) {
+                if (fieldOffset != null) {
                     callStaticInit(owner)
                     printer.push(wasmType)
                     // load class index
@@ -1918,16 +1904,7 @@ class MethodTranslator(
                 }
             }
             SET_STATIC -> {
-                if (name in enumFieldsNames) {
-                    val classId = gIndex.getClassId(owner)
-                    printer
-                        .append(i32Const(classId))
-                        .append(Call.findClass)
-                        .append(i32Const(OFFSET_CLASS_ENUM_CONSTANTS))
-                    printer.append(I32Add).append(Call("swapi32i32")).append(I32Store)
-                    if (comments) printer.comment("enum values")
-                    printer.pop(wasmType)
-                } else if (fieldOffset != null) {
+                if (fieldOffset != null) {
                     callStaticInit(owner)
                     printer.pop(wasmType)
                     val staticPtr = lookupStaticVariable(owner, fieldOffset)

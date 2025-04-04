@@ -3,7 +3,7 @@ package utils
 import byteStrings
 import gIndex
 import hIndex
-import jvm.JVM32.*
+import jvm.JVM32.ptrSize
 import jvm.JVMShared.*
 import me.anno.utils.assertions.assertEquals
 import utils.Descriptor.Companion.voidDescriptor
@@ -49,14 +49,21 @@ object DefaultClassLayouts {
         gIndex.stringClass = gIndex.getClassId(string)
         gIndex.stringArrayClass = gIndex.getClassId(if (byteStrings) "[B" else "[C")
 
+        // object overhead
+        eq(object0, "__classId_gcGen", "int", -objectOverhead, OFFSET_OBJECT_CLASS_ID)
+
         // instance arrays
         eq("[]", "length", "int", 0, OFFSET_ARRAY_LENGTH)
+        for (name in NativeTypes.nativeArrays) {
+            eq(name, "length", "int", 0, OFFSET_ARRAY_LENGTH)
+        }
 
         // strings, first the hash for alignment
         eq(string, "hash", "int", 0, OFFSET_STRING_HASH)
         eq(string, "value", if (byteStrings) "[B" else "[C", intSize, OFFSET_STRING_VALUE)
         gIndex.stringInstanceSize = gIndex.getInstanceSize(string)
 
+        hIndex.registerSuperClass(accessibleObject, object0)
         hIndex.registerSuperClass(field, accessibleObject)
         hIndex.registerSuperClass(executable, accessibleObject)
         hIndex.registerSuperClass(constructor, executable)
@@ -79,8 +86,7 @@ object DefaultClassLayouts {
         eq(clazz, "fields", "[$field", ptrSize * 2 + intSize, OFFSET_CLASS_FIELDS)
         eq(clazz, "methods", "[$method", ptrSize * 3 + intSize, OFFSET_CLASS_METHODS)
         eq(clazz, "constructors", "[$constructor", ptrSize * 4 + intSize, OFFSET_CLASS_CONSTRUCTORS)
-        eq(clazz, "enumConstants", "[java/lang/Enum", ptrSize * 5 + intSize, OFFSET_CLASS_ENUM_CONSTANTS)
-        eq(clazz, "modifiers", "int", ptrSize * 6 + intSize, OFFSET_CLASS_MODIFIERS)
+        eq(clazz, "modifiers", "int", ptrSize * 5 + intSize, OFFSET_CLASS_MODIFIERS)
 
         // remove securityCheckCache and override, we don't need them
         eq(field, "slot", "int", 0, OFFSET_FIELD_SLOT)

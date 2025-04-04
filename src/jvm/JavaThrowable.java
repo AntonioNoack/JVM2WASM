@@ -23,7 +23,7 @@ public class JavaThrowable {
     @Alias(names = "java_lang_Throwable_printStackTrace_V")
     public static void Throwable_printStackTrace_V(Throwable th) {
         printStackTraceHead(th.getClass().getName(), th.getMessage());
-        StackTraceElement[] trace = ptrTo(read32(getAddr(th) + objectOverhead + 4));
+        StackTraceElement[] trace = getStackTrace(th);
         for (StackTraceElement element : trace) {
             String clazz = element.getClassName();
             String name = element.getMethodName();

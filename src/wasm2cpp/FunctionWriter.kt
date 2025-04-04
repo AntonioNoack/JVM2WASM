@@ -36,7 +36,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                         "long,mutable,namespace,new,noexcept,not,not_eq,nullptr,operator,or,or_eq,private,protected,public," +
                         "reflexpr,register,reinterpret_cast,requires,return,short,signed,sizeof,static,static_assert," +
                         "static_cast,struct,switch,synchronized,template,this,thread_local,throw,true,try,typedef," +
-                        "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq"
+                        "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq," +
+                        // reserved by default imports :/
+                        "OVERFLOW,_OVERFLOW,UNDERFLOW,_UNDERFLOW,NULL"
                 ).split(',').toHashSet()
     }
 
@@ -305,9 +307,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
 
                 val returnsImmediately =
                     if (nextInstr is ExprReturn) {
-                        if (nextInstr.results.isEmpty() && instr.resultName == null) true
-                        else if (nextInstr.results.size == 1 && nextInstr.results[0].expr == instr.resultName) true
-                        else false
+                        nextInstr.results.size == 1 && nextInstr.results[0].expr == instr.resultName
                     } else false
 
                 val assignsImmediately =

@@ -6,6 +6,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 
 import static jvm.JVM32.*;
+import static jvm.JVMShared.classIdToInstance;
 import static jvm.JavaLang.Object_toString;
 import static jvm.JavaReflect.getClassId;
 import static jvm.NativeLog.log;

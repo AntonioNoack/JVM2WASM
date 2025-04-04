@@ -10,10 +10,8 @@ import java.lang.reflect.Executable;
 import java.security.AccessControlContext;
 import java.util.Map;
 
-import static jvm.JVM32.readPtrAtOffset;
 import static jvm.JVMShared.resolveInterfaceByClass;
-import static jvm.JavaReflect.getClassId;
-import static utils.StaticFieldOffsets.OFFSET_CLASS_ENUM_CONSTANTS;
+import static jvm.JavaReflect.*;
 
 public class JavaLangAccessImpl implements JavaLangAccess {
 
@@ -54,16 +52,8 @@ public class JavaLangAccessImpl implements JavaLangAccess {
 
     @Override
     public <E extends Enum<E>> E[] getEnumConstantsShared(Class<E> c) {
-        // ensure that the class is loaded
-        int classId = getClassId(c);
-        int methodId = resolveInterfaceByClass(classId, 0);
-        callStaticInit(methodId);
-        return readPtrAtOffset(c, OFFSET_CLASS_ENUM_CONSTANTS);
+        return c.getEnumConstants();
     }
-
-    // needs to be assigned dynamically to differentiate between throwing/non-throwing functions
-    // @WASM(code = "call_indirect (type $Xi)")
-    public static native void callStaticInit(int methodId);
 
     @Override
     public void blockedOn(Thread thread, Interruptible interruptible) {

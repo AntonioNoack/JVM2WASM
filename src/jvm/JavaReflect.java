@@ -29,16 +29,25 @@ public class JavaReflect {
 
     @NoThrow
     @NotNull
-    @Alias(names = "java_lang_Class_getFields_AW")
+    @Alias(names = {"java_lang_Class_getFields_AW", "java_lang_Class_getDeclaredFields_AW"})
     public static Field[] getFields(Class<?> clazz) {
         return readPtrAtOffset(clazz, OFFSET_CLASS_FIELDS);
     }
 
     @NotNull
-    @Alias(names = "java_lang_Class_getDeclaredFields_AW")
-    public static Field[] Class_getDeclaredFields_AW(Class<?> clazz) {
-        return getFields(clazz);
+    @Alias(names = {"java_lang_Class_getEnumConstants_AW", "java_lang_Class_getEnumConstantsShared_AW"})
+    public static <E extends Enum<E>> Enum<E>[] getEnumConstantsShared(Class<E> self) {
+        // ensure that the class is loaded
+        int classId = getClassId(self);
+        int methodId = resolveInterfaceByClass(classId, 0);
+        callStaticInit(methodId);
+        //noinspection unchecked
+        return (E[]) Field_get(Class_getField(self, "$VALUES"), null);
     }
+
+    // needs to be assigned dynamically to differentiate between throwing/non-throwing functions
+    // @WASM(code = "call_indirect (type $Xi)")
+    public static native void callStaticInit(int methodId);
 
     @SuppressWarnings("rawtypes")
     @Alias(names = "java_lang_Class_getField_Ljava_lang_StringLjava_lang_reflect_Field")
@@ -144,44 +153,44 @@ public class JavaReflect {
     @Alias(names = "java_lang_reflect_Field_get_Ljava_lang_ObjectLjava_lang_Object")
     public static Object Field_get(Field field, Object instance) {
         // log("Field_get", getAddr(field), getAddr(instance));
-        int addr = getFieldAddr(field, instance);
+        int offset = getFieldOffsetSafely(field, instance);
         // if the field is native, we have to wrap it
         Class<?> clazz = field.getType();
         switch (getClassId(clazz)) {
             case NATIVE_BOOLEAN:
-                return Boolean.valueOf(read8(addr) > 0);
+                return Boolean.valueOf(readI8AtOffset(instance, offset) > 0);
             case NATIVE_BYTE:
-                return Byte.valueOf(read8(addr));
+                return Byte.valueOf(readI8AtOffset(instance, offset));
             case NATIVE_SHORT:
-                return Short.valueOf(read16s(addr));
+                return Short.valueOf(readS16AtOffset(instance, offset));
             case NATIVE_CHAR:
-                return Character.valueOf(read16u(addr));
+                return Character.valueOf(readU16AtOffset(instance, offset));
             case NATIVE_INT:
-                return Integer.valueOf(read32(addr));
+                return Integer.valueOf(readI32AtOffset(instance, offset));
             case NATIVE_LONG:
-                return Long.valueOf(read64(addr));
+                return Long.valueOf(readI64AtOffset(instance, offset));
             case NATIVE_FLOAT:
-                return Float.valueOf(read32f(addr));
+                return Float.valueOf(readF32AtOffset(instance, offset));
             case NATIVE_DOUBLE:
-                return Double.valueOf(read64f(addr));
+                return Double.valueOf(readF64AtOffset(instance, offset));
             default:
-                return ptrTo(read32(addr));
+                return readPtrAtOffset(instance, offset);
         }
     }
 
-    private static int getFieldAddr(Field field, Object instance) {
+    private static int getFieldOffsetSafely(Field field, Object instance) {
         int offset = getFieldOffset(field);
         if (Modifier.isStatic(field.getModifiers())) {
             return findStatic(getClassId(field.getDeclaringClass()), offset);
         } else {
             if (instance == null) throw new NullPointerException("getFieldAddr");
-            return getAddr(instance) + offset;
+            return offset;
         }
     }
 
     @Alias(names = "java_lang_reflect_Field_set_Ljava_lang_ObjectLjava_lang_ObjectV")
     public static void Field_set(Field field, Object instance, Object value) {
-        int addr = getFieldAddr(field, instance);
+        int offset = getFieldOffsetSafely(field, instance);
         // log("Field.set()", addr, getAddr(value));
         // log("Field.newValue", String.valueOf(value));
         boolean isInstanceOfType = field.getType().isInstance(value);
@@ -192,31 +201,32 @@ public class JavaReflect {
         // log("Field.instanceOf?", isInstanceOfType ? "true" : "false");
         switch (getClassId(field.getType())) {
             case NATIVE_BOOLEAN:
-                write8(addr, (byte) (((Boolean) value) ? 1 : 0));
+                boolean value1 = (Boolean) value;
+                writeI8AtOffset(instance, offset, value1 ? (byte) 1 : (byte) 0);
                 break;
             case NATIVE_BYTE:
-                write8(addr, (Byte) value);
+                writeI8AtOffset(instance, offset, (Byte) value);
                 break;
             case NATIVE_SHORT:
-                write16(addr, (Short) value);
+                writeI16AtOffset(instance, offset, (Short) value);
                 break;
             case NATIVE_CHAR:
-                write16(addr, (Character) value);
+                writeI16AtOffset(instance, offset, (Character) value);
                 break;
             case NATIVE_INT:
-                write32(addr, (Integer) value);
+                writeF32AtOffset(instance, offset, (Integer) value);
                 break;
             case NATIVE_LONG:
-                write64(addr, (Long) value);
+                writeF64AtOffset(instance, offset, (Long) value);
                 break;
             case NATIVE_FLOAT:
-                write32(addr, (Float) value);
+                writeF32AtOffset(instance, offset, (Float) value);
                 break;
             case NATIVE_DOUBLE:
-                write64(addr, (Double) value);
+                writeF64AtOffset(instance, offset, (Double) value);
                 break;
             default:
-                write32(addr, getAddr(value));
+                writePtrAtOffset(instance, offset, value);
                 break;
         }
     }
@@ -225,112 +235,112 @@ public class JavaReflect {
     public static void Field_setInt(Field field, Object instance, int value) {
         if (getClassId(field.getType()) != NATIVE_INT)
             throw new IllegalArgumentException("Type is not an integer");
-        write32(getFieldAddr(field, instance), value);
+        writeI32AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getInt_Ljava_lang_ObjectI")
     public static int Field_getInt(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_INT)
             throw new IllegalArgumentException("Type is not an integer");
-        return read32(getFieldAddr(field, instance));
+        return readI32AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setFloat_Ljava_lang_ObjectFV")
     public static void Field_setFloat(Field field, Object instance, float value) {
         if (getClassId(field.getType()) != NATIVE_FLOAT)
             throw new IllegalArgumentException("Type is not a float");
-        write32(getFieldAddr(field, instance), value);
+        writeF32AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getFloat_Ljava_lang_ObjectF")
     public static float Field_getFloat(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_FLOAT)
             throw new IllegalArgumentException("Type is not a float");
-        return read32f(getFieldAddr(field, instance));
+        return readF32AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setLong_Ljava_lang_ObjectJV")
     public static void Field_setLong(Field field, Object instance, long value) {
         if (getClassId(field.getType()) != NATIVE_LONG)
             throw new IllegalArgumentException("Type is not a long");
-        write64(getFieldAddr(field, instance), value);
+        writeI64AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getLong_Ljava_lang_ObjectJ")
     public static long Field_getLong(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_LONG)
             throw new IllegalArgumentException("Type is not a long");
-        return read64(getFieldAddr(field, instance));
+        return readI64AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setDouble_Ljava_lang_ObjectDV")
     public static void Field_setDouble(Field field, Object instance, double value) {
         if (getClassId(field.getType()) != NATIVE_DOUBLE)
             throw new IllegalArgumentException("Type is not a double");
-        write64(getFieldAddr(field, instance), value);
+        writeF64AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getDouble_Ljava_lang_ObjectD")
     public static double Field_getDouble(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_DOUBLE)
             throw new IllegalArgumentException("Type is not a double");
-        return read64f(getFieldAddr(field, instance));
+        return readF64AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setByte_Ljava_lang_ObjectBV")
     public static void Field_setByte(Field field, Object instance, byte value) {
         if (getClassId(field.getType()) != NATIVE_BYTE)
             throw new IllegalArgumentException("Type is not a byte");
-        write8(getFieldAddr(field, instance), value);
+        writeI8AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getByte_Ljava_lang_ObjectB")
     public static byte Field_getByte(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_BYTE)
             throw new IllegalArgumentException("Type is not a byte");
-        return read8(getFieldAddr(field, instance));
+        return readI8AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setShort_Ljava_lang_ObjectSV")
     public static void Field_setShort(Field field, Object instance, short value) {
         if (getClassId(field.getType()) != NATIVE_SHORT)
             throw new IllegalArgumentException("Type is not a short");
-        write16(getFieldAddr(field, instance), value);
+        writeI16AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getShort_Ljava_lang_ObjectS")
     public static short Field_getShort(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_SHORT)
             throw new IllegalArgumentException("Type is not a short");
-        return read16s(getFieldAddr(field, instance));
+        return readS16AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setChar_Ljava_lang_ObjectCV")
     public static void Field_setChar(Field field, Object instance, char value) {
         if (getClassId(field.getType()) != NATIVE_CHAR)
             throw new IllegalArgumentException("Type is not a char");
-        write16(getFieldAddr(field, instance), value);
+        writeI16AtOffset(instance, getFieldOffsetSafely(field, instance), value);
     }
 
     @Alias(names = "java_lang_reflect_Field_getChar_Ljava_lang_ObjectC")
     public static char Field_getChar(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_CHAR)
             throw new IllegalArgumentException("Type is not a char");
-        return read16u(getFieldAddr(field, instance));
+        return readU16AtOffset(instance, getFieldOffsetSafely(field, instance));
     }
 
     @Alias(names = "java_lang_reflect_Field_setBoolean_Ljava_lang_ObjectZV")
     public static void Field_setBoolean(Field field, Object instance, boolean value) {
         if (getClassId(field.getType()) != NATIVE_BOOLEAN)
             throw new IllegalArgumentException("Type is not a boolean");
-        write8(getFieldAddr(field, instance), (byte) (value ? 1 : 0));
+        writeI8AtOffset(instance, getFieldOffsetSafely(field, instance), (byte) (value ? 1 : 0));
     }
 
     @Alias(names = "java_lang_reflect_Field_getBoolean_Ljava_lang_ObjectZ")
     public static boolean Field_getBoolean(Field field, Object instance) {
         if (getClassId(field.getType()) != NATIVE_BOOLEAN)
             throw new IllegalArgumentException("Type is not a boolean");
-        return read8(getFieldAddr(field, instance)) != 0;
+        return readI8AtOffset(instance, getFieldOffsetSafely(field, instance)) != 0;
     }
 
     @SuppressWarnings("rawtypes")

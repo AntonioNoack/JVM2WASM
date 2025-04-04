@@ -1,16 +1,23 @@
 package wasm2cpp
 
 import crashOnAllExceptions
+import dIndex
+import gIndex
 import globals
+import hIndex
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
 import org.apache.logging.log4j.LogManager
+import translator.GeneratorIndex
 import utils.*
+import utils.WASMTypes.*
 import wasm.parser.*
 import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
+
+var generateHighLevelCpp = true
 
 var enableCppTracing = true
 
@@ -30,6 +37,9 @@ val clock = Clock(LOGGER)
 // once everything here works, implementing a Zig or Rust implementation shouldn't be hard anymore
 
 fun main() {
+    if (generateHighLevelCpp) {
+        throw IllegalStateException("Cannot generate high-level C++ from WASM (yet?)")
+    }
     wasm2cpp()
 }
 
@@ -84,8 +94,128 @@ fun wasm2cpp(
         writeCluster(i, clusters[i], globals, functionsByName)
         clock.stop("Writing Cluster [$i]")
     }
+    writeStructs()
     writeFuncTable(functions, functionTable)
     clock.stop("Writing FuncTable")
+}
+
+fun jvmNameToCppName(className: String): String {
+    return className.escapeChars()
+}
+
+fun jvmNameToCppName2(className: String): String {
+    return when (className) {
+        "int" -> i32
+        "long" -> i64
+        "float" -> f32
+        "double" -> f64
+        "boolean", "byte" -> "uint8_t"
+        "char" -> "uint16_t"
+        "short" -> "int16_t"
+        else -> ptrType
+    }
+}
+
+fun writeStructField(name: String, field: GeneratorIndex.FieldData) {
+    writer.append("  ")
+    if (is32Bits || field.type in NativeTypes.nativeTypes) {
+        writer.append(jvmNameToCppName2(field.type))
+    } else if (!field.type.startsWith("[") || field.type in NativeTypes.nativeArrays) {
+        val cppType = structNames[gIndex.getClassId(field.type)]
+        writer.append("struct ").append(cppType).append('*')
+    } else {
+        val cppType = structNames[StaticClassIndices.OBJECT_ARRAY]
+        writer.append("struct ").append(cppType).append('*')
+    }
+    var nameI = name
+    while (nameI in FunctionWriter.cppKeywords) nameI += "_"
+    writer.append(' ').append(nameI).append("; /* @").append(field.offset)
+        .append(", ").append(field.type).append(" */\n")
+}
+
+private val structNames = ArrayList<String>(512)
+fun writeStruct(className: String, classId: Int) {
+    // todo define inheritance??? cannot be supported for super-class-padding-used-for-fields
+    // for each constructable type, create a struct
+    // extends parentName = ": public parentName"
+    writer.append("struct ").append(structNames[classId])
+    val superClass = hIndex.superClass[className] ?: "java/lang/Object"
+    val superClassId = gIndex.getClassId(superClass)
+    if (className != "java/lang/Object") {
+        writer.append(" : public ").append(structNames[superClassId])
+    }
+    writer.append(" {\n")
+    val fields = gIndex.getFieldOffsets(className, static = false)
+    val sortedFields =
+        fields.fields.entries.sortedBy { it.value.offset }
+    for ((name, field) in sortedFields) {
+        writeStructField(name, field)
+    }
+    writer.append("};\n\n")
+}
+
+// todo static-assert all offsets
+//  (or create an init-function, that overrides them and instance sizes at start?)
+
+fun writeStaticStruct(className: String) {
+    // for each constructable type, create a struct
+    // extends parentName = ": public parentName"
+    val classNameCpp = jvmNameToCppName(className)
+    writer.append("struct static_").append(classNameCpp).append(" {\n")
+    val fields = gIndex.getFieldOffsets(className, static = true)
+    val sortedFields =
+        fields.fields.entries.sortedBy { it.value.offset }
+    for ((name, field) in sortedFields) {
+        writeStructField(name, field)
+    }
+    writer.append("} Static_").append(classNameCpp).append(";\n\n")
+}
+
+fun writeStructs() {
+    val structFile = cppFolder.getChild("jvm2wasm-structs.hpp")
+    if (!generateHighLevelCpp) {
+        structFile.writeText("// structs are disabled")
+        return
+    }
+
+    writer.append("#include \"jvm2wasm-types.h\"\n\n")
+
+    val classNames = gIndex.classNamesByIndex
+    for (classId in classNames.indices) {
+        val className = classNames[classId]
+        if (className in dIndex.constructableClasses &&
+            className !in NativeTypes.nativeTypes &&
+            gIndex.getFieldOffsets(className, false).fields.isNotEmpty()
+        ) {
+            val cppName = jvmNameToCppName(className)
+            writer.append("struct ").append(cppName).append(";\n")
+            structNames.add(cppName)
+        } else {
+            val superClass = hIndex.superClass[className] ?: "java/lang/Object"
+            val superClassId = gIndex.getClassId(superClass)
+            structNames.add(structNames[superClassId])
+        }
+    }
+    writer.append("\n")
+
+    for (classId in classNames.indices) {
+        val className = classNames[classId]
+        if (className in dIndex.constructableClasses &&
+            className !in NativeTypes.nativeTypes &&
+            gIndex.getFieldOffsets(className, false).fields.isNotEmpty()
+        ) {
+            writeStruct(className, classId)
+        }
+        val staticFields = gIndex.getFieldOffsets(className, true)
+        if (staticFields.fields.isNotEmpty()) {
+            writeStaticStruct(className)
+        }
+    }
+    // todo for each valid static field, create a static-struct-thingy?
+
+    structFile
+        .writeBytes(writer.values, 0, writer.size)
+    writer.clear()
 }
 
 fun defineReturnStructs(functions: Collection<FunctionImpl>) {

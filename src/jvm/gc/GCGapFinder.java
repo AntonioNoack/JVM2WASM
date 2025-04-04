@@ -1,6 +1,7 @@
 package jvm.gc;
 
 import annotations.NoThrow;
+import annotations.WASM;
 import jvm.custom.WeakRef;
 
 import java.util.ArrayList;

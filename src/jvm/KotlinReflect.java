@@ -15,7 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import static jvm.JVM32.classIdToInstance;
+import static jvm.JVMShared.classIdToInstance;
 import static jvm.JVMShared.numClasses;
 import static jvm.JavaReflect.Class_getSimpleName;
 import static jvm.JavaReflect.getClassId;

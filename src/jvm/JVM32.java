@@ -7,10 +7,7 @@ import annotations.WASM;
 import jvm.gc.GarbageCollector;
 import jvm.gc.GarbageCollectorFlags;
 
-import static jvm.gc.GCGapFinder.getInstanceSize;
 import static jvm.JVMShared.*;
-import static jvm.JVMValues.emptyArray;
-import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticClassIndices.*;
@@ -35,59 +32,8 @@ public class JVM32 {
     @WASM(code = "") // automatically converted
     public static native int getAddr(Object obj);
 
-    @NoThrow
-    @Alias(names = "findClass")
-    public static Class<Object> classIdToInstance(int classId) {
-        return ptrTo(classIdToInstancePtr(classId));
-    }
-
-    @NoThrow
-    public static int classIdToInstancePtr(int classId) {
-        return classId * getClassSize() + getClassInstanceTable();
-    }
-
-    @Alias(names = "resolveIndirectFail")
-    public static void resolveIndirectFail(Object instance, String methodName) {
-        throwJs("Resolving non constructable method", getAddr(instance), methodName);
-    }
-
     // todo mark some static fields as not needing <clinit>
     // private static int riLastClass, riLastMethod, riLastImpl;
-
-    @NoThrow
-    private static void checkAddress(int instance) {
-        if (ge_ub(instance, getAllocatedSize())) {
-            throwJs("Not a valid address!", instance);
-        }
-    }
-
-    @Alias(names = "createInstance")
-    public static Object createInstance(int classId) {
-        validateClassId(classId);
-
-        int instanceSize = getInstanceSizeNonArray(classId);
-        if (instanceSize < 0) throw new IllegalStateException("Non-constructable class cannot be instantiated");
-        if (instanceSize == 0) return getClassIdPtr(classId); // pseudo-instance
-
-        if (trackAllocations) trackCalloc(classId);
-        Object newInstance = calloc(instanceSize);
-        writeClass(newInstance, classId);
-        // log("Created", classId, newInstance, instanceSize);
-        // if (newInstance > 10_300_000) validateAllClassIds();
-        return newInstance;
-    }
-
-    @Alias(names = "createObjectArray")
-    public static Object[] createObjectArray(int length) {
-        // probably a bit illegal; should be fine for us, saving allocations :)
-        if (length == 0) {
-            Object[] sth = emptyArray;
-            if (sth != null) return sth;
-            // else awkward, probably recursive trap
-        }
-        // log("creating array", length);
-        return (Object[]) createNativeArray1(length, OBJECT_ARRAY);
-    }
 
     @Alias(names = "createNativeArray1")
     public static Object createNativeArray1(int length, int classId) {
@@ -329,23 +275,17 @@ public class JVM32 {
     }
 
     @NoThrow
-    static void printStackTraceLine(int index) {
-        int lookupBasePtr = getStackTraceTablePtr();
-        if (lookupBasePtr <= 0) return;
-        int throwableLookup = lookupBasePtr + index * 12;
-        String className = ptrTo(read32(throwableLookup));
-        String methodName = ptrTo(read32(throwableLookup + 4));
-        int line = read32(throwableLookup + 8);
-        printStackTraceLine(getStackDepth(), className, methodName, line);
-    }
-
-    @NoThrow
     public static void writeI8AtOffset(Object instance, int offset, byte value) {
         write8(getAddr(instance) + offset, value);
     }
 
     @NoThrow
     public static void writeI16AtOffset(Object instance, int offset, short value) {
+        write16(getAddr(instance) + offset, value);
+    }
+
+    @NoThrow
+    public static void writeI16AtOffset(Object instance, int offset, char value) {
         write16(getAddr(instance) + offset, value);
     }
 
@@ -418,10 +358,6 @@ public class JVM32 {
     @NoThrow
     @WASM(code = "i32.lt_u")
     public static native boolean unsignedLessThanI(Object a, Object b);
-
-    @NoThrow
-    @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
-    private static native void printStackTraceLine(int depth, String className, String methodName, int lineNumber);
 
     @NoThrow
     @Alias(names = "getClassIdPtr")
