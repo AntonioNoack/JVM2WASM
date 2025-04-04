@@ -9,7 +9,6 @@ import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
-import wasm.instr.Drop
 import wasm.instr.Instructions.F32EQ
 import wasm.instr.Instructions.F32GE
 import wasm.instr.Instructions.F32GT
@@ -40,6 +39,7 @@ import wasm.instr.Instructions.I64NE
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.WATParser
+import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import kotlin.math.min
 
 object ReplaceOptimizer {
@@ -110,8 +110,6 @@ object ReplaceOptimizer {
         listOf(Call.getStaticFieldI32, Drop) to listOf(Drop),
         listOf(Call.getStaticFieldI64, Drop) to listOf(Drop),
     )
-
-    // todo run special replacements before if-branches and i32EQZ
 
     private val replacementsByInstr = replacements.groupBy { it.first.first() }
 
@@ -218,6 +216,18 @@ object ReplaceOptimizer {
                     }
                 }
             }
+
+            // remove double EQZ before if-branches
+            for (i in instructions.indices) {
+                if (i > instructions.size - 2) break
+                if (instructions[i] != I32EQZ) continue
+                val ni = nextInstr(instructions, i)
+                if (ni < 0 || instructions[ni] != I32EQZ) continue
+                val nj = nextInstr(instructions, ni)
+                if (nj < 0 || instructions[nj] !is IfBranch) continue
+                instructions.subList(i, ni + 1).clear()
+                onChange()
+            }
         }
 
         do {
@@ -312,7 +322,11 @@ object ReplaceOptimizer {
             )
             testOptimize(
                 listOf(I32EQZ),
-                listOf(I32EQZ, I32EQZ, IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32)))
+                listOf(
+                    I32EQZ,
+                    I32EQZ,
+                    IfBranch(arrayListOf(i32Const0), arrayListOf(i32Const1), emptyList(), listOf(i32))
+                )
             )
             testOptimize(
                 listOf(I32NE),
