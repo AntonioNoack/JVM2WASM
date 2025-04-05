@@ -2,10 +2,8 @@ package wasm2cpp
 
 import me.anno.utils.assertions.assertFail
 import optimizer.InstructionProcessor
-import wasm.instr.Comment
-import wasm.instr.Instruction
+import wasm.instr.*
 import wasm.instr.Instructions.Unreachable
-import wasm.instr.LoopInstr
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm2cpp.StackToDeclarative.Companion.nextInstr
@@ -121,7 +119,63 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         joinRedundantNullDeclarationsWithAssignments(function.body)
         writeInstructions(function.body, true)
 
+        removeRedundantAssignments(writer)
+
         return ArrayList(writer)
+    }
+
+    private fun removeRedundantAssignments(instructions: ArrayList<Instruction>) {
+        val previousAssignments = HashMap<String, Int>()
+        var i = 0
+        while (i < instructions.size) {
+            fun removeNames(expr: StackElement) {
+                for (name in expr.names) previousAssignments.remove(name)
+            }
+            when (val instr = instructions[i]) {
+                is Assignment -> {
+                    removeNames(instr.newValue)
+                    val previous = previousAssignments[instr.name]
+                    if (previous != null && previous < i) {
+                        when (instructions[previous]) {
+                            is NullDeclaration, is Declaration -> {
+                                instructions[i] = Declaration(instr.type, instr.name, instr.newValue)
+                                instructions[previous] = NopInstr
+                            }
+                            is Assignment -> {
+                                instructions[previous] = NopInstr
+                            }
+                            else -> throw NotImplementedError()
+                        }
+                    }
+                    previousAssignments[instr.name] = i
+                }
+                is Declaration -> {
+                    removeNames(instr.initialValue)
+                    previousAssignments[instr.name] = i
+                }
+                is NullDeclaration -> {
+                    previousAssignments[instr.name] = i
+                }
+                is ExprIfBranch -> {
+                    removeRedundantAssignments(instr.ifTrue)
+                    removeRedundantAssignments(instr.ifFalse)
+                    previousAssignments.clear()
+                }
+                is LoopInstr -> {
+                    removeRedundantAssignments(instr.body)
+                    previousAssignments.clear()
+                }
+                is IfBranch, is Jumping, is CppStoreInstr,
+                is ExprCall, is GotoInstr, is ExprReturn, Unreachable -> {
+                    previousAssignments.clear()
+                }
+                BreakThisLoopInstr, is CppLoadInstr, is FunctionTypeDefinition, is Comment -> {}
+                else -> throw NotImplementedError("${instr.javaClass} not yet implemented")
+            }
+            i++
+        }
+
+        instructions.removeIf { it == NopInstr }
     }
 
     private fun writeDebugUsages() {

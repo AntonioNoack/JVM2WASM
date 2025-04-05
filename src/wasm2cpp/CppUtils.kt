@@ -39,7 +39,7 @@ fun defineFunctionImplementations(
     val functionWriter = FunctionWriter(globals)
     for (fi in functions.indices) {
         val function = functions[fi]
-        // if (function.funcName != "me_anno_engine_ui_control_ControlScheme_zoom_FV") continue
+        // if (function.funcName != "org_joml_Vector4f_hashCode_I") continue
         val pos0 = writer.size
         try {
             val declarative = stackToDeclarative.write(function)
