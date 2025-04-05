@@ -118,12 +118,6 @@ object ParserValidation {
                     serialize(instr.body, dst)
                     dst.add(EndPseudo)
                 }
-                is BlockInstr -> {
-                    dst.add(BlockPseudo)
-                    dst.add(PseudoInstr2(instr))
-                    serialize(instr.body, dst)
-                    dst.add(EndPseudo)
-                }
                 is BreakableInstruction -> throw NotImplementedError()
                 else -> dst.add(instr)
             }

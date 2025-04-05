@@ -386,19 +386,6 @@ class WATParser : Module() {
                             val label = list.consume(TokenType.DOLLAR, i++)
                             result.add(JumpIf(breakableByLabel[label]!!))
                         }
-                        "block" -> {
-                            // just a labelled block
-                            val label = list.consume(TokenType.DOLLAR, i++)
-                            val (k0, params) = readParams(list, i)
-                            val (k1, results) = readResults(list, k0)
-                            val block = BlockInstr(label, emptyArrayList, params, results)
-                            breakableByLabel[label] = block
-                            val (k2, instructions) = parseFunctionBlock(list, k1)
-                            assertEquals(block, breakableByLabel.remove(label))
-                            block.body = instructions
-                            result.add(block)
-                            return FunctionBlock(k2, result)
-                        }
                         else -> {
                             val simple = simpleInstructions[instrName]
                             if (simple != null) {

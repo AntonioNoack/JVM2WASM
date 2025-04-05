@@ -25,7 +25,6 @@ fun interface InstructionReplacer {
                         remaining.add(instr.ifFalse)
                     }
                     is LoopInstr -> remaining.add(instr.body)
-                    is BlockInstr -> remaining.add(instr.body)
                     is BreakableInstruction -> throw NotImplementedError()
                 }
             }

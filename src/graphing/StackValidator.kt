@@ -238,15 +238,6 @@ object StackValidator {
                 }
                 stack.addAll(i.type.results)
             }
-            is BlockInstr -> {
-                // to do confirm Jump[If](BlockInstr) has correct stack
-                assertTrue(stack.endsWith(params))
-                validateStack3(
-                    sig, i.body, stack, i.results, returnResults,
-                    localVarTypes, paramsTypes
-                )
-                if (i.isReturning()) return true// done
-            }
             is LoopInstr -> {
                 validateStack3(
                     sig, i.body, stack, i.results, returnResults,

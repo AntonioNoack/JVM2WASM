@@ -6,7 +6,7 @@ import me.anno.utils.structures.lists.Lists.any2
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
-import wasm2cpp.instr.BreakInstr
+import wasm2cpp.instr.BreakThisLoopInstr
 
 data class LoopInstr(
     override val label: String, var body: ArrayList<Instruction>,
@@ -45,7 +45,7 @@ data class LoopInstr(
     override fun isReturning(): Boolean {
         val lastInstr = body.lastOrNull { it !is Comment }
         if (lastInstr is Jump && lastInstr.label == label) return true // while(true)-loop
-        if (lastInstr is BreakInstr) return false // cancels loop (not WASM-compatible!)
+        if (lastInstr is BreakThisLoopInstr) return false // cancels loop (not WASM-compatible!)
         return body.any2 { it.isReturning() }
     }
 

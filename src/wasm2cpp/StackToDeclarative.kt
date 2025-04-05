@@ -707,7 +707,6 @@ class StackToDeclarative(
                 append(FunctionTypeDefinition(type, tmpType, tmpVar, popElement(i32)))
                 writeCall(tmpVar, type.params, type.results)
             }
-            is BlockInstr -> append(i)
             is LoopInstr -> {
                 val resultNames = i.results.map { nextTemporaryVariable() }
                 for (j in i.results.indices) {
@@ -728,7 +727,7 @@ class StackToDeclarative(
                     for (j in i.results.lastIndex downTo 0) {
                         append(Assignment(resultNames[j], popElement(i.results[j])))
                     }
-                    append(BreakInstr)
+                    append(BreakThisLoopInstr)
                 } else assertTrue(i.results.isEmpty())
 
                 stack.clear()
