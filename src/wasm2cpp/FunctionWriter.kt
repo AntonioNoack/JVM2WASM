@@ -40,6 +40,8 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                         // reserved by default imports :/
                         "OVERFLOW,_OVERFLOW,UNDERFLOW,_UNDERFLOW,NULL"
                 ).split(',').toHashSet()
+
+        private var debugInstructions = false
     }
 
     private var depth = 1
@@ -137,7 +139,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             begin().append("wasCalled = true").end()
         }
 
-        if (false) {
+        if (debugInstructions) {
             begin().append("// usages: ").append(usageCounts).append('\n')
             begin().append("// assigns: ").append(assignCounts).append('\n')
         }
@@ -222,7 +224,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun writeInstruction(instr: Instruction, nextInstr: Instruction?, isLastInstr: Boolean): Boolean {
-        if (false) {
+        if (debugInstructions) {
             begin().append("/* ").append(instr.javaClass.simpleName)
             if (instr is Declaration) writer.append(", ").append(instr.initialValue.names)
             writer.append(" */\n")
@@ -242,11 +244,14 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                 writer.append(instr.valueExpr.expr).end()
             }
             is NullDeclaration -> {
+                val unused = isUnused(instr.name)
+                val canBeInlined = canInlineDeclaration(instr.name)
+                if (!debugInstructions && (unused || canBeInlined)) return false
                 begin()
-                if (!canInlineDeclaration(instr.name)) {
-                    if (isUnused(instr.name)) writer.append("// unused: ")
+                if (!canBeInlined) {
+                    if (unused) writer.append("// unused: ")
                 } else {
-                    if (isUnused(instr.name)) {
+                    if (unused) {
                         writer.append("// unused, inlined: ")
                     } else {
                         writer.append("// inlined: ")
@@ -256,8 +261,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                     .append(" = 0").end()
             }
             is Declaration -> {
-                begin()
                 val unused = isUnused(instr.name)
+                if (unused && !debugInstructions) return false
+                begin()
                 if (unused) writer.append("// unused: ")
                 val inlineReturn = !unused &&
                         nextInstr is ExprReturn && nextInstr.results.size == 1 &&
@@ -271,8 +277,10 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                 return inlineReturn
             }
             is Assignment -> {
+                val unused = isUnused(instr.name)
+                if (unused && !debugInstructions) return false
                 begin()
-                if (isUnused(instr.name)) writer.append("// unused: ")
+                if (unused) writer.append("// unused: ")
                 if (canInlineDeclaration(instr.name)) {
                     writer.append(instr.type).append(' ')
                 }
@@ -391,7 +399,6 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             }
             is GotoInstr -> begin().append("goto ").append(instr.label).end()
             is BreakInstr -> begin().append("break").end()
-            is SwitchCase -> writeSwitchCase(instr, isLastInstr)
             is Comment -> begin().append("// ").append(instr.name).append('\n')
             else -> assertFail("Unknown instruction type ${instr.javaClass}")
         }
@@ -428,16 +435,5 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
                 begin().append("}\n")
             }
         } else begin().append("}\n")
-    }
-
-    private fun writeSwitchCase(switchCase: SwitchCase, isLastInstr: Boolean) {
-        val cases = switchCase.cases
-        for (j in cases.indices) {
-            begin().append("case").append(j).append(": {\n")
-            depth++
-            writeInstructions(cases[j], isLastInstr)
-            depth--
-            begin().append("}\n")
-        }
     }
 }

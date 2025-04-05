@@ -3,7 +3,6 @@ package graphing
 import crashOnAllExceptions
 import graphing.ExtractBigLoop.tryExtractBigLoop
 import graphing.ExtractEndNodes.tryExtractEnd
-import graphing.LargeSwitchStatement.createLargeSwitchStatement2
 import graphing.SolveLinearTree.trySolveLinearTree
 import graphing.StackValidator.validateInputOutputStacks
 import graphing.StackValidator.validateNodes1
@@ -11,12 +10,11 @@ import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
 import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
+import optimizer.StaticInitOptimizer.optimizeStaticInit
 import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
-import optimizer.StaticInitOptimizer.optimizeStaticInit
-import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.I32EQ
@@ -352,7 +350,7 @@ class StructuralAnalysis(
     }
 
     private fun isComplexInstr(it: Instruction): Boolean {
-        return it is IfBranch || it is SwitchCase || it is LoopInstr
+        return it is IfBranch || it is LoopInstr
     }
 
     private fun joinFirstSequence(): Boolean {
@@ -1070,11 +1068,8 @@ class StructuralAnalysis(
             }
 
             if (!hadAnyChange) {
-                if (printOps) printState(nodes, "Before large switch statement:")
-                methodTranslator.variables.addLocalVariable("lbl", i32, "I")
-                val switchStatement = createLargeSwitchStatement2(this)
-                if (printOps) printState(nodes, "solved large switch statement")
-                return switchStatement
+                printState(nodes, "Everything should be transformable!")
+                throw IllegalStateException()
             }
         }
 

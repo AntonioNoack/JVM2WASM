@@ -4,6 +4,7 @@ import highlevel.FieldGetInstr
 import highlevel.FieldSetInstr
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
+import me.anno.utils.Warning.unused
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
@@ -183,54 +184,56 @@ class StackToDeclarative(
         append(Assignment(name, popElement(type)))
     }
 
-    private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
-
-        if (funcName.startsWith("getNth_")) {
-            stack.add(stack[stack.size - params.size])
-            return
-        }
-
-        if (funcName == "wasStaticInited") {
-            popElement(i32)
-            stack.add(zeroForStaticInited)
-            return
-        }
-
-        if (!enableCppTracing) {
-            if (funcName == "stackPush" || funcName == "stackPop") {
-                if (funcName == "stackPush") popElement(i32)
-                return
+    private fun handleSpecialCall(funcName: String, params: List<String>, results: List<String>): Boolean {
+        unused(results)
+        when {
+            funcName.startsWith("getNth_") -> {
+                stack.add(stack[stack.size - params.size])
             }
+            funcName == "wasStaticInited" -> {
+                popElement(i32)
+                stack.add(zeroForStaticInited)
+            }
+            !enableCppTracing && (funcName == "stackPush" || funcName == "stackPop") -> {
+                if (funcName == "stackPush") popElement(i32)
+            }
+            funcName.startsWith("swap") -> {
+                stack.add(stack.size - 2, stack.removeLast())
+            }
+            funcName.startsWith("dupi") || funcName.startsWith("dupf") -> {
+                stack.add(stack.last())
+            }
+            funcName.startsWith("dup2i") || funcName.startsWith("dup2f") -> {
+                val v0 = stack[stack.size - 2]
+                val v1 = stack.last()
+                stack.add(v0)
+                stack.add(v1)
+            }
+            // todo incorrect, because it causes a segfault :/
+            false && funcName.startsWith("dup_x1") -> {
+                val v1 = stack.removeLast()
+                val v0 = stack.removeLast()
+                stack.add(v1)
+                stack.add(v0)
+                stack.add(v1)
+            }
+            // todo incorrect, because it causes a segfault :/
+            false && funcName.startsWith("dup_x2") -> {
+                val v2 = stack.removeLast()
+                val v1 = stack.removeLast()
+                val v0 = stack.removeLast()
+                stack.add(v2)
+                stack.add(v0)
+                stack.add(v1)
+                stack.add(v2)
+            }
+            else -> return false
         }
+        return true
+    }
 
-        if (funcName.startsWith("swap")) {
-            stack.add(stack.size - 2, stack.removeLast())
-            return
-        }
-
-        if (funcName.startsWith("dupi") || funcName.startsWith("dupf")) {
-            stack.add(stack.last())
-            return
-        }
-
-        if (funcName.startsWith("dup2i") || funcName.startsWith("dup2f")) {
-            val v0 = stack[stack.size - 2]
-            val v1 = stack.last()
-            stack.add(v0)
-            stack.add(v1)
-            return
-        }
-
-        // these aren't correct yet, because they cause a segfault :/
-        /*if (funcName.startsWith("dup_x1")) {
-            stack.add(stack.size - 2, stack.last())
-            return
-        }
-
-        if (funcName.startsWith("dup_x2")) {
-            stack.add(stack.size - 3, stack.last())
-            return
-        }*/
+    private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
+        if (handleSpecialCall(funcName, params, results)) return
 
         val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else null
         val popped = popInReverse(funcName, params)
@@ -706,43 +709,36 @@ class StackToDeclarative(
             }
             is BlockInstr -> append(i)
             is LoopInstr -> {
-                val firstInstr = i.body.firstOrNull()
-                if (i.body.size == 1 && firstInstr is SwitchCase &&
-                    i.results.isEmpty() && stack.isEmpty()
-                ) {
-                    writeSwitchCase(firstInstr)
-                } else {
-                    val resultNames = i.results.map { nextTemporaryVariable() }
-                    for (j in i.results.indices) {
-                        append(NullDeclaration(i.results[j], resultNames[j]))
-                    }
-
-                    val newLoop = ArrayList<Instruction>()
-                    writer.add(newLoop)
-
-                    val stackSave = ArrayList(stack)
-                    stack.clear()
-                    val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
-                    val i1 = i.body.size - lastIsContinue.toInt()
-                    writeInstructions(i.body, 0, i1)
-
-                    if (!lastIsContinue) {
-                        // save results
-                        for (j in i.results.lastIndex downTo 0) {
-                            append(Assignment(resultNames[j], popElement(i.results[j])))
-                        }
-                        append(BreakInstr)
-                    } else assertTrue(i.results.isEmpty())
-
-                    stack.clear()
-                    stack.addAll(stackSave)
-                    for (j in i.results.indices) {
-                        push(i.results[j], resultNames[j])
-                    }
-
-                    writer.removeLast()
-                    append(LoopInstr(i.label, newLoop, i.params, i.results))
+                val resultNames = i.results.map { nextTemporaryVariable() }
+                for (j in i.results.indices) {
+                    append(NullDeclaration(i.results[j], resultNames[j]))
                 }
+
+                val newLoop = ArrayList<Instruction>()
+                writer.add(newLoop)
+
+                val stackSave = ArrayList(stack)
+                stack.clear()
+                val lastIsContinue = (i.body.lastOrNull() as? Jump)?.label == i.label
+                val i1 = i.body.size - lastIsContinue.toInt()
+                writeInstructions(i.body, 0, i1)
+
+                if (!lastIsContinue) {
+                    // save results
+                    for (j in i.results.lastIndex downTo 0) {
+                        append(Assignment(resultNames[j], popElement(i.results[j])))
+                    }
+                    append(BreakInstr)
+                } else assertTrue(i.results.isEmpty())
+
+                stack.clear()
+                stack.addAll(stackSave)
+                for (j in i.results.indices) {
+                    push(i.results[j], resultNames[j])
+                }
+
+                writer.removeLast()
+                append(LoopInstr(i.label, newLoop, i.params, i.results))
             }
             is Jump -> {
                 // C++ doesn't have proper continue@label/break@label, so use goto
@@ -753,7 +749,6 @@ class StackToDeclarative(
                 val condition = popElement("i32")
                 append(ExprIfBranch(condition, arrayListOf(GotoInstr(i.label)), emptyArrayList))
             }
-            is SwitchCase -> writeSwitchCase(i)
             Drop -> stack.pop()
             is Comment -> append(i)
             is FieldGetInstr -> writeReadInstr(i, k, assignments)
@@ -787,102 +782,5 @@ class StackToDeclarative(
             pushWithNames(rType, newValue, combinedDependencies, false)
         }
         tmp.clear()
-    }
-
-    private fun writeSwitchCase(switchCase: SwitchCase) {
-        // big monster, only 1 per function allowed, afaik
-        val cases = switchCase.cases
-        val label = switchCase.label
-        assertTrue(stack.isEmpty()) { "Expected empty stack, got $stack" }
-
-        fun getBranchIdx(instructions: List<Instruction>): Int {
-            val first = instructions.firstOrNull()
-            return if (instructions.size == 1 &&
-                first is Const && first.type == ConstType.I32
-            ) first.value as Int else assertFail()
-        }
-
-        val newCases = ArrayList<ArrayList<Instruction>>()
-        for (j in cases.indices) {
-            stack.clear()
-            val newCase = ArrayList<Instruction>()
-            writer.add(newCase)
-            newCases.add(newCase)
-
-            var hadReturn = false
-            val instructions = cases[j]
-            for (i in instructions.indices) {
-                val ni = nextInstr(instructions, i)
-                val next = instructions.getOrNull(ni)
-                val instr = instructions[i]
-
-                if (next is LocalSet && next.name == label) {
-                    var nni = nextInstr(instructions, ni)
-                    var nextNext = instructions[nni]
-                    while (nextNext !is Jump) {
-                        // confirm it is a stack variable
-                        assertTrue(nextNext is LocalSet && nextNext.name.startsWith("s"))
-                        val lastNNi = nni
-                        nni = nextInstr(instructions, nni)
-                        assertTrue(nni > lastNNi)
-                        nextNext = instructions[nni]
-                    }
-                    fun saveStack() {
-                        // save stack
-                        for (k in ni + 1 until nni) {
-                            writeInstruction(instructions[k])
-                        }
-                    }
-                    when (instr) {
-                        is IfBranch -> {
-                            // implement branch-goto
-                            val trueCase = getBranchIdx(instr.ifTrue)
-                            val falseCase = getBranchIdx(instr.ifFalse)
-                            val branch = popElement(i32)
-                            saveStack()
-                            append(
-                                ExprIfBranch(
-                                    branch,
-                                    arrayListOf(GotoInstr("case$trueCase")),
-                                    arrayListOf(GotoInstr("case$falseCase"))
-                                )
-                            )
-                        }
-                        is Const -> {
-                            // implement simple goto
-                            saveStack()
-                            val targetCase = getBranchIdx(listOf(instr))
-                            append(GotoInstr("case$targetCase"))
-                        }
-                        I32EQ, I32NE, I32EQZ,
-                        I32LES, I32LTS, I32GTS, I32GES -> {
-                            writeInstruction(instr)
-                            append(
-                                ExprIfBranch(
-                                    popElement(i32),
-                                    arrayListOf(GotoInstr("case1")),
-                                    arrayListOf(GotoInstr("case0"))
-                                )
-                            )
-                        }
-                        else -> throw NotImplementedError("Unknown symbol before switch-label: $instr")
-                    }
-                    hadReturn = true
-                    break
-                }
-
-                writeInstruction(instr)
-
-                if (instr.isReturning()) {
-                    hadReturn = true
-                    break
-                }
-            }
-
-            assertTrue(hadReturn)
-
-            writer.removeLast()
-        }
-        append(SwitchCase(switchCase.label, newCases, switchCase.params, switchCase.results))
     }
 }

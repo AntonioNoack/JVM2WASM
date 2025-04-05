@@ -200,12 +200,6 @@ object ReplaceOptimizer {
                     is LoopInstr -> {
                         optimizeUsingReplacements2(instr.body)
                     }
-                    is SwitchCase -> {
-                        val cases = instr.cases
-                        for (i in cases.indices) {
-                            optimizeUsingReplacements2(cases[i])
-                        }
-                    }
                     else -> {
                         val replacements = replacementsByInstr[instr]
                             ?: continue

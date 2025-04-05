@@ -140,7 +140,7 @@ object StackValidator {
         val stack = ArrayList(params)
         for (j in instructions.indices) {
             val i = instructions[j]
-            if (print && i !is IfBranch && i !is LoopInstr && i !is SwitchCase) {
+            if (print && i !is IfBranch && i !is LoopInstr) {
                 println("  $stack, $i")
             }
             if (validateStackStep(sig, params, returnResults, localVarTypes, paramsTypes, stack, print, j, i)) {
@@ -264,15 +264,6 @@ object StackValidator {
             }
             is LoadInstr -> stack.pop(ptrType).push(i.wasmType)
             is StoreInstr -> stack.pop(i.wasmType).pop(ptrType)
-            is SwitchCase -> {
-                assertTrue(stack.isEmpty())
-                for (case in i.cases) {
-                    validateStack3(
-                        sig, case, emptyList(), emptyList(), returnResults,
-                        localVarTypes, paramsTypes
-                    )
-                }
-            }
             PtrDupInstr -> stack.pop(ptrType).push(ptrType).push(ptrType)
             is HighLevelInstruction -> {
                 for (instr in i.toLowLevel()) {

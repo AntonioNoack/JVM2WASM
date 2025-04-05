@@ -92,11 +92,6 @@ class Clustering(val functions: List<FunctionImpl>, var complexity: Int) {
                     findDependencies(instr.ifTrue, funcByName, dst)
                     findDependencies(instr.ifFalse, funcByName, dst)
                 }
-                is SwitchCase -> {
-                    for (case in instr.cases) {
-                        findDependencies(case, funcByName, dst)
-                    }
-                }
                 is Call -> {
                     val func = funcByName[instr.name]
                     if (func != null) dst.add(func)
@@ -168,7 +163,6 @@ class Clustering(val functions: List<FunctionImpl>, var complexity: Int) {
             return when (instr) {
                 is LoopInstr -> 2 + getComplexity(instr.body)
                 is IfBranch -> 1 + getComplexity(instr.ifTrue) + getComplexity(instr.ifFalse)
-                is SwitchCase -> 5 + instr.cases.sumOfInt { getComplexity(it) }
                 else -> 1
             }
         }

@@ -2,8 +2,8 @@ package graphing
 
 import graphing.ExtractEndNodes.replaceGotoEndNode
 import graphing.ExtractEndNodes.solve
-import graphing.LargeSwitchStatement.loadStackPrepend
-import graphing.LargeSwitchStatement.storeStackAppend
+import graphing.LoadStoreStack.loadStackPrepend
+import graphing.LoadStoreStack.storeStackAppend
 import graphing.StackValidator.validateNodes1
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber

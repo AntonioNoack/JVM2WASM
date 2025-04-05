@@ -1,7 +1,7 @@
 package graphing
 
-import graphing.LargeSwitchStatement.loadStackPrepend
-import graphing.LargeSwitchStatement.storeStackAppend
+import graphing.LoadStoreStack.loadStackPrepend
+import graphing.LoadStoreStack.storeStackAppend
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*

@@ -74,9 +74,20 @@ object NativeHelperFunctions {
     }
 
     fun appendNativeHelperFunctions() {
-
         forAll { v1 ->
             register("dup$v1", listOf(v1), listOf(v1, v1), listOf(ParamGet[0], ParamGet[0], Return))
+        }
+        forAll2 { v1, v2 ->
+            register(
+                "dup_x1$v1$v2", listOf(v2, v1), listOf(v1, v2, v1),
+                listOf(ParamGet[1], ParamGet[0], ParamGet[1], Return)
+            )
+        }
+        forAll3 { v1, v2, v3 ->
+            register(
+                "dup_x2$v1$v2$v3", listOf(v3, v2, v1), listOf(v1, v3, v2, v1),
+                listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2], Return)
+            )
         }
         forAll2 { v1, v2 ->
             register(
@@ -176,20 +187,6 @@ object NativeHelperFunctions {
             register(
                 call.name, listOf(i32), listOf(type),
                 listOf(ParamGet[0], loadInstr, Return)
-            )
-        }
-
-        forAll2 { v1, v2 ->
-            register(
-                "dup_x1$v1$v2", listOf(v2, v1), listOf(v1, v2, v1),
-                listOf(ParamGet[1], ParamGet[0], ParamGet[1], Return)
-            )
-        }
-
-        forAll3 { v1, v2, v3 ->
-            register(
-                "dup_x2$v1$v2$v3", listOf(v3, v2, v1), listOf(v1, v3, v2, v1),
-                listOf(ParamGet[2], ParamGet[0], ParamGet[1], ParamGet[2], Return)
             )
         }
 

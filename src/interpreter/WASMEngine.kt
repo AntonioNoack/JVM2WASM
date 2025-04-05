@@ -96,12 +96,6 @@ class WASMEngine(memorySize: Int) {
                 newInstr.body = resolveCalls(i.body, byLabel)
                 newInstr
             }
-            is SwitchCase -> {
-                val newInstr = SwitchCase(i.label, i.cases, i.params, i.results)
-                byLabel[i.label] = newInstr
-                newInstr.cases = i.cases.map { caseI -> resolveCalls(caseI, byLabel) }
-                newInstr
-            }
             is IfBranch -> IfBranch(
                 resolveCalls(i.ifTrue, byLabel),
                 resolveCalls(i.ifFalse, byLabel),

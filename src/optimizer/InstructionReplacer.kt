@@ -26,7 +26,6 @@ fun interface InstructionReplacer {
                     }
                     is LoopInstr -> remaining.add(instr.body)
                     is BlockInstr -> remaining.add(instr.body)
-                    is SwitchCase -> remaining.addAll(instr.cases)
                     is BreakableInstruction -> throw NotImplementedError()
                 }
             }

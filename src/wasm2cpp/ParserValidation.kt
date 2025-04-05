@@ -124,16 +124,6 @@ object ParserValidation {
                     serialize(instr.body, dst)
                     dst.add(EndPseudo)
                 }
-                is SwitchCase -> {
-                    dst.add(SwitchPseudo)
-                    dst.add(PseudoInstr2(instr))
-                    for (case in instr.cases) {
-                        dst.add(CasePseudo)
-                        serialize(case, dst)
-                        dst.add(EndPseudo)
-                    }
-                    dst.add(EndPseudo)
-                }
                 is BreakableInstruction -> throw NotImplementedError()
                 else -> dst.add(instr)
             }

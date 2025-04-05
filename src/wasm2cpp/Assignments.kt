@@ -34,11 +34,6 @@ object Assignments {
                 insertAssignments(instr.ifTrue, i, result)
                 insertAssignments(instr.ifFalse, i, result)
             }
-            is SwitchCase -> {
-                for (j in instr.cases.indices) {
-                    insertAssignments(instr.cases[j], i, result)
-                }
-            }
             is Call, is CallIndirect -> {
                 // todo we don't need that, if we can prove that the function is pure wrt writing memory
                 //  (not native, not setting, not calling any setting methods)

@@ -76,11 +76,6 @@ object StaticInitRemover {
                 is LoopInstr -> {
                     removeStaticInit(instr.body)
                 }
-                is SwitchCase -> {
-                    instr.cases.forEach { caseI ->
-                        removeStaticInit(caseI)
-                    }
-                }
             }
             i++
         }
