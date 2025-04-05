@@ -35,4 +35,5 @@ wasm/index0.js
 /cpp/runtime-data.bin
 /cpp/jvm2wasm-funcTable.cpp
 /cpp/jvm2wasm-part*
+/cpp/jvm2wasm-structs.hpp
 /cpp/compile-log.txt

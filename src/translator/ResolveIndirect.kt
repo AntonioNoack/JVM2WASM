@@ -141,9 +141,6 @@ object ResolveIndirect {
         calledCanThrow: Boolean
     ): Boolean {
 
-        val tmpI32 = variables.tmpI32
-        val tmpPtr = variables.tmpPtr
-
         val groupedByClass =
             groupedByClassCache.getOrPut(sig0) {
                 findMethodsGroupedByClass(sig0, sig)
@@ -153,69 +150,93 @@ object ResolveIndirect {
         val numTests = countTests(groupedByClass)
         if (numTests >= maxOptionsInTree) return false
 
-        fun printCallPyramid(printer: Builder, returnInBranch: Boolean) {
-
-            val checkForInvalidClasses = false
-
-            if (comments) printer.comment("tree for $sig0 -> $options")
-            if (groupedByClass.size > 1 || checkForInvalidClasses) {
-                getCaller(printer)
-                printer.append(Call.readClass)
-                    .append(tmpI32.setter)
-            }
-
-            var lastBranch: ArrayList<Instruction> =
-                if (checkForInvalidClasses) arrayListOf(Call("jvm_JVM32_throwJs_V"), Unreachable)
-                else createBody(groupedByClass.last().first, calledCanThrow, returnInBranch)
-
-            val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
-            for (j in jMax - 1 downTo 0) {
-                val (toBeCalled, classes2) = groupedByClass[j]
-                val nextBranch = createPyramidCondition(classes2, tmpI32)
-                nextBranch.add(
-                    IfBranch(
-                        createBody(toBeCalled, calledCanThrow, returnInBranch),
-                        lastBranch, getArgs(splitArgs), getResult(ret, calledCanThrow)
-                    )
-                )
-                lastBranch = nextBranch
-            }
-            printer.append(lastBranch)
-        }
-
         if (numTests < 3) {
             if (comments) printer.comment("small pyramid")
-            printCallPyramid(printer, false)
+            val tmpI32 = variables.defineLocalVar("classId", i32, "int")
+            printCallPyramid(
+                sig0, splitArgs, ret, options, getCaller, calledCanThrow,
+                printer, groupedByClass, tmpI32, false
+            )
         } else {
-            val helperName = "tree_${sig0.toString().escapeChars()}"
-            helperFunctions.getOrPut(helperName) {
-                val results = ArrayList<String>(2)
-                if (ret != null) results.add(jvm2wasmTyped(ret))
-                if (canThrowError) results.add(ptrType)
-
-                // local variable for dupi32
-                val printer = Builder()
-                // load all parameters onto the stack
-                for (k in 0 until splitArgs.size + 1) {
-                    printer.append(ParamGet[k])
-                }
-                printCallPyramid(printer, true)
-                printer.append(Return)
-
-                FunctionImpl(
-                    helperName, (listOf(ptrType) + splitArgs).toParams(),
-                    results,
-                    listOf(
-                        LocalVariable(tmpI32.name, i32),
-                        LocalVariable(tmpPtr.name, ptrType)
-                    ),
-                    printer.instrs, false,
-                )
-            }
-            printer.append(Call(helperName))
+            val treeCall = getOrPutTree(
+                sig0, splitArgs, ret, options,
+                calledCanThrow, true, groupedByClass
+            )
+            printer.append(treeCall)
         }
 
         return true
+    }
+
+    private fun printCallPyramid(
+        sig0: MethodSig, splitArgs: List<String>, ret: String?,
+        options: Set<MethodSig>, getCaller: (Builder) -> Unit,
+        calledCanThrow: Boolean, printer: Builder,
+        groupedByClass: List<Pair<MethodSig, List<String>>>,
+        classIdLocal: LocalVariableOrParam,
+        returnInBranch: Boolean,
+    ) {
+
+        val checkForInvalidClasses = false
+
+        if (comments) printer.comment("tree for $sig0 -> $options")
+        if (groupedByClass.size > 1 || checkForInvalidClasses) {
+            getCaller(printer)
+            printer.append(Call.readClass)
+                .append(classIdLocal.setter)
+        }
+
+        var lastBranch: ArrayList<Instruction> =
+            if (checkForInvalidClasses) arrayListOf(Call("jvm_JVM32_throwJs_V"), Unreachable)
+            else createBody(groupedByClass.last().first, calledCanThrow, returnInBranch)
+
+        val jMax = groupedByClass.size - (!checkForInvalidClasses).toInt()
+        for (j in jMax - 1 downTo 0) {
+            val (toBeCalled, classes2) = groupedByClass[j]
+            val nextBranch = createPyramidCondition(classes2, classIdLocal)
+            nextBranch.add(
+                IfBranch(
+                    createBody(toBeCalled, calledCanThrow, returnInBranch),
+                    lastBranch, getArgs(splitArgs), getResult(ret, calledCanThrow)
+                )
+            )
+            lastBranch = nextBranch
+        }
+        printer.append(lastBranch)
+    }
+
+    private val treeGetSelf = { printerI: Builder -> printerI.append(ParamGet[0]); Unit }
+    private fun MethodTranslator.getOrPutTree(
+        sig0: MethodSig, splitArgs: List<String>, ret: String?,
+        options: Set<MethodSig>, calledCanThrow: Boolean,
+        returnInBranch: Boolean, groupedByClass: List<Pair<MethodSig, List<String>>>,
+    ): Call {
+        val helperName = "tree_${sig0.toString().escapeChars()}"
+        helperFunctions.getOrPut(helperName) {
+            val results = ArrayList<String>(2)
+            if (ret != null) results.add(jvm2wasmTyped(ret))
+            if (canThrowError) results.add(ptrType)
+
+            // local variable for dupi32
+            val printer = Builder()
+            // load all parameters onto the stack
+            for (k in 0 until splitArgs.size + 1) {
+                printer.append(ParamGet[k])
+            }
+            val classIdLocal = LocalVariableOrParam("int", i32, "classId", 0, false)
+            printCallPyramid(
+                sig0, splitArgs, ret, options, treeGetSelf,
+                calledCanThrow, printer, groupedByClass, classIdLocal, returnInBranch
+            )
+            printer.append(Return)
+
+            FunctionImpl(
+                helperName, (listOf(ptrType) + splitArgs).toParams(), results,
+                listOf(LocalVariable(classIdLocal.name, i32)),
+                printer.instrs, false,
+            )
+        }
+        return Call(helperName)
     }
 
 }

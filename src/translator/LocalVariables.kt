@@ -4,7 +4,6 @@ import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import translator.MethodTranslator.Companion.renameVariables
 import utils.*
-import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm2cpp.FunctionWriter
 
@@ -16,9 +15,6 @@ class LocalVariables {
     val localVarInfos = HashSet<LocalVarInfo>()
     val parameterByIndex = ArrayList<LocalVariableOrParam?>()
     private val localVarsLookup = ListMap<LocalVariableOrParam>()
-
-    val tmpI32 by lazy { defineLocalVar(i32, "?") }
-    val tmpPtr by lazy { defineLocalVar(ptrType, "java/lang/Object") }
 
     fun defineParamVariables(clazz: String, descriptor: Descriptor, isStatic: Boolean) {
         // special rules in Java:
@@ -73,7 +69,8 @@ class LocalVariables {
     }
 
     fun findOrDefineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
-        return localVarsLookup[getLookupIdx(i, wasmType)] ?: defineLocalVar(i, wasmType, descriptor)
+        return localVarsLookup[getLookupIdx(i, wasmType)]
+            ?: defineLocalVar("l", i, wasmType, descriptor)
     }
 
     private var nextLocalVar = -1
@@ -81,12 +78,13 @@ class LocalVariables {
         return nextLocalVar--
     }
 
-    fun defineLocalVar(wasmType: String, descriptor: String): LocalVariableOrParam {
-        return defineLocalVar(nextLocalVarIndex(), wasmType, descriptor)
+    fun defineLocalVar(prefix: String, wasmType: String, descriptor: String): LocalVariableOrParam {
+        return defineLocalVar(prefix, nextLocalVarIndex(), wasmType, descriptor)
     }
 
-    private fun defineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
-        val wasmName = "l${localVars.size}"
+    private fun defineLocalVar(prefix: String, i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
+        val count = localVars.count { it.name.startsWith(prefix) }
+        val wasmName = "$prefix$count"
         return defineLocalVar(i, wasmName, wasmType, descriptor)
     }
 

@@ -872,7 +872,7 @@ class MethodTranslator(
 
         if (fields.isNotEmpty()) {
             val createdInstance =
-                variables.defineLocalVar(utils.ptrType, synthClassName)
+                variables.defineLocalVar("new", utils.ptrType, synthClassName)
             printer.pop(ptrType)
             printer.append(createdInstance.setter)
 
@@ -1109,7 +1109,7 @@ class MethodTranslator(
 
         var calledCanThrow = canThrowError(sig1)
 
-        val getCaller = {printer: Builder ->
+        val getCaller = { printer: Builder ->
             if (splitArgs.isNotEmpty()) {
                 val wasmTypes = convertTypesToWASM(listOf(ptrType) + splitArgs)
                 printer.append(Call(gIndex.getNth(wasmTypes)))
@@ -1406,7 +1406,7 @@ class MethodTranslator(
         val default = getLabel(default0)
         val labels = labels0.map { getLabel(it) }
         if (printOps) println("  [lookup] switch [$default], [${keys.joinToString()}], [${labels.joinToString()}]")
-        val helper = variables.defineLocalVar(WASMTypes.i32, "int")
+        val helper = variables.defineLocalVar("switch", WASMTypes.i32, "int")
         printer.pop(i32)
         printer.append(helper.localSet)
         for (i in keys.indices) {
@@ -1474,7 +1474,7 @@ class MethodTranslator(
 
             if (catchers.size > 1 || (catchers[0].type != "java/lang/Throwable")) {
 
-                val throwable = variables.defineLocalVar(ptrType, "java/lang/Throwable")
+                val throwable = variables.defineLocalVar("thrown", ptrType, "java/lang/Throwable")
                 printer.append(throwable.localSet).comment("multiple/complex catchers")
 
                 var handler = TranslatorNode(createLabel())
@@ -1555,19 +1555,19 @@ class MethodTranslator(
                     printer.comment("maybe throwing single generic catcher")
 
                     val mainHandler = TranslatorNode(createLabel())
-                    val throwable = variables.defineLocalVar(ptrType, catcher.type)
+                    val thrown = variables.defineLocalVar("thrown", ptrType, catcher.type)
 
                     if (printOps) println("--- handler: ${mainHandler.label}")
 
                     printer.push(ptrType)
-                    printer.append(throwable.localSet)
-                    printer.append(throwable.localGet)
+                    printer.append(thrown.localSet)
+                    printer.append(thrown.localGet)
                     visitJumpInsn(0x9a, mainHandler.label) // if not null
 
                     mainHandler.inputStack = ArrayList(stack)
                     mainHandler.outputStack = listOf(ptrType)
                     for (e in stack.indices) mainHandler.printer.drop()
-                    mainHandler.printer.append(throwable.localGet)
+                    mainHandler.printer.append(thrown.localGet)
                     mainHandler.isAlwaysTrue = true
                     mainHandler.ifTrue = catcher.handler
                     nodes.add(mainHandler)
@@ -1599,7 +1599,7 @@ class MethodTranslator(
             }
             printer.append(Return)
         } else {
-            val tmp = variables.tmpPtr
+            val tmp = variables.defineLocalVar("thrown", ptrType, "java/lang/Throwable")
             printer.append(tmp.localSet)
             printer.append(tmp.localGet)
             val ifTrue = if (retType == null) {
