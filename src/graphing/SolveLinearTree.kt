@@ -201,17 +201,19 @@ object SolveLinearTree {
             return null
         }
 
+        val addExtraUnreachable = false
         for (i in nodes.indices) {
             val node = nodes[i]
             assertEquals(i, node.index)
 
+            val isSpecialLastNode = !addExtraUnreachable && i == nodes.lastIndex
             val extraInputs1 = extraInputs[node] ?: emptyList()
             val hasRootInput = (firstNodeIsEntry && i == 0) || extraInputs1.isNotEmpty()
             val hasInputs = hasRootInput || node.inputs.isNotEmpty()
             assertTrue(hasInputs)
 
             val nodeInputs = node.inputs.toList()
-            val printer = if (hasRootInput) {
+            val printer = if (hasRootInput || isSpecialLastNode) {
                 depth[node.index] = 0
                 // println("appending ${node.index} onto root")
                 resultPrinter
@@ -228,33 +230,43 @@ object SolveLinearTree {
                 }
             }
 
-            var hadCondition = false
-            fun addCondition(condition: LocalVariableOrParam) {
-                printer.append(condition.getter)
-                if (hadCondition) printer.append(I32Or)
-                hadCondition = true
-            }
-
-            // sort them to make it look a little nicer
-            val nodeLabels = nodeInputs.map { nodeI ->
-                val isTrue = when {
-                    nodeI is BranchNode && node == nodeI.ifTrue -> 1
-                    nodeI is BranchNode && node == nodeI.ifFalse -> 0
-                    nodeI is SequenceNode && node == nodeI.next -> 0
-                    else -> assertFail("Unknown case")
+            if (!isSpecialLastNode) {
+                var hadCondition = false
+                fun addCondition(condition: LocalVariableOrParam) {
+                    printer.append(condition.getter)
+                    if (hadCondition) printer.append(I32Or)
+                    hadCondition = true
                 }
-                labels[nodeI.index * 2 + isTrue]
-            }.sortedByDescending { it.index }
-            for (label in nodeLabels) {
-                addCondition(label)
-            }
 
-            for (j in extraInputs1.indices) {
-                addCondition(extraInputs1[j])
-            }
+                // sort them to make it look a little nicer
+                val nodeLabels = nodeInputs.map { nodeI ->
+                    val isTrue = when {
+                        nodeI is BranchNode && node == nodeI.ifTrue -> 1
+                        nodeI is BranchNode && node == nodeI.ifFalse -> 0
+                        nodeI is SequenceNode && node == nodeI.next -> 0
+                        else -> assertFail("Unknown case")
+                    }
+                    labels[nodeI.index * 2 + isTrue]
+                }.sortedByDescending { it.index }
+                for (label in nodeLabels) {
+                    addCondition(label)
+                }
 
-            if (!hadCondition) printer.append(i32Const1)
-            printer.append(IfBranch(node.printer.instrs))
+                for (j in extraInputs1.indices) {
+                    addCondition(extraInputs1[j])
+                }
+
+                // we need to create extra if-branches, because if we don't:
+                //  - this is added
+                //  - child decides to add content to THIS' printer (but won't be used anymore)
+                //  -> code goes missing
+                if (!hadCondition) printer.append(i32Const1)
+                printer.append(IfBranch(node.printer.instrs))
+
+            } else {
+                // the last branch is trivial :3
+                printer.append(node.printer)
+            }
 
             if (validate) StackValidator.validateStack2( // O(n²)
                 mt.sig, printer, emptyList(), emptyList(), retTypes,
@@ -262,8 +274,10 @@ object SolveLinearTree {
             )
         }
 
-        // end cannot be reached; in theory, we can skip the branch of the last node
-        resultPrinter.append(Unreachable)
+        if (addExtraUnreachable) {
+            // end cannot be reached
+            resultPrinter.append(Unreachable)
+        } // else: we can skip the branch of the last node
 
         nodes.clear()
         val inputStack = if (firstNodeIsEntry) firstNode.inputStack else emptyList()

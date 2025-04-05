@@ -33,6 +33,9 @@ import wasm.instr.Instructions.I64NE
 import wasm.instr.Instructions.Unreachable
 import java.io.File
 
+/**
+ * Transforms an arbitrary code-graph into a structure out of ifs and whiles.
+ * */
 class StructuralAnalysis(
     val methodTranslator: MethodTranslator,
     val nodes: MutableList<GraphingNode>
@@ -222,14 +225,14 @@ class StructuralAnalysis(
         return newNode
     }
 
-    fun replaceSelfIO(oldNode: GraphingNode, newNode: GraphingNode) {
+    private fun replaceSelfIO(oldNode: GraphingNode, newNode: GraphingNode) {
         if (oldNode in oldNode.inputs) {
             newNode.inputs.remove(oldNode)
             newNode.inputs.add(newNode)
         }
     }
 
-    fun replaceOutputs(oldNode: GraphingNode, newNode: GraphingNode) {
+    private fun replaceOutputs(oldNode: GraphingNode, newNode: GraphingNode) {
         for (output in oldNode.outputs) {
             val relatedNodes = output.inputs
             relatedNodes.remove(oldNode)
@@ -237,7 +240,7 @@ class StructuralAnalysis(
         }
     }
 
-    fun replaceInputs(oldNode: GraphingNode, newNode: GraphingNode) {
+    private fun replaceInputs(oldNode: GraphingNode, newNode: GraphingNode) {
         for (input in oldNode.inputs) {
             when (input) {
                 is BranchNode -> {
@@ -251,7 +254,7 @@ class StructuralAnalysis(
         }
     }
 
-    fun replaceLinks(oldNode: GraphingNode, newNode: GraphingNode) {
+    private fun replaceLinks(oldNode: GraphingNode, newNode: GraphingNode) {
         replaceSelfIO(oldNode, newNode)
         replaceOutputs(oldNode, newNode)
         replaceInputs(oldNode, newNode)
