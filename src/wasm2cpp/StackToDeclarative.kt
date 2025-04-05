@@ -19,18 +19,11 @@ import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F64Load
 import wasm.instr.Instructions.F64Store
-import wasm.instr.Instructions.I32EQ
-import wasm.instr.Instructions.I32EQZ
-import wasm.instr.Instructions.I32GES
-import wasm.instr.Instructions.I32GTS
-import wasm.instr.Instructions.I32LES
-import wasm.instr.Instructions.I32LTS
 import wasm.instr.Instructions.I32Load
 import wasm.instr.Instructions.I32Load16S
 import wasm.instr.Instructions.I32Load16U
 import wasm.instr.Instructions.I32Load8S
 import wasm.instr.Instructions.I32Load8U
-import wasm.instr.Instructions.I32NE
 import wasm.instr.Instructions.I32Store
 import wasm.instr.Instructions.I32Store16
 import wasm.instr.Instructions.I32Store8
@@ -234,20 +227,20 @@ class StackToDeclarative(
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
         if (handleSpecialCall(funcName, params, results)) return
-
-        val tmp = if (results.isNotEmpty()) nextTemporaryVariable() else null
-        val popped = popInReverse(funcName, params)
-        append(ExprCall(funcName, popped, results, tmp))
-
-        when (results.size) {
-            0 -> {}
-            1 -> push(results[0], tmp!!)
-            else -> {
-                tmp!!
+        if (results.isEmpty()) {
+            val popped = popInReverse(funcName, params)
+            append(ExprCall(funcName, popped, results, null, null))
+        } else {
+            val resultName = nextTemporaryVariable()
+            val popped = popInReverse(funcName, params)
+            append(ExprCall(funcName, popped, results, resultName, null))
+            if (results.size == 1) {
+                push(results[0], resultName)
+            } else {
                 for (j in results.indices) {
                     val newName = nextTemporaryVariable()
                     val typeJ = results[j]
-                    append(Declaration(typeJ, newName, StackElement(typeJ, "$tmp.v$j", listOf(tmp), false)))
+                    append(Declaration(typeJ, newName, StackElement(typeJ, "$resultName.v$j", listOf(resultName), false)))
                     push(typeJ, newName)
                 }
             }
@@ -284,37 +277,6 @@ class StackToDeclarative(
 
     private fun writeInstruction(i: Instruction) {
         writeInstruction(i, Int.MAX_VALUE, null)
-    }
-
-    private fun isNameOrNumber(expression: StackElement): Boolean {
-        return isNameOrNumber(expression.expr)
-    }
-
-    private fun isNameOrNumber(expression: String): Boolean {
-        return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
-                expression.toDoubleOrNull() != null
-    }
-
-    private fun isNumber(expression: String): Boolean {
-        for (i in expression.indices) {
-            val char = expression[i]
-            when (char) {
-                in '0'..'9' -> {} // ok
-                // difficult -> just use built-in, even if a little slow
-                '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
-                else -> return false
-            }
-        }
-        return true // all digits -> a number
-    }
-
-    private fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
-        if (isNameOrNumber(expression)) {
-            append(expression.expr)
-        } else {
-            append('(').append(expression.expr).append(')')
-        }
-        return this
     }
 
     private fun unaryInstr(
@@ -607,7 +569,7 @@ class StackToDeclarative(
                 for (j in i.params.indices) {
                     val j1 = baseSize + j
                     val stackJ = stack[j1]
-                    if (!isNameOrNumber(stackJ)) {
+                    if (!isNameOrNumber(stackJ.expr)) {
                         val newName = nextTemporaryVariable()
                         append(Declaration(stackJ.type, newName, stackJ))
                         stack[j1] = StackElement(stackJ.type, newName, listOf(newName), false)

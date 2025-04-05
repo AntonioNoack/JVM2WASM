@@ -1,6 +1,7 @@
 package wasm2cpp.instr
 
 import me.anno.utils.structures.lists.Lists.any2
+import wasm.instr.Comment
 import wasm.instr.Instruction
 import wasm2cpp.StackElement
 

@@ -18,6 +18,10 @@ data class LoopInstr(
     constructor(label: String, node: GraphingNode) :
             this(label, node.printer.instrs, node.inputStack, node.outputStack)
 
+    fun withBody(body: ArrayList<Instruction>): LoopInstr {
+        return LoopInstr(label, body, params, results)
+    }
+
     init {
         if (label.startsWith('$')) throw IllegalArgumentException(label)
     }

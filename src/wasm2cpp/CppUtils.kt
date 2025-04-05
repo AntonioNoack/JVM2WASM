@@ -35,6 +35,7 @@ fun defineFunctionImplementations(
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
     val stackToDeclarative = StackToDeclarative(globals, functionsByName)
+    val optimizer = DeclarativeOptimizer(globals)
     val functionWriter = FunctionWriter(globals)
     for (fi in functions.indices) {
         val function = functions[fi]
@@ -42,7 +43,8 @@ fun defineFunctionImplementations(
         val pos0 = writer.size
         try {
             val declarative = stackToDeclarative.write(function)
-            functionWriter.write(function.withBody(declarative))
+            val optimized = optimizer.write(function.withBody(declarative))
+            functionWriter.write(function.withBody(optimized))
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)
