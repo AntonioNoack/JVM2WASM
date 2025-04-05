@@ -55,9 +55,9 @@ object ResolveIndirect {
 
     fun MethodTranslator.resolveIndirect(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
-        getCaller: (Builder) -> Unit, calledCanThrow: Boolean
+        getCaller: (Builder) -> Unit, calledCanThrow: Boolean,
+        options: Set<MethodSig>
     ): Boolean {
-        val options = findConstructableChildImplementations(sig0)
         if (options.size == 1) {
             callSingleOption(options.first(), sig0, calledCanThrow)
             return true

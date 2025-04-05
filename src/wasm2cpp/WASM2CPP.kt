@@ -14,6 +14,7 @@ import utils.*
 import utils.WASMTypes.*
 import wasm.parser.*
 import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
+import wasm2cpp.PureFunctions
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
@@ -90,8 +91,9 @@ fun wasm2cpp(
     writeHeader(functions, functionTable, imports, globals)
     clock.stop("Writing Header")
     val clusters = splitFunctionsIntoClusters(functions, numTargetClusters)
+    val pureFunctions = PureFunctions(imports, functions, functionsByName).findPureFunctions()
     for (i in clusters.indices) {
-        writeCluster(i, clusters[i], globals, functionsByName)
+        writeCluster(i, clusters[i], globals, functionsByName, pureFunctions)
         clock.stop("Writing Cluster [$i]")
     }
     writeStructs()
@@ -360,11 +362,11 @@ fun writeHeader(
 
 fun writeCluster(
     i: Int, clustering: Clustering, globals: Map<String, GlobalVariable>,
-    functionsByName: Map<String, FunctionImpl>
+    functionsByName: Map<String, FunctionImpl>, pureFunctions: Set<String>
 ) {
     writer.append("#include \"jvm2wasm-base.h\"\n\n")
     defineFunctionHeads(clustering.imports)
-    defineFunctionImplementations(clustering.functions, globals, functionsByName)
+    defineFunctionImplementations(clustering.functions, globals, functionsByName, pureFunctions)
     getClusterFile(i).writeBytes(writer.values, 0, writer.size)
     writer.clear()
 }

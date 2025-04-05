@@ -30,11 +30,11 @@ fun defineFunctionHead(funcName: String, params: List<Param>, results: List<Stri
 
 fun defineFunctionImplementations(
     functions: List<FunctionImpl>, globals: Map<String, GlobalVariable>,
-    functionsByName: Map<String, FunctionImpl>
+    functionsByName: Map<String, FunctionImpl>, pureFunctions: Set<String>
 ) {
     writer.append("// implementations\n")
     writer.append("#include <cmath> // trunc, ...\n")
-    val stackToDeclarative = StackToDeclarative(globals, functionsByName)
+    val stackToDeclarative = StackToDeclarative(globals, functionsByName, pureFunctions)
     val optimizer = DeclarativeOptimizer(globals)
     val functionWriter = FunctionWriter(globals)
     for (fi in functions.indices) {

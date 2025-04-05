@@ -1,7 +1,5 @@
 package wasm2cpp
 
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
 import me.anno.utils.Warning.unused
@@ -34,7 +32,6 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
-import wasm2cpp.Assignments.MEMORY_DEPENDENCY
 import wasm2cpp.instr.*
 
 /**
@@ -42,7 +39,8 @@ import wasm2cpp.instr.*
  * */
 class StackToDeclarative(
     val globals: Map<String, GlobalVariable>,
-    private val functionsByName: Map<String, FunctionImpl>
+    private val functionsByName: Map<String, FunctionImpl>,
+    private val pureFunctions: Set<String>
 ) {
 
     companion object {
@@ -225,25 +223,49 @@ class StackToDeclarative(
         return true
     }
 
+    private fun inlineCall(funcName: String, popped: List<StackElement>): String {
+        val tmp = tmpExprBuilder
+        tmp.append(funcName).append('(')
+        for (i in popped.indices) {
+            if (i > 0) tmp.append(", ")
+            tmp.append(popped[i].expr)
+        }
+        tmp.append(')')
+        val inlinedCall = tmp.toString()
+        tmp.clear()
+        return inlinedCall
+    }
+
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
         if (handleSpecialCall(funcName, params, results)) return
         if (results.isEmpty()) {
+            // empty function -> nothing to be inlined
             val popped = popInReverse(funcName, params)
             append(ExprCall(funcName, popped, results, null, null))
-        } else {
-            val resultName = nextTemporaryVariable()
-            val popped = popInReverse(funcName, params)
-            append(ExprCall(funcName, popped, results, resultName, null))
-            if (results.size == 1) {
-                push(results[0], resultName)
-            } else {
-                for (j in results.indices) {
-                    val newName = nextTemporaryVariable()
-                    val typeJ = results[j]
-                    append(Declaration(typeJ, newName, StackElement(typeJ, "$resultName.v$j", listOf(resultName), false)))
-                    push(typeJ, newName)
-                }
-            }
+            return
+        }
+        val popped = popInReverse(funcName, params)
+        if (results.size == 1 && funcName in pureFunctions) {
+            // can be inlined :)
+            val type = results[0]
+            val joinedNames = popped.flatMap { it.names }.distinct()
+            stack.add(StackElement(type, inlineCall(funcName, popped), joinedNames, false))
+            return
+        }
+
+        val resultName = nextTemporaryVariable()
+        append(ExprCall(funcName, popped, results, resultName, null))
+        if (results.size == 1) {
+            push(results[0], resultName)
+            return
+        }
+
+        // too complicated to be inlined for now
+        for (j in results.indices) {
+            val newName = nextTemporaryVariable()
+            val typeJ = results[j]
+            append(Declaration(typeJ, newName, StackElement(typeJ, "$resultName.v$j", listOf(resultName), false)))
+            push(typeJ, newName)
         }
     }
 
@@ -712,36 +734,9 @@ class StackToDeclarative(
             }
             Drop -> stack.pop()
             is Comment -> append(i)
-            is FieldGetInstr -> writeReadInstr(i, k, assignments)
             PtrDupInstr -> stack.add(stack.last())
             is HighLevelInstruction -> writeInstructions(i.toLowLevel())
             else -> assertFail("Unknown instruction type ${i.javaClass}")
         }
-    }
-
-    private fun writeReadInstr(i: FieldGetInstr, k: Int, assignments: Map<String, Int>?) {
-        // append to expression, if possible -> inline more things;
-        // -> will be especially good for future, high-level code
-        //  - we need a dependency/name for "memory", or special addresses even
-        //  - and non-pure functions invalidate that, too
-        val rType = i.loadInstr.wasmType
-        val isStatic = i.fieldSig.isStatic
-        val self = if (isStatic) null else popElement(ptrType)
-        val tmp = tmpExprBuilder
-        assertTrue(tmp.size == 0)
-        tmp.append(i.loadCall.name).append('(')
-        if (self != null) tmp.append(self.expr).append(", ")
-        tmp.append(FieldSetInstr.getFieldAddr(if (isStatic) null else 0, i.fieldSig))
-        tmp.append(')')
-        val newValue = tmp.toString()
-        val combinedDependencies = if (self != null) self.names + MEMORY_DEPENDENCY else listOf(MEMORY_DEPENDENCY)
-        if (self != null && self.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
-            val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, combinedDependencies, false)))
-            push(rType, newName)
-        } else {
-            pushWithNames(rType, newValue, combinedDependencies, false)
-        }
-        tmp.clear()
     }
 }

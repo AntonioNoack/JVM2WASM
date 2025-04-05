@@ -1121,7 +1121,8 @@ class MethodTranslator(
             INVOKE_INTERFACE -> {
                 assertTrue(sig0 in dIndex.usedInterfaceCalls)
                 beforeDynamicCall(owner, getCaller)
-                if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow)) {
+                val options = findConstructableChildImplementations(sig0)
+                if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow, options)) {
 
                     // load interface/function index
                     getCaller(printer)
@@ -1130,7 +1131,9 @@ class MethodTranslator(
                     // instance, function index -> instance, function-ptr
 
                     printer.push(i32).append(Call.resolveInterface)
-                    printer.pop(i32).append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
+                    val callInstr = CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow))
+                    callInstr.options = options
+                    printer.pop(i32).append(callInstr)
                     ActuallyUsedIndex.add(this.sig, sig1)
                     if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
@@ -1228,7 +1231,8 @@ class MethodTranslator(
                     }
                 } else {
                     beforeDynamicCall(owner, getCaller)
-                    if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow)) {
+                    val options = findConstructableChildImplementations(sig0)
+                    if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow, options)) {
                         // method can have well-defined place in class :) -> just precalculate that index
                         // looks up the class, and in the class-function lut, it looks up the function ptr
                         // get the Nth element on the stack, where N = |args|
@@ -1239,7 +1243,9 @@ class MethodTranslator(
                             // instance, function index -> function-ptr
                             .append(Call.resolveIndirect)
                             .push(i32)
-                        printer.pop(i32).append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
+                        val callInstr = CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow))
+                        callInstr.options = options
+                        printer.pop(i32).append(callInstr)
                         ActuallyUsedIndex.add(this.sig, sig1)
                         if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
                     }

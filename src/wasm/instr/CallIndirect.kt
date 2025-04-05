@@ -1,11 +1,14 @@
 package wasm.instr
 
 import interpreter.WASMEngine
+import utils.MethodSig
 import utils.StringBuilder2
 
 data class CallIndirect(val type: FuncType) : Instruction {
 
     var typeIndex = -1
+
+    var options: Set<MethodSig>? = null
 
     override fun toString(): String {
         val builder = StringBuilder2()

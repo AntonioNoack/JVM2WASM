@@ -207,6 +207,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         val tmpType = instr.typeName
         val tmpVar = instr.instanceName
         // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
+        // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
         begin().append("using ").append(tmpType).append(" = ")
         if (type.results.isEmpty()) {
             writer.append("void")
@@ -221,7 +222,6 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             writer.append(type.params[pi])
         }
         writer.append(")").end()
-        // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
         begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
             .append(tmpType).append(">(indirect[").append(instr.indexExpr.expr).append("])").end()
     }
