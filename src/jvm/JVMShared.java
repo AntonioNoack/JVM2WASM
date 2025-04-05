@@ -532,10 +532,12 @@ public class JVMShared {
     }
 
 
+    @NoThrow
     @Alias(names = "resolveInterface")
     public static int resolveInterface(Object instance, int methodId) {
         if (instance == null) {
-            throw new NullPointerException("Instance for resolveInterface is null");
+            throwJs("Instance for resolveInterface is null");
+            return -1;
         } else {
             return resolveInterfaceByClass(readClassId(instance), methodId);
         }
@@ -620,10 +622,11 @@ public class JVMShared {
     @WASM(code = "global.get $numClasses")
     public static native int numClasses();
 
+    @NoThrow
     @Alias(names = "resolveIndirect")
     public static int resolveIndirect(Object instance, int signatureId) {
         if (instance == null) {
-            throw new NullPointerException("Instance for resolveIndirect is null");
+            throwJs("Instance for resolveIndirect is null");
         }
         return resolveIndirectByClass(readClassId(instance), signatureId);
     }

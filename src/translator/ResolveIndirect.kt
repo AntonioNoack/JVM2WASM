@@ -47,30 +47,33 @@ object ResolveIndirect {
         }
     }
 
-    private fun MethodTranslator.callSingleOption(
-        sigJ: MethodSig, splitArgs: List<String>, ret: String?,
-        owner: String, getCaller: (Builder) -> Unit,
-        sig0: MethodSig, calledCanThrow: Boolean
-    ) {
+    fun MethodTranslator.beforeDynamicCall(owner: String, getCaller: (Builder) -> Unit) {
         stackPush()
-        if (!ignoreNonCriticalNullPointers) {
-            checkNotNull0(owner, name, getCaller)
-        }
-        if (comments) printer.comment("single for $sig0 -> $sigJ")
-        ActuallyUsedIndex.add(this.sig, sigJ)
-        printer.append(Call(methodName(sigJ)))
-        printer.fixThrowable(calledCanThrow, sigJ)
+        checkNotNull0(owner, name, getCaller)
+    }
+
+    fun MethodTranslator.afterDynamicCall(splitArgs: List<String>, ret: String?) {
         pop(splitArgs, false, ret)
         stackPop()
     }
 
+    private fun MethodTranslator.callSingleOption(
+        sigJ: MethodSig, sig0: MethodSig, calledCanThrow: Boolean
+    ) {
+        if (comments) printer.comment("single for $sig0 -> $sigJ")
+        ActuallyUsedIndex.add(this.sig, sigJ)
+        printer.append(Call(methodName(sigJ)))
+        printer.fixThrowable(calledCanThrow, sigJ)
+    }
+
     fun MethodTranslator.resolveIndirect(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
-        options: Set<MethodSig>, getCaller: (Builder) -> Unit,
-        calledCanThrow: Boolean, owner: String
+        getCaller: (Builder) -> Unit, calledCanThrow: Boolean,
+        owner: String
     ): Boolean {
+        val options = findConstructableChildImplementations(sig0)
         if (options.size == 1) {
-            callSingleOption(options.first(), splitArgs, ret, owner, getCaller, sig0, calledCanThrow)
+            callSingleOption(options.first(), sig0, calledCanThrow)
             return true
         } else if (options.size < maxOptionsInTree) {
             return resolveIndirectTree(sig0, splitArgs, ret, options, getCaller, calledCanThrow, owner)
@@ -194,9 +197,6 @@ object ResolveIndirect {
             printer.append(lastBranch)
         }
 
-        stackPush()
-        checkNotNull0(owner, name, getCaller)
-
         if (numTests < 3) {
             if (comments) printer.comment("small pyramid")
             printCallPyramid(printer, false)
@@ -229,8 +229,6 @@ object ResolveIndirect {
             printer.append(Call(helperName))
         }
 
-        pop(splitArgs, false, ret)
-        stackPop()
         return true
     }
 

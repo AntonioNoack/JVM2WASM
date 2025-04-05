@@ -47,6 +47,8 @@ import translator.LoadStoreHelper.getStaticStoreCall
 import translator.LoadStoreHelper.getStoreCall
 import translator.LoadStoreHelper.getStoreInstr
 import translator.LoadStoreHelper.getVIOStoreCall
+import translator.ResolveIndirect.afterDynamicCall
+import translator.ResolveIndirect.beforeDynamicCall
 import translator.ResolveIndirect.resolveIndirect
 import translator.TranslatorNode.Companion.convertTypeToWASM
 import translator.TranslatorNode.Companion.convertTypesToWASM
@@ -1107,31 +1109,23 @@ class MethodTranslator(
 
         when (opcode0) {
             INVOKE_INTERFACE -> {
-
                 assertTrue(sig0 in dIndex.usedInterfaceCalls)
+                beforeDynamicCall(owner, ::getCaller)
+                if (!resolveIndirect(sig0, splitArgs, ret, ::getCaller, calledCanThrow, owner)) {
 
-                val variants = findConstructableChildImplementations(sig0)
-                if (!resolveIndirect(sig0, splitArgs, ret, variants, ::getCaller, calledCanThrow, owner)) {
                     // load interface/function index
                     getCaller(printer)
                     printer.append(i32Const(gIndex.getInterfaceIndex(InterfaceSig.c(name, sig0.descriptor))))
                     // looks up class, goes to interface list, binary searches function, returns func-ptr
                     // instance, function index -> instance, function-ptr
-                    stackPush()
+
                     printer.push(i32).append(Call.resolveInterface)
-                    stackPop() // so we can track the call better
-                    if (useResultForThrowables) handleThrowable() // if it's not found or nullptr
-                    printer.pop(i32) // pop instance
-                    pop(splitArgs, false, ret)
-
-                    stackPush()
-
-                    printer.append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
+                    printer.pop(i32).append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
                     ActuallyUsedIndex.add(this.sig, sig1)
                     if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
-                    stackPop()
                 }
+                afterDynamicCall(splitArgs, ret)
             }
             INVOKE_VIRTUAL -> {
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
@@ -1223,32 +1217,26 @@ class MethodTranslator(
                         }
                     }
                 } else {
-                    val options = findConstructableChildImplementations(sig0)
-                    if (!resolveIndirect(sig0, splitArgs, ret, options, ::getCaller, calledCanThrow, owner)) {
+                    beforeDynamicCall(owner, ::getCaller)
+                    if (!resolveIndirect(sig0, splitArgs, ret, ::getCaller, calledCanThrow, owner)) {
                         // method can have well-defined place in class :) -> just precalculate that index
                         // looks up the class, and in the class-function lut, it looks up the function ptr
                         // get the Nth element on the stack, where N = |args|
                         // problem: we don't have generic functions, so we need all combinations
+
                         getCaller(printer)
                         // +1 for internal VM offset
                         // << 2 for access without shifting
-                        // println("$clazz/${this.name}/${this.descriptor} -> $sig0 -> $sig")
-                        // printUsed(MethodSig(clazz, this.name, this.descriptor))
-                        stackPush()
                         val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
                         printer.append(i32Const(funcPtr))
                             // instance, function index -> function-ptr
                             .append(Call.resolveIndirect)
                             .push(i32)
-                        if (comments) printer.comment("$sig0, #${options.size}")
-                        stackPop()
-                        if (useResultForThrowables) handleThrowable()
-                        printer.pop(i32)
-                        pop(splitArgs, false, ret)
-                        printer.append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
-                        if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
+                        printer.pop(i32).append(CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow)))
                         ActuallyUsedIndex.add(this.sig, sig1)
+                        if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
                     }
+                    afterDynamicCall(splitArgs, ret)
                 }
             }
             // typically, <init>, but also can be private or super function; -> no resolution required
