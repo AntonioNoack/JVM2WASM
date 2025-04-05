@@ -5,7 +5,6 @@ import dIndex
 import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
-import ignoreNonCriticalNullPointers
 import me.anno.utils.algorithms.Recursion
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
@@ -47,19 +46,7 @@ object ResolveIndirect {
         }
     }
 
-    fun MethodTranslator.beforeDynamicCall(owner: String, getCaller: (Builder) -> Unit) {
-        stackPush()
-        checkNotNull0(owner, name, getCaller)
-    }
-
-    fun MethodTranslator.afterDynamicCall(splitArgs: List<String>, ret: String?) {
-        pop(splitArgs, false, ret)
-        stackPop()
-    }
-
-    private fun MethodTranslator.callSingleOption(
-        sigJ: MethodSig, sig0: MethodSig, calledCanThrow: Boolean
-    ) {
+    private fun MethodTranslator.callSingleOption(sigJ: MethodSig, sig0: MethodSig, calledCanThrow: Boolean) {
         if (comments) printer.comment("single for $sig0 -> $sigJ")
         ActuallyUsedIndex.add(this.sig, sigJ)
         printer.append(Call(methodName(sigJ)))
@@ -68,15 +55,14 @@ object ResolveIndirect {
 
     fun MethodTranslator.resolveIndirect(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
-        getCaller: (Builder) -> Unit, calledCanThrow: Boolean,
-        owner: String
+        getCaller: (Builder) -> Unit, calledCanThrow: Boolean
     ): Boolean {
         val options = findConstructableChildImplementations(sig0)
         if (options.size == 1) {
             callSingleOption(options.first(), sig0, calledCanThrow)
             return true
         } else if (options.size < maxOptionsInTree) {
-            return resolveIndirectTree(sig0, splitArgs, ret, options, getCaller, calledCanThrow, owner)
+            return resolveIndirectTree(sig0, splitArgs, ret, options, getCaller, calledCanThrow)
         } else return false
     }
 
@@ -152,7 +138,7 @@ object ResolveIndirect {
     private fun MethodTranslator.resolveIndirectTree(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
         options: Set<MethodSig>, getCaller: (Builder) -> Unit,
-        calledCanThrow: Boolean, owner: String
+        calledCanThrow: Boolean
     ): Boolean {
 
         val tmpI32 = variables.tmpI32

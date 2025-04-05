@@ -250,6 +250,12 @@ object GeneratorIndex {
         return getDynMethodIdx(sig.clazz, sig.name, sig.descriptor)
     }
 
+    fun getDynMethodIdxOffset(sig: MethodSig): Int {
+        // +1 for internal VM offset (length value)
+        // << 2 for access without shifting
+        return (getDynMethodIdx(sig) + 1) shl 2
+    }
+
     data class FieldData(val offset: Int, val type: String)
     data class Gap(val offset: Int, val size: Int)
 

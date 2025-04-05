@@ -1,7 +1,6 @@
 package utils
 
 import wasm.instr.*
-import wasm.instr.Drop
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 
@@ -99,11 +98,14 @@ class Builder(val instrs: ArrayList<Instruction>) {
     }
 
     fun drop(): Builder {
-        val last = lastOrNull()
-        when (last) {
+        when (val last = lastOrNull()) {
             Return, Unreachable -> return this
             is Const, is LocalGet, is ParamGet, is GlobalGet -> {
                 removeLast()
+            }
+            is Call -> {
+                if (last.name.startsWith("getNth_")) removeLast()
+                else append(Drop)
             }
             is UnaryInstruction -> {
                 removeLast()

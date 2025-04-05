@@ -47,8 +47,6 @@ import translator.LoadStoreHelper.getStaticStoreCall
 import translator.LoadStoreHelper.getStoreCall
 import translator.LoadStoreHelper.getStoreInstr
 import translator.LoadStoreHelper.getVIOStoreCall
-import translator.ResolveIndirect.afterDynamicCall
-import translator.ResolveIndirect.beforeDynamicCall
 import translator.ResolveIndirect.resolveIndirect
 import translator.TranslatorNode.Companion.convertTypeToWASM
 import translator.TranslatorNode.Companion.convertTypesToWASM
@@ -1077,6 +1075,16 @@ class MethodTranslator(
         return visitMethodInsn2(opcode, sig, isInterface, checkThrowable)
     }
 
+    fun beforeDynamicCall(owner: String, getCaller: (Builder) -> Unit) {
+        stackPush()
+        checkNotNull0(owner, name, getCaller)
+    }
+
+    fun afterDynamicCall(splitArgs: List<String>, ret: String?) {
+        pop(splitArgs, false, ret)
+        stackPop()
+    }
+
     fun visitMethodInsn2(opcode0: Int, sig0: MethodSig, isInterface: Boolean, checkThrowable: Boolean): Boolean {
 
         val owner = sig0.clazz
@@ -1088,8 +1096,9 @@ class MethodTranslator(
 
         val ret = descriptor.returnType
         val splitArgs = descriptor.wasmParams
-        if (isStatic != hIndex.isStatic(sig0))
-            throw RuntimeException("Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)")
+        assertEquals(isStatic, hIndex.isStatic(sig0)) {
+            "Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)"
+        }
 
         val sig1 = hIndex.getAlias(sig0)
 
@@ -1100,18 +1109,19 @@ class MethodTranslator(
 
         var calledCanThrow = canThrowError(sig1)
 
-        fun getCaller(printer: Builder) {
+        val getCaller = {printer: Builder ->
             if (splitArgs.isNotEmpty()) {
                 val wasmTypes = convertTypesToWASM(listOf(ptrType) + splitArgs)
                 printer.append(Call(gIndex.getNth(wasmTypes)))
             } else printer.append(PtrDupInstr)
+            Unit
         }
 
         when (opcode0) {
             INVOKE_INTERFACE -> {
                 assertTrue(sig0 in dIndex.usedInterfaceCalls)
-                beforeDynamicCall(owner, ::getCaller)
-                if (!resolveIndirect(sig0, splitArgs, ret, ::getCaller, calledCanThrow, owner)) {
+                beforeDynamicCall(owner, getCaller)
+                if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow)) {
 
                     // load interface/function index
                     getCaller(printer)
@@ -1190,7 +1200,7 @@ class MethodTranslator(
                         }
                         else -> {
                             if (!ignoreNonCriticalNullPointers) {
-                                checkNotNull0(owner, name, ::getCaller)
+                                checkNotNull0(owner, name, getCaller)
                             }
                             pop(splitArgs, false, ret)
                             // final, so not actually virtual;
@@ -1217,17 +1227,14 @@ class MethodTranslator(
                         }
                     }
                 } else {
-                    beforeDynamicCall(owner, ::getCaller)
-                    if (!resolveIndirect(sig0, splitArgs, ret, ::getCaller, calledCanThrow, owner)) {
+                    beforeDynamicCall(owner, getCaller)
+                    if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow)) {
                         // method can have well-defined place in class :) -> just precalculate that index
                         // looks up the class, and in the class-function lut, it looks up the function ptr
                         // get the Nth element on the stack, where N = |args|
                         // problem: we don't have generic functions, so we need all combinations
-
                         getCaller(printer)
-                        // +1 for internal VM offset
-                        // << 2 for access without shifting
-                        val funcPtr = (gIndex.getDynMethodIdx(sig0) + 1) shl 2
+                        val funcPtr = gIndex.getDynMethodIdxOffset(sig0)
                         printer.append(i32Const(funcPtr))
                             // instance, function index -> function-ptr
                             .append(Call.resolveIndirect)
@@ -1242,7 +1249,7 @@ class MethodTranslator(
             // typically, <init>, but also can be private or super function; -> no resolution required
             INVOKE_SPECIAL -> {
                 if (!ignoreNonCriticalNullPointers) {
-                    checkNotNull0(owner, name, ::getCaller)
+                    checkNotNull0(owner, name, getCaller)
                 }
                 pop(splitArgs, false, ret)
                 val inline = hIndex.inlined[sig1]
