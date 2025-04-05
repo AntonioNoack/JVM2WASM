@@ -106,7 +106,6 @@ data class Call(val name: String) : Instruction {
         val panic = Call("panic")
         val readClass = Call("readClass")
         val findClass = Call("findClass")
-        val findStatic = Call("findStatic")
         val instanceOf = Call("instanceOf")
         val instanceOfNonInterface = Call("instanceOfNonInterface")
         val instanceOfExact = Call("instanceOfExact")
@@ -134,9 +133,9 @@ data class Call(val name: String) : Instruction {
         val dcmpl = Call("dcmpl") // -1 if NaN
         val dcmpg = Call("dcmpg") // +1 if NaN
 
-        val checkWrite = Call("checkWrite")
-
         val dupI32 = Call("dupi32")
         val dupI64 = Call("dupi64")
+
+        val resolveInterface = Call("resolveInterface")
     }
 }

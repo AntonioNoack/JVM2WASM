@@ -1118,7 +1118,7 @@ class MethodTranslator(
                     // looks up class, goes to interface list, binary searches function, returns func-ptr
                     // instance, function index -> instance, function-ptr
                     stackPush()
-                    printer.push(i32).append(Call("resolveInterface"))
+                    printer.push(i32).append(Call.resolveInterface)
                     stackPop() // so we can track the call better
                     if (useResultForThrowables) handleThrowable() // if it's not found or nullptr
                     printer.pop(i32) // pop instance
