@@ -2,11 +2,13 @@ package graphing
 
 import canThrowError
 import graphing.StructuralAnalysis.Companion.printState
+import graphing.StructuralAnalysis.Companion.printState2
 import hIndex
 import hierarchy.HierarchyIndex.methodAliases
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
 import implementedMethods
+import me.anno.utils.OS
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
@@ -16,11 +18,8 @@ import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.isLookingAtSpecial
 import useWASMExceptions
-import utils.Builder
-import utils.MethodSig
+import utils.*
 import utils.WASMTypes.i32
-import utils.helperFunctions
-import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
@@ -95,7 +94,10 @@ object StackValidator {
                     mt.variables.localVarsAndParams
                 )
             } catch (e: IllegalStateException) {
-                printState(nodes, e.message.toString())
+                val builder = StringBuilder2()
+                printState2(nodes) { line -> builder.append(line).append('\n') }
+                OS.desktop.getChild("stack-crash.txt")
+                    .writeText(builder.toString())
                 throw IllegalStateException("Error in $node", e)
             }
         }
@@ -107,7 +109,7 @@ object StackValidator {
         localVarsWithParams: List<LocalVariableOrParam>
     ) {
         val (localVarTypes, paramsTypes) = validateLocalVariables(localVarsWithParams)
-        validateStack3(sig, printer.instrs, params, normalResults, returnResults, localVarTypes, paramsTypes)
+        validateStack3(sig, printer.instrs, params, normalResults, returnResults, localVarTypes, paramsTypes, 0)
     }
 
 
@@ -116,16 +118,30 @@ object StackValidator {
         instructions: List<Instruction>, params: List<String>,
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
+        depth: Int,
     ) {
         try {
-            validateStack3Impl(sig, instructions, params, normalResults, returnResults, localVarTypes, paramsTypes)
+            validateStack3Impl(
+                sig, instructions, params, normalResults, returnResults,
+                localVarTypes, paramsTypes, depth, false
+            )
         } catch (e: IllegalStateException) {
+            try {
+                // print where we crash
+                validateStack3Impl(
+                    sig, instructions, params, normalResults, returnResults,
+                    localVarTypes, paramsTypes, depth, true
+                )
+            } catch (ignored: IllegalStateException) {
+            }
+
             val prefix = "ValidateStack3"
             if ((e.message ?: "").startsWith(prefix)) throw e
-            throw IllegalStateException(
-                "$prefix[$params,$normalResults/$returnResults]\n" +
-                        instructions.joinToString("\n"), e
-            )
+            val builder = StringBuilder2()
+            builder.append(instructions.joinToString("\n"))
+            OS.desktop.getChild("stack-crash-instr-$depth.txt")
+                .writeText(builder.toString())
+            throw IllegalStateException("${e.message}[$params -> $normalResults/$returnResults]", e)
         }
     }
 
@@ -134,41 +150,52 @@ object StackValidator {
         instructions: List<Instruction>, params: List<String>,
         normalResults: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
+        depth: Int, allowPrinting: Boolean
     ) {
-        val print = false && isLookingAtSpecial(sig)
-        if (print) println("Validating stack $sig/$params -> $normalResults/$returnResults, $localVarTypes")
+        val print = allowPrinting && isLookingAtSpecial(sig)
+        if (print) println("${"  ".repeat(depth)}Validating stack[${instructions.size}] $sig/$params -> $normalResults/$returnResults, $localVarTypes")
         val stack = ArrayList(params)
-        for (j in instructions.indices) {
-            val i = instructions[j]
-            if (print && i !is IfBranch && i !is LoopInstr) {
-                println("  $stack, $i")
+        for (i in instructions.indices) {
+            val instr = instructions[i]
+            if (print) {
+                when (instr) {
+                    is IfBranch -> println("${"  ".repeat(depth)}  [$i] $stack, if(${instr.params}) -> ${instr.results}")
+                    is LoopInstr -> println("${"  ".repeat(depth)}  [$i] $stack, loop(${instr.params}) -> ${instr.results}")
+                    else -> println("${"  ".repeat(depth)}  [$i] $stack, $instr")
+                }
             }
-            if (validateStackStep(sig, params, returnResults, localVarTypes, paramsTypes, stack, print, j, i)) {
-                return
+            try {
+                val hasReturned = validateStackStep(
+                    sig, params, returnResults,
+                    localVarTypes, paramsTypes,
+                    stack, print, i, instr, depth
+                )
+                if (hasReturned) return
+            } catch (e: Exception) {
+                throw IllegalStateException("Exception at [$i]", e)
             }
         }
+        // assertEquals(normalResults, stack,  "Stack incorrect, $normalResults vs $stack")
         assertTrue(stack.endsWith(normalResults), "Stack incorrect, $normalResults vs $stack")
     }
 
     private fun validateStackStep(
-        sig: MethodSig,
-        params: List<String>,
-        returnResults: List<String>,
+        sig: MethodSig, params: List<String>, returnResults: List<String>,
         localVarTypes: Map<String, String>, paramsTypes: List<String>,
-        stack: ArrayList<String>, print: Boolean, j: Int, i: Instruction
+        stack: ArrayList<String>, print: Boolean, i: Int, instr: Instruction, depth: Int,
     ): Boolean {
-        when (i) {
+        when (instr) {
             is LocalGet -> stack.push(
-                localVarTypes[i.name]
-                    ?: throw IllegalStateException("Missing $i")
+                localVarTypes[instr.name]
+                    ?: throw IllegalStateException("Missing $instr")
             )
             is LocalSet -> stack.pop(
-                localVarTypes[i.name]
-                    ?: throw IllegalStateException("Missing $i"),
-                i.name
+                localVarTypes[instr.name]
+                    ?: throw IllegalStateException("Missing $instr"),
+                instr.name
             )
-            is ParamGet -> stack.push(paramsTypes[i.index])
-            is ParamSet -> stack.pop(paramsTypes[i.index])
+            is ParamGet -> stack.push(paramsTypes[instr.index])
+            is ParamSet -> stack.pop(paramsTypes[instr.index])
             is GlobalGet -> stack.push(i32)
             is GlobalSet -> stack.pop(i32)
             Return -> {
@@ -180,45 +207,51 @@ object StackValidator {
             }
             is IfBranch -> {
                 stack.pop(i32)
-                for (param in i.params.reversed()) {
+                for (param in instr.params.reversed()) {
                     stack.pop(param)
                 }
-                validateStack3(sig, i.ifTrue, i.params, i.results, returnResults, localVarTypes, paramsTypes)
-                validateStack3(sig, i.ifFalse, i.params, i.results, returnResults, localVarTypes, paramsTypes)
-                if (i.isReturning()) {
+                validateStack3(
+                    sig, instr.ifTrue, instr.params, instr.results,
+                    returnResults, localVarTypes, paramsTypes, depth + 1
+                )
+                validateStack3(
+                    sig, instr.ifFalse, instr.params, instr.results,
+                    returnResults, localVarTypes, paramsTypes, depth + 1
+                )
+                if (instr.isReturning()) {
                     // done :)
                     return true
                 } else {
-                    stack.addAll(i.results)
+                    stack.addAll(instr.results)
                 }
             }
-            is Const -> stack.push(i.type.wasmType)
+            is Const -> stack.push(instr.type.wasmType)
             is Comment -> {} // ignored
             is UnaryInstruction -> {
-                if (stack.lastOrNull() != i.popType) {
-                    throw IllegalStateException("Cannot pop #$j $i from $stack")
+                if (stack.lastOrNull() != instr.popType) {
+                    throw IllegalStateException("Cannot pop #$i $instr from $stack")
                 }
-                stack.pop(i.popType).push(i.pushType)
+                stack.pop(instr.popType).push(instr.pushType)
             }
-            is BinaryInstruction -> stack.pop(i.popType).pop(i.popType).push(i.pushType)
-            is ShiftInstr -> stack.pop(i.type).pop(i.type).push(i.type)
+            is BinaryInstruction -> stack.pop(instr.popType).pop(instr.popType).push(instr.pushType)
+            is ShiftInstr -> stack.pop(instr.type).pop(instr.type).push(instr.type)
             Drop -> stack.removeLast()
-            is NumberCastInstruction -> stack.pop(i.popType).push(i.pushType)
+            is NumberCastInstruction -> stack.pop(instr.popType).push(instr.pushType)
             is Call -> {
                 // println("Calling $i on $stack")
                 val func =
-                    methodAliases[i.name]
-                        ?: implementedMethods[i.name]
-                        ?: helperFunctions[i.name]
-                        ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == i.name }
+                    methodAliases[instr.name]
+                        ?: implementedMethods[instr.name]
+                        ?: helperFunctions[instr.name]
+                        ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == instr.name }
                 if (func == null) {
-                    LOGGER.warn("Missing ${i.name}, skipping validation")
+                    LOGGER.warn("Missing ${instr.name}, skipping validation")
                     return true
                 }
                 // drop all arguments in reverse order
                 val callParams = getCallParams(func)
-                for (j in callParams.lastIndex downTo 0) { // last one is return type
-                    stack.pop(callParams[j])
+                for (k in callParams.lastIndex downTo 0) { // last one is return type
+                    stack.pop(callParams[k])
                 }
                 // drop "self"
                 if (hasSelfParam(func)) {
@@ -227,23 +260,25 @@ object StackValidator {
                 // push return values
                 val canThrow = !useWASMExceptions && canThrowError1(func)
                 val retTypes = getRetType(func, canThrow)
-                if (print) println("call ${i.name} -> $func -> $retTypes")
+                if (print) println("${"  ".repeat(depth + 2)}call(${callParams.joinToString()}) -> $retTypes")
                 stack.addAll(retTypes)
             }
             is CallIndirect -> {
                 stack.pop(i32) // pop method pointer
-                val params1 = i.type.params
+                val params1 = instr.type.params
                 for (k in params1.lastIndex downTo 0) {
                     stack.pop(params1[k])
                 }
-                stack.addAll(i.type.results)
+                stack.addAll(instr.type.results)
             }
             is LoopInstr -> {
+                assertTrue(instr.params.isEmpty())
                 validateStack3(
-                    sig, i.body, stack, i.results, returnResults,
-                    localVarTypes, paramsTypes
+                    sig, instr.body, stack, instr.results, returnResults,
+                    localVarTypes, paramsTypes, depth + 1
                 )
-                if (i.isReturning()) return true// done
+                stack.addAll(instr.results)
+                if (instr.isReturning()) return true// done
             }
             is Jump -> {
                 // todo check results match stack
@@ -253,19 +288,19 @@ object StackValidator {
                 stack.pop(i32)
                 // todo check results match stack
             }
-            is LoadInstr -> stack.pop(ptrType).push(i.wasmType)
-            is StoreInstr -> stack.pop(i.wasmType).pop(ptrType)
+            is LoadInstr -> stack.pop(ptrType).push(instr.wasmType)
+            is StoreInstr -> stack.pop(instr.wasmType).pop(ptrType)
             PtrDupInstr -> stack.pop(ptrType).push(ptrType).push(ptrType)
             is HighLevelInstruction -> {
-                for (instr in i.toLowLevel()) {
+                for (lowInstr in instr.toLowLevel()) {
                     val returning = validateStackStep(
                         sig, params, returnResults, localVarTypes,
-                        paramsTypes, stack, print, j, instr
+                        paramsTypes, stack, print, i, lowInstr, depth
                     )
                     if (returning) return true
                 }
             }
-            else -> throw NotImplementedError(i.toString())
+            else -> throw NotImplementedError(instr.toString())
         }
         return false
     }
@@ -302,7 +337,7 @@ object StackValidator {
         }
     }
 
-    private fun <V> List<V>.endsWith(end: List<V>): Boolean {
+    fun <V> List<V>.endsWith(end: List<V>): Boolean {
         val offset = size - end.size
         if (offset < 0) return false
         for (i in end.indices) {
@@ -331,7 +366,7 @@ object StackValidator {
         }
     }
 
-    fun validateInputs(nodes: List<GraphingNode>) {
+    private fun validateInputs(nodes: List<GraphingNode>) {
         for (node in nodes) {
             for (output in node.outputs) {
                 assertTrue(node in output.inputs) {

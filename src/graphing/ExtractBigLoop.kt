@@ -7,8 +7,8 @@ import graphing.LoadStoreStack.storeStackAppend
 import graphing.StackValidator.validateNodes1
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
-import me.anno.utils.assertions.*
 import me.anno.utils.algorithms.Recursion
+import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
 import translator.MethodTranslator
@@ -17,7 +17,7 @@ import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.Jump
 import wasm.instr.LoopInstr
-import kotlin.math.abs
+import kotlin.math.min
 
 /**
  * ideal: half/half-split
@@ -28,6 +28,8 @@ import kotlin.math.abs
  * - no other connections between loopNodes and startNodes
  * */
 object ExtractBigLoop {
+
+    val validate = true
 
     fun tryExtractBigLoop(sa: StructuralAnalysis): Boolean {
         // return false // not yet properly implemented
@@ -49,9 +51,11 @@ object ExtractBigLoop {
         return nodes.indices.mapNotNull {
             val loopStart = nodes[it]
             findBigLoopFrom(loopStart, sa)
-        }.minByOrNull {
+        }.maxByOrNull { loop ->
             // the ideal split is in the middle
-            abs(nodes.size.shr(1) - it.inLoopNodes.size)
+            val size0 = loop.inLoopNodes.size
+            val size1 = sa.nodes.size
+            min(size0, size1)
         }
     }
 
@@ -113,7 +117,6 @@ object ExtractBigLoop {
     private fun createMergedCode(sa: StructuralAnalysis, subset: BigLoop) {
 
         val print = sa.methodTranslator.isLookingAtSpecial
-        val validate = true
 
         val loopStart = subset.loopStart
         val inLoopNodes = subset.inLoopNodes
@@ -133,7 +136,7 @@ object ExtractBigLoop {
             println()
             println("------------------------------------------------------")
             println(
-                "ExtractStart, " +
+                "ExtractBigLoop, " +
                         "start: 0-${startNodesSize - 1}, " +
                         "loopStart: ${loopStart.index}, " +
                         "inLoop: ${loopStart.index + 1}-${sa.nodes.lastIndex}"
@@ -169,7 +172,7 @@ object ExtractBigLoop {
         // ensure node.index = actual index
         renumber(sa.nodes)
 
-        for (input in loopStart.inputs.toList()) {
+        for (input in loopStart.inputs.toList()) { // toList() to clone it
             when (input) {
                 loopStart -> assertFail()
                 !in inLoopNodes -> {
@@ -200,18 +203,22 @@ object ExtractBigLoop {
                         builder.append(jumpBack)
                         builder
                     }
+                    if (print) printState(sa.nodes, "After end-goto $input")
                 }
             }
         }
-        // loopNodes is invalid after this point, because nodes in it can be replaced
 
+        // loopNodes is invalid after this point, because nodes in it can be replaced
         loopStart.inputs.clear()
 
         if (print) printState(sa.nodes, "After Link Replacement")
 
+        if (validate) validateNodes1(sa.nodes, mt)
+
         // solve loop insides
         val loopNodesList = sa.nodes.subList(startNodesSize, startNodesSize + inLoopNodes.size)
-        if (validate) assertSame(loopStart, loopNodesList.first())
+        assertSame(loopStart, loopNodesList.first())
+
         val loopContent = solve(mt, loopNodesList)
         loadStackPrepend(stackToSave, loopContent, mt)
         loopInstr.body = loopContent.instrs

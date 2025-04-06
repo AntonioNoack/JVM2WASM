@@ -1,6 +1,5 @@
 package wasm2cpp.instr
 
-import me.anno.utils.structures.lists.Lists.all2
 import me.anno.utils.structures.lists.Lists.any2
 import wasm.instr.Instruction
 import wasm2cpp.StackElement

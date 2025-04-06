@@ -8,7 +8,7 @@ import wasm.instr.Instruction
  * */
 class PseudoHighLevelInstr(
     val body: List<Instruction>
-) : HighLevelInstruction {
+) : HighLevelInstruction() {
 
     override fun execute(engine: WASMEngine): String? {
         for (i in body.indices) {

@@ -189,8 +189,10 @@ class MethodTranslator(
             "w8", "w16", "w32", "w64", "w32f", "w64f"
         ).toSet()
 
-        @Suppress("UNUSED_PARAMETER")
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
+            // return sig.clazz == "me/anno/input/ActionManager" && sig.name == "init"
+            // return sig.clazz == "me/anno/ui/editor/code/CodeEditor" && sig.name == "draw\$lambda\$4"
+            // return sig.name == "listOfChildrenImpl"
             // return methodName(sig) == "kotlin_text_StringsKt__StringsJVMKt_replace_Ljava_lang_StringLjava_lang_StringLjava_lang_StringZLjava_lang_String"
             return false
         }
@@ -221,7 +223,6 @@ class MethodTranslator(
         return labelNames.getOrPut(label) { labelNames.size }
     }
 
-    var linearTreeNodeIndex = 0
     var endNodeExtractorIndex = 0
     var bigLoopExtractorIndex = 0
     var endNodeIndex = 0
@@ -1994,6 +1995,7 @@ class MethodTranslator(
         if (!isAbstract) {
             try {
                 // must happen before GraphingNodes, because we need to be able to associate labels with nodes
+                // (when a local variable is only valid for part of a function)
                 variables.renameLocalVariables(sig, nodes, labelNames.size)
                 variables.initializeLocalVariables(nodes.first().printer)
 
@@ -2005,6 +2007,7 @@ class MethodTranslator(
                 val nodes = TranslatorNode.convertNodes(nodes)
                 validateInputOutputStacks(nodes, sig)
                 validateStack(nodes, this)
+
                 val jointBuilder = StructuralAnalysis(this, nodes).joinNodes()
                 val variableValidator = VariableValidator.INSTANCE
                 val funcHead = createFuncHead()

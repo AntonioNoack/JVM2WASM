@@ -30,6 +30,8 @@ import wasm.instr.LoopInstr
  * */
 object ExtractEndNodes {
 
+    val validate = true
+
     fun tryExtractEnd(sa: StructuralAnalysis): Boolean {
         val endNodes = findEndNodes(sa)
         if (shouldReplaceEndNodes(endNodes)) {
@@ -39,14 +41,16 @@ object ExtractEndNodes {
         } else return false
     }
 
+    data class EndNodes(val endNodes: Set<GraphingNode>, val commonInputStack: List<String>)
+
     private fun findEndNodes(sa: StructuralAnalysis): Set<GraphingNode> {
         // check all nodes, whose following nodes are not recursive
         val capacity = sa.nodes.size
-        val endNodes = HashMap<GraphingNode, Boolean>(capacity)
+        val isEndNodeMap = HashMap<GraphingNode, Boolean>(capacity)
         for (node in sa.nodes) {
-            isEndNode(node, endNodes)
+            isEndNode(node, isEndNodeMap)
         }
-        return endNodes.filter { it.value }.keys
+        return isEndNodeMap.filter { it.value }.keys
     }
 
     private fun isEndNode(node: GraphingNode, endNodeCache: HashMap<GraphingNode, Boolean>): Boolean {
@@ -73,6 +77,9 @@ object ExtractEndNodes {
     }
 
     private fun validateNodes(sa: StructuralAnalysis, endNodes: Set<GraphingNode>) {
+
+        // printState(sa.nodes, "endNodes: ${endNodes.map { it.index }}")
+
         assertTrue(endNodes.size < sa.nodes.size)
         assertTrue(sa.nodes.first() !in endNodes)
         for (node in sa.nodes) {
@@ -87,7 +94,6 @@ object ExtractEndNodes {
     private fun createMergedCode(sa: StructuralAnalysis, endNodes: Set<GraphingNode>) {
 
         val print = sa.methodTranslator.isLookingAtSpecial
-        val validate = true
 
         if (validate) validateNodes1(sa.nodes, sa.methodTranslator)
 
@@ -157,15 +163,14 @@ object ExtractEndNodes {
 
         assertTrue(extraInputs.isNotEmpty())
         if (print) println(endNodesList.map { node -> "${node.index}.extra=${extraInputs[node]?.map { it.name }}" })
-        if (endNodes.size > 1) {
-            assertTrue(SolveLinearTree.trySolveLinearTree(endNodesList, mt, false, extraInputs))
-            assertEquals(1, endNodesList.size)
-        }
-        val endNodeCode = endNodesList.first().printer.instrs
 
+        assertTrue(SolveLinearTree.trySolveLinearTree(endNodesList, mt, false, extraInputs))
+        assertEquals(1, endNodesList.size)
+
+        val endNodeCode = endNodesList.first().printer
         loopInstr.body = arrayListOf(
             firstRunVariable.getter,
-            IfBranch(startCode.instrs, endNodeCode, emptyList(), emptyList()),
+            IfBranch(startCode.instrs, endNodeCode.instrs, emptyList(), emptyList()),
             Unreachable // should be unreachable, too
         )
 

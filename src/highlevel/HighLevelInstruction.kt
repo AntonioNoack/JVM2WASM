@@ -9,9 +9,9 @@ import wasm.instr.Instruction
  * Instruction, that can be split into smaller, more basic instructions.
  * Used to generate high-level code like JavaScript (in the future)
  * */
-interface HighLevelInstruction : Instruction {
+abstract class HighLevelInstruction : Instruction {
 
-    fun toLowLevel(): List<Instruction>
+    abstract fun toLowLevel(): List<Instruction>
 
     override fun toString(depth: Int, builder: StringBuilder2) {
         val instructions = toLowLevel()
@@ -21,5 +21,11 @@ interface HighLevelInstruction : Instruction {
             instr.toString(depth, builder)
             assertTrue(instr !is Comment)
         }
+    }
+
+    override fun toString(): String {
+        val tmp = StringBuilder2()
+        toString(0, tmp)
+        return tmp.toString()
     }
 }

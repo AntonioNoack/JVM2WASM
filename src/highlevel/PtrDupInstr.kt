@@ -5,7 +5,7 @@ import utils.is32Bits
 import wasm.instr.Call
 import wasm.instr.Instruction
 
-object PtrDupInstr : HighLevelInstruction {
+object PtrDupInstr : HighLevelInstruction() {
     override fun execute(engine: WASMEngine): String? {
         val value = engine.pop()
         engine.push(value)

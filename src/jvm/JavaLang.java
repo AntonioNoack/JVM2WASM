@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.management.RuntimeMXBean;
+import java.security.AccessControlContext;
 import java.util.Random;
 
 import static jvm.ArrayAccessSafe.arrayLength;
@@ -424,7 +425,9 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_Thread_init_Ljava_lang_ThreadGroupLjava_lang_RunnableLjava_lang_StringJLjava_security_AccessControlContextZV")
-    public static void privateThreadInit(int threadGroup, int runnable, int name, long stackSize, int ctx, boolean inheritThreadLocals) {
+    public static void Thread_init(
+            Thread self, ThreadGroup threadGroup, Runnable runnable, String name,
+            long stackSize, AccessControlContext ctx, boolean inheritThreadLocals) {
 
     }
 

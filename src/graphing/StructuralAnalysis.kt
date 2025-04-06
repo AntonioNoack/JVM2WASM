@@ -10,6 +10,7 @@ import me.anno.utils.assertions.*
 import me.anno.utils.structures.Collections.filterIsInstance2
 import me.anno.utils.structures.lists.Lists.count2
 import me.anno.utils.structures.lists.Lists.none2
+import me.anno.utils.structures.tuples.IntPair
 import optimizer.StaticInitOptimizer.optimizeStaticInit
 import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
@@ -128,6 +129,22 @@ class StructuralAnalysis(
                         node.printer.instrs
                             .joinToString("|")
                             .replace('\n', '|')
+                    }"
+                )
+            }
+        }
+
+        fun printState2(nodes: List<GraphingNode>, printLine: (String) -> Unit) {
+            for (i in nodes.indices) {
+                val node = nodes[i]
+                printLine(
+                    "${"$node,".padEnd(15)}#${
+                        node.inputs.map { it.index }.sorted()
+                    }, ${node.inputStack} -> ${node.outputStack}\n${
+                        node.printer.instrs
+                            .map { it.toString() }
+                            .flatMap { it.split('\n') }
+                            .joinToString("\n") { " | $it" }
                     }"
                 )
             }
@@ -294,6 +311,7 @@ class StructuralAnalysis(
         return changed
     }
 
+    private val removedNodeIds = ArrayList<Int>()
     private fun removeNodesWithoutCode() {
         for (i in nodes.lastIndex downTo 0) { // reverse, so we don't trample our own feet
             val node = nodes[i]
@@ -313,9 +331,13 @@ class StructuralAnalysis(
                 } else {
                     nodes.removeAt(i) // remove that node
                 }
-
-                if (printOps) printState(nodes, "-${node.index}, no code")
+                if (printOps) removedNodeIds.add(node.index)
             }
+        }
+        if (printOps && removedNodeIds.isNotEmpty()) {
+            removedNodeIds.sort()
+            printState(nodes, "Removed ${removedNodeIds}, no code")
+            removedNodeIds.clear()
         }
     }
 
@@ -387,34 +409,39 @@ class StructuralAnalysis(
         return true
     }
 
+    /**
+     * A -> B becomes B
+     * */
     private fun joinSequences(): Boolean {
         var changed = false
-        val firstNode = nodes.first()
-        for (i in 1 until nodes.size) {
-            val curr = nodes.getOrNull(i) ?: break
-            if (curr.inputs.size == 1) {
-                // merge with previous node
-                val prev = curr.inputs.first()
-                if (prev !is SequenceNode) continue // cannot merge
-                if (prev === curr) continue // cannot merge either
-                if (prev == firstNode) continue // should not remove that node;
-                // replace inputs with inputs of previous node
-                curr.inputs.clear()
-                curr.inputs.addAll(prev.inputs)
-                curr.inputStack = prev.inputStack
-                // prepend the previous node to this one
-                curr.printer.prepend(prev.printer)
-                // replace links from prev to curr
-                replaceInputs(prev, curr)
-                // then delete the previous node
-                nodes.remove(prev)
-                changed = true
+        var index = 0
+        while (++index < nodes.size) {
+            val nodeA = nodes.getOrNull(index) as? SequenceNode ?: break
+            val nodeB = nodeA.next
+            if (nodeA === nodeB || nodeB.inputs.size > 1) continue
+            assertEquals(setOf(nodeA), nodeB.inputs)
 
-                if (printOps) {
-                    printState(nodes, "Removed ${prev.index} via replaceSequences()")
-                }
-                checkState()
+            // replace inputs with inputs of previous node
+            nodeB.inputs.clear()
+            nodeB.inputs.addAll(nodeA.inputs)
+            nodeB.inputStack = nodeA.inputStack
+            // prepend the previous node to this one
+            nodeB.printer.prepend(nodeA.printer)
+            // replace links from prev to curr
+            replaceInputs(nodeA, nodeB)
+            // then delete the previous node
+            nodes.removeAt(index)
+            changed = true
+
+            if (printOps) {
+                removedNodeIds.add(nodeA.index)
             }
+            checkState()
+            index--
+        }
+        if (removedNodeIds.isNotEmpty()) {
+            printState(nodes, "Removed $removedNodeIds via replaceSequences()")
+            removedNodeIds.clear()
         }
         return changed
     }
@@ -443,19 +470,32 @@ class StructuralAnalysis(
                     val newPrev = replaceNode(prev, ReturnNode(prev.printer), nodes.indexOf(prev))
                     retNode.inputs.remove(newPrev)
                     if (printOps) {
-                        printState(nodes, "Append ${retNode.index} onto ${newPrev.index}")
+                        removedNodeIds.add(retNode.index)
+                        removedNodeIds.add(newPrev.index)
                     }
                     changed = true
                 }
                 if (retNode.inputs.isEmpty()) {
-                    // node can be deleted
-                    assertNotEquals(0, i)
+                    assertNotEquals(0, i, "first node must not be deleted")
                     nodes.removeAt(i)
                     if (printOps) {
-                        printState(nodes, "Removed ${retNode.index}")
+                        printState(nodes, "Removed end ${retNode.index}")
                     }
                 }
             }
+        }
+        if (removedNodeIds.isNotEmpty()) {
+            printState(
+                nodes, "Appended end ${
+                    (removedNodeIds.indices step 2).map {
+                        val retNode = removedNodeIds[it]
+                        val newPrev = removedNodeIds[it + 1]
+                        IntPair(retNode, newPrev)
+                    }.groupBy { it.first }.map { (retNode, pairs) ->
+                        "$retNode onto ${pairs.map { it.second }}"
+                    }
+                }")
+            removedNodeIds.clear()
         }
         return changed
     }
@@ -684,7 +724,7 @@ class StructuralAnalysis(
                     if (printOps) {
                         printState(
                             nodes, "generalBranching " +
-                                    "[${newNodeA.index}, ${nodeB.index}, ${nodeC.index}, ${nodeD.index}]"
+                                    "[${newNodeA.index} -> [${nodeB.index}|${nodeC.index}] -> ${nodeD.index}]"
                         )
                     }
                     checkState()
@@ -737,7 +777,7 @@ class StructuralAnalysis(
                     nodes.removeAll(listOf(b0, b1))
 
                     if (printOps) {
-                        printState(nodes, "-${b0.index},${b1.index} by 1/2")
+                        printState(nodes, "Removed both ending branches ${b0.index},${b1.index}")
                     }
                 } else if (b0Ends) {
                     // merge exit into this node
@@ -755,7 +795,7 @@ class StructuralAnalysis(
                     nodes.remove(b0)
 
                     if (printOps) {
-                        printState(nodes, "-${b0.index} by 3")
+                        printState(nodes, "Removed ending branch/0 ${b0.index}")
                     }
                 } else {
                     // merge exit into this node
@@ -771,7 +811,7 @@ class StructuralAnalysis(
                     nodes.remove(b1)
 
                     if (printOps) {
-                        printState(nodes, "-${b1.index} by 4")
+                        printState(nodes, "Removed ending branch/1 ${b1.index}")
                     }
                 }
 
@@ -973,7 +1013,8 @@ class StructuralAnalysis(
         printOps = methodTranslator.isLookingAtSpecial
 
         if (printOps) {
-            println("\n[SA] ${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
+            println()
+            LOGGER.info("${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
         }
 
         assertTrue(nodes.isNotEmpty())
@@ -1013,8 +1054,8 @@ class StructuralAnalysis(
                     val hadStepChange = when (step) {
                         0 -> removeEmptyIfStatements()
                         1 -> duplicateSimpleReturnNodes()
-                        2 -> joinFirstSequence()
-                        3 -> joinSequences()
+                        2 -> joinSequences()
+                        3 -> joinFirstSequence()
                         4 -> removeDeadEnds()
                         5 -> findWhereBothBranchesTerminate()
                         6 -> findWhileTrueLoopsA()
@@ -1032,7 +1073,7 @@ class StructuralAnalysis(
                         if (printOps) println("Change by [$step]")
                         checkState()
                         if (canReturnFirstNode()) {
-                            if (printOps) printState(nodes, "solved normally")
+                            if (printOps) printState(nodes, "Solved normally")
                             return firstNodeForReturn()
                         }
                         hadAnyChange = true

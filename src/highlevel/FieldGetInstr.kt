@@ -17,7 +17,7 @@ class FieldGetInstr(
     val fieldSig: FieldSig,
     val loadInstr: LoadInstr,
     val loadCall: Call
-) : HighLevelInstruction {
+) : HighLevelInstruction() {
     override fun execute(engine: WASMEngine): String? {
         val self = if (fieldSig.isStatic) null else engine.pop()
         val addr = getFieldAddr(self, fieldSig)

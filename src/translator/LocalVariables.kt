@@ -2,10 +2,12 @@ package translator
 
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
+import me.anno.utils.types.Strings.toInt
 import translator.MethodTranslator.Companion.renameVariables
 import utils.*
 import wasm.instr.*
 import wasm2cpp.FunctionWriter
+import kotlin.math.max
 
 class LocalVariables {
 
@@ -46,6 +48,10 @@ class LocalVariables {
         return defineLocalVar(nextLocalVarIndex(), name, type, descriptor)
     }
 
+    fun addPrefixedLocalVariable(prefix: String, type: String, descriptor: String): LocalVariableOrParam {
+        return defineLocalVar(prefix, nextLocalVarIndex(), type, descriptor)
+    }
+
     private val stackVariables = HashMap<String, LocalVariableOrParam>()
     fun getStackVarName(i: Int, type: String): LocalVariableOrParam {
         val name = "s$i$type"
@@ -83,8 +89,16 @@ class LocalVariables {
     }
 
     private fun defineLocalVar(prefix: String, i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
-        val count = localVars.count { it.name.startsWith(prefix) }
-        val wasmName = "$prefix$count"
+        assertTrue(prefix.isNotEmpty())
+        val prefix0 = prefix[0]
+        assertTrue(prefix0 in 'A'..'Z' || prefix0 in 'a'..'z')
+        val maxIndex = localVars.maxOfOrNull {
+            if (it.name.startsWith(prefix)) {
+                (it.name as CharSequence).toInt(prefix.length, it.name.length)
+            } else -1
+        } ?: -1
+        val nextIndex = max(maxIndex + 1, 0)
+        val wasmName = "$prefix$nextIndex"
         return defineLocalVar(i, wasmName, wasmType, descriptor)
     }
 

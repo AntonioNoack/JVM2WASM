@@ -19,7 +19,7 @@ class FieldSetInstr(
     val fieldSig: FieldSig,
     val storeInstr: StoreInstr,
     val storeCall: Call
-) : HighLevelInstruction {
+) : HighLevelInstruction() {
 
     companion object {
         fun getFieldAddr(self: Number?, fieldSig: FieldSig): Int {
