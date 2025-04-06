@@ -7,7 +7,9 @@ import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.types.Booleans.toInt
 import me.anno.utils.types.Strings.indexOf2
+import utils.Param.Companion.getSampleJVMType
 import utils.Param.Companion.toParams
+import utils.WASMType
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
 import wasm.instr.Const.Companion.f64Const
@@ -200,7 +202,7 @@ class WATParser : Module() {
                                 parseBlock(list, i) // params are optional
                             if (list.getType(i) == TokenType.OPEN_BRACKET) i = parseBlock(list, i)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
-                            types[typeName] = FuncType(ArrayList(params), ArrayList(results))
+                            types[typeName] = FuncType(ArrayList(params), ArrayList(results), Unit)
                             params.clear()
                             results.clear()
                         }
@@ -230,7 +232,8 @@ class WATParser : Module() {
                                         // (local $addr i32)
                                         val localName = list.consume(TokenType.DOLLAR, i++)
                                         val localType = list.consume(TokenType.NAME, i++)
-                                        locals.add(LocalVariable(localName, localType))
+                                        val wasmType = WASMType.find(localType)
+                                        locals.add(LocalVariable(localName, getSampleJVMType(wasmType), wasmType))
                                     }
                                     else -> {
                                         // some instruction
@@ -267,7 +270,7 @@ class WATParser : Module() {
                             list.consume(TokenType.OPEN_BRACKET, i++)
                             list.consume(TokenType.NAME, "i32.const", i++)
                             val initialValue = list.consume(TokenType.NUMBER, i++).toInt()
-                            globals[shortName] = GlobalVariable(shortName, "i32", initialValue, isMutable)
+                            globals[shortName] = GlobalVariable(shortName, WASMType.I32, initialValue, isMutable)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                         }
                         else -> assertFail("Unknown name: $name at " + list.subList(i, min(i + 20, list.size)))

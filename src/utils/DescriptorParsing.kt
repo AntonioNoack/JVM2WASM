@@ -1,13 +1,16 @@
 package utils
 
 import hIndex
-import utils.WASMTypes.*
+import translator.JavaTypes.convertTypeToWASM
+import utils.WASMTypes.i32
+import utils.WASMTypes.i64
 import wasm.instr.FuncType
 
 // could be changed to i64 in the future, if more browsers support 64 bit wasm
 // quite a few bits expect i32 though... hard to change now
 val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
+val ptrTypeI = if (is32Bits) WASMType.I32 else WASMType.I64
 
 fun genericsTypes(sig: MethodSig): String {
     return genericsTypes(sig.descriptor, hIndex.isStatic(sig))
@@ -34,26 +37,26 @@ fun genericsTypes(desc: Descriptor, isStatic: Boolean): String {
 }
 
 fun descriptorToFuncType(isStatic: Boolean, descriptor: Descriptor, canThrow: Boolean): FuncType {
-    val params = if (isStatic) descriptor.params
+    val params = if (isStatic) descriptor.wasmParams
     else run {
         // should be cacheable, too... idk if that's worth it
-        val params = ArrayList<String>(descriptor.wasmParams.size + 1)
-        params.add(ptrType) // self
+        val params = ArrayList<WASMType>(descriptor.wasmParams.size + 1)
+        params.add(ptrTypeI) // self
         params.addAll(descriptor.wasmParams)
         params
     }
-    val results = descriptor.getResultWASMTypes(canThrow)
-    return FuncType(params, results)
+    val results = descriptor.getResultTypes(canThrow)
+    return FuncType(params, results.map { convertTypeToWASM(it) })
 }
 
-fun jvm2wasmTyped(d: String): String = when (d) {
+fun jvm2wasmTyped(d: String): WASMType = when (d) {
     "Z", "C", "S", "B", "I", "F", "D", "J", "V" ->
         throw IllegalArgumentException("Use jvm2wasmRaw")
-    "boolean", "char", "short", "byte", "int" -> i32
-    "float" -> f32
-    "double" -> f64
-    "long" -> i64
-    else -> ptrType
+    "boolean", "char", "short", "byte", "int" -> WASMType.I32
+    "float" -> WASMType.F32
+    "double" -> WASMType.F64
+    "long" -> WASMType.I64
+    else -> ptrTypeI
 }
 
 fun storageSize(d: String): Int = when (d) {

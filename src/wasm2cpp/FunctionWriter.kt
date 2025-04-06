@@ -145,7 +145,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun writeNullDeclaration(instr: NullDeclaration) {
-        begin().append(instr.type).append(' ').append(instr.name)
+        begin().append(instr.jvmType).append(' ').append(instr.name)
             .append(" = 0").end()
     }
 

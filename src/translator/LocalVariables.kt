@@ -3,8 +3,10 @@ package translator
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Strings.toInt
+import translator.JavaTypes.convertTypeToWASM
 import translator.MethodTranslator.Companion.renameVariables
 import utils.*
+import utils.Param.Companion.getSampleJVMType
 import wasm.instr.*
 import wasm2cpp.FunctionWriter
 import kotlin.math.max
@@ -23,7 +25,7 @@ class LocalVariables {
         // double and long use two slots in localVariables
         var idx = 0
         if (!isStatic) {
-            defineParamVariable(clazz, ptrType, "self", 0)
+            defineParamVariable(clazz, ptrTypeI, "self", 0)
             idx++
         }
         for (i in descriptor.params.indices) {
@@ -37,26 +39,27 @@ class LocalVariables {
         }
     }
 
-    private fun defineParamVariable(clazz: String, type: String, name: String, k: Int) {
-        val localVar = LocalVariableOrParam(clazz, type, name, k, true)
+    private fun defineParamVariable(jvmType: String, wasmType: WASMType, name: String, k: Int) {
+        val localVar = LocalVariableOrParam(jvmType, wasmType, name, k, true)
         localVarsAndParams.add(localVar)
-        assertNull(localVarsLookup.set(getLookupIdx(k, type), localVar))
+        assertNull(localVarsLookup.set(getLookupIdx(k, wasmType), localVar))
         parameterByIndex.add(localVar)
     }
 
-    fun addLocalVariable(name: String, type: String, descriptor: String): LocalVariableOrParam {
-        return defineLocalVar(nextLocalVarIndex(), name, type, descriptor)
+    fun addLocalVariable(name: String, wasmType: WASMType, jvmType: String): LocalVariableOrParam {
+        return defineLocalVar(nextLocalVarIndex(), name, wasmType, jvmType)
     }
 
-    fun addPrefixedLocalVariable(prefix: String, type: String, descriptor: String): LocalVariableOrParam {
-        return defineLocalVar(prefix, nextLocalVarIndex(), type, descriptor)
+    fun addPrefixedLocalVariable(prefix: String, wasmType: WASMType, jvmType: String): LocalVariableOrParam {
+        return defineLocalVar(prefix, nextLocalVarIndex(), wasmType, jvmType)
     }
 
     private val stackVariables = HashMap<String, LocalVariableOrParam>()
-    fun getStackVarName(i: Int, type: String): LocalVariableOrParam {
-        val name = "s$i$type"
+    fun getStackVarName(i: Int, jvmType: String): LocalVariableOrParam {
+        val wasmType = convertTypeToWASM(jvmType)
+        val name = "s$i$wasmType"
         return stackVariables.getOrPut(name) {
-            addLocalVariable(name, type, "?")
+            addLocalVariable(name, wasmType, getSampleJVMType(wasmType))
         }
     }
 
@@ -69,12 +72,12 @@ class LocalVariables {
         printer.prepend(instructions)
     }
 
-    private fun getLookupIdx(i: Int, wasmType: String): Int {
+    private fun getLookupIdx(i: Int, wasmType: WASMType): Int {
         assertTrue(i >= 0)
         return i * WASMTypes.numWASMTypes + WASMTypes.getWASMTypeIndex(wasmType)
     }
 
-    fun findOrDefineLocalVar(i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
+    fun findOrDefineLocalVar(i: Int, wasmType: WASMType, descriptor: String): LocalVariableOrParam {
         return localVarsLookup[getLookupIdx(i, wasmType)]
             ?: defineLocalVar("l", i, wasmType, descriptor)
     }
@@ -84,11 +87,11 @@ class LocalVariables {
         return nextLocalVar--
     }
 
-    fun defineLocalVar(prefix: String, wasmType: String, descriptor: String): LocalVariableOrParam {
+    fun defineLocalVar(prefix: String, wasmType: WASMType, descriptor: String): LocalVariableOrParam {
         return defineLocalVar(prefix, nextLocalVarIndex(), wasmType, descriptor)
     }
 
-    private fun defineLocalVar(prefix: String, i: Int, wasmType: String, descriptor: String): LocalVariableOrParam {
+    private fun defineLocalVar(prefix: String, i: Int, wasmType: WASMType, descriptor: String): LocalVariableOrParam {
         assertTrue(prefix.isNotEmpty())
         val prefix0 = prefix[0]
         assertTrue(prefix0 in 'A'..'Z' || prefix0 in 'a'..'z')
@@ -102,7 +105,7 @@ class LocalVariables {
         return defineLocalVar(i, wasmName, wasmType, descriptor)
     }
 
-    private fun defineLocalVar(i: Int, name: String, wasmType: String, descriptor: String): LocalVariableOrParam {
+    private fun defineLocalVar(i: Int, name: String, wasmType: WASMType, descriptor: String): LocalVariableOrParam {
         assertTrue(localVars.none { it.name == name }) { "Duplicate variable $name" }
         val variable = LocalVariableOrParam(descriptor, wasmType, name, i, false)
         localVarsAndParams.add(variable)

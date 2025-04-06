@@ -55,7 +55,7 @@ class VariableValidator {
 
         for (i in locals.indices) {
             val local = locals[i]
-            zeros[local.name] = Const.zero[local.type]!!
+            zeros[local.name] = Const.zero[local.wasmType]!!
         }
 
         read.retainAll(written)

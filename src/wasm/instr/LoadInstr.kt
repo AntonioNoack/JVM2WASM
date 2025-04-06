@@ -1,11 +1,14 @@
 package wasm.instr
 
 import interpreter.WASMEngine
+import utils.WASMType
 import wasm.writer.Opcode
 import java.nio.ByteBuffer
 
-class LoadInstr(name: String, val wasmType: String, val numBytes: Int, opcode: Opcode, val impl: (ByteBuffer) -> Number) :
-    SimpleInstr(name, opcode) {
+class LoadInstr(
+    name: String, val wasmType: WASMType, val numBytes: Int,
+    opcode: Opcode, val impl: (ByteBuffer) -> Number
+) : SimpleInstr(name, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val addr = engine.pop().toInt()

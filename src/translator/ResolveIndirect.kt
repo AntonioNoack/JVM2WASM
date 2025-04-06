@@ -8,11 +8,11 @@ import hIndex
 import me.anno.utils.algorithms.Recursion
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
+import translator.JavaTypes.ptrType
 import translator.MethodTranslator.Companion.comments
 import utils.*
 import utils.MethodResolver.resolveMethod
 import utils.Param.Companion.toParams
-import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
@@ -85,7 +85,7 @@ object ResolveIndirect {
 
     private fun getResult(ret: String?, calledCanThrow: Boolean): List<String> {
         val result = ArrayList<String>(2)
-        if (ret != null) result.add(jvm2wasmTyped(ret))
+        if (ret != null) result.add(ret)
         if (calledCanThrow) result.add(ptrType)
         return result
     }
@@ -152,7 +152,7 @@ object ResolveIndirect {
 
         if (numTests < 3) {
             if (comments) printer.comment("small pyramid")
-            val tmpI32 = variables.defineLocalVar("classId", i32, "int")
+            val tmpI32 = variables.defineLocalVar("classId", WASMType.I32, "int")
             printCallPyramid(
                 sig0, splitArgs, ret, options, getCaller, calledCanThrow,
                 printer, groupedByClass, tmpI32, false
@@ -214,7 +214,7 @@ object ResolveIndirect {
         val helperName = "tree_${sig0.toString().escapeChars()}"
         helperFunctions.getOrPut(helperName) {
             val results = ArrayList<String>(2)
-            if (ret != null) results.add(jvm2wasmTyped(ret))
+            if (ret != null) results.add(ret)
             if (canThrowError) results.add(ptrType)
 
             // local variable for dupi32
@@ -223,7 +223,7 @@ object ResolveIndirect {
             for (k in 0 until splitArgs.size + 1) {
                 printer.append(ParamGet[k])
             }
-            val classIdLocal = LocalVariableOrParam("int", i32, "classId", 0, false)
+            val classIdLocal = LocalVariableOrParam("int", WASMType.I32, "classId", 0, false)
             printCallPyramid(
                 sig0, splitArgs, ret, options, treeGetSelf,
                 calledCanThrow, printer, groupedByClass, classIdLocal, returnInBranch
@@ -232,7 +232,7 @@ object ResolveIndirect {
 
             FunctionImpl(
                 helperName, (listOf(ptrType) + splitArgs).toParams(), results,
-                listOf(LocalVariable(classIdLocal.name, i32)),
+                listOf(LocalVariable(classIdLocal.name, "int", WASMType.I32)),
                 printer.instrs, false,
             )
         }

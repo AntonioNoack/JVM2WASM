@@ -1,10 +1,17 @@
 package wasm.instr
 
 import me.anno.utils.assertions.assertFail
-import utils.*
+import translator.JavaTypes
+import utils.StringBuilder2
+import utils.WASMType
 import utils.WASMTypes.*
 
-data class FuncType(val params: List<String>, val results: List<String>) {
+data class FuncType(val params: List<WASMType>, val results: List<WASMType>) {
+
+    constructor(params: List<String>, results: List<String>, unused: Unit) :
+            this(
+                params.map { JavaTypes.convertTypeToWASM(it) },
+                results.map { JavaTypes.convertTypeToWASM(it) })
 
     companion object {
         fun parse(type: String): FuncType {
@@ -15,23 +22,23 @@ data class FuncType(val params: List<String>, val results: List<String>) {
             )
         }
 
-        private fun getCharType(type: Char, typeStr: String): String {
+        private fun getCharType(type: Char, typeStr: String): WASMType {
             return when (type) {
-                'i' -> i32
-                'l' -> i64
-                'f' -> f32
-                'd' -> f64
+                'i' -> WASMType.I32
+                'l' -> WASMType.I64
+                'f' -> WASMType.F32
+                'd' -> WASMType.F64
                 else -> assertFail(typeStr)
             }
         }
 
-        fun getTypeChar(type: String): Char {
+        fun getTypeChar(type: WASMType): Char {
             return when (type) {
-                i32 -> 'i'
-                i64 -> 'l'
-                f32 -> 'f'
-                f64 -> 'd'
-                else -> assertFail(type)
+                WASMType.I32 -> 'i'
+                WASMType.I64 -> 'l'
+                WASMType.F32 -> 'f'
+                WASMType.F64 -> 'd'
+                else -> assertFail(type.wasmName)
             }
         }
     }

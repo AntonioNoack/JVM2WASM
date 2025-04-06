@@ -20,10 +20,26 @@ enum class TypeKind(val id: Int) {
 
     ;
 
+    val wasmName = name.lowercase()
+
+    override fun toString(): String {
+        return wasmName
+    }
+
     companion object {
         val i32 = I32
         val i64 = I64
         val f32 = F32
         val f64 = F64
+
+        fun find(name: String): TypeKind {
+            return when (name) {
+                "i32" -> I32
+                "i64" -> I64
+                "f32" -> F32
+                "f64" -> F64
+                else -> throw NotImplementedError()
+            }
+        }
     }
 }

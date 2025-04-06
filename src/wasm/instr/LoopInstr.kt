@@ -3,6 +3,7 @@ package wasm.instr
 import graphing.GraphingNode
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.any2
+import translator.JavaTypes.typeListEquals
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
@@ -57,8 +58,8 @@ data class LoopInstr(
         return other === this ||
                 other is LoopInstr &&
                 other.label == label &&
-                other.params == params &&
-                other.results == results &&
+                typeListEquals(other.params, params) &&
+                typeListEquals(other.results, results) &&
                 other.body == body
     }
 

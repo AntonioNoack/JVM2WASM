@@ -22,9 +22,9 @@ fun StringBuilder2.import2(sig: MethodSig) {
     if (hIndex.isAbstract(sig)) return
     if (hIndex.getAlias(sig) == sig || hIndex.hasAnnotation(sig, Annotations.ALIAS)) {
         val self = if (hIndex.isStatic(sig)) emptyList() else listOf(ptrType)
-        val params = desc.wasmParams
+        val params = desc.params
         val canThrowError1 = canThrowError(sig) && !useWASMExceptions
-        val returned = desc.getResultWASMTypes(canThrowError1)
+        val returned = desc.getResultTypes(canThrowError1)
         import1(methodName(sig), self + params, returned)
     }
 }

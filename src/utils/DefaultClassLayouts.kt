@@ -43,7 +43,7 @@ object DefaultClassLayouts {
 
         // todo we might be able to remove instance-init, because we have proper constructors now
         eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, voidDescriptor)), 0)
-        eq(gIndex.getType(true, voidDescriptor, true), FuncType(listOf(), listOf(ptrType)))
+        eq(gIndex.getType(true, voidDescriptor, true), FuncType(listOf(), listOf(ptrTypeI)))
 
         // prepare String properties
         gIndex.stringClass = gIndex.getClassId(string)

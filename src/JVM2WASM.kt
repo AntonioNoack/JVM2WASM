@@ -625,33 +625,33 @@ private fun appendNthGetterMethods(bodyPrinter: StringBuilder2) {
     }
 }
 
-private fun defineGlobal(name: String, type: String, value: Int, isMutable: Boolean = false) {
+private fun defineGlobal(name: String, type: WASMType, value: Int, isMutable: Boolean = false) {
     globals[name] = GlobalVariable(name, type, value, isMutable)
 }
 
 private fun defineGlobals(classTableStart: Int, numClasses: Int, ptr0: Int): Int {
 
-    defineGlobal("inheritanceTable", ptrType, classTableStart) // class table
-    defineGlobal("staticTable", ptrType, staticFieldOffsetsPtr) // static table
-    defineGlobal("resolveIndirectTable", ptrType, resolveIndirectTablePtr)
-    defineGlobal("numClasses", ptrType, numClasses)
-    defineGlobal("classInstanceTable", ptrType, classInstanceTablePtr)
-    defineGlobal("classSize", ptrType, gIndex.getInstanceSize("java/lang/Class"))
-    defineGlobal("staticInitTable", ptrType, staticInitFlagsPtr)
-    defineGlobal("stackTraceTable", ptrType, stackTraceTablePtr)
-    defineGlobal("resourceTable", ptrType, resourceTablePtr)
+    defineGlobal("inheritanceTable", ptrTypeI, classTableStart) // class table
+    defineGlobal("staticTable", ptrTypeI, staticFieldOffsetsPtr) // static table
+    defineGlobal("resolveIndirectTable", ptrTypeI, resolveIndirectTablePtr)
+    defineGlobal("numClasses", ptrTypeI, numClasses)
+    defineGlobal("classInstanceTable", ptrTypeI, classInstanceTablePtr)
+    defineGlobal("classSize", ptrTypeI, gIndex.getInstanceSize("java/lang/Class"))
+    defineGlobal("staticInitTable", ptrTypeI, staticInitFlagsPtr)
+    defineGlobal("stackTraceTable", ptrTypeI, stackTraceTablePtr)
+    defineGlobal("resourceTable", ptrTypeI, resourceTablePtr)
 
     var ptr = ptr0
-    defineGlobal("stackEndPointer", ptrType, ptr) // stack end ptr
+    defineGlobal("stackEndPointer", ptrTypeI, ptr) // stack end ptr
     ptr += stackSize
-    defineGlobal("stackPointer", ptrType, ptr, true) // stack ptr
-    defineGlobal("stackPointerStart", ptrType, ptr) // stack ptr start address
+    defineGlobal("stackPointer", ptrTypeI, ptr, true) // stack ptr
+    defineGlobal("stackPointerStart", ptrTypeI, ptr) // stack ptr start address
 
     ptr = alignPointer(ptr + 4) // +4 for the top stack entry
     allocationStart = ptr
     // allocation start address
-    defineGlobal("allocationPointer", ptrType, ptr, true)
-    defineGlobal("allocationStart", ptrType, ptr) // original allocation start address
+    defineGlobal("allocationPointer", ptrTypeI, ptr, true)
+    defineGlobal("allocationStart", ptrTypeI, ptr) // original allocation start address
     return ptr
 }
 

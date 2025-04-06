@@ -136,10 +136,9 @@ object Annotations {
                 ?: throw IllegalStateException("Missing field $implClass.${method.name}: $fieldType")
 
             val funcName = methodName2(sig)
-            val wasmType = jvm2wasmTyped(fieldType)
-            val selfParam = Param(ptrType, "self")
+            val selfParam = Param("self", "java/lang/Object", ptrTypeI)
             gIndex.translatedMethods[sig] = FunctionImpl(
-                funcName, listOf(selfParam), listOf(wasmType),
+                funcName, listOf(selfParam), listOf(fieldType),
                 emptyList(), arrayListOf(
                     ParamGet(0, selfParam.name),
                     i32Const(fieldOffset),

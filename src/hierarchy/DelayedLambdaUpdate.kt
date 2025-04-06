@@ -1,20 +1,17 @@
 package hierarchy
 
-import useResultForThrowables
 import dIndex
 import gIndex
 import hIndex
 import me.anno.utils.assertions.assertFalse
 import me.anno.utils.assertions.assertTrue
 import org.objectweb.asm.Handle
+import org.objectweb.asm.Opcodes.*
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
+import useResultForThrowables
 import utils.*
 import utils.CommonInstructions.DUP_INSTR
-import utils.CommonInstructions.GET_FIELD
-import utils.CommonInstructions.INVOKE_INTERFACE
-import utils.CommonInstructions.INVOKE_STATIC
-import utils.CommonInstructions.INVOKE_VIRTUAL
 import utils.CommonInstructions.NEW_INSTR
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Instructions.Return
@@ -43,35 +40,35 @@ class DelayedLambdaUpdate(
         assertTrue(isNative(arg))
         when (arg) {
             "byte" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
+                INVOKESTATIC, "java/lang/Byte", "valueOf", "(B)Ljava/lang/Byte;",
                 false, checkThrowable
             )
             "short" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
+                INVOKESTATIC, "java/lang/Short", "valueOf", "(S)Ljava/lang/Short;",
                 false, checkThrowable
             )
             "char" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
+                INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;",
                 false, checkThrowable
             )
             "int" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
+                INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;",
                 false, checkThrowable
             )
             "long" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
+                INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;",
                 false, checkThrowable
             )
             "float" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
+                INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;",
                 false, checkThrowable
             )
             "double" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
+                INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;",
                 false, checkThrowable
             )
             "boolean" -> printer.visitMethodInsn2(
-                INVOKE_STATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
+                INVOKESTATIC, "java/lang/Boolean", "valueOf", "(Z)Ljava/lang/Boolean;",
                 false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
@@ -82,35 +79,35 @@ class DelayedLambdaUpdate(
         assertFalse(isNative(arg))
         when (arg2) {
             "byte" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Byte", "byteValue", "()B",
+                INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B",
                 false, checkThrowable
             )
             "short" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Short", "shortValue", "()S",
+                INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S",
                 false, checkThrowable
             )
             "char" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Character", "charValue", "()C",
+                INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C",
                 false, checkThrowable
             )
             "int" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Integer", "intValue", "()I",
+                INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I",
                 false, checkThrowable
             )
             "long" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Long", "longValue", "()J",
+                INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J",
                 false, checkThrowable
             )
             "float" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Float", "floatValue", "()F",
+                INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F",
                 false, checkThrowable
             )
             "double" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Double", "doubleValue", "()D",
+                INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D",
                 false, checkThrowable
             )
             "boolean" -> printer.visitMethodInsn2(
-                INVOKE_VIRTUAL, "java/lang/Boolean", "booleanValue", "()Z",
+                INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z",
                 false, checkThrowable
             )
             else -> throw NotImplementedError("$arg/$arg2")
@@ -167,7 +164,7 @@ class DelayedLambdaUpdate(
             if (usesSelf) {
                 if (comments) mt.printer.comment("[0] += self")
                 mt.visitVarInsn(0x2a, 0) // local.get this
-                mt.visitFieldInsn2(GET_FIELD, synthClassName, "self", "java/lang/Object", false) // get field
+                mt.visitFieldInsn2(GETFIELD, synthClassName, "self", "java/lang/Object", false) // get field
             } else {
                 mt.printer.append(i32Const0)
                 if (comments) mt.printer.comment("self, unused")
@@ -184,7 +181,7 @@ class DelayedLambdaUpdate(
             if (comments) mt.printer.comment("[1] += $arg")
             // load self for field
             mt.visitVarInsn(0x2a, 0) // local.get this
-            mt.visitFieldInsn2(GET_FIELD, synthClassName, fieldName, arg, false) // get field
+            mt.visitFieldInsn2(GETFIELD, synthClassName, fieldName, arg, false) // get field
             if (isNative(arg) != (if (k == 0) false else isNative(wanted!!))) {
                 boxUnbox(arg, wanted ?: "", mt, true)
             }
@@ -227,7 +224,7 @@ class DelayedLambdaUpdate(
         }
 
         var couldThrow = mt.visitMethodInsn2(
-            if (isInterface) INVOKE_INTERFACE else if (callingStatic) INVOKE_STATIC else INVOKE_VIRTUAL,
+            if (isInterface) INVOKEINTERFACE else if (callingStatic) INVOKESTATIC else INVOKEVIRTUAL,
             calledMethod, isInterface, false
         )
 

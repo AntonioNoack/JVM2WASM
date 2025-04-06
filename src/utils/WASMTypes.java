@@ -9,19 +9,20 @@ public class WASMTypes {
 
     public static final int numWASMTypes = 4;
 
-    public static int getWASMTypeIndex(String wasmType) {
-        switch (wasmType) {
+    public static boolean isWASMType(String name) {
+        switch (name) {
             case i32:
-                return 0;
             case i64:
-                return 1;
             case f32:
-                return 2;
             case f64:
-                return 3;
+                return true;
             default:
-                throw new IllegalArgumentException(wasmType);
+                return false;
         }
+    }
+
+    public static int getWASMTypeIndex(WASMType wasmType) {
+        return wasmType.ordinal();
     }
 
 }

@@ -14,12 +14,17 @@ import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
+import translator.JavaTypes.convertTypeToWASM
+import translator.JavaTypes.i32
+import translator.JavaTypes.popType
+import translator.JavaTypes.ptrType
+import translator.JavaTypes.pushType
+import translator.JavaTypes.typeListEquals
 import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.isLookingAtSpecial
 import useWASMExceptions
 import utils.*
-import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
@@ -31,7 +36,7 @@ object StackValidator {
 
     fun getReturnTypes(sig: MethodSig): List<String> {
         val hasErrorRetType = canThrowError(sig) && !useWASMExceptions
-        return sig.descriptor.getResultWASMTypes(hasErrorRetType)
+        return sig.descriptor.getResultTypes(hasErrorRetType)
     }
 
     private fun validateLocalVariables(localVarsWithParams: List<LocalVariableOrParam>):
@@ -42,28 +47,33 @@ object StackValidator {
             if (v.isParam) {
                 val index = (v.getter as ParamGet).index
                 assertEquals(params.size, index)
-                params.add(v.wasmType)
+                params.add(v.jvmType)
             } else {
-                assertEquals(null, localVars.put(v.name, v.wasmType)) {
-                    "Duplicate variable ${v.name}, ${v.wasmType}, ${v.descriptor}, ${v.index}"
+                assertEquals(null, localVars.put(v.name, v.jvmType)) {
+                    "Duplicate variable ${v.name}, ${v.wasmType}, ${v.jvmType}, ${v.index}"
                 }
             }
         }
         return localVars to params
     }
 
-    private fun ArrayList<String>.push(value: String): ArrayList<String> {
-        add(value)
+    private fun ArrayList<String>.push(type: String): ArrayList<String> {
+        pushType(type)
         return this
     }
 
-    private fun ArrayList<String>.pop(value: String): ArrayList<String> {
-        assertEquals(value, removeLastOrNull())
+    private fun ArrayList<String>.push(type: WASMType): ArrayList<String> {
+        pushType(type.wasmName)
         return this
     }
 
-    private fun ArrayList<String>.pop(value: String, context: String): ArrayList<String> {
-        assertEquals(value, removeLastOrNull()) { "Error dropping $context" }
+    private fun ArrayList<String>.pop(expectedType: String): ArrayList<String> {
+        popType(expectedType)
+        return this
+    }
+
+    private fun ArrayList<String>.pop(expectedType: WASMType): ArrayList<String> {
+        popType(expectedType.wasmName)
         return this
     }
 
@@ -191,8 +201,7 @@ object StackValidator {
             )
             is LocalSet -> stack.pop(
                 localVarTypes[instr.name]
-                    ?: throw IllegalStateException("Missing $instr"),
-                instr.name
+                    ?: throw IllegalStateException("Missing $instr")
             )
             is ParamGet -> stack.push(paramsTypes[instr.index])
             is ParamSet -> stack.pop(paramsTypes[instr.index])
@@ -225,14 +234,9 @@ object StackValidator {
                     stack.addAll(instr.results)
                 }
             }
-            is Const -> stack.push(instr.type.wasmType)
+            is Const -> stack.push(instr.type.wasmName)
             is Comment -> {} // ignored
-            is UnaryInstruction -> {
-                if (stack.lastOrNull() != instr.popType) {
-                    throw IllegalStateException("Cannot pop #$i $instr from $stack")
-                }
-                stack.pop(instr.popType).push(instr.pushType)
-            }
+            is UnaryInstruction -> stack.pop(instr.popType).push(instr.pushType)
             is BinaryInstruction -> stack.pop(instr.popType).pop(instr.popType).push(instr.pushType)
             is ShiftInstr -> stack.pop(instr.type).pop(instr.type).push(instr.type)
             Drop -> stack.removeLast()
@@ -250,8 +254,8 @@ object StackValidator {
                 }
                 // drop all arguments in reverse order
                 val callParams = getCallParams(func)
-                for (k in callParams.lastIndex downTo 0) { // last one is return type
-                    stack.pop(callParams[k])
+                for (callParam in callParams.reversed()) { // last one is return type
+                    stack.pop(callParam)
                 }
                 // drop "self"
                 if (hasSelfParam(func)) {
@@ -269,7 +273,9 @@ object StackValidator {
                 for (k in params1.lastIndex downTo 0) {
                     stack.pop(params1[k])
                 }
-                stack.addAll(instr.type.results)
+                for (resultType in instr.type.results) {
+                    stack.add(resultType.wasmName)
+                }
             }
             is LoopInstr -> {
                 assertTrue(instr.params.isEmpty())
@@ -307,8 +313,8 @@ object StackValidator {
 
     private fun getCallParams(func: Any): List<String> {
         return when (func) {
-            is FunctionImpl -> func.params.map { it.wasmType } // helper function
-            is MethodSig -> func.descriptor.wasmParams
+            is FunctionImpl -> func.params.map { it.jvmType } // helper function
+            is MethodSig -> func.descriptor.params
             else -> throw NotImplementedError()
         }
     }
@@ -316,7 +322,7 @@ object StackValidator {
     private fun getRetType(func: Any, canThrow: Boolean): List<String> {
         return when (func) {
             is FunctionImpl -> func.results // helper function
-            is MethodSig -> func.descriptor.getResultWASMTypes(canThrow)
+            is MethodSig -> func.descriptor.getResultTypes(canThrow)
             else -> assertFail()
         }
     }
@@ -337,11 +343,11 @@ object StackValidator {
         }
     }
 
-    fun <V> List<V>.endsWith(end: List<V>): Boolean {
+    fun List<String>.endsWith(end: List<String>): Boolean {
         val offset = size - end.size
         if (offset < 0) return false
         for (i in end.indices) {
-            if (end[i] != this[i + offset]) return false
+            if (convertTypeToWASM(end[i]) != convertTypeToWASM(this[i + offset])) return false
         }
         return true
     }
@@ -352,7 +358,7 @@ object StackValidator {
         for (node in nodes) {
             for (next in node.outputs) {
                 val outputStack = node.outputStack
-                if (next.inputStack != outputStack) {
+                if (!typeListEquals(next.inputStack, outputStack)) {
                     illegals += ("$outputStack != ${next.inputStack}, ${node.index} -> ${next.index}")
                 }
             }

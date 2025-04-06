@@ -2,6 +2,7 @@ package wasm.instr
 
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
+import translator.JavaTypes.typeListEquals
 import utils.StringBuilder2
 import wasm.instr.Instruction.Companion.appendParams
 import wasm.instr.Instruction.Companion.appendResults
@@ -55,8 +56,8 @@ data class IfBranch(
     override fun equals(other: Any?): Boolean {
         return other === this ||
                 other is IfBranch &&
-                other.params == params &&
-                other.results == results &&
+                typeListEquals(other.params, params) &&
+                typeListEquals(other.results, results) &&
                 other.ifTrue == ifTrue &&
                 other.ifFalse == ifFalse
     }

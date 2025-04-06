@@ -18,9 +18,9 @@ class Descriptor private constructor(val params: List<String>, val returnType: S
     override fun hashCode(): Int = raw.hashCode()
     override fun toString(): String = raw
 
-    fun getResultWASMTypes(canThrowError: Boolean): List<String> {
+    fun getResultTypes(canThrowError: Boolean): List<String> {
         // could be cached...
-        val returnType = wasmReturnType
+        val returnType = returnType
         return if (canThrowError) {
             if (returnType != null) listOf(returnType, ptrType)
             else listOf(ptrType)

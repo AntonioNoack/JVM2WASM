@@ -1,3 +1,5 @@
 package wasm.parser
 
-data class LocalVariable(val name: String, val type: String)
+import utils.WASMType
+
+data class LocalVariable(val name: String, val jvmType: String, val wasmType: WASMType)

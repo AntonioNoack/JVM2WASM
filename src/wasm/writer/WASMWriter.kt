@@ -4,6 +4,8 @@ import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
+import translator.JavaTypes.convertTypeToWASM
+import utils.WASMType
 import utils.WASMTypes.*
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
@@ -13,7 +15,7 @@ import wasm.parser.Import
 object WASMWriter {
 
     private fun FunctionImpl.toFuncType(): FuncType {
-        return FuncType(params.map { it.wasmType }, results)
+        return FuncType(params.map { it.wasmType }, results.map { convertTypeToWASM(it) })
     }
 
     private lateinit var functionNameToIndex: Map<String, Int>
@@ -37,13 +39,13 @@ object WASMWriter {
                 ?: throw IllegalStateException("Missing index for ${instr.name}")
             is CallIndirect -> instr.typeIndex = getTypeIndex(instr.type)
             is LoopInstr -> {
-                instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results))
+                instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results, Unit))
                 assertNull(branchDepth.put(instr.label, depth))
                 insertIndicesAndDepths(instr.body, depth + 1)
                 assertEquals(depth, branchDepth.remove(instr.label))
             }
             is IfBranch -> {
-                instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results))
+                instr.typeIndex = getTypeIndex(FuncType(instr.params, instr.results, Unit))
                 val nextDepth = depth + 1
                 insertIndicesAndDepths(instr.ifTrue, nextDepth)
                 insertIndicesAndDepths(instr.ifFalse, nextDepth)
@@ -133,9 +135,9 @@ object WASMWriter {
                 .sortedBy { it.value }.map { it.key }
                 .map { func ->
                     FuncTypeI(func.toString(), func.params.map { param ->
-                        typeToType[param]!!
+                        typeToType[param.wasmName]!!
                     }, func.results.map { result ->
-                        typeToType[result]!!
+                        typeToType[result.wasmName]!!
                     })
                 },
             imports = listOf(MemoryImport("js", "mem", memory)) +
@@ -144,18 +146,18 @@ object WASMWriter {
                         FuncImport("jvm", it.funcName, getTypeIndex(it.toFuncType()))
                     },
             functions = (imports + functions).map { func ->
-                Function(typeToIndex[FuncType(func.params.map { it.wasmType }, func.results)]!!)
+                Function(typeToIndex[FuncType(func.params.map { it.jvmType }, func.results, Unit)]!!)
             },
             tables = listOf(table),
             memories = listOf(memory),
             tags = emptyList(), // tags???
             globals = globalsList.mapIndexed { i, global ->
                 assertEquals(i, globalToIndex[global.name])
-                assertEquals(i32, global.wasmType)
+                assertEquals(WASMType.I32, global.wasmType)
                 Global(
                     global.name,
                     listOf(i32Const(global.initialValue)),
-                    typeToType[global.wasmType]!!,
+                    typeToType[global.wasmType.wasmName]!!,
                     global.isMutable
                 )
             },

@@ -14,6 +14,7 @@ import me.anno.utils.structures.lists.Lists.partition1
 import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import utils.Builder
+import utils.WASMType
 import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
@@ -117,7 +118,7 @@ object ExtractEndNodes {
 
         val mt = sa.methodTranslator
         val firstRunLabel = "firstRunE${mt.endNodeExtractorIndex++}"
-        val firstRunVariable = mt.variables.addLocalVariable("${firstRunLabel}v", i32, "I")
+        val firstRunVariable = mt.variables.addLocalVariable("${firstRunLabel}v", WASMType.I32, "int")
         val loopInstr = LoopInstr(firstRunLabel, emptyArrayList, emptyList(), emptyList())
         val jumpInstr = Jump(loopInstr)
 
@@ -126,7 +127,7 @@ object ExtractEndNodes {
             assertTrue(endNode in endNodes)
             return extraInputs.getOrPut(endNode) {
                 val name = "endNode${mt.endNodeIndex++}"
-                listOf(mt.variables.addLocalVariable(name, i32, "I"))
+                listOf(mt.variables.addLocalVariable(name, WASMType.I32, "int"))
             }.first()
         }
 

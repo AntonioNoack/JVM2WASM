@@ -1,19 +1,17 @@
 package utils
 
-import utils.WASMTypes.*
-
 enum class CallType(val symbol: Char) {
     POINTER('T'),
     I32('I'), I64('J'),
     F32('F'), F64('D');
 
-    fun toWASM(): String {
+    fun toWASM(): WASMType {
         return when (this) {
-            POINTER -> ptrType
-            I32 -> i32
-            I64 -> i64
-            F32 -> f32
-            F64 -> f64
+            POINTER -> ptrTypeI
+            I32 -> WASMType.I32
+            I64 -> WASMType.I64
+            F32 -> WASMType.F32
+            F64 -> WASMType.F64
         }
     }
 }

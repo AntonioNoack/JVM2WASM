@@ -40,6 +40,16 @@ import org.apache.logging.log4j.LogManager
 import org.objectweb.asm.*
 import org.objectweb.asm.Opcodes.*
 import replaceClass
+import translator.JavaTypes.convertTypeToWASM
+import translator.JavaTypes.f32
+import translator.JavaTypes.f64
+import translator.JavaTypes.i32
+import translator.JavaTypes.i64
+import translator.JavaTypes.popType
+import translator.JavaTypes.poppushType
+import translator.JavaTypes.ptrType
+import translator.JavaTypes.pushType
+import translator.JavaTypes.useJavaTypes
 import translator.LoadStoreHelper.getLoadCall
 import translator.LoadStoreHelper.getLoadInstr
 import translator.LoadStoreHelper.getStaticLoadCall
@@ -48,8 +58,6 @@ import translator.LoadStoreHelper.getStoreCall
 import translator.LoadStoreHelper.getStoreInstr
 import translator.LoadStoreHelper.getVIOStoreCall
 import translator.ResolveIndirect.resolveIndirect
-import translator.TranslatorNode.Companion.convertTypeToWASM
-import translator.TranslatorNode.Companion.convertTypesToWASM
 import useHighLevelInstructions
 import useResultForThrowables
 import useWASMExceptions
@@ -57,17 +65,10 @@ import utils.*
 import utils.Builder.Companion.isDuplicable
 import utils.CommonInstructions.ARRAY_LENGTH_INSTR
 import utils.CommonInstructions.ATHROW_INSTR
-import utils.CommonInstructions.GET_FIELD
-import utils.CommonInstructions.GET_STATIC
-import utils.CommonInstructions.INVOKE_INTERFACE
-import utils.CommonInstructions.INVOKE_SPECIAL
-import utils.CommonInstructions.INVOKE_STATIC
-import utils.CommonInstructions.INVOKE_VIRTUAL
 import utils.CommonInstructions.MONITOR_ENTER
 import utils.CommonInstructions.MONITOR_EXIT
+import utils.CommonInstructions.NEW_ARRAY_INSTR
 import utils.CommonInstructions.NEW_INSTR
-import utils.CommonInstructions.SET_FIELD
-import utils.CommonInstructions.SET_STATIC
 import utils.PrintUsed.printUsed
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
@@ -161,14 +162,6 @@ class MethodTranslator(
 
         private val LOGGER = LogManager.getLogger(MethodTranslator::class)
 
-        // todo make this work
-        val useJavaTypes = false
-        val i32 = if (useJavaTypes) "int" else WASMTypes.i32
-        val i64 = if (useJavaTypes) "long" else WASMTypes.i64
-        val f32 = if (useJavaTypes) "float" else WASMTypes.f32
-        val f64 = if (useJavaTypes) "double" else WASMTypes.f64
-        val ptrType = if (useJavaTypes) "java/lang/Object" else utils.ptrType
-
         val stackTraceTable = ByteArrayOutputStream2(1024)
 
         var comments = true
@@ -190,6 +183,7 @@ class MethodTranslator(
         ).toSet()
 
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
+            // return sig.clazz == "me/anno/ui/Panel" && sig.name == "<init>"
             // return sig.clazz == "me/anno/input/ActionManager" && sig.name == "init"
             // return sig.clazz == "me/anno/ui/editor/code/CodeEditor" && sig.name == "draw\$lambda\$4"
             // return sig.name == "listOfChildrenImpl"
@@ -286,15 +280,16 @@ class MethodTranslator(
     private fun createFuncHead(): FunctionImpl {
         val name2 = methodName(sig)
         val exported = exportAll || sig in hIndex.exportedMethods
-        val results = descriptor.getResultWASMTypes(canThrowError)
+        val results = descriptor.getResultTypes(canThrowError)
         val wasmParams = descriptor.wasmParams
         val numParams = wasmParams.size + (!isStatic).toInt()
         val params = variables.localVarsAndParams
             .subList(0, numParams)
         assertTrue(params.all { it.isParam })
         return FunctionImpl(
-            name2, params.map { Param(it.wasmType, it.name) },
-            results, variables.localVars.map { LocalVariable(it.name, it.wasmType) }, emptyArrayList, exported
+            name2, params.map { Param(it.name, it.jvmType, it.wasmType) }, results,
+            variables.localVars.map { LocalVariable(it.name, it.jvmType, it.wasmType) },
+            emptyArrayList, exported
         )
     }
 
@@ -382,7 +377,7 @@ class MethodTranslator(
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         // increment the variable at that index
         if (printOps) println("  [$varIndex] += $increment")
-        val type = variables.findOrDefineLocalVar(varIndex, WASMTypes.i32, "int")
+        val type = variables.findOrDefineLocalVar(varIndex, WASMType.I32, "int")
         printer
             .append(type.localGet).append(i32Const(increment)).append(I32Add)
             .append(type.localSet)
@@ -408,8 +403,7 @@ class MethodTranslator(
         // ensure we got the correct type
         if (printOps) println("// $stack = $expectedType")
         if (comments && commentStackOps) printer.comment("$stack = $expectedType")
-        assertFalse(stack.isEmpty()) { "Expected $expectedType, but stack was empty; $clazz, $name, $descriptor" }
-        assertEquals(convertTypeToWASM(expectedType), convertTypeToWASM(stack.last()))
+        stack.poppushType(expectedType)
         return this
     }
 
@@ -417,8 +411,7 @@ class MethodTranslator(
         // ensure we got the correct type
         if (printOps) println("// $stack -= $expectedType")
         if (comments && commentStackOps) printer.comment("$stack -= $expectedType")
-        assertFalse(stack.isEmpty()) { "Expected $expectedType, but stack was empty; $clazz, $name, $descriptor" }
-        assertEquals(convertTypeToWASM(expectedType), convertTypeToWASM(stack.removeLast()))
+        stack.popType(expectedType)
         return this
     }
 
@@ -428,8 +421,16 @@ class MethodTranslator(
         }
         if (printOps) println("// $stack += $type")
         if (comments && commentStackOps) printer.comment("$stack += $type")
-        stack.add(type)
+        stack.pushType(type)
         return this
+    }
+
+    private fun isCategory2Type(type: String): Boolean {
+        if (!is32Bits && ptrType == i64) throw IllegalStateException("We'd need to differentiate ptrType from $type")
+        return when (type) {
+            "i64", "f64", "long", "double" -> true
+            else -> false
+        }
     }
 
     override fun visitInsn(opcode: Int) {
@@ -651,9 +652,13 @@ class MethodTranslator(
                 printer.append(Call("dup_x2$v0i$v1i$v2i"))
             }
             0x5c -> {
-                val v1 = stack[stack.size - 1]
-                if (!is32Bits) throw NotImplementedError("We'd need to differentiate ptrType from i64 for this to work correctly")
-                if (v1 == i32 || v1 == f32) {
+                val v1 = stack.last()
+                if (isCategory2Type(v1)) {
+                    // dup
+                    stack.add(v1)
+                    val v1i = convertTypeToWASM(v1)
+                    printer.append(Call("dup$v1i"))
+                } else {
                     // value2, value1 ->
                     // value2, value1, value2, value1
                     val v0 = stack[stack.size - 2]
@@ -662,18 +667,17 @@ class MethodTranslator(
                     val v0i = convertTypeToWASM(v0)
                     val v1i = convertTypeToWASM(v1)
                     printer.append(Call("dup2$v0i$v1i"))
-                } else {
-                    // dup
-                    stack.add(v1)
-                    val v1i = convertTypeToWASM(v1)
-                    printer.append(Call("dup$v1i"))
                 }
             }
             0x5d -> {
                 // dup2_x1
-                val v1 = stack[stack.size - 1]
-                if (!is32Bits) throw NotImplementedError("We'd need to differentiate ptrType from i64 for this to work correctly")
-                if (v1 == i32 || v1 == f32) {
+                val v1 = stack.last()
+                if (isCategory2Type(v1)) {
+                    // value2, value1 ->
+                    // value1, value2, value1
+                    // seems to be identical to 0x5a
+                    visitInsn(0x5a)
+                } else {
                     // value3, value2, value1 ->
                     // value2, value1, value3, value2, value1
                     stack.pop()
@@ -688,11 +692,6 @@ class MethodTranslator(
                     val v2i = convertTypeToWASM(v2)
                     val v3i = convertTypeToWASM(v3)
                     printer.append(Call("dup2_x1$v1i$v2i$v3i"))
-                } else {
-                    // value2, value1 ->
-                    // value1, value2, value1
-                    // seems to be identical to 0x5a
-                    visitInsn(0x5a)
                 }
             }
             0x5e -> {
@@ -873,7 +872,7 @@ class MethodTranslator(
 
         if (fields.isNotEmpty()) {
             val createdInstance =
-                variables.defineLocalVar("new", utils.ptrType, synthClassName)
+                variables.defineLocalVar("new", ptrTypeI, synthClassName)
             printer.pop(ptrType)
             printer.append(createdInstance.setter)
 
@@ -902,7 +901,7 @@ class MethodTranslator(
                         .append(Call("swap${jvm2wasmTyped(type)}$ptrType")) // swap ptr and value
                         .append(getStoreInstr(type))
                 }
-                printer.pop(jvm2wasmTyped(type))
+                printer.pop(type)
             }
 
             // get the instance, ready to continue :)
@@ -1038,15 +1037,17 @@ class MethodTranslator(
     }
 
     fun pop(splitArgs: List<String>, static: Boolean, ret: String?) {
-        for (v in splitArgs.reversed()) {// arguments
-            printer.pop(v)
+        for (i in splitArgs.lastIndex downTo 0) {// arguments
+            printer.pop(splitArgs[i])
         }
         if (!static) {
             // instance
             printer.pop(ptrType)
         }
         // return type
-        if (ret != null) printer.push(jvm2wasmTyped(ret))
+        if (ret != null) {
+            printer.push(ret)
+        }
     }
 
     fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
@@ -1067,7 +1068,6 @@ class MethodTranslator(
         visitMethodInsn2(opcode0, owner, name, descriptor, isInterface, true)
     }
 
-
     fun visitMethodInsn2(
         opcode: Int, owner: String, name: String, descriptor: String,
         isInterface: Boolean, checkThrowable: Boolean
@@ -1076,12 +1076,12 @@ class MethodTranslator(
         return visitMethodInsn2(opcode, sig, isInterface, checkThrowable)
     }
 
-    fun beforeDynamicCall(owner: String, getCaller: (Builder) -> Unit) {
+    private fun beforeDynamicCall(owner: String, getCaller: (Builder) -> Unit) {
         stackPush()
         checkNotNull0(owner, name, getCaller)
     }
 
-    fun afterDynamicCall(splitArgs: List<String>, ret: String?) {
+    private fun afterDynamicCall(splitArgs: List<String>, ret: String?) {
         pop(splitArgs, false, ret)
         stackPop()
     }
@@ -1091,12 +1091,12 @@ class MethodTranslator(
         val owner = sig0.clazz
         val name = sig0.name
         val descriptor = sig0.descriptor
-        val isStatic = opcode0 == INVOKE_STATIC || name == STATIC_INIT
+        val isStatic = opcode0 == INVOKESTATIC || name == STATIC_INIT
 
         if (printOps) println("  [call] ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface")
 
         val ret = descriptor.returnType
-        val splitArgs = descriptor.wasmParams
+        val splitArgs = descriptor.params
         assertEquals(isStatic, hIndex.isStatic(sig0)) {
             "Called static/non-static incorrectly, $isStatic vs $sig0 (in $sig)"
         }
@@ -1112,14 +1112,14 @@ class MethodTranslator(
 
         val getCaller = { printer: Builder ->
             if (splitArgs.isNotEmpty()) {
-                val wasmTypes = convertTypesToWASM(listOf(ptrType) + splitArgs)
+                val wasmTypes = listOf(ptrTypeI) + splitArgs.map { convertTypeToWASM(it) }
                 printer.append(Call(gIndex.getNth(wasmTypes)))
             } else printer.append(PtrDupInstr)
             Unit
         }
 
         when (opcode0) {
-            INVOKE_INTERFACE -> {
+            INVOKEINTERFACE -> {
                 assertTrue(sig0 in dIndex.usedInterfaceCalls)
                 beforeDynamicCall(owner, getCaller)
                 val options = findConstructableChildImplementations(sig0)
@@ -1141,7 +1141,7 @@ class MethodTranslator(
                 }
                 afterDynamicCall(splitArgs, ret)
             }
-            INVOKE_VIRTUAL -> {
+            INVOKEVIRTUAL -> {
                 if (owner[0] !in "[A" && owner !in dIndex.constructableClasses) {
 
                     stackPush()
@@ -1183,14 +1183,14 @@ class MethodTranslator(
                     when {
                         setter != null -> {
                             visitFieldInsn2(
-                                if (isStatic(setter)) SET_STATIC else SET_FIELD,
+                                if (isStatic(setter)) PUTSTATIC else PUTFIELD,
                                 setter.clazz, setter.name, setter.descriptor, true
                             )
                             calledCanThrow = false
                         }
                         getter != null -> {
                             visitFieldInsn2(
-                                if (isStatic(getter)) GET_STATIC else GET_FIELD,
+                                if (isStatic(getter)) GETSTATIC else GETFIELD,
                                 getter.clazz, getter.name, getter.descriptor, true
                             )
                             calledCanThrow = false
@@ -1254,7 +1254,7 @@ class MethodTranslator(
                 }
             }
             // typically, <init>, but also can be private or super function; -> no resolution required
-            INVOKE_SPECIAL -> {
+            INVOKESPECIAL -> {
                 if (!ignoreNonCriticalNullPointers) {
                     checkNotNull0(owner, name, getCaller)
                 }
@@ -1278,7 +1278,7 @@ class MethodTranslator(
                 }
             }
             // static, no resolution required
-            INVOKE_STATIC -> {
+            INVOKESTATIC -> {
                 pop(splitArgs, true, ret)
                 val inline = hIndex.inlined[sig1]
                 if (inline != null) {
@@ -1413,7 +1413,7 @@ class MethodTranslator(
         val default = getLabel(default0)
         val labels = labels0.map { getLabel(it) }
         if (printOps) println("  [lookup] switch [$default], [${keys.joinToString()}], [${labels.joinToString()}]")
-        val helper = variables.defineLocalVar("switch", WASMTypes.i32, "int")
+        val helper = variables.defineLocalVar("switch", WASMType.I32, "int")
         printer.pop(i32)
         printer.append(helper.localSet)
         for (i in keys.indices) {
@@ -1481,7 +1481,7 @@ class MethodTranslator(
 
             if (catchers.size > 1 || (catchers[0].type != "java/lang/Throwable")) {
 
-                val throwable = variables.defineLocalVar("thrown", ptrType, "java/lang/Throwable")
+                val throwable = variables.defineLocalVar("thrown", ptrTypeI, "java/lang/Throwable")
                 printer.append(throwable.localSet).comment("multiple/complex catchers")
 
                 var handler = TranslatorNode(createLabel())
@@ -1562,7 +1562,7 @@ class MethodTranslator(
                     printer.comment("maybe throwing single generic catcher")
 
                     val mainHandler = TranslatorNode(createLabel())
-                    val thrown = variables.defineLocalVar("thrown", ptrType, catcher.type)
+                    val thrown = variables.defineLocalVar("thrown", ptrTypeI, catcher.type)
 
                     if (printOps) println("--- handler: ${mainHandler.label}")
 
@@ -1606,7 +1606,7 @@ class MethodTranslator(
             }
             printer.append(Return)
         } else {
-            val tmp = variables.defineLocalVar("thrown", ptrType, "java/lang/Throwable")
+            val tmp = variables.defineLocalVar("thrown", ptrTypeI, "java/lang/Throwable")
             printer.append(tmp.localSet)
             printer.append(tmp.localGet)
             val ifTrue = if (retType == null) {
@@ -1730,6 +1730,7 @@ class MethodTranslator(
         if (printOps) println("  [var] local ${OpCode[opcode]}, $varIndex, $paramVariable")
         val isPush = getVarIsPush(opcode)
         val type = getVarWASMType(opcode)
+        // println("pushing $type by $opcode,$varIndex,$paramVariable")
         if (isPush) printer.push(type)
         else printer.pop(type)
         val wasmType = convertTypeToWASM(type)
@@ -1747,9 +1748,9 @@ class MethodTranslator(
     override fun visitIntInsn(opcode: Int, operand: Int) {
         if (printOps) println("  [intInsn] ${OpCode[opcode]}($operand)")
         when (opcode) {
-            0x10 -> printer.push(i32).append(i32Const(operand))
-            0x11 -> printer.push(i32).append(i32Const(operand))
-            0xbc -> { // new array
+            BIPUSH -> printer.push(i32).append(i32Const(operand))
+            SIPUSH -> printer.push(i32).append(i32Const(operand))
+            NEW_ARRAY_INSTR -> {
                 val type = when (operand) {
                     4 -> "[Z"
                     5 -> "[C"
@@ -1859,11 +1860,11 @@ class MethodTranslator(
         // getstatic, putstatic, getfield, putfield
         if (printOps) println("  [field] ${OpCode[opcode]}, $owner, $name, $type")
         val wasmType = jvm2wasmTyped(type)
-        val static = opcode == GET_STATIC || opcode == SET_STATIC
+        val static = opcode == GETSTATIC || opcode == PUTSTATIC
         val fieldOffset = gIndex.getFieldOffset(owner, name, type, static)
         val sig = FieldSig(owner, name, type, static)
         val value = hIndex.finalFields[sig]
-        val setter = opcode == SET_FIELD || opcode == SET_STATIC
+        val setter = opcode == PUTFIELD || opcode == PUTSTATIC
         if (value != null) {
             // get/set a final value
             if (!checkNull) throw IllegalStateException("Field $owner,$name,$type is final")
@@ -1882,10 +1883,10 @@ class MethodTranslator(
                 visitLdcInsn(value) // too easy xD
             }
         } else when (opcode) {
-            GET_STATIC -> {
+            GETSTATIC -> {
                 if (fieldOffset != null) {
                     callStaticInit(owner)
-                    printer.push(wasmType)
+                    printer.push(type)
                     // load class index
                     val staticPtr = lookupStaticVariable(owner, fieldOffset)
                     val loadCall = getStaticLoadCall(type)
@@ -1902,13 +1903,13 @@ class MethodTranslator(
                     }
                     if (comments) printer.comment("get static '$owner.$name'")
                 } else {
-                    printer.push(wasmType).append(Const.zero[wasmType]!!)
+                    printer.push(type).append(Const.zero[wasmType]!!)
                 }
             }
-            SET_STATIC -> {
+            PUTSTATIC -> {
                 if (fieldOffset != null) {
                     callStaticInit(owner)
-                    printer.pop(wasmType)
+                    printer.pop(type)
                     val staticPtr = lookupStaticVariable(owner, fieldOffset)
                     val storeCall = getStaticStoreCall(type)
                     if (useHighLevelInstructions) {
@@ -1920,10 +1921,10 @@ class MethodTranslator(
                     }
                     if (comments) printer.comment("put static '$owner.$name'")
                 } else {
-                    printer.pop(wasmType).drop()
+                    printer.pop(type).drop()
                 }
             }
-            GET_FIELD -> {
+            GETFIELD -> {
                 // second part of check is <self>
                 if (comments) {
                     printer.comment(
@@ -1938,7 +1939,7 @@ class MethodTranslator(
                         printer.dupPtr()
                     }
                 }
-                printer.pop(ptrType).push(wasmType)
+                printer.pop(ptrType).push(type)
                 if (fieldOffset != null) {
                     val loadCall = getLoadCall(type)
                     if (useHighLevelInstructions) {
@@ -1953,7 +1954,7 @@ class MethodTranslator(
                     printer.drop().append(Const.zero[wasmType]!!)
                 }
             }
-            SET_FIELD -> {
+            PUTFIELD -> {
                 // second part of check is <self>
                 if (comments) {
                     printer.comment(
@@ -1968,10 +1969,10 @@ class MethodTranslator(
                     !(!isStatic && printer.endsWith(listOf(ParamGet[0], i32Const0)))
                 ) {
                     checkNotNull0(owner, name) {
-                        printer.append(Call(gIndex.getNth(listOf(ptrType, wasmType))))
+                        printer.append(Call(gIndex.getNth(listOf(ptrTypeI, wasmType))))
                     }
                 }
-                printer.pop(wasmType).pop(ptrType)
+                printer.pop(type).pop(ptrType)
                 if (fieldOffset != null) {
                     val storeCall = getStoreCall(type)
                     // we'd need to call a function twice, so call a generic functions for this

@@ -1,6 +1,7 @@
 package wasm.instr
 
 import interpreter.WASMEngine
+import translator.JavaTypes.convertTypeToWASM
 import utils.Param
 import utils.StringBuilder2
 
@@ -21,7 +22,7 @@ interface Instruction {
         fun appendParams(params: List<String>, builder: StringBuilder2) {
             if (params.isNotEmpty()) {
                 builder.append(" (param")
-                for (param in params) builder.append(" ").append(param)
+                for (param in params) builder.append(" ").append(convertTypeToWASM(param))
                 builder.append(")")
             }
         }
@@ -37,7 +38,7 @@ interface Instruction {
         fun appendResults(results: List<String>, builder: StringBuilder2) {
             if (results.isNotEmpty()) {
                 builder.append(" (result")
-                for (result in results) builder.append(" ").append(result)
+                for (result in results) builder.append(" ").append(convertTypeToWASM(result))
                 builder.append(")")
             }
         }

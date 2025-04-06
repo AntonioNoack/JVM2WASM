@@ -14,7 +14,7 @@ data class CallSignature(val params: List<CallType>, val returnType: CallType?, 
 
     fun toFuncType(): FuncType {
         val results = if (returnType != null) listOf(returnType.toWASM()) else emptyList()
-        val throws = if (canThrow) listOf(ptrType) else emptyList()
+        val throws = if (canThrow) listOf(ptrTypeI) else emptyList()
         return FuncType(params.map { it.toWASM() }, results + throws)
     }
 

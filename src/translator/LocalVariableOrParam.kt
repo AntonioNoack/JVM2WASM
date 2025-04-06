@@ -1,22 +1,23 @@
 package translator
 
-import me.anno.utils.assertions.assertTrue
-import utils.WASMTypes.*
+import me.anno.utils.assertions.assertFalse
+import utils.WASMType
+import utils.WASMTypes.isWASMType
 import wasm.instr.LocalGet
 import wasm.instr.LocalSet
 import wasm.instr.ParamGet
 import wasm.instr.ParamSet
 
 class LocalVariableOrParam(
-    val descriptor: String,
-    val wasmType: String,
+    val jvmType: String,
+    val wasmType: WASMType,
     var name: String,
     val index: Int,
     isParam: Boolean
 ) {
 
     init {
-        assertTrue(wasmType == i32 || wasmType == f32 || wasmType == i64 || wasmType == f64)
+        assertFalse(isWASMType(jvmType), jvmType)
     }
 
     val localGet = if (isParam) ParamGet(index, name) else LocalGet(name)

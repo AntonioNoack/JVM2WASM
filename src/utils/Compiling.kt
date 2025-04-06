@@ -809,7 +809,7 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
         val name = methodName(sig)
         // not truly used, even tho marked as such...
         if (name in usedMethods) {
-            bodyPrinter.append(impl)
+            impl.toString(bodyPrinter)
         } else if (!name.startsWith("new_") && !name.startsWith("static_") &&
             sig !in hIndex.getterMethods && sig !in hIndex.setterMethods
         ) {
@@ -821,7 +821,7 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
     }
     for (impl in helperFunctions
         .values.sortedBy { it.funcName }) {
-        bodyPrinter.append(impl)
+        impl.toString(bodyPrinter)
     }
 }
 

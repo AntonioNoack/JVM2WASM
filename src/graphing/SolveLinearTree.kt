@@ -12,6 +12,7 @@ import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
+import utils.WASMType
 import utils.WASMTypes.i32
 import wasm.instr.Comment
 import wasm.instr.Const
@@ -27,7 +28,7 @@ object SolveLinearTree {
 
     val validate = true
 
-    private val unusedLabel = LocalVariableOrParam("I", i32, "lUnused", -1, false)
+    private val unusedLabel = LocalVariableOrParam("I", WASMType.I32, "lUnused", -1, false)
 
     private fun createLabels(nodes: List<GraphingNode>, mt: MethodTranslator): List<LocalVariableOrParam> {
         val labels = ArrayList<LocalVariableOrParam>(nodes.size * 2)
@@ -39,12 +40,12 @@ object SolveLinearTree {
                     labels.add(unusedLabel)
                 }
                 is BranchNode -> {
-                    labels.add(mt.variables.addPrefixedLocalVariable("nF", i32, "I"))
-                    labels.add(mt.variables.addPrefixedLocalVariable("nT", i32, "I"))
+                    labels.add(mt.variables.addPrefixedLocalVariable("nF", WASMType.I32, "I"))
+                    labels.add(mt.variables.addPrefixedLocalVariable("nT", WASMType.I32, "I"))
                 }
                 is SequenceNode -> {
                     val variable =
-                        mt.variables.addPrefixedLocalVariable("n", i32, "I")
+                        mt.variables.addPrefixedLocalVariable("n", WASMType.I32, "I")
                     labels.add(variable)
                     labels.add(variable)
                 }

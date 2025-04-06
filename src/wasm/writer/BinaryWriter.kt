@@ -6,7 +6,7 @@ import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.structures.lists.Lists.none2
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
-import utils.WASMTypes.*
+import utils.WASMType
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
@@ -504,11 +504,11 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
             val local = locals[i]
             writeU32Leb128(1)
             writeType(
-                when (local.type) {
-                    i32 -> TypeKind.I32
-                    i64 -> TypeKind.I64
-                    f32 -> TypeKind.F32
-                    f64 -> TypeKind.F64
+                when (local.wasmType) {
+                    WASMType.I32 -> TypeKind.I32
+                    WASMType.I64 -> TypeKind.I64
+                    WASMType.F32 -> TypeKind.F32
+                    WASMType.F64 -> TypeKind.F64
                     else -> throw NotImplementedError()
                 }
             )

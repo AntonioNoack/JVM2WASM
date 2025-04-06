@@ -298,10 +298,10 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         }
 
         if (isComment) {
-            writer.add(Comment("$prefix${instr.type} ${instr.name} = 0"))
+            writer.add(Comment("$prefix${instr.jvmType} ${instr.name} = 0"))
         } else {
-            val zero = StackElement(instr.type, "0", emptyList(), false)
-            writer.add(Declaration(instr.type, instr.name, zero))
+            val zero = StackElement(instr.jvmType, "0", emptyList(), false)
+            writer.add(Declaration(instr.jvmType, instr.name, zero))
         }
     }
 

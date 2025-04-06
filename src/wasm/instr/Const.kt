@@ -2,11 +2,12 @@ package wasm.instr
 
 import interpreter.WASMEngine
 import me.anno.utils.structures.lists.LazyList
+import utils.WASMType
 import utils.is32Bits
 
 data class Const(val type: ConstType, val value: Number) : Instruction {
 
-    override fun toString(): String = "${type.wasmType}.const $value"
+    override fun toString(): String = "${type.wasmName}.const $value"
 
     override fun execute(engine: WASMEngine): String? {
         engine.push(value)
@@ -44,10 +45,10 @@ data class Const(val type: ConstType, val value: Number) : Instruction {
         val f64Const1 = f64Const(1.0)
 
         val zero = mapOf(
-            "i32" to i32Const0,
-            "i64" to i64Const0,
-            "f32" to f32Const0,
-            "f64" to f64Const0
+            WASMType.I32 to i32Const0,
+            WASMType.I64 to i64Const0,
+            WASMType.F32 to f32Const0,
+            WASMType.F64 to f64Const0
         )
     }
 }

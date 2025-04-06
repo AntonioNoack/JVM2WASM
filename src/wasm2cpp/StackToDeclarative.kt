@@ -8,7 +8,9 @@ import me.anno.utils.structures.lists.Lists.any2
 import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
+import translator.JavaTypes.convertTypeToWASM
 import utils.StringBuilder2
+import utils.WASMType
 import utils.WASMTypes.*
 import utils.ptrType
 import wasm.instr.*
@@ -118,7 +120,7 @@ class StackToDeclarative(
 
         for (local in function.locals) {
             if (local.name == "lbl") continue
-            append(NullDeclaration(local.type, local.name))
+            append(NullDeclaration(local.jvmType, local.name))
         }
 
         if (!writeInstructions(function.body)) {
@@ -134,12 +136,14 @@ class StackToDeclarative(
 
     private fun popInReverse(funcName: String, types: List<String>): List<StackElement> {
         assertTrue(stack.size >= types.size) { "Expected $types for $funcName, got $stack" }
-        val hasMismatch = types.indices.any { i -> types[i] != stack[i + stack.size - types.size].type }
+        val offset = stack.size - types.size
+        val hasMismatch = types.indices.any { i ->
+            convertTypeToWASM(types[i]) != convertTypeToWASM(stack[i + offset].type)
+        }
         assertFalse(hasMismatch) { "Expected $types for $funcName, got $stack" }
         val result = ArrayList<StackElement>(types.size)
         for (ti in types.lastIndex downTo 0) {
-            val name = popElement(types[ti])
-            result.add(name)
+            result.add(popElement(types[ti]))
         }
         result.reverse()
         return result
@@ -149,7 +153,7 @@ class StackToDeclarative(
         val i0 = stack.removeLastOrNull()
             ?: assertFail("Tried popping $type, but stack was empty")
         // println("pop -> $i0 + $stack")
-        assertEquals(type, i0.type) { "pop($type) vs $stack + $i0" }
+        assertEquals(convertTypeToWASM(type), convertTypeToWASM(i0.type)) { "pop($type) vs $stack + $i0" }
         return i0
     }
 
@@ -162,8 +166,8 @@ class StackToDeclarative(
         return (a.names + b.names).distinct()
     }
 
-    private fun pushConstant(type: String, expression: String) {
-        pushWithNames(type, expression, emptyList(), false)
+    private fun pushConstant(type: WASMType, expression: String) {
+        pushWithNames(type.wasmName, expression, emptyList(), false)
     }
 
     private fun pushWithNames(type: String, expression: String, names: List<String>, isBoolean: Boolean) {
@@ -234,6 +238,14 @@ class StackToDeclarative(
         val inlinedCall = tmp.toString()
         tmp.clear()
         return inlinedCall
+    }
+
+    private fun writeCall3(funcName: String, params: List<WASMType>, results: List<String>) {
+        writeCall(funcName, params.map { it.wasmName }, results)
+    }
+
+    private fun writeCall2(funcName: String, params: List<WASMType>, results: List<WASMType>) {
+        writeCall(funcName, params.map { it.wasmName }, results.map { it.wasmName })
     }
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
@@ -432,30 +444,30 @@ class StackToDeclarative(
                 val index = i.index
                 val type = function.params[index]
                 // assertEquals(i.name, type.name) // todo why is the name incorrect???
-                writeGetInstruction(type.wasmType, type.name, k, assignments)
+                writeGetInstruction(type.jvmType, type.name, k, assignments)
             }
             is LocalGet -> {
                 val local = localsByName[i.name]
                     ?: throw IllegalStateException("Missing local '${i.name}'")
                 assertNotEquals("lbl", i.name)
-                writeGetInstruction(local.type, local.name, k, assignments)
+                writeGetInstruction(local.jvmType, local.name, k, assignments)
             }
             is GlobalGet -> {
                 val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
-                writeGetInstruction(global.wasmType, global.fullName, k, assignments)
+                writeGetInstruction(global.wasmType.wasmName, global.fullName, k, assignments)
             }
             is ParamSet -> {
                 val index = i.index
                 val type = function.params[index]
                 // assertEquals(i.name, type.name) // todo why is the name incorrect???
-                beginSetPoppedEnd(type.name, type.wasmType)
+                beginSetPoppedEnd(type.name, type.jvmType)
             }
             is LocalSet -> {
                 val local = localsByName[i.name]
                     ?: throw IllegalStateException("Missing local '${i.name}'")
                 if (i.name != "lbl") {
-                    beginSetPoppedEnd(local.name, local.type)
+                    beginSetPoppedEnd(local.name, local.jvmType)
                 } else {
                     // unfortunately can still happen
                     val value = popElement(i32).expr
@@ -465,7 +477,7 @@ class StackToDeclarative(
             is GlobalSet -> {
                 val global = globals[i.name]
                     ?: throw IllegalStateException("Missing global '${i.name}'")
-                beginSetPoppedEnd(global.fullName, global.wasmType)
+                beginSetPoppedEnd(global.fullName, global.wasmType.wasmName)
             }
             // loading and storing
             // loading and storing
@@ -513,19 +525,19 @@ class StackToDeclarative(
             is Const -> {
                 // will be integrated into expressions
                 when (i.type) {
-                    ConstType.F32 -> pushConstant(i.type.wasmType, i.value.toString() + "f")
-                    ConstType.F64 -> pushConstant(i.type.wasmType, i.value.toString())
+                    ConstType.F32 -> pushConstant(i.type, i.value.toString() + "f")
+                    ConstType.F64 -> pushConstant(i.type, i.value.toString())
                     ConstType.I32 -> {
                         val v =
                             if (i.value == Int.MIN_VALUE) "(i32)(1u << 31)"
                             else i.value.toString()
-                        pushConstant(i.type.wasmType, v)
+                        pushConstant(i.type, v)
                     }
                     ConstType.I64 -> {
                         val v =
                             if (i.value == Long.MIN_VALUE) "(i64)(1llu << 63)"
                             else i.value.toString() + "ll"
-                        pushConstant(i.type.wasmType, v)
+                        pushConstant(i.type, v)
                     }
                 }
             }
@@ -583,7 +595,7 @@ class StackToDeclarative(
 
                 // confirm parameters to branch are correct
                 for (j in i.params.indices) {
-                    assertEquals(stack[baseSize + j].type, i.params[j])
+                    assertEquals(convertTypeToWASM(stack[baseSize + j].type), convertTypeToWASM(i.params[j]))
                 }
 
                 // only pop them, if their content is complicated expressions
@@ -682,14 +694,14 @@ class StackToDeclarative(
                 //  -> find these methods, so we can inline them
                 val func = functionsByName[i.name]
                     ?: throw IllegalStateException("Missing ${i.name}")
-                writeCall(func.funcName, func.params.map { it.wasmType }, func.results)
+                writeCall3(func.funcName, func.params.map { it.wasmType }, func.results)
             }
             is CallIndirect -> {
                 val type = i.type
                 val tmpType = nextTemporaryVariable()
                 val tmpVar = nextTemporaryVariable()
                 append(FunctionTypeDefinition(type, tmpType, tmpVar, popElement(i32)))
-                writeCall(tmpVar, type.params, type.results)
+                writeCall2(tmpVar, type.params, type.results)
             }
             is LoopInstr -> {
                 val resultNames = i.results.map { nextTemporaryVariable() }

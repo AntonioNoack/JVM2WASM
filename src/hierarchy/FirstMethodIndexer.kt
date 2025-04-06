@@ -6,16 +6,12 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.DelayedLambdaUpdate.Companion.needingBridgeUpdate
 import org.objectweb.asm.*
+import org.objectweb.asm.Opcodes.*
 import replaceClass
 import useResultForThrowables
 import utils.*
-import utils.CommonInstructions.GET_FIELD
-import utils.CommonInstructions.GET_STATIC
 import utils.CommonInstructions.INVOKE_INTERFACE
-import utils.CommonInstructions.INVOKE_STATIC
 import utils.CommonInstructions.NEW_INSTR
-import utils.CommonInstructions.SET_FIELD
-import utils.CommonInstructions.SET_STATIC
 import wasm.instr.CallIndirect
 import wasm.instr.FuncType
 
@@ -105,7 +101,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val retType = descriptor1.returnType
         if (retType != null) clazz.dep(retType)
 
-        val isStatic = opcode == INVOKE_STATIC || name == STATIC_INIT
+        val isStatic = opcode == INVOKESTATIC || name == STATIC_INIT
         val isInterfaceCall = opcode == INVOKE_INTERFACE
         val sig1 = MethodSig.c(owner, name, descriptor)
 
@@ -293,20 +289,20 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
         // only getters are of importance, because setters without getters don't matter
         val type = Descriptor.parseType(descriptor)
-        val isStatic = opcode == GET_STATIC || opcode == SET_STATIC
+        val isStatic = opcode == GETSTATIC || opcode == PUTSTATIC
         val sig = FieldSig(owner, name, type, isStatic)
         lastField = sig
         // final fields can be inlined :)
         if (sig !in hIndex.finalFields) {
             // fields are only relevant if they are both written and read
             when (opcode) {
-                GET_STATIC, GET_FIELD -> readFields.add(sig)
-                SET_STATIC, SET_FIELD -> writtenFields.add(sig)
+                GETSTATIC, GETFIELD -> readFields.add(sig)
+                PUTSTATIC, PUTFIELD -> writtenFields.add(sig)
             }
         }
     }
 
-    private fun defineCallIndirectWASM(params: List<String>, results: List<String>) {
+    private fun defineCallIndirectWASM(params: List<WASMType>, results: List<WASMType>) {
         defineCallIndirectWASM(FuncType(params, results))
     }
 
@@ -329,9 +325,9 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         val throws = useResultForThrowables && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
 
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
-            defineCallIndirectWASM(listOf(ptrType), if (throws) listOf(ptrType) else emptyList())
+            defineCallIndirectWASM(listOf(ptrTypeI), if (throws) listOf(ptrTypeI) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflect" && sig.name == "callStaticInit") {
-            defineCallIndirectWASM(emptyList(), if (throws) listOf(ptrType) else emptyList())
+            defineCallIndirectWASM(emptyList(), if (throws) listOf(ptrTypeI) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
             // confirm that the method is native???
             val callSignature = CallSignature.c(sig, removeLastParam = true)

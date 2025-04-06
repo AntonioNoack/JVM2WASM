@@ -21,6 +21,7 @@ import replaceClassNullable
 import useWASMExceptions
 import utils.*
 import utils.Param.Companion.toParams
+import utils.Param.Companion.toParams2
 import utils.PrintUsed.printUsed
 import utils.WASMTypes.*
 import wasm.instr.FuncType
@@ -28,6 +29,7 @@ import wasm.instr.Instruction
 import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
+import wasm.writer.TypeKind
 
 object GeneratorIndex {
 
@@ -101,7 +103,7 @@ object GeneratorIndex {
 
     init {
         // static call with no arguments, which can throw an exception
-        val staticInitResult = if (useWASMExceptions || crashOnAllExceptions) emptyList() else listOf(ptrType)
+        val staticInitResult = if (useWASMExceptions || crashOnAllExceptions) emptyList() else listOf(ptrTypeI)
         types.add(FuncType(emptyList(), staticInitResult))
     }
 
@@ -115,16 +117,16 @@ object GeneratorIndex {
 
     val translatedMethods = HashMap<MethodSig, FunctionImpl>(8192)
 
-    val nthGetterMethods = HashMap<List<String>, FunctionImpl>(64)
-    fun getNth(typeStack: List<String>): String {
+    val nthGetterMethods = HashMap<List<WASMType>, FunctionImpl>(64)
+    fun getNth(typeStack: List<WASMType>): String {
         return nthGetterMethods.getOrPut(typeStack) {
             val name0 = typeStack.joinToString("") {
                 when (it) {
-                    i32 -> "i"
-                    i64 -> "l"
-                    f32 -> "f"
-                    f64 -> "d"
-                    else -> assertFail(it)
+                    WASMType.I32 -> "i"
+                    WASMType.I64 -> "l"
+                    WASMType.F32 -> "f"
+                    WASMType.F64 -> "d"
+                    else -> assertFail(it.name)
                 }
             }
             val name = "getNth_$name0"
@@ -135,7 +137,7 @@ object GeneratorIndex {
             instructions.add(ParamGet[0])
             instructions.add(Return)
             FunctionImpl(
-                name, typeStack.toParams(), typeStack + typeStack.first(),
+                name, typeStack.toParams2(), (typeStack + typeStack.first()).map { it.wasmName },
                 emptyList(), instructions,
                 false
             )

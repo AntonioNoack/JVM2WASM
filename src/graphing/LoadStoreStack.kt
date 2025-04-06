@@ -15,8 +15,8 @@ object LoadStoreStack {
         val pre = Builder()
         if (comments) pre.comment("load stack $inputs")
         for (idx in inputs.indices) {
-            val type = inputs[idx]
-            pre.append(mt.variables.getStackVarName(idx, type).getter)
+            val jvmType = inputs[idx]
+            pre.append(mt.variables.getStackVarName(idx, jvmType).getter)
         }
         printer.prepend(pre)
     }
@@ -28,8 +28,8 @@ object LoadStoreStack {
     fun storeStackAppend(outputs: List<String>, printer: Builder, mt: MethodTranslator) {
         if (outputs.isEmpty()) return
         if (comments) printer.comment("store stack $outputs")
-        for ((idx, type) in outputs.withIndex().reversed()) {
-            printer.append(mt.variables.getStackVarName(idx, type).setter)
+        for ((idx, jvmType) in outputs.withIndex().reversed()) {
+            printer.append(mt.variables.getStackVarName(idx, jvmType).setter)
         }
     }
 }
