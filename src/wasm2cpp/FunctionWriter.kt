@@ -3,6 +3,7 @@ package wasm2cpp
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
+import translator.JavaTypes.convertTypeToWASM
 import utils.StringBuilder2
 import wasm.instr.Comment
 import wasm.instr.Instruction
@@ -145,13 +146,13 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun writeNullDeclaration(instr: NullDeclaration) {
-        begin().append(instr.jvmType).append(' ').append(instr.name)
+        begin().append(convertTypeToWASM(instr.jvmType)).append(' ').append(instr.name)
             .append(" = 0").end()
     }
 
     private fun writeDeclaration(instr: Declaration) {
         begin()
-            .append(instr.type).append(' ').append(instr.name).append(" = ")
+            .append(convertTypeToWASM(instr.type)).append(' ').append(instr.name).append(" = ")
             .append(instr.initialValue.expr).end()
     }
 

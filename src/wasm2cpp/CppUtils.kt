@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import translator.JavaTypes.convertTypeToWASM
 import utils.Param
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
@@ -12,8 +13,8 @@ fun defineFunctionHead(funcName: String, params: List<Param>, results: List<Stri
     if (results.isEmpty()) {
         writer.append("void")
     } else {
-        for (ri in results) {
-            writer.append(ri)
+        for (jvmType in results) {
+            writer.append(convertTypeToWASM(jvmType))
         }
     }
     writer.append(' ').append(funcName).append('(')

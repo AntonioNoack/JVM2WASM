@@ -2,6 +2,7 @@ package wasm2cpp
 
 import me.anno.utils.assertions.assertFail
 import optimizer.InstructionProcessor
+import translator.JavaTypes.convertTypeToWASM
 import wasm.instr.*
 import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
@@ -376,12 +377,15 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 } else {
                     resultName = variableName
                     if (declaration) {
-                        resultType = instr.resultTypes[0]
+                        resultType = convertTypeToWASM(instr.resultTypes[0]).wasmName
                     }
                 }
             } else {
                 resultName = instr.resultName
-                resultType = instr.resultTypes.joinToString("") // combine result types into struct name
+                resultType = instr.resultTypes.joinToString("") {
+                    // combine result types into struct name
+                    convertTypeToWASM(it).wasmName
+                }
             }
         }
 
