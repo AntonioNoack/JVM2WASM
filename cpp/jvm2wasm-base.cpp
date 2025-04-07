@@ -410,12 +410,6 @@ void jvm_LWJGLxOpenGL_uniformMatrix4fv_IZIIV(i32 u, i32 t, i32 data, i32 len) {
     glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (u32)data));
 }
 
-// todo handle NaN correctly
-i32 dcmpg(f64 a, f64 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
-i32 dcmpl(f64 a, f64 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
-i32 fcmpg(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
-i32 fcmpl(f32 a, f32 b) { return (a > b ? 1 : 0) - (a < b ? 1 : 0); }
-
 i32 engine_Engine_fillBaseURL_ACI(i32) { return 0; }
 
 roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(

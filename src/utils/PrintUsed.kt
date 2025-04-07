@@ -22,7 +22,7 @@ object PrintUsed {
     }
 
     private val builder = StringBuilder2(512)
-    fun printUsed(sig: MethodSig) {
+    fun printUsed(sig: MethodSig, errorStream: Boolean = false) {
         builder.append("  ").append(sig).append(":")
         if (sig in (hIndex.methodsByClass[sig.clazz] ?: emptySet())) builder.append(" known")
         if (sig in dIndex.usedMethods) builder.append(" used")
@@ -75,10 +75,14 @@ object PrintUsed {
             val closestMatch = hIndex.methodsByClass.values.flatten().minByOrNull { str.distance(it.toString()) }
             builder.append(" closest-match: $closestMatch")
         }
-        println(builder.toString())
+        if (errorStream) {
+            System.err.println(builder.toString())
+        } else {
+            println(builder.toString())
+        }
         builder.clear()
         if (mapsTo != sig) {
-            printUsed(mapsTo)
+            printUsed(mapsTo, errorStream)
         }
     }
 

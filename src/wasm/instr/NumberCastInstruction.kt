@@ -5,9 +5,9 @@ import wasm.writer.Opcode
 
 class NumberCastInstruction(
     name: String, val prefix: String, val suffix: String,
-    val popType: String,val pushType: String, opcode: Opcode,
+    popType: String, pushType: String, opcode: Opcode,
     val impl: (Number) -> Number
-) : SimpleInstr(name, opcode) {
+) : UnaryInstruction(name, popType, pushType, "This is NumberCast!", opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

@@ -1,20 +1,29 @@
 package utils
 
 import exportHelpers
-import me.anno.utils.assertions.assertNull
+import me.anno.utils.assertions.assertTrue
 import utils.Param.Companion.toParams
 import utils.WASMTypes.*
 import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const0
+import wasm.instr.Const.Companion.i32Const1
+import wasm.instr.Const.Companion.i32ConstM1
 import wasm.instr.Const.Companion.i64Const0
+import wasm.instr.IfBranch
 import wasm.instr.Instruction
 import wasm.instr.Instructions.F32Div
+import wasm.instr.Instructions.F32EQ
+import wasm.instr.Instructions.F32GT
+import wasm.instr.Instructions.F32LT
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Mul
 import wasm.instr.Instructions.F32Store
 import wasm.instr.Instructions.F32Sub
 import wasm.instr.Instructions.F32Trunc
 import wasm.instr.Instructions.F64Div
+import wasm.instr.Instructions.F64EQ
+import wasm.instr.Instructions.F64GT
+import wasm.instr.Instructions.F64LT
 import wasm.instr.Instructions.F64Load
 import wasm.instr.Instructions.F64Mul
 import wasm.instr.Instructions.F64Store
@@ -41,8 +50,11 @@ import wasm.parser.FunctionImpl
 object NativeHelperFunctions {
 
     private val types = listOf(i32, i64, f32, f64)
-    fun register(functionImpl: FunctionImpl) {
-        assertNull(helperFunctions.put(functionImpl.funcName, functionImpl))
+    fun register(func: FunctionImpl) {
+        val old = helperFunctions.put(func.funcName, func)
+        assertTrue(old == null) {
+            "Found duplicate implementation for ${func.funcName}"
+        }
     }
 
     fun register(name: String, params: List<String>, results: List<String>, instructions: List<Instruction>) {
@@ -115,7 +127,8 @@ object NativeHelperFunctions {
                     // ParamGet[0], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
 
                     ParamGet[0], ParamGet[2], I32Add,
-                    ParamGet[1], storeInstr, Return)
+                    ParamGet[1], storeInstr, Return
+                )
             )
         }
 
@@ -199,6 +212,47 @@ object NativeHelperFunctions {
             "f64rem", listOf(f64, f64), listOf(f64),
             listOf(ParamGet[0], ParamGet[0], ParamGet[1], F64Div, ParamGet[1], F64Trunc, F64Mul, F64Sub, Return)
         )
+
+        fun ifElseChain(
+            ifs: List<Pair<List<Instruction>, Instruction>>,
+            default: Instruction
+        ): List<Instruction> {
+            return if (ifs.isEmpty()) {
+                listOf(default, Return)
+            } else {
+                val (firstCondition, firstResult) = ifs.first()
+                firstCondition + IfBranch(
+                    arrayListOf(firstResult, Return),
+                    ArrayList(ifElseChain(ifs.subList(1, ifs.size), default)),
+                )
+            }
+        }
+
+        for ((prefix, row) in listOf(
+            "f" to listOf(F32EQ, F32LT, F32GT),
+            "d" to listOf(F64EQ, F64LT, F64GT)
+        )) {
+            val (eq, lt, gt) = row
+            val type = if (prefix == "f") "float" else "double"
+            val x = ParamGet[0]
+            val y = ParamGet[1]
+            register( // return -1 if NaN
+                "${prefix}cmpl", listOf(type, type), listOf("int"), ifElseChain(
+                    listOf(
+                        listOf(x, y, eq) to i32Const0, // == -> 0
+                        listOf(x, y, gt) to i32Const1 //   > -> 1
+                    ), i32ConstM1
+                )
+            )
+            register( // return +1 if NaN
+                "${prefix}cmpg", listOf(type, type), listOf("int"), ifElseChain(
+                    listOf(
+                        listOf(x, y, eq) to i32Const0, // == ->  0
+                        listOf(x, y, lt) to i32ConstM1 //  < -> -1
+                    ), i32Const1
+                )
+            )
+        }
 
         register("i32neg", listOf(i32), listOf(i32), listOf(i32Const0, ParamGet[0], I32Sub, Return))
         register("i64neg", listOf(i64), listOf(i64), listOf(i64Const0, ParamGet[0], I64Sub, Return))

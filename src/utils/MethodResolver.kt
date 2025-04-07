@@ -27,8 +27,8 @@ object MethodResolver {
         if (!(clazz2 in dIndex.constructableClasses || isStatic) &&
             methodSig in (hIndex.methodsByClass[clazz2] ?: emptyList())
         ) {
-            printUsed(methodSig)
-            println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz2 }.map { it.key }}")
+            printUsed(methodSig, true)
+            System.err.println("  child classes: ${hIndex.superClass.entries.filter { it.value == clazz2 }.map { it.key }}")
             LOGGER.warn("Non-constructable classes are irrelevant to be resolved ($clazz2)")
         }
     }

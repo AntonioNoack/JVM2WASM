@@ -183,11 +183,7 @@ class MethodTranslator(
         ).toSet()
 
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
-            // return sig.clazz == "me/anno/ui/Panel" && sig.name == "<init>"
-            // return sig.clazz == "me/anno/input/ActionManager" && sig.name == "init"
-            // return sig.clazz == "me/anno/ui/editor/code/CodeEditor" && sig.name == "draw\$lambda\$4"
-            // return sig.name == "listOfChildrenImpl"
-            // return methodName(sig) == "kotlin_text_StringsKt__StringsJVMKt_replace_Ljava_lang_StringLjava_lang_StringLjava_lang_StringZLjava_lang_String"
+            // return sig.clazz == "me/anno/io/saveable/NamedSaveable" && sig.name == "setProperty"
             return false
         }
     }
@@ -1129,7 +1125,7 @@ class MethodTranslator(
                     getCaller(printer)
                     printer.append(i32Const(gIndex.getInterfaceIndex(InterfaceSig.c(name, sig0.descriptor))))
                     // looks up class, goes to interface list, binary searches function, returns func-ptr
-                    // instance, function index -> instance, function-ptr
+                    // instance, function index -> function-ptr
 
                     printer.push(i32).append(Call.resolveInterface)
                     val callInstr = CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow))

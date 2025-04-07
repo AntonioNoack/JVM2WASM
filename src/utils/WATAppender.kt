@@ -178,12 +178,6 @@ private fun fillInFields(
             }
         }
 
-        if (classIndex < 10) {
-            LOGGER.info(
-                "Fields for $classIndex [${indexStartPtr + classIndex * classSize}]: $className -> $allFields, " +
-                        allFields.joinToString { "${gIndex.getString(it.name)}" })
-        } else if (classIndex == 10 && numClasses > 11) LOGGER.info("...")
-
         // create new fields array
         alignBuffer(classData, ptrSize)
         val arrayPtr = indexStartPtr + classData.size()
@@ -343,15 +337,20 @@ private fun fillInMethods(
         val methods = if (writeConstructors) {
             if (isConstructable) {
                 val selfMethods1 = methodsByClass[clazzName] ?: emptyList()
-                selfMethods1.filter { hasBeenImplemented(it) } // filter by implemented methods
+                selfMethods1.filter { sig -> hasBeenImplemented(sig) } // filter by implemented methods
             } else emptyList()
         } else {
             val selfMethods1 = methodsByClass[clazzName] ?: emptyList()
-            (selfMethods1 + superMethods.map {
-                // withClass is only needed, if !static
-                if (hIndex.isStatic(it)) it
-                else it.withClass(clazzName)
-            }).distinct() // remove duplicates
+            if (isConstructable) {
+                (selfMethods1 + superMethods.mapNotNull { sig ->
+                    // withClass is only needed, if !static
+                    if (hIndex.isStatic(sig)) null
+                    else sig.withClass(clazzName)
+                }).distinct() // remove duplicates
+            } else {
+                selfMethods1.distinct()// remove duplicates
+                    .filter { sig -> hIndex.isStatic(sig) } // and make sure it's callable
+            }
         }
         methodsForClass.add(methods)
 

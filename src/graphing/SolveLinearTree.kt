@@ -2,6 +2,7 @@ package graphing
 
 import graphing.LoadStoreStack.loadStackPrepend
 import graphing.LoadStoreStack.storeStackAppend
+import graphing.StackDepthTester.findMinDepth
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.renumber
 import me.anno.utils.assertions.*
@@ -13,12 +14,8 @@ import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
 import utils.WASMType
-import utils.WASMTypes.i32
-import wasm.instr.Comment
-import wasm.instr.Const
+import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const1
-import wasm.instr.Drop
-import wasm.instr.IfBranch
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.I32EQZ
 import wasm.instr.Instructions.I32Or
@@ -28,26 +25,25 @@ object SolveLinearTree {
 
     val validate = true
 
-    private val unusedLabel = LocalVariableOrParam("I", WASMType.I32, "lUnused", -1, false)
+    private fun createLabel(prefix: String, mt: MethodTranslator): LocalVariableOrParam {
+        return mt.variables.addPrefixedLocalVariable(prefix, WASMType.I32, "boolean")
+    }
 
-    private fun createLabels(nodes: List<GraphingNode>, mt: MethodTranslator): List<LocalVariableOrParam> {
-        val labels = ArrayList<LocalVariableOrParam>(nodes.size * 2)
+    private fun createLabels(nodes: List<GraphingNode>, mt: MethodTranslator): List<LocalVariableOrParam?> {
+        val labels = ArrayList<LocalVariableOrParam?>(nodes.size * 2)
         for (i in nodes.indices) {
-            val node = nodes[i]
-            when (node) {
+            when (nodes[i]) {
                 is ReturnNode -> {
-                    labels.add(unusedLabel)
-                    labels.add(unusedLabel)
+                    labels.add(null)
+                    labels.add(null)
                 }
                 is BranchNode -> {
-                    labels.add(mt.variables.addPrefixedLocalVariable("nF", WASMType.I32, "I"))
-                    labels.add(mt.variables.addPrefixedLocalVariable("nT", WASMType.I32, "I"))
+                    labels.add(createLabel("nT", mt))
+                    labels.add(createLabel("nF", mt))
                 }
                 is SequenceNode -> {
-                    val variable =
-                        mt.variables.addPrefixedLocalVariable("n", WASMType.I32, "I")
-                    labels.add(variable)
-                    labels.add(variable)
+                    labels.add(createLabel("n", mt))
+                    labels.add(null)
                 }
                 else -> assertFail()
             }
@@ -56,26 +52,48 @@ object SolveLinearTree {
         return labels
     }
 
-    private fun setLabelsInNodes(nodes: List<GraphingNode>, labels: List<LocalVariableOrParam>) {
+    private fun initLabelsInNodes(nodes: List<GraphingNode>, labels: List<LocalVariableOrParam?>, printer: Builder) {
         for (i in nodes.indices) {
-            when (val node = nodes[i]) {
+            val i2 = i * 2
+            when (nodes[i]) {
                 is ReturnNode -> {}
                 is BranchNode -> {
-                    // set labels to result
-                    val ifTrue = labels[2 * i + 1]
-                    val ifFalse = labels[2 * i]
-                    node.printer
-                        .append(ifTrue.setter)
-                        .append(ifTrue.getter).append(I32EQZ).append(ifFalse.setter)
+                    printer.append(Const.i32Const0).append(labels[i2]!!.setter)
+                    printer.append(Const.i32Const0).append(labels[i2 + 1]!!.setter)
                 }
                 is SequenceNode -> {
-                    // set labels to true
-                    node.printer
-                        .append(i32Const1).append(labels[2 * i].setter)
+                    printer.append(Const.i32Const0).append(labels[i2]!!.setter)
                 }
                 else -> assertFail()
             }
         }
+    }
+
+    private fun setLabelsInNodes(nodes: List<GraphingNode>, labels: List<LocalVariableOrParam?>) {
+        for (i in nodes.indices) {
+            val i2 = i * 2
+            when (val node = nodes[i]) {
+                is ReturnNode -> {}
+                is BranchNode -> {
+                    // set label to result, and its inverse
+                    node.printer
+                        .append(labels[i2]!!.setter)
+                        .append(labels[i2]!!.getter)
+                        .append(I32EQZ)
+                        .append(labels[i2 + 1]!!.setter)
+                }
+                is SequenceNode -> {
+                    // set label to true
+                    node.printer.append(i32Const1).append(labels[i2]!!.setter)
+                }
+                else -> assertFail()
+            }
+        }
+    }
+
+    private fun <V> List<V>.takeNLast(n: Int): List<V> {
+        assertTrue(size >= n) { "Expected at least $size for $n used, $this" }
+        return subList(size - n, size)
     }
 
     private fun unifyInputAndOutputStacks(
@@ -85,44 +103,29 @@ object SolveLinearTree {
         for (i in nodes.indices) {
             val node = nodes[i]
             val shallLoadStack = !(i == 0 && firstNodeIsEntry)
+            // we can save on loading/storing the stack, if its elements aren't used:
+            //  find out how much stack is being used
+            val maxStackSize = -findMinDepth(mt.sig, node.printer.instrs, node.inputStack.size)
+            val skippedOnStack = node.inputStack.size - maxStackSize
             // keep stack in order
             if (shallLoadStack) {
-                loadStackPrepend(node, mt)
+                val inputsToLoad = node.inputStack
+                    .takeNLast(maxStackSize)
+                loadStackPrepend(inputsToLoad, node.printer, mt, skippedOnStack)
                 node.inputStack = emptyList()
             } else if (comments) {
                 node.printer.prepend(Comment("loading stack skipped on entry-node"))
             }
             when (node) {
-                is BranchNode,
-                is SequenceNode -> storeStackAppend(node, mt)
+                is BranchNode, is SequenceNode -> {
+                    val outputsToStore = node.outputStack
+                        .takeNLast(node.outputStack.size - skippedOnStack)
+                    storeStackAppend(outputsToStore, node.printer, mt, skippedOnStack)
+                }
                 is ReturnNode -> {}
                 else -> assertFail()
             }
             node.outputStack = emptyList()
-        }
-    }
-
-    private fun setLabelsTo01InNodes(nodes: List<GraphingNode>, labels: List<LocalVariableOrParam>, printer: Builder) {
-        for (i in nodes.indices) {
-            val node = nodes[i]
-            when (node) {
-                is ReturnNode -> {}
-                is BranchNode -> {
-                    // two labels needed
-                    printer
-                        .append(Const.i32Const0)
-                        .append(labels[i * 2].setter)
-                        .append(Const.i32Const0)
-                        .append(labels[i * 2 + 1].setter)
-                }
-                is SequenceNode -> {
-                    // just one label needed
-                    printer
-                        .append(Const.i32Const0)
-                        .append(labels[i * 2].setter)
-                }
-                else -> assertFail()
-            }
         }
     }
 
@@ -173,7 +176,7 @@ object SolveLinearTree {
         unifyInputAndOutputStacks(nodes, mt, firstNodeIsEntry)
 
         // set all labels to 0 at the start
-        setLabelsTo01InNodes(nodes, labels, resultPrinter)
+        initLabelsInNodes(nodes, labels, resultPrinter)
 
         val depth = IntArray(nodes.size)
         depth.fill(-1, if (firstNodeIsEntry) 1 else 0)
@@ -248,9 +251,17 @@ object SolveLinearTree {
             }
 
             val printer = printerNode.printer
+            var last1Label: String? = null
+            if (printer.instrs.size >= 2) {
+                if (printer.instrs[printer.instrs.size - 2] == i32Const1) {
+                    last1Label = (printer.instrs.last() as? LocalSet)?.name
+                }
+            }
+
             if (!isSpecialLastNode) {
                 var hadCondition = false
                 fun addCondition(condition: LocalVariableOrParam) {
+                    if (condition.name == last1Label) return
                     printer.append(condition.getter)
                     if (hadCondition) printer.append(I32Or)
                     hadCondition = true
@@ -259,15 +270,15 @@ object SolveLinearTree {
                 // sort them to make it look a little nicer
                 val nodeLabels = nodeInputs.map { nodeI ->
                     val isTrue = when {
-                        nodeI is BranchNode && node == nodeI.ifTrue -> 1
-                        nodeI is BranchNode && node == nodeI.ifFalse -> 0
+                        nodeI is BranchNode && node == nodeI.ifTrue -> 0
+                        nodeI is BranchNode && node == nodeI.ifFalse -> 1
                         nodeI is SequenceNode && node == nodeI.next -> 0
                         else -> assertFail("Unknown case")
                     }
                     labels[nodeI.index * 2 + isTrue]
-                }.sortedByDescending { it.index }
+                }.sortedByDescending { it!!.index }
                 for (label in nodeLabels) {
-                    addCondition(label)
+                    addCondition(label!!)
                 }
 
                 for (j in extraInputs1.indices) {

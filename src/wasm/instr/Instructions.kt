@@ -166,12 +166,12 @@ object Instructions {
     val Return = ReturnInstr("return", Opcode.RETURN)
     val Unreachable = ReturnInstr("unreachable", Opcode.UNREACHABLE)
 
-    val I32Shl = ShiftInstr("i32.shl", Opcode.I32_SHL) { a, b -> a.toInt().shl(b) }
-    val I32ShrU = ShiftInstr("i32.shr_u", Opcode.I32_SHRU) { a, b -> a.toInt().ushr(b) }
-    val I32ShrS = ShiftInstr("i32.shr_s", Opcode.I32_SHRS) { a, b -> a.toInt().shr(b) }
-    val I64Shl = ShiftInstr("i64.shl", Opcode.I64_SHL) { a, b -> a.toLong().shl(b) }
-    val I64ShrU = ShiftInstr("i64.shr_u", Opcode.I64_SHRU) { a, b -> a.toLong().ushr(b) }
-    val I64ShrS = ShiftInstr("i64.shr_s", Opcode.I64_SHRS) { a, b -> a.toLong().shr(b) }
+    val I32Shl = ShiftInstr("i32.shl", i32, Opcode.I32_SHL) { a, b -> a.toInt().shl(b) }
+    val I32ShrU = ShiftInstr("i32.shr_u", i32, Opcode.I32_SHRU) { a, b -> a.toInt().ushr(b) }
+    val I32ShrS = ShiftInstr("i32.shr_s", i32, Opcode.I32_SHRS) { a, b -> a.toInt().shr(b) }
+    val I64Shl = ShiftInstr("i64.shl", i64, Opcode.I64_SHL) { a, b -> a.toLong().shl(b) }
+    val I64ShrU = ShiftInstr("i64.shr_u", i64, Opcode.I64_SHRU) { a, b -> a.toLong().ushr(b) }
+    val I64ShrS = ShiftInstr("i64.shr_s", i64, Opcode.I64_SHRS) { a, b -> a.toLong().shr(b) }
 
     val I32And = BinaryI32Instruction("i32.and", "&", Opcode.I32_AND) { a, b -> a and b }
     val I64And = BinaryI64Instruction("i64.and", "&", Opcode.I64_AND) { a, b -> a and b }

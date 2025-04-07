@@ -15,7 +15,9 @@ data class IfBranch(
 
     var typeIndex = -1
 
-    constructor(ifTrue: ArrayList<Instruction>) : this(ifTrue, emptyArrayList, emptyList(), emptyList())
+    constructor(ifTrue: ArrayList<Instruction>) : this(ifTrue, emptyArrayList)
+    constructor(ifTrue: ArrayList<Instruction>, ifFalse: ArrayList<Instruction>) :
+            this(ifTrue, ifFalse, emptyList(), emptyList())
 
     override fun toString(): String {
         val builder = StringBuilder2()

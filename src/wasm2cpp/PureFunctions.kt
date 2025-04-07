@@ -1,15 +1,9 @@
 package wasm2cpp
 
 import dependency.StaticDependencies.transpose
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
-import highlevel.PtrDupInstr
-import optimizer.InstructionProcessor
+import me.anno.utils.Clock
 import org.apache.logging.log4j.LogManager
-import utils.methodName
-import wasm.instr.*
 import wasm.parser.FunctionImpl
-import wasm.parser.Import
 
 /**
  * Find functions, which can be called out of order, because they are just reading memory or globals
@@ -26,20 +20,30 @@ class PureFunctions(
 
     fun findPureFunctions(): Set<String> {
 
+        val clock = Clock("PureFunctions")
         val impureFunctions = ArrayList<String>(functions.size)
-        impureFunctions.addAll(imports.map { it.funcName })
+        for (i in imports.indices) {
+            impureFunctions.add(imports[i].funcName)
+        }
+        clock.stop("Init")
 
         val pureFunctions = HashSet<String>()
-        val dependencies = HashMap<String, Set<String>>(functions.size)
+        val dependencies = HashMap<String, Collection<String>>(functions.size)
+        val detector = MayBePureDetector(functionByName, HashSet())
         for (i in functions.indices) {
             val func = functions[i]
-            val funcDependencies = HashSet<String>()
-            val mayBePure = mayBePure(func, funcDependencies)
+            detector.canBePure = true
+            detector.process(func)
+            val mayBePure = detector.canBePure
             val name = func.funcName
             if (mayBePure) pureFunctions.add(name)
             else impureFunctions.add(name)
-            dependencies[name] = funcDependencies
+            if (detector.dst.isNotEmpty()) {
+                dependencies[name] = detector.dst
+                detector.dst = HashSet()
+            }
         }
+        clock.stop("MayBePure")
 
         // recursively remove calls to non-pure functions
         val calledBy = dependencies.transpose(::HashSet)
@@ -53,41 +57,10 @@ class PureFunctions(
                 }
             }
         }
+        clock.stop("Recursion")
 
         LOGGER.info("Pure functions: ${pureFunctions.size}/(${functions.size}+${imports.size})")
         return pureFunctions
 
-    }
-
-    private fun mayBePure(function: FunctionImpl, dst: HashSet<String>): Boolean {
-        var canBePure = true
-        InstructionProcessor { instruction ->
-            when (instruction) {
-                is Call -> {
-                    val isImport = functionByName[instruction.name] is Import
-                    if (isImport) canBePure = false
-                    else dst.add(instruction.name)
-                }
-                is GlobalSet,
-                is StoreInstr -> canBePure = false
-                is CallIndirect -> {
-                    // call-indirect could call only a specific function maybe, but that's too complicated to find out ;)
-                    val options = instruction.options
-                    if (options == null) canBePure = false
-                    else dst.addAll(options.map { methodName(it) })
-                }
-                is LocalSet, is ParamSet, is LocalGet, is ParamGet, is GlobalGet,
-                is SimpleInstr, is Comment, is FieldGetInstr, is Const, is Jumping,
-                is PtrDupInstr -> {
-                    // instruction is pure
-                }
-                is IfBranch, is LoopInstr -> {
-                    // content is handled by InstructionProcessor
-                }
-                is FieldSetInstr -> canBePure = false
-                else -> throw NotImplementedError("Unknown instruction $instruction")
-            }
-        }.process(function)
-        return canBePure
     }
 }

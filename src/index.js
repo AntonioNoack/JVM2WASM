@@ -19,13 +19,7 @@ try {
     });
 
     var imports = {
-        jvm: {
-            // todo handle NaN correctly
-            fcmpl(a,b){ return (a > b ? 1 : 0) - (a < b ? 1 : 0) }, // none of these can throw
-            fcmpg(a,b){ return (a > b ? 1 : 0) - (a < b ? 1 : 0) },
-            dcmpl(a,b){ return (a > b ? 1 : 0) - (a < b ? 1 : 0) },
-            dcmpg(a,b){ return (a > b ? 1 : 0) - (a < b ? 1 : 0) },
-        },
+        jvm: { },
         js: { mem: memory }
     }
 

@@ -466,11 +466,6 @@ fun jvm2wasm() {
         importPrinter.append("(import \"extmod\" \"exttag\" (tag \$exTag (param i32)))\n")
     }
 
-    importPrinter.import1("fcmpl", listOf(f32, f32), listOf(i32))
-    importPrinter.import1("fcmpg", listOf(f32, f32), listOf(i32))
-    importPrinter.import1("dcmpl", listOf(f64, f64), listOf(i32))
-    importPrinter.import1("dcmpg", listOf(f64, f64), listOf(i32))
-
     // this should be empty, and replaced using functions with JavaScript-pseudo implementations
     val missingMethods = HashSet<MethodSig>(4096)
     printForbiddenMethods(importPrinter, missingMethods)

@@ -189,41 +189,21 @@ object DynIndex {
                     debugInfo.append("  ").append(idx).append(": ")
                         .append(sig0).append(" -> -1X // ").append(mapped).append("\n")
                 }
-                if (true) {
-
+                if (!(sig.name == INSTANCE_INIT && sig.clazz in initMayBeBrokenFor)) {
                     LOGGER.warn("$sig ($classId/$idx) is missing from dynIndex")
-                    printUsed(sig)
+                    printUsed(sig, true)
                     LOGGER.warn("    $idx -> -1*")
-
-                    if (false) {
-                        // to do check if any super class or interface is being used...
-                        fun checkChildren(clazz: String) {
-                            if (sig.withClass(clazz) in dIndex.usedMethods) {
-                                printUsed(sig)
-                                throw IllegalStateException("$sig is being used by super class $clazz")
-                            }
-                            for (child in hIndex.childClasses[clazz] ?: return) {
-                                checkChildren(child)
-                            }
-                        }
-
-                        fun checkSuper(clazz: String) {
-                            if (clazz == "java/lang/Object") return
-                            if (sig.withClass(clazz) in dIndex.usedMethods) {
-                                printUsed(sig)
-                                throw IllegalStateException("$sig is being used by super class $clazz")
-                            }
-                            checkSuper(hIndex.superClass[clazz] ?: return)
-                        }
-
-                        checkSuper(sig.clazz)
-                        checkChildren(sig.clazz)
-                    }
                 }
                 return -1
             }
         }
     }
+
+    private val initMayBeBrokenFor = listOf(
+        // these are only instantiated by this compiler
+        "java/lang/reflect/AccessibleObject", "java/lang/reflect/Field",
+        "java/lang/reflect/Executable", "java/lang/reflect/Method", "java/lang/reflect/Constructor"
+    )
 
     private var numOk = 0
     private var numBroken = 0

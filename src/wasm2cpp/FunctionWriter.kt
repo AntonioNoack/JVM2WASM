@@ -236,7 +236,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>) {
-        if (!writer.endsWith("else if(")) begin().append("if (")
+        if (!writer.endsWith("else if (")) begin().append("if (")
         writer.append(instr.expr.expr).append(") {")
         for (i in extraComments.indices) {
             val comment = extraComments[i] as Comment
@@ -252,7 +252,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
             val ni = nextInstr(ifFalse, i)
             val instrI = ifFalse.getOrNull(i)
             if (ni == -1 && instrI is ExprIfBranch) {
-                begin().append("} else if(")
+                begin().append("} else if (")
                 // continue if-else-cascade
                 writeIfBranch(instrI, ifFalse.subList(0, i))
                 // append any additional comments

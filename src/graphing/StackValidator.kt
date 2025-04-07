@@ -1,19 +1,20 @@
 package graphing
 
 import canThrowError
+import graphing.StackCallUtils.findCallByName
+import graphing.StackCallUtils.getCallParams
+import graphing.StackCallUtils.getCallResults
+import graphing.StackCallUtils.hasSelfParam
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.printState2
 import hIndex
-import hierarchy.HierarchyIndex.methodAliases
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
-import implementedMethods
 import me.anno.utils.OS
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
-import translator.GeneratorIndex
 import translator.JavaTypes.convertTypeToWASM
 import translator.JavaTypes.i32
 import translator.JavaTypes.popType
@@ -24,7 +25,10 @@ import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.isLookingAtSpecial
 import useWASMExceptions
-import utils.*
+import utils.Builder
+import utils.MethodSig
+import utils.StringBuilder2
+import utils.WASMType
 import wasm.instr.*
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
@@ -121,7 +125,6 @@ object StackValidator {
         val (localVarTypes, paramsTypes) = validateLocalVariables(localVarsWithParams)
         validateStack3(sig, printer.instrs, params, normalResults, returnResults, localVarTypes, paramsTypes, 0)
     }
-
 
     private fun validateStack3(
         sig: MethodSig,
@@ -238,16 +241,10 @@ object StackValidator {
             is Comment -> {} // ignored
             is UnaryInstruction -> stack.pop(instr.popType).push(instr.pushType)
             is BinaryInstruction -> stack.pop(instr.popType).pop(instr.popType).push(instr.pushType)
-            is ShiftInstr -> stack.pop(instr.type).pop(instr.type).push(instr.type)
             Drop -> stack.removeLast()
-            is NumberCastInstruction -> stack.pop(instr.popType).push(instr.pushType)
             is Call -> {
                 // println("Calling $i on $stack")
-                val func =
-                    methodAliases[instr.name]
-                        ?: implementedMethods[instr.name]
-                        ?: helperFunctions[instr.name]
-                        ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == instr.name }
+                val func = findCallByName(instr.name)
                 if (func == null) {
                     LOGGER.warn("Missing ${instr.name}, skipping validation")
                     return true
@@ -262,8 +259,7 @@ object StackValidator {
                     stack.pop(ptrType)
                 }
                 // push return values
-                val canThrow = !useWASMExceptions && canThrowError1(func)
-                val retTypes = getRetType(func, canThrow)
+                val retTypes = getCallResults(func)
                 if (print) println("${"  ".repeat(depth + 2)}call(${callParams.joinToString()}) -> $retTypes")
                 stack.addAll(retTypes)
             }
@@ -294,7 +290,6 @@ object StackValidator {
                 stack.pop(i32)
                 // todo check results match stack
             }
-            is LoadInstr -> stack.pop(ptrType).push(instr.wasmType)
             is StoreInstr -> stack.pop(instr.wasmType).pop(ptrType)
             PtrDupInstr -> stack.pop(ptrType).push(ptrType).push(ptrType)
             is HighLevelInstruction -> {
@@ -309,38 +304,6 @@ object StackValidator {
             else -> throw NotImplementedError(instr.toString())
         }
         return false
-    }
-
-    private fun getCallParams(func: Any): List<String> {
-        return when (func) {
-            is FunctionImpl -> func.params.map { it.jvmType } // helper function
-            is MethodSig -> func.descriptor.params
-            else -> throw NotImplementedError()
-        }
-    }
-
-    private fun getRetType(func: Any, canThrow: Boolean): List<String> {
-        return when (func) {
-            is FunctionImpl -> func.results // helper function
-            is MethodSig -> func.descriptor.getResultTypes(canThrow)
-            else -> assertFail()
-        }
-    }
-
-    private fun hasSelfParam(func: Any): Boolean {
-        return when (func) {
-            is FunctionImpl -> false // helper function
-            is MethodSig -> !hIndex.isStatic(func)
-            else -> assertFail()
-        }
-    }
-
-    private fun canThrowError1(func: Any): Boolean {
-        return when (func) {
-            is FunctionImpl -> false // helper function
-            is MethodSig -> canThrowError(func)
-            else -> assertFail()
-        }
     }
 
     fun List<String>.endsWith(end: List<String>): Boolean {
