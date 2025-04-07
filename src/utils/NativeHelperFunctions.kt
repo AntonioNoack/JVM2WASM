@@ -44,6 +44,7 @@ import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.I64Sub
 import wasm.instr.Instructions.Return
+import wasm.instr.Instructions.Unreachable
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
 
@@ -242,7 +243,7 @@ object NativeHelperFunctions {
                         listOf(x, y, eq) to i32Const0, // == -> 0
                         listOf(x, y, gt) to i32Const1 //   > -> 1
                     ), i32ConstM1
-                )
+                ) + Unreachable
             )
             register( // return +1 if NaN
                 "${prefix}cmpg", listOf(type, type), listOf("int"), ifElseChain(
@@ -250,7 +251,7 @@ object NativeHelperFunctions {
                         listOf(x, y, eq) to i32Const0, // == ->  0
                         listOf(x, y, lt) to i32ConstM1 //  < -> -1
                     ), i32Const1
-                )
+                ) + Unreachable
             )
         }
 
