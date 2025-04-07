@@ -2,6 +2,7 @@ package interpreter
 
 import gIndex
 import interpreter.functions.*
+import jvm.JVMFlags.is32Bits
 import jvm.JVMShared.objectOverhead
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
@@ -13,7 +14,6 @@ import utils.Param.Companion.toParams
 import utils.StaticClassIndices
 import utils.StaticFieldOffsets
 import utils.WASMTypes.*
-import utils.is32Bits
 import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instructions.Return

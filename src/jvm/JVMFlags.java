@@ -1,0 +1,7 @@
+package jvm;
+
+public class JVMFlags {
+    public static boolean is32Bits = false;
+    public static int ptrSize = is32Bits ? 4 : 8;
+    public static int ptrSizeBits = is32Bits ? 2 : 3;
+}

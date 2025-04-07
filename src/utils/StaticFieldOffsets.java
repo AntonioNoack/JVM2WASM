@@ -1,6 +1,6 @@
 package utils;
 
-import static jvm.JVM32.ptrSize;
+import static jvm.JVMFlags.ptrSize;
 import static jvm.JVMShared.intSize;
 import static jvm.JVMShared.objectOverhead;
 
@@ -44,8 +44,8 @@ public class StaticFieldOffsets {
     public static final int OFFSET_CONSTRUCTOR_DECLARING_CLASS = objectOverhead + intSize + 2 * ptrSize;
     public static final int OFFSET_CONSTRUCTOR_MODIFIERS = objectOverhead + intSize + 3 * ptrSize;
 
-    public static final int OFFSET_THROWABLE_MESSAGE = objectOverhead;
-    public static final int OFFSET_THROWABLE_STACKTRACE = objectOverhead + ptrSize;
+    public static final int OFFSET_THROWABLE_MESSAGE = objectOverhead + intSize;
+    public static final int OFFSET_THROWABLE_STACKTRACE = objectOverhead + intSize + ptrSize;
 
     public static final int OFFSET_STE_LINE = objectOverhead;
     public static final int OFFSET_STE_CLASS = objectOverhead + intSize;

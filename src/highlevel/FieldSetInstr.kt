@@ -2,10 +2,10 @@ package highlevel
 
 import alwaysUseFieldCalls
 import interpreter.WASMEngine
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
 import translator.GeneratorIndex
 import utils.FieldSig
-import utils.is32Bits
 import utils.lookupStaticVariable
 import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const

@@ -225,7 +225,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 // restore comments in-between, so file length stays comparable
                 val pos1 = writer.size
                 for (j in i + 1 until ni) {
-                    writeInstruction(instructions[j], null, false)
+                    writeInstruction(instructions[j] as Comment, null, false)
                 }
                 // these should be inserted before, not after
                 swap(pos0, pos1)
@@ -253,6 +253,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
     private fun writeInstruction(instr: Instruction, nextInstr: Instruction?, isLastInstr: Boolean): Boolean {
         if (debugInstructions) writeDebugInfo(instr)
         when (instr) {
+            is Comment,
             Unreachable,
             is FunctionTypeDefinition,
             is GotoInstr, BreakThisLoopInstr,
@@ -265,7 +266,6 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             is ExprIfBranch -> writeIfBranch(instr, isLastInstr)
             is ExprCall -> return writeExprCall(instr, nextInstr)
             is LoopInstr -> writeLoopInstr(instr)
-            is Comment -> writer.add(instr)
             else -> assertFail("Unknown instruction type ${instr.javaClass}")
         }
         return false

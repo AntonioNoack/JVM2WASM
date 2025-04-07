@@ -292,7 +292,7 @@ class StackToDeclarative(
     }
 
     private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int): Boolean {
-        val assignments = Assignments.findAssignments(instructions)
+        val assignments = Assignments.findAssignments(instructions, pureFunctions)
         for (i in i0 until i1) {
             val instr = instructions[i]
             writeInstruction(instr, i, assignments)

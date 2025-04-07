@@ -3,8 +3,8 @@ package highlevel
 import alwaysUseFieldCalls
 import highlevel.FieldSetInstr.Companion.getFieldAddr
 import interpreter.WASMEngine
+import jvm.JVMFlags.is32Bits
 import utils.FieldSig
-import utils.is32Bits
 import wasm.instr.Call
 import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.ptrConst

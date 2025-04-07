@@ -25,6 +25,7 @@ import highlevel.FieldGetInstr
 import highlevel.FieldSetInstr
 import highlevel.PtrDupInstr
 import ignoreNonCriticalNullPointers
+import jvm.JVMFlags.is32Bits
 import me.anno.io.Streams.writeLE32
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
@@ -183,7 +184,7 @@ class MethodTranslator(
         ).toSet()
 
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
-            // return sig.clazz == "me/anno/io/saveable/NamedSaveable" && sig.name == "setProperty"
+            return methodName(sig) == "me_anno_ecs_EntityStats_calcTotalNumEntitiesXlambdaX0_Lkotlin_jvm_internal_RefXIntRefLme_anno_ecs_EntityLjava_util_ArrayListLkotlin_Unit"
             return false
         }
     }
@@ -456,37 +457,37 @@ class MethodTranslator(
             // in 0x15 .. 0x19 -> printer.append("  local.get [idx]")
 
             // load instructions
-            0x2e -> {
+            IALOAD -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32)
+                printer.pop(i32).pop(utils.ptrType).push(i32)
                     .append(if (checkArrayAccess) Call.i32ArrayLoad else Call.i32ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x2f -> {
+            LALOAD -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(i64)
+                printer.pop(i32).pop(ptrType).push(i64)
                     .append(if (checkArrayAccess) Call.i64ArrayLoad else Call.i64ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x30 -> {
+            FALOAD -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(f32)
+                printer.pop(i32).pop(ptrType).push(f32)
                     .append(if (checkArrayAccess) Call.f32ArrayLoad else Call.f32ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x31 -> {
+            DALOAD -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(f64)
+                printer.pop(i32).pop(ptrType).push(f64)
                     .append(if (checkArrayAccess) Call.f64ArrayLoad else Call.f64ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x32 -> {
+            AALOAD -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).push(ptrType)
+                printer.pop(i32).pop(ptrType).push(ptrType)
                     .append(
                         if (checkArrayAccess) if (is32Bits) Call.i32ArrayLoad else Call.i64ArrayLoad
                         else if (is32Bits) Call.i32ArrayLoadU else Call.i64ArrayLoadU
@@ -494,21 +495,21 @@ class MethodTranslator(
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x33 -> {
+            BALOAD -> { // used for bytes and booleans
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x34 -> {
+            CALOAD -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x35 -> {
+            SALOAD -> {
                 stackPush()
                 printer.pop(ptrType).poppush(i32)
                     .append(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
@@ -516,37 +517,37 @@ class MethodTranslator(
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             // store instructions
-            0x4f -> {
+            IASTORE -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i32ArrayStore else Call.i32ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x50 -> {
+            LASTORE -> {
                 stackPush()
                 printer.pop(i64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i64ArrayStore else Call.i64ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x51 -> {
+            FASTORE -> {
                 stackPush()
                 printer.pop(f32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f32ArrayStore else Call.f32ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x52 -> {
+            DASTORE -> {
                 stackPush()
                 printer.pop(f64).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.f64ArrayStore else Call.f64ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x53 -> {
+            AASTORE -> {
                 stackPush()
-                printer.pop(ptrType).pop(i32).pop(ptrType)
+                printer.pop(i32).pop(ptrType).pop(ptrType)
                     .append(
                         if (checkArrayAccess) if (is32Bits) Call.i32ArrayStore else Call.i64ArrayStore
                         else if (is32Bits) Call.i32ArrayStoreU else Call.i64ArrayStoreU
@@ -554,14 +555,14 @@ class MethodTranslator(
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x54 -> {
+            BASTORE -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i8ArrayStore else Call.i8ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            0x55, 0x56 -> { // char/short-array store
+            CASTORE, SASTORE -> { // char/short-array store
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
                     .append(if (checkArrayAccess) Call.i16ArrayStore else Call.i16ArrayStoreU)

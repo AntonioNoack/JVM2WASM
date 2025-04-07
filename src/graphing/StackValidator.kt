@@ -7,12 +7,10 @@ import graphing.StackCallUtils.getCallResults
 import graphing.StackCallUtils.hasSelfParam
 import graphing.StructuralAnalysis.Companion.printState
 import graphing.StructuralAnalysis.Companion.printState2
-import hIndex
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
 import me.anno.utils.OS
 import me.anno.utils.assertions.assertEquals
-import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
@@ -32,7 +30,6 @@ import utils.WASMType
 import wasm.instr.*
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
-import wasm.parser.FunctionImpl
 
 object StackValidator {
 
@@ -63,11 +60,6 @@ object StackValidator {
 
     private fun ArrayList<String>.push(type: String): ArrayList<String> {
         pushType(type)
-        return this
-    }
-
-    private fun ArrayList<String>.push(type: WASMType): ArrayList<String> {
-        pushType(type.wasmName)
         return this
     }
 

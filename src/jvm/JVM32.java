@@ -16,9 +16,6 @@ import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 @SuppressWarnings("unused")
 public class JVM32 {
 
-    public static int ptrSizeBits = 2; // this is JVM32, so this is correct
-    public static int ptrSize = 1 << ptrSizeBits;
-
     @NoThrow
     @WASM(code = "") // todo this method shall only be used by JVM32
     public static native <V> V ptrTo(int addr);

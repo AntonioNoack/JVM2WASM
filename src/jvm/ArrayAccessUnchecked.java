@@ -4,6 +4,7 @@ import annotations.Alias;
 import annotations.NoThrow;
 
 import static jvm.JVM32.*;
+import static jvm.JVMFlags.ptrSize;
 import static jvm.JVMShared.arrayOverhead;
 import static jvm.JVMShared.objectOverhead;
 

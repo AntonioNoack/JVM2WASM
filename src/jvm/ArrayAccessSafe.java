@@ -3,6 +3,7 @@ package jvm;
 import annotations.Alias;
 
 import static jvm.JVM32.*;
+import static jvm.JVMFlags.ptrSize;
 import static jvm.JVMShared.*;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticClassIndices.*;
@@ -11,14 +12,12 @@ public class ArrayAccessSafe {
 
     @Alias(names = "i32ArrayStore")
     public static void arrayStore(Object instance, int index, int value) {
-        //noinspection ConstantValue
         checkOutOfBounds(instance, index, ptrSize == 4 ? OBJECT_ARRAY : INT_ARRAY, INT_ARRAY);
         writeI32AtOffset(instance, arrayOverhead + (index << 2), value);
     }
 
     @Alias(names = "i64ArrayStore")
     public static void arrayStore(Object instance, int index, long value) {
-        //noinspection ConstantValue
         checkOutOfBounds(instance, index, ptrSize == 8 ? OBJECT_ARRAY : LONG_ARRAY, LONG_ARRAY);
         writeI64AtOffset(instance, arrayOverhead + (index << 3), value);
     }
@@ -55,14 +54,12 @@ public class ArrayAccessSafe {
 
     @Alias(names = "i32ArrayLoad")
     public static int arrayLoad32(Object instance, int index) {
-        //noinspection ConstantValue
         checkOutOfBounds(instance, index, ptrSize == 4 ? OBJECT_ARRAY : INT_ARRAY, INT_ARRAY);
         return readI32AtOffset(instance, arrayOverhead + (index << 2));
     }
 
     @Alias(names = "i64ArrayLoad")
     public static long arrayLoad64(Object instance, int index) {
-        //noinspection ConstantValue
         checkOutOfBounds(instance, index, ptrSize == 8 ? OBJECT_ARRAY : LONG_ARRAY, LONG_ARRAY);
         return readI64AtOffset(instance, arrayOverhead + (index << 3));
     }

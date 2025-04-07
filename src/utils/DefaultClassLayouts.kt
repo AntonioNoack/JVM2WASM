@@ -3,7 +3,8 @@ package utils
 import byteStrings
 import gIndex
 import hIndex
-import jvm.JVM32.ptrSize
+import jvm.JVMFlags.ptrSize
+import jvm.JVMFlags.ptrSizeBits
 import jvm.JVMShared.*
 import me.anno.utils.assertions.assertEquals
 import utils.Descriptor.Companion.voidDescriptor
@@ -72,10 +73,11 @@ object DefaultClassLayouts {
         gIndex.getFieldOffset(system, "in", "java/io/InputStream", true)
         gIndex.getFieldOffset(system, "out", "java/io/PrintStream", true)
         gIndex.getFieldOffset(system, "err", "java/io/PrintStream", true)
-        eq(throwable, "detailMessage", string, 0, OFFSET_THROWABLE_MESSAGE)
-        eq(throwable, "stackTrace", "[$ste", ptrSize, OFFSET_THROWABLE_STACKTRACE)
+        eq(throwable, "padding", "int", 0, objectOverhead) // for 64-bits :/
+        eq(throwable, "detailMessage", string, intSize, OFFSET_THROWABLE_MESSAGE)
+        eq(throwable, "stackTrace", "[$ste", intSize + ptrSize, OFFSET_THROWABLE_STACKTRACE)
 
-        eq(ste, "lineNumber", string, 0, OFFSET_STE_LINE)
+        eq(ste, "lineNumber", "int", 0, OFFSET_STE_LINE)
         eq(ste, "declaringClass", string, intSize, OFFSET_STE_CLASS)
         eq(ste, "methodName", string, intSize + ptrSize, OFFSET_STE_METHOD)
         eq(ste, "fileName", string, intSize + 2 * ptrSize, OFFSET_STE_FILE)
@@ -119,6 +121,8 @@ object DefaultClassLayouts {
         hIndex.finalFields[FieldSig("jvm/JVMShared", "objectOverhead", "int", true)] = objectOverhead
         hIndex.finalFields[FieldSig("jvm/JVMShared", "arrayOverhead", "int", true)] = arrayOverhead
         hIndex.finalFields[FieldSig("jvm/JVMShared", "trackAllocations", "boolean", true)] = trackAllocations
+        hIndex.finalFields[FieldSig("jvm/JVMFlags", "ptrSize", "int", true)] = ptrSize
+        hIndex.finalFields[FieldSig("jvm/JVMFlags", "ptrSizeBits", "int", true)] = ptrSizeBits
 
         eq(gIndex.getInterfaceIndex(InterfaceSig.c(STATIC_INIT, voidDescriptor)), 0)
         gIndex.getFieldOffset(constructor, "clazz", clazz, false)

@@ -439,8 +439,8 @@ public class JavaReflect {
 
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")
-    public static int Object_getClass(Object instance) {
-        return classIdToInstancePtr(readClassId(instance));
+    public static Object Object_getClass(Object instance) {
+        return classIdToInstance(readClassId(instance));
     }
 
     @Alias(names = "java_lang_Object_hashCode_I")

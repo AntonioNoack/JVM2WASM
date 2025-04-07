@@ -1,6 +1,6 @@
 package translator
 
-import utils.is32Bits
+import jvm.JVMFlags.is32Bits
 import wasm.instr.Call
 import wasm.instr.Instructions.F32Load
 import wasm.instr.Instructions.F32Store

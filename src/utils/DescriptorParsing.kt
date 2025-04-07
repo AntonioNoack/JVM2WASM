@@ -1,6 +1,7 @@
 package utils
 
 import hIndex
+import jvm.JVMFlags.is32Bits
 import translator.JavaTypes.convertTypeToWASM
 import utils.WASMTypes.i32
 import utils.WASMTypes.i64
@@ -8,7 +9,6 @@ import wasm.instr.FuncType
 
 // could be changed to i64 in the future, if more browsers support 64 bit wasm
 // quite a few bits expect i32 though... hard to change now
-val is32Bits = true
 val ptrType = if (is32Bits) i32 else i64
 val ptrTypeI = if (is32Bits) WASMType.I32 else WASMType.I64
 

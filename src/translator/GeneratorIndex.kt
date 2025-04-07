@@ -6,7 +6,8 @@ import crashOnAllExceptions
 import dependency.ActuallyUsedIndex
 import hIndex
 import isRootType
-import jvm.JVM32.ptrSize
+import jvm.JVMFlags.is32Bits
+import jvm.JVMFlags.ptrSize
 import jvm.JVMShared.*
 import me.anno.io.Streams.writeLE16
 import me.anno.io.Streams.writeLE32

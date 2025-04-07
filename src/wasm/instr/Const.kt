@@ -1,9 +1,9 @@
 package wasm.instr
 
 import interpreter.WASMEngine
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.structures.lists.LazyList
 import utils.WASMType
-import utils.is32Bits
 
 data class Const(val type: ConstType, val value: Number) : Instruction {
 

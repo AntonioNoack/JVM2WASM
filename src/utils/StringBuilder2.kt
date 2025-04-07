@@ -154,5 +154,14 @@ class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
         }
     }
 
+    override fun hashCode(): Int {
+        var hash = 0
+        val values = values
+        for (i in 0 until size) {
+            hash = 31 * hash + values[i].toInt().and(255)
+        }
+        return hash
+    }
+
     val length get() = size
 }

@@ -1,7 +1,7 @@
 package highlevel
 
 import interpreter.WASMEngine
-import utils.is32Bits
+import jvm.JVMFlags.is32Bits
 import wasm.instr.Call
 import wasm.instr.Instruction
 

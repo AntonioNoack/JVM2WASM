@@ -5,6 +5,7 @@ import dIndex
 import gIndex
 import globals
 import hIndex
+import jvm.JVMFlags.is32Bits
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents

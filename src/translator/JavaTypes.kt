@@ -1,11 +1,11 @@
 package translator
 
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFalse
 import org.apache.logging.log4j.LogManager
 import utils.WASMType
 import utils.WASMTypes
-import utils.is32Bits
 
 object JavaTypes {
 

@@ -1,6 +1,7 @@
 package utils
 
 import exportHelpers
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertTrue
 import utils.Param.Companion.toParams
 import utils.WASMTypes.*
@@ -38,11 +39,13 @@ import wasm.instr.Instructions.I32Store
 import wasm.instr.Instructions.I32Store16
 import wasm.instr.Instructions.I32Store8
 import wasm.instr.Instructions.I32Sub
+import wasm.instr.Instructions.I64Add
 import wasm.instr.Instructions.I64GTS
 import wasm.instr.Instructions.I64LTS
 import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.I64Sub
+import wasm.instr.Instructions.I64_EXTEND_I32S
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.ParamGet
@@ -143,13 +146,20 @@ object NativeHelperFunctions {
             Triple(Call.setVIOFieldF64, f64, F64Store),
         )) {
             register(
-                call.name, listOf(type, i32, i32), emptyList(),
-                listOf(
-                    // ParamGet[1], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
+                call.name, listOf(type, ptrType, i32), emptyList(),
+                if (is32Bits) {
+                    listOf(
+                        // ParamGet[1], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
 
-                    ParamGet[1], ParamGet[2], I32Add,
-                    ParamGet[0], storeInstr, Return
-                )
+                        ParamGet[1], ParamGet[2], I32Add,
+                        ParamGet[0], storeInstr, Return
+                    )
+                } else {
+                    listOf(
+                        ParamGet[1], ParamGet[2], I64_EXTEND_I32S, I64Add,
+                        ParamGet[0], storeInstr, Return
+                    )
+                }
             )
         }
 
@@ -183,8 +193,9 @@ object NativeHelperFunctions {
             Triple(Call.getFieldF64, f64, F64Load),
         )) {
             register(
-                call.name, listOf(i32, i32), listOf(type),
-                listOf(ParamGet[0], ParamGet[1], I32Add, loadInstr, Return)
+                call.name, listOf(ptrType, i32), listOf(type),
+                if (is32Bits) listOf(ParamGet[0], ParamGet[1], I32Add, loadInstr, Return)
+                else listOf(ParamGet[0], ParamGet[1], I64_EXTEND_I32S, I64Add, loadInstr, Return)
             )
         }
 

@@ -8,6 +8,7 @@ import java.io.PrintStream;
 
 import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.JVM32.*;
+import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
