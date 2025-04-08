@@ -4,6 +4,7 @@ import annotations.UnsafePointerField;
 
 import java.lang.ref.ReferenceQueue;
 
+import static jvm.Pointer.getAddrS;
 import static jvm.gc.GarbageCollector.lockMallocMutex;
 import static jvm.gc.GarbageCollector.unlockMallocMutex;
 import static jvm.JVM32.*;
@@ -22,7 +23,7 @@ public class WeakRef<V> {
         address = instance;
         if (isAfterAllocationStart()) {
             lockMallocMutex();
-            next = weakRefInstances.put(getAddr(address), this);
+            next = weakRefInstances.put(getAddrS(address), this);
             unlockMallocMutex();
         } // else don't register, because instance isn't tracked
     }

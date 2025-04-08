@@ -21,16 +21,13 @@ import replaceClass
 import replaceClassNullable
 import useWASMExceptions
 import utils.*
-import utils.Param.Companion.toParams
 import utils.Param.Companion.toParams2
 import utils.PrintUsed.printUsed
-import utils.WASMTypes.*
 import wasm.instr.FuncType
 import wasm.instr.Instruction
 import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
-import wasm.writer.TypeKind
 
 object GeneratorIndex {
 

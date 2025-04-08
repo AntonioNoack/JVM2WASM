@@ -90,6 +90,7 @@ import wasm.instr.Const.Companion.i32ConstM1
 import wasm.instr.Const.Companion.i64Const
 import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Const.Companion.i64Const1
+import wasm.instr.Const.Companion.ptrConst
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.F32Add
 import wasm.instr.Instructions.F32Div
@@ -184,7 +185,8 @@ class MethodTranslator(
         ).toSet()
 
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
-            return methodName(sig) == "me_anno_ecs_EntityStats_calcTotalNumEntitiesXlambdaX0_Lkotlin_jvm_internal_RefXIntRefLme_anno_ecs_EntityLjava_util_ArrayListLkotlin_Unit"
+            // return sig.name == "allocateNewSpace0"
+            // return methodName(sig) == "me_anno_mesh_vox_VOXReader_applyMapping_V"
             return false
         }
     }
@@ -423,7 +425,6 @@ class MethodTranslator(
     }
 
     private fun isCategory2Type(type: String): Boolean {
-        if (!is32Bits && ptrType == i64) throw IllegalStateException("We'd need to differentiate ptrType from $type")
         return when (type) {
             "i64", "f64", "long", "double" -> true
             else -> false
@@ -434,25 +435,25 @@ class MethodTranslator(
         // https://github.com/AssemblyScript/assemblyscript/wiki/WebAssembly-to-TypeScript-Cheat-Sheet
         if (printOps) println("  [${OpCode[opcode]}]")
         when (opcode) {
-            0x00 -> {} // nop
+            NOP -> {} // nop
 
             // constant loading instructions
-            0x01 -> printer.push(ptrType)
-                .append(if (is32Bits) i32Const0 else i64Const0) // load null
-            0x02 -> printer.push(i32).append(i32ConstM1)
-            0x03 -> printer.push(i32).append(i32Const0)
-            0x04 -> printer.push(i32).append(i32Const1)
-            0x05 -> printer.push(i32).append(i32Const2)
-            0x06 -> printer.push(i32).append(i32Const3)
-            0x07 -> printer.push(i32).append(i32Const4)
-            0x08 -> printer.push(i32).append(i32Const5)
-            0x09 -> printer.push(i64).append(i64Const0)
-            0x0a -> printer.push(i64).append(i64Const1)
-            0x0b -> printer.push(f32).append(f32Const0)
-            0x0c -> printer.push(f32).append(f32Const1)
-            0x0d -> printer.push(f32).append(f32Const2)
-            0x0e -> printer.push(f64).append(f64Const0)
-            0x0f -> printer.push(f64).append(f64Const1)
+            ACONST_NULL -> printer.push(ptrType)
+                .append(if (is32Bits) i32Const0 else i64Const0)
+            ICONST_M1 -> printer.push(i32).append(i32ConstM1)
+            ICONST_0 -> printer.push(i32).append(i32Const0)
+            ICONST_1 -> printer.push(i32).append(i32Const1)
+            ICONST_2 -> printer.push(i32).append(i32Const2)
+            ICONST_3 -> printer.push(i32).append(i32Const3)
+            ICONST_4 -> printer.push(i32).append(i32Const4)
+            ICONST_5 -> printer.push(i32).append(i32Const5)
+            LCONST_0 -> printer.push(i64).append(i64Const0)
+            LCONST_1 -> printer.push(i64).append(i64Const1)
+            FCONST_0 -> printer.push(f32).append(f32Const0)
+            FCONST_1 -> printer.push(f32).append(f32Const1)
+            FCONST_2 -> printer.push(f32).append(f32Const2)
+            DCONST_0 -> printer.push(f64).append(f64Const0)
+            DCONST_1 -> printer.push(f64).append(f64Const1)
 
             // in 0x15 .. 0x19 -> printer.append("  local.get [idx]")
 
@@ -497,21 +498,21 @@ class MethodTranslator(
             }
             BALOAD -> { // used for bytes and booleans
                 stackPush()
-                printer.pop(ptrType).poppush(i32)
+                printer.pop(i32).pop(ptrType).push(i32)
                     .append(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             CALOAD -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32)
+                printer.pop(i32).pop(ptrType).push(i32)
                     .append(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             SALOAD -> {
                 stackPush()
-                printer.pop(ptrType).poppush(i32)
+                printer.pop(i32).pop(ptrType).push(i32)
                     .append(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
@@ -547,7 +548,7 @@ class MethodTranslator(
             }
             AASTORE -> {
                 stackPush()
-                printer.pop(i32).pop(ptrType).pop(ptrType)
+                printer.pop(ptrType).pop(i32).pop(ptrType)
                     .append(
                         if (checkArrayAccess) if (is32Bits) Call.i32ArrayStore else Call.i64ArrayStore
                         else if (is32Bits) Call.i32ArrayStoreU else Call.i64ArrayStoreU
@@ -602,18 +603,18 @@ class MethodTranslator(
                 // if it is missing anywhere, we could call this:
                 // nextNode(createLabel())
             }
-            0x57 -> {
+            POP -> {
                 val type1 = stack.last()
                 printer.pop(type1).drop()
             }
-            0x58 -> {
+            POP2 -> {
                 val type = stack.last()
                 printer.pop(type).drop()
-                if (!is32Bits) throw NotImplementedError("We'd need to differentiate ptrType from i64 for this to work correctly")
-                if (type == i32 || type == f32)
+                if (!isCategory2Type(type)) {
                     printer.pop(stack.last()).drop()
+                }
             }
-            0x59 -> {// dup
+            DUP -> {// dup
                 val type1 = stack.last()
                 printer.push(type1)
                 val lastInstr = printer.lastOrNull()
@@ -623,7 +624,7 @@ class MethodTranslator(
                     printer.append(Call("dup${convertTypeToWASM(type1)}"))
                 }
             }
-            0x5a -> {
+            DUP_X1 -> {
                 val v0 = stack.pop()!!
                 val v1 = stack.pop()!!
                 stack.add(v0)
@@ -635,7 +636,7 @@ class MethodTranslator(
                 // value2, value1 →
                 // value1, value2, value1
             }
-            0x5b -> {
+            DUP_X2 -> {
                 val v0 = stack.pop()!!
                 val v1 = stack.pop()!!
                 val v2 = stack.pop()!!
@@ -648,7 +649,7 @@ class MethodTranslator(
                 val v2i = convertTypeToWASM(v2)
                 printer.append(Call("dup_x2$v0i$v1i$v2i"))
             }
-            0x5c -> {
+            DUP2 -> {
                 val v1 = stack.last()
                 if (isCategory2Type(v1)) {
                     // dup
@@ -666,8 +667,7 @@ class MethodTranslator(
                     printer.append(Call("dup2$v0i$v1i"))
                 }
             }
-            0x5d -> {
-                // dup2_x1
+            DUP2_X1 -> {
                 val v1 = stack.last()
                 if (isCategory2Type(v1)) {
                     // value2, value1 ->
@@ -691,12 +691,12 @@ class MethodTranslator(
                     printer.append(Call("dup2_x1$v1i$v2i$v3i"))
                 }
             }
-            0x5e -> {
+            DUP2_X2 -> {
                 // didn't appear yet...
                 printer.append(Call("dup2_x2"))
                 throw NotImplementedError("Implement dup2_x2 instruction")
             }
-            0x5f -> { // swap
+            SWAP -> {
                 val v0 = stack.last()
                 val v1 = stack[stack.size - 2]
                 if (v0 != v1) printer.pop(v0).pop(v1).push(v0).push(v1)
@@ -704,20 +704,20 @@ class MethodTranslator(
                 val v1i = convertTypeToWASM(v1)
                 printer.append(Call("swap$v0i$v1i"))
             }
-            0x60 -> printer.pop(i32).poppush(i32).append(I32Add)
-            0x61 -> printer.pop(i64).poppush(i64).append(I64Add)
-            0x62 -> printer.pop(f32).poppush(f32).append(F32Add)
-            0x63 -> printer.pop(f64).poppush(f64).append(F64Add)
-            0x64 -> printer.pop(i32).poppush(i32).append(I32Sub)
-            0x65 -> printer.pop(i64).poppush(i64).append(I64Sub)
-            0x66 -> printer.pop(f32).poppush(f32).append(F32Sub)
-            0x67 -> printer.pop(f64).poppush(f64).append(F64Sub)
+            IADD -> printer.pop(i32).poppush(i32).append(I32Add)
+            LADD -> printer.pop(i64).poppush(i64).append(I64Add)
+            FADD -> printer.pop(f32).poppush(f32).append(F32Add)
+            DADD -> printer.pop(f64).poppush(f64).append(F64Add)
+            ISUB -> printer.pop(i32).poppush(i32).append(I32Sub)
+            LSUB -> printer.pop(i64).poppush(i64).append(I64Sub)
+            FSUB -> printer.pop(f32).poppush(f32).append(F32Sub)
+            DSUB -> printer.pop(f64).poppush(f64).append(F64Sub)
             // there are no signed/unsigned versions, because it only shows the last 32 bits
-            0x68 -> printer.pop(i32).poppush(i32).append(I32Mul)
-            0x69 -> printer.pop(i64).poppush(i64).append(I64Mul)
-            0x6a -> printer.pop(f32).poppush(f32).append(F32Mul)
-            0x6b -> printer.pop(f64).poppush(f64).append(F64Mul)
-            0x6c -> {
+            IMUL -> printer.pop(i32).poppush(i32).append(I32Mul)
+            LMUL -> printer.pop(i64).poppush(i64).append(I64Mul)
+            FMUL -> printer.pop(f32).poppush(f32).append(F32Mul)
+            DMUL -> printer.pop(f64).poppush(f64).append(F64Mul)
+            IDIV -> {
                 if (checkIntDivisions) {
                     stackPush()
                     printer.poppush(i32).append(Call("safeDiv32"))
@@ -728,7 +728,7 @@ class MethodTranslator(
                     printer.pop(i32).poppush(i32).append(I32_DIVS)
                 }
             }
-            0x6d -> {
+            LDIV -> {
                 if (checkIntDivisions) {
                     stackPush()
                     printer.poppush(i64).append(Call("safeDiv64"))
@@ -739,9 +739,9 @@ class MethodTranslator(
                     printer.pop(i64).poppush(i64).append(I64_DIVS)
                 }
             }
-            0x6e -> printer.pop(f32).poppush(f32).append(F32Div)
-            0x6f -> printer.pop(f64).poppush(f64).append(F64Div)
-            0x70 -> {
+            FDIV -> printer.pop(f32).poppush(f32).append(F32Div)
+            DDIV -> printer.pop(f64).poppush(f64).append(F64Div)
+            IREM -> {
                 if (checkIntDivisions) {
                     stackPush()
                     printer.poppush(i32).append(Call("checkNonZero32"))
@@ -750,7 +750,7 @@ class MethodTranslator(
                 }
                 printer.pop(i32).poppush(i32).append(I32_REM_S)
             }
-            0x71 -> {
+            LREM -> {
                 if (checkIntDivisions) {
                     stackPush()
                     printer.poppush(i64).append(Call("checkNonZero64"))
@@ -760,52 +760,52 @@ class MethodTranslator(
                 printer.pop(i64).poppush(i64)
                 printer.append(I64_REM_S)
             }
-            0x72 -> printer.pop(f32).poppush(f32).append(Call("f32rem"))
-            0x73 -> printer.pop(f64).poppush(f64).append(Call("f64rem"))
-            0x74 -> printer.poppush(i32).append(Call("i32neg"))
-            0x75 -> printer.poppush(i64).append(Call("i64neg"))
-            0x76 -> printer.poppush(f32).append(F32_NEG)
-            0x77 -> printer.poppush(f64).append(F64_NEG)
-            0x78 -> printer.pop(i32).poppush(i32).append(I32Shl)
-            0x79 -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64Shl)
-            0x7a -> printer.pop(i32).poppush(i32).append(I32ShrS)
-            0x7b -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrS)
-            0x7c -> printer.pop(i32).poppush(i32).append(I32ShrU)
-            0x7d -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrU)
-            0x7e -> printer.pop(i32).poppush(i32).append(I32And)
-            0x7f -> printer.pop(i64).poppush(i64).append(I64And)
-            0x80 -> printer.pop(i32).poppush(i32).append(I32Or)
-            0x81 -> printer.pop(i64).poppush(i64).append(I64Or)
-            0x82 -> printer.pop(i32).poppush(i32).append(I32XOr)
-            0x83 -> printer.pop(i64).poppush(i64).append(I64XOr)
+            FREM -> printer.pop(f32).poppush(f32).append(Call("f32rem"))
+            DREM -> printer.pop(f64).poppush(f64).append(Call("f64rem"))
+            INEG -> printer.poppush(i32).append(Call("i32neg"))
+            LNEG -> printer.poppush(i64).append(Call("i64neg"))
+            FNEG -> printer.poppush(f32).append(F32_NEG)
+            DNEG -> printer.poppush(f64).append(F64_NEG)
+            ISHL -> printer.pop(i32).poppush(i32).append(I32Shl)
+            LSHL -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64Shl)
+            ISHR -> printer.pop(i32).poppush(i32).append(I32ShrS)
+            LSHR -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrS)
+            IUSHR -> printer.pop(i32).poppush(i32).append(I32ShrU)
+            LUSHR -> printer.pop(i32).poppush(i64).append(I64_EXTEND_I32S).append(I64ShrU)
+            IAND -> printer.pop(i32).poppush(i32).append(I32And)
+            LAND -> printer.pop(i64).poppush(i64).append(I64And)
+            IOR -> printer.pop(i32).poppush(i32).append(I32Or)
+            LOR -> printer.pop(i64).poppush(i64).append(I64Or)
+            IXOR -> printer.pop(i32).poppush(i32).append(I32XOr)
+            LXOR -> printer.pop(i64).poppush(i64).append(I64XOr)
             // iinc, has a constant -> different function, i32.const <value>, i32.add
-            0x85 -> printer.pop(i32).push(i64).append(I64_EXTEND_I32S) // i2l
-            0x86 -> printer.pop(i32).push(f32).append(F32_CONVERT_I32S) // i2f
-            0x87 -> printer.pop(i32).push(f64).append(F64_CONVERT_I32S) // i2d
-            0x88 -> printer.pop(i64).push(i32).append(I32_WRAP_I64) // l2i
-            0x89 -> printer.pop(i64).push(f32).append(F32_CONVERT_I64S) // l2f
-            0x8a -> printer.pop(i64).push(f64).append(F64_CONVERT_I64S) // l2d
-            0x8b -> printer.pop(f32).push(i32).append(Call("f2i")) // f2i
-            0x8c -> printer.pop(f32).push(i64).append(Call("f2l")) // f2l
-            0x8d -> printer.pop(f32).push(f64).append(F64_PROMOTE_F32) // f2d
-            0x8e -> printer.pop(f64).push(i32).append(Call("d2i"))
-            0x8f -> printer.pop(f64).push(i64).append(Call("d2l"))
-            0x90 -> printer.pop(f64).push(f32).append(F32_DEMOTE_F64) // d2f
+            I2L -> printer.pop(i32).push(i64).append(I64_EXTEND_I32S)
+            I2F -> printer.pop(i32).push(f32).append(F32_CONVERT_I32S)
+            I2D -> printer.pop(i32).push(f64).append(F64_CONVERT_I32S)
+            L2I -> printer.pop(i64).push(i32).append(I32_WRAP_I64)
+            L2F -> printer.pop(i64).push(f32).append(F32_CONVERT_I64S)
+            L2D -> printer.pop(i64).push(f64).append(F64_CONVERT_I64S)
+            F2I -> printer.pop(f32).push(i32).append(Call("f2i"))
+            F2L -> printer.pop(f32).push(i64).append(Call("f2l"))
+            F2D -> printer.pop(f32).push(f64).append(F64_PROMOTE_F32)
+            D2I -> printer.pop(f64).push(i32).append(Call("d2i"))
+            D2L -> printer.pop(f64).push(i64).append(Call("d2l"))
+            D2F -> printer.pop(f64).push(f32).append(F32_DEMOTE_F64)
 
-            0x91 -> printer.poppush(i32)
+            I2B -> printer.poppush(i32)
                 .append(i32Const(24)).append(I32Shl)
                 .append(i32Const(24)).append(I32ShrS)
-            0x92 -> printer.poppush(i32)
+            I2C -> printer.poppush(i32)
                 .append(i32Const(65535)).append(I32And)
-            0x93 -> printer.poppush(i32)
+            I2S -> printer.poppush(i32)
                 .append(i32Const(16)).append(I32Shl)
                 .append(i32Const(16)).append(I32ShrS)
 
-            0x94 -> printer.pop(i64).pop(i64).push(i32).append(Call.lcmp)
-            0x95 -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpl) // -1 if NaN
-            0x96 -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpg) // +1 if NaN
-            0x97 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpl) // -1 if NaN
-            0x98 -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpg) // +1 if NaN
+            LCMP -> printer.pop(i64).pop(i64).push(i32).append(Call.lcmp)
+            FCMPL -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpl) // -1 if NaN
+            FCMPG -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpg) // +1 if NaN
+            DCMPL -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpl) // -1 if NaN
+            DCMPG -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpg) // +1 if NaN
 
             ARRAY_LENGTH_INSTR -> {
                 // array length
@@ -893,7 +893,7 @@ class MethodTranslator(
                         .append(getVIOStoreCall(type))
                 } else {
                     printer
-                        .append(if (is32Bits) i32Const(offset) else i64Const(offset.toLong()))
+                        .append(ptrConst(offset))
                         .append(if (is32Bits) I32Add else I64Add)
                         .append(Call("swap${jvm2wasmTyped(type)}$ptrType")) // swap ptr and value
                         .append(getStoreInstr(type))
@@ -917,26 +917,26 @@ class MethodTranslator(
         if (printOps) println("  [jump] ${OpCode[opcode]} -> [L$label]")
         when (opcode) {
             // consume two args for comparison
-            0x9f -> printer.pop(i32).pop(i32).append(I32EQ)
-            0xa0 -> printer.pop(i32).pop(i32).append(I32NE)
-            0xa1 -> printer.pop(i32).pop(i32).append(I32LTS)
-            0xa2 -> printer.pop(i32).pop(i32).append(I32GES)
-            0xa3 -> printer.pop(i32).pop(i32).append(I32GTS)
-            0xa4 -> printer.pop(i32).pop(i32).append(I32LES)
-            0xa5 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32EQ else I64EQ)
-            0xa6 -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32NE else I64NE)
-            0xc6 -> printer.pop(ptrType) // is null
+            IF_ICMPEQ -> printer.pop(i32).pop(i32).append(I32EQ)
+            IF_ICMPNE -> printer.pop(i32).pop(i32).append(I32NE)
+            IF_ICMPLT -> printer.pop(i32).pop(i32).append(I32LTS)
+            IF_ICMPGE -> printer.pop(i32).pop(i32).append(I32GES)
+            IF_ICMPGT -> printer.pop(i32).pop(i32).append(I32GTS)
+            IF_ICMPLE -> printer.pop(i32).pop(i32).append(I32LES)
+            IF_ACMPEQ -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32EQ else I64EQ)
+            IF_ACMPNE -> printer.pop(ptrType).pop(ptrType).append(if (is32Bits) I32NE else I64NE)
+            IFNULL -> printer.pop(ptrType) // is null
                 .append(if (is32Bits) I32EQZ else I64EQZ)
-            0xc7 -> printer.pop(ptrType) // is not null
+            IFNONNULL -> printer.pop(ptrType) // is not null
                 .append(if (is32Bits) I32EQZ else I64EQZ)
                 .append(I32EQZ)
-            0xa7 -> {} // just goto -> stack doesn't change
-            0x99 -> printer.pop(i32).append(I32EQZ) // == 0
-            0x9a -> printer.pop(i32).append(i32Const0).append(I32NE) // != 0
-            0x9b -> printer.pop(i32).append(i32Const0).append(I32LTS) // < 0
-            0x9c -> printer.pop(i32).append(i32Const0).append(I32GES) // >= 0
-            0x9d -> printer.pop(i32).append(i32Const0).append(I32GTS) // > 0
-            0x9e -> printer.pop(i32).append(i32Const0).append(I32LES) // <= 0
+            GOTO -> {} // just goto -> stack doesn't change
+            IFEQ -> printer.pop(i32).append(I32EQZ) // == 0
+            IFNE -> printer.pop(i32).append(i32Const0).append(I32NE) // != 0
+            IFLT -> printer.pop(i32).append(i32Const0).append(I32LTS) // < 0
+            IFGE -> printer.pop(i32).append(i32Const0).append(I32GES) // >= 0
+            IFGT -> printer.pop(i32).append(i32Const0).append(I32GTS) // > 0
+            IFLE -> printer.pop(i32).append(i32Const0).append(I32LES) // <= 0
             else -> assertFail(OpCode[opcode])
         }
         if (comments) printer.comment("jump ${OpCode[opcode]} -> [L$label], stack: $stack")
@@ -985,9 +985,9 @@ class MethodTranslator(
                 // Pack string into constant memory, and load its address.
                 // Optimizing them against being dropped isn't worth it, because these are parameter names,
                 // and in most cases (99%), there is a field with that same name.
-                printer.push(ptrType)
+                printer.push("java/lang/String")
                 val address = gIndex.getString(value)
-                printer.append(if (is32Bits) i32Const(address) else i64Const(address.toLong()))
+                printer.append(ptrConst(address))
                 if (comments) {
                     printer.comment(
                         "\"" + value.shorten(100)
@@ -997,7 +997,7 @@ class MethodTranslator(
                 }
             }
             is Type -> {
-                printer.push(i32)
+                printer.push("java/lang/Class")
                 // used for assert() with getClassLoader()
                 val type = Descriptor.parseType(value.descriptor)
                 printer.append(i32Const(gIndex.getClassId(type)))
@@ -1145,8 +1145,9 @@ class MethodTranslator(
                     getCaller(printer)
 
                     if (comments) printer.comment("not constructable class, $sig1, $owner, $name, $descriptor")
+                    val methodNamePtr = gIndex.getString(methodName(sig1))
                     printer
-                        .append(i32Const(gIndex.getString(methodName(sig1))))
+                        .append(ptrConst(methodNamePtr))
                         // instance, function index -> function-ptr
                         .append(Call.resolveIndirectFail)
                         .append(Unreachable)

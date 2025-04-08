@@ -2,6 +2,7 @@ package jvm.utf8;
 
 import annotations.Alias;
 import annotations.NoThrow;
+import jvm.Pointer;
 
 import java.nio.charset.Charset;
 import java.util.Locale;
@@ -9,6 +10,8 @@ import java.util.Locale;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getClassId;
+import static jvm.Pointer.add;
+import static jvm.Pointer.diff;
 import static utils.StaticFieldOffsets.OFFSET_STRING_HASH;
 import static utils.StaticFieldOffsets.OFFSET_STRING_VALUE;
 
@@ -103,20 +106,20 @@ public class StringsUTF8 {
         byte[] v1 = getValue(str1);
         if (offset0 < 0 || offset0 + charsToCompare > v0.length) return false;
         if (offset1 < 0 || offset1 + charsToCompare > v1.length) return false;
-        int a0 = getAddr(v0) + arrayOverhead + offset0;
-        int a1 = getAddr(v1) + arrayOverhead + offset1;
-        int e0 = a0 + charsToCompare;
+        Pointer a0 = add(castToPtr(v0), (long) arrayOverhead + offset0);
+        Pointer a1 = add(castToPtr(v1), (long) arrayOverhead + offset1);
+        Pointer e0 = add(a0, charsToCompare);
         while (true) {
-            final int diff0 = findDiscrepancy(a0, e0, a1);
-            if (unsignedGreaterThanEqual(diff0, e0)) return true;// they are the same :) -> match
+            final Pointer diff0 = findDiscrepancy(a0, e0, a1);
+            if (Pointer.unsignedGreaterThanEqual(diff0, e0)) return true;// they are the same :) -> match
             if (!ignoreCase) return false; // they are different -> no match
-            a1 += (diff0 - a0); // advance a1
+            a1 = add(a1, Pointer.sub(diff0, a0)); // advance a1
             a0 = diff0;
             byte b0 = toUpperCase(read8(a0));
             byte b1 = toUpperCase(read8(a1));
             if (b0 != b1) return false; // even with ignored case, they are different -> no match
-            a0++; // advance to next position
-            a1++;
+            a0 = add(a0, 1); // advance to next position
+            a1 = add(a1, 1);
         }
     }
 
@@ -197,18 +200,18 @@ public class StringsUTF8 {
     public static int String_compareTo(String self, String other) {
         if (self == other) return 0;
         if (other == null) throw new NullPointerException("String.compareTo");
-        int chars0 = getAddr(getValue(self));
-        int chars1 = getAddr(getValue(other));
-        int a0 = chars0 + objectOverhead;
-        int b0 = chars1 + objectOverhead;
+        Pointer chars0 = castToPtr(getValue(self));
+        Pointer chars1 = castToPtr(getValue(other));
+        Pointer a0 = add(chars0, objectOverhead);
+        Pointer b0 = add(chars1, objectOverhead);
         int l0 = read32(a0);
         int l1 = read32(b0);
         // skip length
-        a0 += 4;
-        b0 += 4;
+        a0 = add(a0, 4);
+        b0 = add(b0, 4);
         int l = Math.min(l0, l1);
-        int i = findDiscrepancy(a0, a0 + l, b0) - a0;
-        if (i < l) return read8(a0 + i) - read8(b0 + i);
+        long i = diff(findDiscrepancy(a0, add(a0, l), b0) , a0);
+        if (i < l) return read8(add(a0, i)) - read8(add(b0, i));
         return l0 - l1;
     }
 
@@ -272,13 +275,10 @@ public class StringsUTF8 {
     @Alias(names = "java_lang_String_hashCode_I")
     public static int String_hashCode_I(String str) {
         int hash = readI32AtOffset(str, OFFSET_STRING_HASH);
-        byte[] chars = getValue(str);
-        int startPtr = getAddr(chars) + arrayOverhead;
-        int endPtr = startPtr + chars.length;
         if (hash == 0) {
-            while (unsignedLessThan(startPtr, endPtr)) {
-                hash = hash * 31 + (read8(startPtr) & 255);
-                startPtr++;
+            byte[] chars = getValue(str);
+            for(byte charI : chars) {
+                hash = hash * 31 + (charI & 255);
             }
             writeI32AtOffset(str, OFFSET_STRING_HASH, hash);
         }

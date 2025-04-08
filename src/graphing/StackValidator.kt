@@ -1,6 +1,7 @@
 package graphing
 
 import canThrowError
+import globals
 import graphing.StackCallUtils.findCallByName
 import graphing.StackCallUtils.getCallParams
 import graphing.StackCallUtils.getCallResults
@@ -200,8 +201,8 @@ object StackValidator {
             )
             is ParamGet -> stack.push(paramsTypes[instr.index])
             is ParamSet -> stack.pop(paramsTypes[instr.index])
-            is GlobalGet -> stack.push(i32)
-            is GlobalSet -> stack.pop(i32)
+            is GlobalGet -> stack.push(globals[instr.name]!!.wasmType.wasmName)
+            is GlobalSet -> stack.pop(globals[instr.name]!!.wasmType.wasmName)
             Return -> {
                 assertTrue(stack.endsWith(returnResults), "Stack incorrect, $returnResults vs $stack")
                 return true// done :)

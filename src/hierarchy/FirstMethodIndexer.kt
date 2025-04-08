@@ -137,7 +137,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             usesSelf = true
         } else {
             // check for local.get 1
-            if (!(varIndex == 1 && opcode in 0x15..0x35 && instructionIndex == 1)) {
+            if (!(varIndex == 1 && opcode in ILOAD..SALOAD && instructionIndex == 1)) {
                 isSetter = false
             }
         }

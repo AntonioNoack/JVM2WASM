@@ -265,12 +265,18 @@ class WATParser : Module() {
                                 i++ // skip '('
                                 list.consume(TokenType.NAME, "mut", i++)
                             }
-                            list.consume(TokenType.NAME, "i32", i++)
+                            val wasmType = WASMType.find(list.consume(TokenType.NAME, i++))
                             if (isMutable) list.consume(TokenType.CLOSE_BRACKET, i++)
                             list.consume(TokenType.OPEN_BRACKET, i++)
-                            list.consume(TokenType.NAME, "i32.const", i++)
-                            val initialValue = list.consume(TokenType.NUMBER, i++).toInt()
-                            globals[shortName] = GlobalVariable(shortName, WASMType.I32, initialValue, isMutable)
+                            list.consume(TokenType.NAME, "$wasmType.const", i++)
+                            val initialValue = list.consume(TokenType.NUMBER, i++)
+                            val initialValue1 = when (wasmType) {
+                                WASMType.I32 -> initialValue.toInt()
+                                WASMType.I64 -> initialValue.toLong()
+                                WASMType.F32 -> initialValue.toFloat()
+                                WASMType.F64 -> initialValue.toDouble()
+                            }
+                            globals[shortName] = GlobalVariable(shortName, wasmType, initialValue1, isMutable)
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                         }
                         else -> assertFail("Unknown name: $name at " + list.subList(i, min(i + 20, list.size)))
@@ -393,7 +399,7 @@ class WATParser : Module() {
                             val simple = simpleInstructions[instrName]
                             if (simple != null) {
                                 result.add(simple)
-                            } else assertFail(instrName)
+                            } else assertFail("Unknown instruction $instrName")
                         }
                     }
                 }

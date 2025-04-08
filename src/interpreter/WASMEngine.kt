@@ -180,7 +180,9 @@ class WASMEngine(memorySize: Int) {
             listOf(ptrType, ptrType, i32), emptyList(), PrintStackTraceLine2
         )
         registerEmptyFunction("jvm_JavaThrowable_printStackTraceEnd_V")
-        registerGetter("jvm_JVM32_getAllocatedSize_I", i32) { it.bytes.size }
+        registerGetter("jvm_JVM32_getAllocatedSize_Ljvm_Pointer", ptrType) {
+            if (is32Bits) it.bytes.size else it.bytes.size.toLong()
+        }
         registerGetter("java_lang_System_nanoTime_J", i64) { System.nanoTime() }
         registerGetter("java_lang_System_currentTimeMillis_J", i64) { System.currentTimeMillis() }
         for (code in "i,?,??,?i,???,?i?,?ii,?iii,??ii,??iii,???i".split(',')) {

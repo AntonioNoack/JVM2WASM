@@ -2,7 +2,7 @@ package jvm.gc;
 
 import java.util.Comparator;
 
-import static jvm.JVM32.getAddr;
+import static jvm.Pointer.getAddrS;
 
 /**
  * QuickSort for unsigned-int-arrays, in-place, stable and fast
@@ -12,6 +12,6 @@ public class AddressComparator implements Comparator<Object> {
 
     @Override
     public int compare(Object o1, Object o2) {
-        return Integer.compareUnsigned(getAddr(o1), getAddr(o2));
+        return Long.compareUnsigned(getAddrS(o1), getAddrS(o2));
     }
 }

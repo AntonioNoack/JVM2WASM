@@ -20,6 +20,8 @@ import static jvm.ArrayAccessSafe.arrayLength;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.unsignedLessThan;
+import static jvm.Pointer.*;
 import static jvm.ThrowJS.throwJs;
 
 @SuppressWarnings("unused")
@@ -190,7 +192,7 @@ public class JavaLang {
     @WASM(code = "f64.abs")
     public static native double Math_abs_DD(double a);
 
-    // original implementation, just no throw
+    // original implementation, just no throw -> isn't that incorrect for Infinity??
     @NoThrow
     @Alias(names = "java_lang_Double_isNaN_DZ")
     public static boolean isNaN(double d) {
@@ -242,34 +244,36 @@ public class JavaLang {
 
         int delta = arrayOverhead;
         int shift = getTypeShift(classIdSrc);// shall be executed here to confirm that this is arrays
-        int src1 = getAddr(src), dst1 = getAddr(dst);
-        int src2 = src1 + delta + (srcIndex << shift);
-        int dst2 = dst1 + delta + (dstIndex << shift);
+        Pointer src1 = castToPtr(src), dst1 = castToPtr(dst);
+        Pointer src2 = add(src1, delta + ((long) srcIndex << shift));
+        Pointer dst2 = add(dst1, delta + ((long) dstIndex << shift));
 
         checkIndices(srcIndex, length, arrayLength(src1));
         checkIndices(dstIndex, length, arrayLength(dst1));
 
-        int bytes = length << shift;
-        if (src != dst || srcIndex > dstIndex) copyForwards(src2, dst2, bytes);
-        else copyBackwards(src2, dst2, bytes);
+        long numBytes = (long) length << shift;
+        if (src != dst || srcIndex > dstIndex) copyForwards(src2, dst2, numBytes);
+        else copyBackwards(src2, dst2, numBytes);
     }
 
     @NoThrow
-    public static void copyForwards(int src, int dst, int length) {
-        int endPtr = dst + length;
-        int end8 = endPtr - 7;
-        for (; unsignedLessThan(dst, end8); dst += 8, src += 8) {
+    public static void copyForwards(Pointer src, Pointer dst, long length) {
+        Pointer endPtr = add(dst, length);
+        Pointer end8 = sub(endPtr, 7);
+        while (unsignedLessThan(dst, end8)) {
             write64(dst, read64(src));
+            dst = add(dst, 8);
+            src = add(src, 8);
         }
         if ((length & 4) != 0) {
             write32(dst, read32(src));
-            dst += 4;
-            src += 4;
+            dst = add(dst, 4);
+            src = add(src, 4);
         }
         if ((length & 2) != 0) {
             write16(dst, read16u(src));
-            dst += 2;
-            src += 2;
+            dst = add(dst, 2);
+            src = add(src, 2);
         }
         if ((length & 1) != 0) {
             write8(dst, read8(src));
@@ -277,29 +281,31 @@ public class JavaLang {
     }
 
     @NoThrow
-    public static void copyBackwards(int src, int dst, int length) {
-        int endPtr = dst - 1;
+    public static void copyBackwards(Pointer src, Pointer dst, long length) {
+        Pointer endPtr = sub(dst, 1);
         // we start at the end
-        src += length - 8;
-        dst += length - 8;
-        for (; unsignedLessThan(endPtr, dst); dst -= 8, src -= 8) {
+        src = add(src, length - 8);
+        dst = add(dst, length - 8);
+        while (unsignedLessThan(endPtr, dst)) {
             write64(dst, read64(src));
+            dst = sub(dst, 8);
+            src = sub(src, 8);
         }
         // looks correct :)
         if ((length & 4) != 0) {
-            write32(dst + 4, read32(src + 4));
+            write32(add(dst, 4), read32(add(src, 4)));
         } else {
-            src += 4;
-            dst += 4;
+            dst = sub(dst, 4);
+            src = sub(src, 4);
         }
         if ((length & 2) != 0) {
-            write16(dst + 2, read16u(src + 2));
+            write16(add(dst, 2), read16u(add(src, 2)));
         } else {
-            src += 2;
-            dst += 2;
+            dst = sub(dst, 2);
+            src = sub(src, 2);
         }
         if ((length & 1) != 0) {
-            write8(dst + 1, read8(src + 1));
+            write8(add(dst, 1), read8(add(src, 1)));
         }
     }
 
@@ -468,12 +474,12 @@ public class JavaLang {
 
     @Alias(names = "java_lang_Runtime_totalMemory_J")
     public static long java_lang_Runtime_totalMemory_J(Runtime runtime) {
-        return Integer.toUnsignedLong(getAllocatedSize());
+        return getAddrS(getAllocatedSize());
     }
 
     @Alias(names = "java_lang_Runtime_freeMemory_J")
     public static long java_lang_Runtime_freeMemory_J(Runtime runtime) {
-        return Integer.toUnsignedLong(GarbageCollector.freeMemory + getAllocatedSize() - getNextPtr());
+        return GarbageCollector.freeMemory + diff(getAllocatedSize(), getNextPtr());
     }
 
     @Alias(names = "java_lang_Object_clone_Ljava_lang_Object")
@@ -548,7 +554,7 @@ public class JavaLang {
     public static int System_identityHashCode(Object obj) {
         // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
         // return getAddr(obj); // good for debugging
-        int x = getAddr(obj);
+        int x = Long.hashCode(getAddrS(obj));
         x = ((x >>> 16) ^ x) * 0x45d9f3b;
         x = ((x >>> 16) ^ x) * 0x45d9f3b;
         x = (x >>> 16) ^ x;

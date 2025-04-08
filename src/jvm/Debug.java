@@ -7,7 +7,7 @@ import annotations.NoThrow;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.JVM32.getAddr;
+import static jvm.JVMShared.castToPtr;
 import static jvm.JavaReflect.getClassId;
 import static jvm.NativeLog.log;
 import static utils.StaticClassIndices.*;
@@ -69,8 +69,8 @@ public class Debug {
             default:
                 Object value = f.get(instance);
                 if (value == null) log(type, name, 0);
-                else if (value instanceof String) log(type, name, getAddr(value), value.toString());
-                else log(type, name, getAddr(value), value.getClass().getName());
+                else if (value instanceof String) log(type, name, castToPtr(value), value.toString());
+                else log(type, name, castToPtr(value), value.getClass().getName());
                 break;
         }
     }

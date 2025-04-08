@@ -58,7 +58,6 @@ class ClassTranslator(val clazz: String) : ClassVisitor(FirstClassIndexer.API_LE
             val sig = MethodSig.c(clazz, name, descriptor)
             val alias = hIndex.getAlias(sig)
             if (sig !in dIndex.methodsWithForbiddenDependencies && sig in dIndex.usedMethods && alias == sig) {
-                println("starting translating ${methodName(sig)}")
                 MethodTranslator(access, clazz, name, sig.descriptor)
             } else null
         } else {

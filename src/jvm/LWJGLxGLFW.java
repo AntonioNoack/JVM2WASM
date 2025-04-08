@@ -8,8 +8,8 @@ import org.lwjgl.glfw.*;
 import java.nio.Buffer;
 import java.nio.ShortBuffer;
 
-import static jvm.JVM32.getAddr;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.getAddrS;
 
 public class LWJGLxGLFW {
 
@@ -347,7 +347,7 @@ public class LWJGLxGLFW {
     @NoThrow
     @Alias(names = "org_lwjgl_system_CallbackI_address_J")
     public static long org_lwjgl_system_CallbackI_address_J(Object self) {
-        return getAddr(self);
+        return getAddrS(self);
     }
 
     @NoThrow

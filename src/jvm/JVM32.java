@@ -7,27 +7,17 @@ import annotations.WASM;
 import jvm.gc.GarbageCollector;
 import jvm.gc.GarbageCollectorFlags;
 
+import static jvm.JVMFlags.is32Bits;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.*;
 import static jvm.ThrowJS.throwJs;
-import static utils.StaticClassIndices.*;
+import static utils.StaticClassIndices.FIRST_ARRAY;
+import static utils.StaticClassIndices.LAST_ARRAY;
 import static utils.StaticFieldOffsets.OFFSET_CLASS_INDEX;
 
 @SuppressWarnings("unused")
 public class JVM32 {
-
-    @NoThrow
-    @WASM(code = "") // todo this method shall only be used by JVM32
-    public static native <V> V ptrTo(int addr);
-
-    @NoThrow
-    public static <V> V ptrTo(long addr) {
-        return ptrTo((int) addr);
-    }
-
-    @NoThrow
-    @WASM(code = "") // automatically converted
-    public static native int getAddr(Object obj);
 
     // todo mark some static fields as not needing <clinit>
     // private static int riLastClass, riLastMethod, riLastImpl;
@@ -37,13 +27,8 @@ public class JVM32 {
         if (length < 0) throw new IllegalArgumentException();
         if (trackAllocations) trackCalloc(classId, length);
         int typeShift = getTypeShiftUnsafe(classId);
-        int numDataBytes = length << typeShift;
-        if ((numDataBytes >>> typeShift) != length) {
-            throw new IllegalArgumentException("Length is too large for 32 bit memory");
-        }
-        int instanceSize = getArraySizeInBytes(length, classId);
+        Pointer instanceSize = getArraySizeInBytes(length, classId);
         Object newInstance = calloc(instanceSize);
-
         writeClass(newInstance, classId); // [] has index 1
         writeI32AtOffset(newInstance, objectOverhead, length); // array length
         // log("Created[]", classId, newInstance, instanceSize);
@@ -51,40 +36,40 @@ public class JVM32 {
         return newInstance;
     }
 
-    public static int getArraySizeInBytes(int length, int classId) {
+    public static Pointer getArraySizeInBytes(int length, int classId) {
         if (classId < FIRST_ARRAY || classId > LAST_ARRAY) {
             log("Invalid classId for getArraySizeInBytes", classId);
             throw new IllegalArgumentException();
         }
         int typeShift = getTypeShiftUnsafe(classId);
-        int numDataBytes = length << typeShift;
-        if ((numDataBytes >>> typeShift) != length) {
+        long numDataBytes = (long) length << typeShift;
+        long size = adjustCallocSize(arrayOverhead + numDataBytes);
+        if (is32Bits && size > Integer.MAX_VALUE) {
             log("Length is too large for 32 bit memory", length, typeShift);
             throw new IllegalArgumentException();
         }
-        int size = arrayOverhead + numDataBytes;
-        return adjustCallocSize(size);
+        return ptrTo(size);
     }
 
     @NoThrow
     @WASM(code = "global.get $allocationStart")
-    public static native int getAllocationStart();
+    public static native Pointer getAllocationStart();
 
     @NoThrow
     @WASM(code = "global.get $allocationPointer")
-    public static native int getNextPtr();
+    public static native Pointer getNextPtr();
 
     @NoThrow
     @WASM(code = "global.set $allocationPointer")
-    public static native void setNextPtr(int value);
+    public static native void setNextPtr(Pointer value);
 
     // @WASM(code = "memory.size i32.const 16 i32.shl")
     @NoThrow
     @JavaScript(code = "return memory.buffer.byteLength;")
-    public static native int getAllocatedSize();
+    public static native Pointer getAllocatedSize();
 
     @NoThrow
-    public static int adjustCallocSize(int size) {
+    public static long adjustCallocSize(long size) {
         // 4 is needed for GPU stuff, or we'd have to reallocate it on the JS side
         // 8 is needed for x86
         return ((size + 7) >>> 3) << 3;
@@ -97,68 +82,55 @@ public class JVM32 {
         writeI32AtOffset(ptr, 0, clazz | (GarbageCollector.iteration << 24));
     }
 
-    private static Object malloc(int size) {
+    private static Pointer malloc(Pointer size) {
         // enough space for the first allocations
-        int ptr;
-        if (GarbageCollectorFlags.hasGaps) {
+        Pointer ptr;
+        if (GarbageCollectorFlags.hasGaps &&
+                getAddrS(size) <= Integer.MAX_VALUE) {
             // try to find a freed place in gaps first
-            ptr = GarbageCollector.findGap(size);
-            if (ptr == 0) {
+            ptr = GarbageCollector.findGap((int) getAddrS(size));
+            if (ptr == null) {
                 ptr = GarbageCollector.allocateNewSpace(size);
             }
         } else ptr = GarbageCollector.allocateNewSpace(size);
-        return ptrTo(ptr);
+        return ptr;
     }
 
-    public static Object calloc(int size) {
-        Object ptr = malloc(size);
-        fill64(getAddr(ptr), getAddr(ptr) + size, 0);
+    public static Object calloc(Pointer size) {
+        Pointer ptr = malloc(size);
+        fill64(ptr, add(ptr, size), 0);
         return ptr;
     }
 
     @NoThrow
-    public static void fill8(int start, int end, byte value) {
-        int value1 = ((int) value) & 255;
-        fill16(start, end, (short) ((value1 << 8) | value1));
-    }
-
-    @NoThrow
-    public static void fill16(int start, int end, short value) {
-        long value1 = ((long) value) & 0xffff;
-        fill64(start, end, (value1 << 48) | (value1 << 32) | (value1 << 16) | value1);
-    }
-
-    @NoThrow
-    public static void fill32(int start, int end, int value) {
-        long value1 = ((long) value) & 0xffffffffL;
-        fill64(start, end, (value1 << 32) | value1);
-    }
+    @WASM(code = "i32.and i32.eqz i32.eqz")
+    public static native boolean hasFlag(Pointer addr, int mask);
 
     /**
      * finds the position of the next different byte;
      * in start
      */
     @NoThrow
-    public static int findDiscrepancy(int start, int end, int start2) {
+    public static Pointer findDiscrepancy(Pointer start, Pointer end, Pointer start2) {
         // align memory
-        while (and(unsignedLessThan(start, end), start & 7)) {
+        while (unsignedLessThan(start, end) && hasFlag(start, 7)) {
             if (read8(start) != read8(start2)) return start;
-            start++;
-            start2++;
+            start = add(start, 1);
+            start2 = add(start2, 1);
         }
         return findDiscrepancyAligned(start, end, start2);
     }
 
     @NoThrow
-    private static int findDiscrepancyAligned(int start, int end, int start2) {
+    private static Pointer findDiscrepancyAligned(Pointer start, Pointer end, Pointer start2) {
         // quickly find first different byte
-        int end8 = end - 7;
+        Pointer end8 = sub(end, 7);
         while (unsignedLessThan(start, end8)) {
             if (neq(read64(start), read64(start2))) {
                 break;
             }
-            start += 8;
-            start2 += 8;
+            start = add(start, 8);
+            start2 = add(start2, 8);
         }
         return findDiscrepancyAlignedEnd(start, end, start2);
     }
@@ -167,24 +139,24 @@ public class JVM32 {
      * finds the position of the next different byte
      */
     @NoThrow
-    private static int findDiscrepancyAlignedEnd(int start, int end, int start2) {
-        if (and(unsignedLessThan(start, end - 3), read32(start) == read32(start2))) {
-            start += 4;
-            start2 += 4;
+    private static Pointer findDiscrepancyAlignedEnd(Pointer start, Pointer end, Pointer start2) {
+        if (unsignedLessThan(start, sub(end, 3)) && read32(start) == read32(start2)) {
+            start = add(start, 4);
+            start2 = add(start2, 4);
         }
-        if (and(unsignedLessThan(start, end - 1), read16s(start) == read16s(start2))) {
-            start += 2;
-            start2 += 2;
+        if (unsignedLessThan(start, sub(end, 1)) && read16s(start) == read16s(start2)) {
+            start = add(start, 2);
+            start2 = add(start2, 2);
         }
-        if (and(unsignedLessThan(start, end), read8(start) == read8(start2))) {
-            start++;
+        if (unsignedLessThan(start, end) && read8(start) == read8(start2)) {
+            start = add(start, 1);
             // start2++;
         }
         return start;
     }
 
     @NoThrow
-    public static void fill64(int start, int end, long value) {
+    public static void fill64(Pointer start, Pointer end, long value) {
 
         // benchmark:
         // let t0 = window.performance.now()
@@ -197,25 +169,25 @@ public class JVM32 {
         // JavaScript speed: 440ms
         // -> so much for WASM being twice as fast 😅
 
-        if ((start & 1) != 0 && unsignedLessThan(start, end)) {
+        if (hasFlag(start, 1) && unsignedLessThan(start, end)) {
             write8(start, (byte) value);
-            start++;
+            start = add(start, 1);
         }
-        if ((start & 2) != 0 && unsignedLessThan(start, end - 1)) {
+        if (hasFlag(start, 2) && unsignedLessThan(start, sub(end, 1))) {
             write16(start, (short) value);
-            start += 2;
+            start = add(start, 2);
         }
-        if ((start & 4) != 0 && unsignedLessThan(start, end - 3)) {
+        if (hasFlag(start, 4) && unsignedLessThan(start, sub(end, 3))) {
             write32(start, (int) value);
-            start += 4;
+            start = add(start, 4);
         }
-        if ((start & 8) != 0 && unsignedLessThan(start, end - 7)) {
+        if (hasFlag(start, 8) && unsignedLessThan(start, sub(end, 7))) {
             write64(start, value);
-            start += 8;
+            start = add(start, 8);
         }
 
-        final int endPtr64 = end - 63;
-        for (; unsignedLessThan(start, endPtr64); start += 64) {
+        final Pointer endPtr64 = sub(end, 63);
+        while (unsignedLessThan(start, endPtr64)) {
             // todo later detect simd features, and send corresponding build :)
             // https://v8.dev/features/simd
             /*clear128(p);
@@ -224,26 +196,28 @@ public class JVM32 {
             clear128(p + 48);
             * */
             write64(start, value);
-            write64(start + 8, value);
-            write64(start + 16, value);
-            write64(start + 24, value);
-            write64(start + 32, value);
-            write64(start + 40, value);
-            write64(start + 48, value);
-            write64(start + 56, value);
+            write64(add(start, 8), value);
+            write64(add(start, 16), value);
+            write64(add(start, 24), value);
+            write64(add(start, 32), value);
+            write64(add(start, 40), value);
+            write64(add(start, 48), value);
+            write64(add(start, 56), value);
+            start = add(start, 64);
         }
 
-        final int endPtr8 = end - 7;
-        for (; unsignedLessThan(start, endPtr8); start += 8) {
+        final Pointer endPtr8 = sub(end, 7);
+        while (unsignedLessThan(start, endPtr8)) {
             write64(start, value);
+            start = add(start, 8);
         }
-        if (unsignedLessThan(start, end - 3)) {
+        if (unsignedLessThan(start, sub(end, 3))) {
             write32(start, (int) value);
-            start += 4;
+            start = add(start, 4);
         }
-        if (unsignedLessThan(start, end - 1)) {
+        if (unsignedLessThan(start, sub(end, 1))) {
             write16(start, (short) value);
-            start += 2;
+            start = add(start, 2);
         }
         if (unsignedLessThan(start, end)) {
             write8(start, (byte) value);
@@ -252,7 +226,7 @@ public class JVM32 {
 
     @NoThrow
     public static boolean isDynamicInstance(Object instance) {
-        return unsignedGreaterThanEqual(getAddr(instance), getAllocationStart());
+        return unsignedGreaterThanEqual(castToPtr(instance), getAllocationStart());
     }
 
     /**
@@ -260,7 +234,7 @@ public class JVM32 {
      */
     @NoThrow
     @WASM(code = "i32.load i32.const 16777215 i32.and")
-    public static native int readClassIdImpl(int addr);
+    public static native int readClassIdImpl(Object addr);
 
     /**
      * returns the class index for the given instance
@@ -268,58 +242,62 @@ public class JVM32 {
     @NoThrow
     @Alias(names = "readClass")
     public static int readClassId(Object instance) {
-        return readClassIdImpl(getAddr(instance));
+        return readClassIdImpl(instance);
     }
 
     @NoThrow
+    @WASM(code = "i32.add")
+    private static native Pointer addr(Object p, int offset);
+
+    @NoThrow
     public static void writeI8AtOffset(Object instance, int offset, byte value) {
-        write8(getAddr(instance) + offset, value);
+        write8(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writeI16AtOffset(Object instance, int offset, short value) {
-        write16(getAddr(instance) + offset, value);
+        write16(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writeI16AtOffset(Object instance, int offset, char value) {
-        write16(getAddr(instance) + offset, value);
+        write16(addr(instance, offset), value);
     }
 
     @NoThrow
     public static byte readI8AtOffset(Object instance, int offset) {
-        return read8(getAddr(instance) + offset);
+        return read8(addr(instance, offset));
     }
 
     @NoThrow
     public static short readS16AtOffset(Object instance, int offset) {
-        return read16s(getAddr(instance) + offset);
+        return read16s(addr(instance, offset));
     }
 
     @NoThrow
     public static char readU16AtOffset(Object instance, int offset) {
-        return read16u(getAddr(instance) + offset);
+        return read16u(addr(instance, offset));
     }
 
     @NoThrow
     public static float readF32AtOffset(Object instance, int offset) {
-        return read32f(getAddr(instance) + offset);
+        return read32f(addr(instance, offset));
     }
 
     @NoThrow
     public static double readF64AtOffset(Object instance, int offset) {
-        return read64f(getAddr(instance) + offset);
+        return read64f(addr(instance, offset));
     }
 
     @NoThrow
     public static int readI32AtOffset(Object instance, int offset) {
         // todo offset must become long for ptrSize=8
-        return read32(getAddr(instance) + offset);
+        return read32(addr(instance, offset));
     }
 
     @NoThrow
     public static long readI64AtOffset(Object instance, int offset) {
-        return read64(getAddr(instance) + offset);
+        return read64(addr(instance, offset));
     }
 
     @NoThrow
@@ -329,27 +307,33 @@ public class JVM32 {
 
     @NoThrow
     public static void writeI32AtOffset(Object instance, int offset, int value) {
-        write32(getAddr(instance) + offset, value);
+        write32(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writeI64AtOffset(Object instance, int offset, long value) {
-        write64(getAddr(instance) + offset, value);
+        write64(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writeF32AtOffset(Object instance, int offset, float value) {
-        write32(getAddr(instance) + offset, value);
+        write32(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writeF64AtOffset(Object instance, int offset, double value) {
-        write64(getAddr(instance) + offset, value);
+        write64(addr(instance, offset), value);
     }
 
     @NoThrow
     public static void writePtrAtOffset(Object instance, int offset, Object value) {
-        writeI32AtOffset(instance, offset, getAddr(value));
+        // only used by reflections, so this IF is fine
+        long value1 = getAddrS(value);
+        if (is32Bits) {
+            writeI32AtOffset(instance, offset, (int) value1);
+        } else {
+            writeI64AtOffset(instance, offset, value1);
+        }
     }
 
     @NoThrow

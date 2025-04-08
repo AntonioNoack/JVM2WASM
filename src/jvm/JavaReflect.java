@@ -17,6 +17,7 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflectMethod.Constructor_invoke;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.getAddrS;
 import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 import static utils.StaticClassIndices.*;
@@ -143,7 +144,7 @@ public class JavaReflect {
     public static int getFieldOffset(Field field) {
         int offset = readI32AtOffset(field, OFFSET_FIELD_SLOT);
         if (offset < objectOverhead && !Modifier.isStatic(field.getModifiers())) {
-            log("Field/0", getAddr(field));
+            log("Field/0", castToPtr(field));
             log("Field/1", field.getDeclaringClass().getName(), field.getName(), field.getModifiers());
             throwJs("Field offset must not be zero");
         }
@@ -445,7 +446,7 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Object_hashCode_I")
     public static int Object_hashCode(Object instance) {
-        return getAddr(instance);
+        return Long.hashCode(getAddrS(instance));
     }
 
     @Alias(names = "java_lang_Class_getComponentType_Ljava_lang_Class")

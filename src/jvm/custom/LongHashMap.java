@@ -5,8 +5,8 @@ import annotations.NoThrow;
 import java.util.ArrayList;
 import java.util.Objects;
 
-import static jvm.JVM32.ptrTo;
 import static jvm.JVMFlags.ptrSize;
+import static jvm.Pointer.ptrTo;
 
 /**
  * Hash table based implementation of the {@code IntMap} interface.  This

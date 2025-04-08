@@ -12,28 +12,28 @@ public class MemDebug {
     @Export
     @NoThrow
     @Alias(names = "r64f")
-    public static double r64f(int addr) {
+    public static double r64f(Pointer addr) {
         return read64f(addr);
     }
 
     @Export
     @NoThrow
     @Alias(names = "r64")
-    public static long r64(int addr) {
+    public static long r64(Pointer addr) {
         return read64(addr);
     }
 
     @Export
     @NoThrow
     @Alias(names = "r32f")
-    public static float r32f(int addr) {
+    public static float r32f(Pointer addr) {
         return read32f(addr);
     }
 
     @Export
     @NoThrow
     @Alias(names = "r32")
-    public static int r32(int addr) {
+    public static int r32(Pointer addr) {
         return read32(addr);
     }
 

@@ -5,13 +5,13 @@ import dependency.DependencyIndex.constructableClasses
 import dependency.StaticDependencies
 import hierarchy.HierarchyIndex
 import jvm.JVM32
-import me.anno.engine.inspector.CachedReflections.Companion.getGetterName
+import jvm.JVMFlags.is32Bits
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.ceilDiv
 import me.anno.utils.Clock
+import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.types.Strings.titlecase
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignPointer
@@ -31,7 +31,6 @@ import utils.DynIndex.resolveIndirectTablePtr
 import utils.MissingFunctions.checkUsedButNotImplemented
 import utils.MissingFunctions.findUsedButNotImplemented
 import utils.NativeHelperFunctions.appendNativeHelperFunctions
-import utils.WASMTypes.*
 import wasm.instr.Instructions.F64_SQRT
 import wasm.parser.GlobalVariable
 import wasm2cpp.FunctionOrder
@@ -40,10 +39,7 @@ import kotlin.math.sin
 
 private val LOGGER = LogManager.getLogger("JVM2WASM")
 
-// todo finally output WASM instead of WAT ourselves to get rid of the WSL dependency and to save a few seconds
-
 // todo create pure JavaScript build with nice types etc
-// todo introduce pseudo instructions for field setters and getters to create better C++/JavaScript code
 
 // todo replace simple bridge methods like the following with just an alias
 /**
@@ -186,6 +182,9 @@ val classReplacements = hashMapOf(
     if (!checkArrayAccess) {
         put("jvm/ArrayAccessSafe", "jvm/ArrayAccessUnchecked")
     }
+    if (!is32Bits) {
+        put("jvm/Pointer", "jvm/Pointer64")
+    }
 }
 
 fun replaceClass(clazz: String): String = replaceClassNullable(clazz)!!
@@ -320,7 +319,6 @@ fun listLibrary(clazz: (String) -> Unit) {
     } else if (!useKotlynReflect) {
         clazz("jvm/KotlinReflect")
     }
-
 }
 
 fun printMethodFieldStats() {
@@ -533,6 +531,7 @@ fun jvm2wasm() {
     stringStart = ptr
 
     appendNativeHelperFunctions()
+    defineGlobalsForValidator()
     translateMethods(classesToLoad, ::filterClass)
     buildSyntheticMethods()
 
@@ -621,7 +620,35 @@ private fun appendNthGetterMethods(bodyPrinter: StringBuilder2) {
 }
 
 private fun defineGlobal(name: String, type: WASMType, value: Int, isMutable: Boolean = false) {
-    globals[name] = GlobalVariable(name, type, value, isMutable)
+    assertTrue(type == WASMType.I32 || type == WASMType.I64)
+    val curr = GlobalVariable(name, type, if (type == WASMType.I64) value.toLong() else value, isMutable)
+    val prev = globals.put(name, curr)
+    if (prev != null) assertEquals(prev.wasmType, curr.wasmType)
+}
+
+private fun defineGlobal(name: String, type: WASMType) {
+    defineGlobal(name, type, 0, false)
+}
+
+private fun defineGlobalsForValidator() {
+
+    defineGlobal("inheritanceTable", ptrTypeI) // class table
+    defineGlobal("staticTable", ptrTypeI) // static table
+    defineGlobal("resolveIndirectTable", ptrTypeI)
+    defineGlobal("numClasses", ptrTypeI)
+    defineGlobal("classInstanceTable", ptrTypeI)
+    defineGlobal("classSize", ptrTypeI)
+    defineGlobal("staticInitTable", ptrTypeI)
+    defineGlobal("stackTraceTable", ptrTypeI)
+    defineGlobal("resourceTable", ptrTypeI)
+
+    defineGlobal("stackEndPointer", ptrTypeI) // stack end ptr
+    defineGlobal("stackPointer", ptrTypeI) // stack ptr
+    defineGlobal("stackPointerStart", ptrTypeI) // stack ptr start address
+
+    // allocation start address
+    defineGlobal("allocationPointer", ptrTypeI)
+    defineGlobal("allocationStart", ptrTypeI) // original allocation start address
 }
 
 private fun defineGlobals(classTableStart: Int, numClasses: Int, ptr0: Int): Int {

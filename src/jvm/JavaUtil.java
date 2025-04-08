@@ -15,9 +15,14 @@ import java.util.TimeZone;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.ToIntFunction;
 
-import static jvm.JVM32.*;
+import static jvm.ArrayAccessSafe.arrayLength;
+import static jvm.JVM32.fill64;
+import static jvm.JVMFlags.is32Bits;
+import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMShared.*;
 import static jvm.JavaLang.toFixed;
+import static jvm.Pointer.add;
+import static jvm.Pointer.getAddrS;
 
 public class JavaUtil {
 
@@ -112,7 +117,8 @@ public class JavaUtil {
                         result.append(formatHex(obj));
                         break;
                     case 'h':
-                        result.append(obj == null ? null : obj.hashCode());
+                        if (obj == null) result.append("null");
+                        else result.append(obj.hashCode());
                         break;
                     case 'n':
                         result.append('\n');
@@ -193,65 +199,70 @@ public class JavaUtil {
 
     @Alias(names = "java_util_Arrays_fill_AZIIZV")
     public static void Arrays_fill(boolean[] data, int start, int end, boolean value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill32(ptr + start, ptr + end, b2i(value) * 0x1010101);
+        fill(data, start, end, 0, b2i(value) * 0x1010101);
     }
 
     @Alias(names = "java_util_Arrays_fill_ABIIBV")
     public static void Arrays_fill(byte[] data, int start, int end, byte value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill8(ptr + start, ptr + end, value);
+        int value1 = ((int) value & 0xff);
+        value1 = (value1 << 8) | value1;
+        value1 = (value1 << 16) | value1;
+        fill(data, start, end, 0, value1);
     }
 
     @Alias(names = "java_util_Arrays_fill_ACIICV")
     public static void Arrays_fill(char[] data, int start, int end, char value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill16(ptr + (start << 1), ptr + (end << 1), (short) value);
+        int value1 = ((int) value & 0xffff);
+        value1 = (value1 << 8) | value1;
+        value1 = (value1 << 16) | value1;
+        fill(data, start, end, 1, value1);
     }
 
     @Alias(names = "java_util_Arrays_fill_ASIISV")
     public static void Arrays_fill(short[] data, int start, int end, short value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill16(ptr + (start << 1), ptr + (end << 1), value);
+        int value1 = ((int) value & 0xffff);
+        value1 = (value1 << 8) | value1;
+        value1 = (value1 << 16) | value1;
+        fill(data, start, end, 1, value1);
     }
 
     @Alias(names = "java_util_Arrays_fill_AFIIFV")
     public static void Arrays_fill(float[] data, int start, int end, float value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill32(ptr + (start << 2), ptr + (end << 2), Float.floatToRawIntBits(value));
+        fill(data, start, end, 2, Float.floatToRawIntBits(value));
     }
 
     @Alias(names = "java_util_Arrays_fill_AIIIIV")
     public static void Arrays_fill(int[] data, int start, int end, int value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill32(ptr + (start << 2), ptr + (end << 2), value);
+        fill(data, start, end, 2, value);
     }
 
     @Alias(names = "java_util_Arrays_fill_ADIIDV")
     public static void Arrays_fill(double[] data, int start, int end, double value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill64(ptr + (start << 3), ptr + (end << 3), Double.doubleToRawLongBits(value));
+        fill(data, start, end, 3, Double.doubleToRawLongBits(value));
     }
 
     @Alias(names = "java_util_Arrays_fill_AJIIJV")
     public static void Arrays_fill(long[] data, int start, int end, long value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill64(ptr + (start << 3), ptr + (end << 3), value);
+        fill(data, start, end, 3, value);
     }
 
     @Alias(names = "java_util_Arrays_fill_AWIILjava_lang_ObjectV")
     public static void Arrays_fill(Object[] data, int start, int end, Object value) {
-        rangeCheck(data.length, start, end);
-        int ptr = getAddr(data) + arrayOverhead;
-        fill32(ptr + (start << 2), ptr + (end << 2), getAddr(value));
+        long value1 = getAddrS(value);
+        if (is32Bits) value1 = (value1 << 32) | value1;
+        fill(data, start, end, ptrSizeBits, value1);
+    }
+
+    public static void fill(Object data, int start, int end, int shift, int fillValue) {
+        long fillValue1 = Integer.toUnsignedLong(fillValue);
+        fillValue1 = (fillValue1 << 32) | fillValue1;
+        fill(data, start, end, shift, fillValue1);
+    }
+
+    public static void fill(Object data, int start, int end, int shift, long fillValue) {
+        rangeCheck(arrayLength(data), start, end);
+        Pointer ptr = add(castToPtr(data), arrayOverhead);
+        fill64(add(ptr, ((long) start << shift)), add(ptr, ((long) end << shift)), fillValue);
     }
 
     @Alias(names = "static_java_util_BitSet_V")

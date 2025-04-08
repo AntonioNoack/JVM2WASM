@@ -89,6 +89,10 @@ object Instructions {
         "i64.extend_i32_s", "static_cast<i64>(", ")",
         i32, i64, Opcode.I64_EXTEND_I32S, Number::toLong
     )
+    val I64_EXTEND_I32U = NumberCastInstruction( // is this C++-part correct???
+        "i64.extend_i32_u", "static_cast<u64>(", ")",
+        i32, i64, Opcode.I64_EXTEND_I32U, Number::toLong
+    )
     val I32_WRAP_I64 = NumberCastInstruction(
         "i32.wrap_i64", "static_cast<i32>(", ")",
         i64, i32, Opcode.I32_WRAP_I64, Number::toInt
@@ -141,15 +145,20 @@ object Instructions {
     val I32LES = Compare0Instr("i32.le_s", "<=", i32, Opcode.I32_LES)
     val I32LTS = Compare0Instr("i32.lt_s", "<", i32, Opcode.I32_LTS)
 
-    val I32GEU = CompareU32Instr("i32.ge_u", ">=", i32, Opcode.I32_GEU)
-    val I32GTU = CompareU32Instr("i32.gt_u", ">", i32, Opcode.I32_GTU)
-    val I32LEU = CompareU32Instr("i32.le_u", "<=", i32, Opcode.I32_LEU)
-    val I32LTU = CompareU32Instr("i32.lt_u", "<", i32, Opcode.I32_LTU)
+    val I32GEU = CompareU32Instr("i32.ge_u", ">=", Opcode.I32_GEU)
+    val I32GTU = CompareU32Instr("i32.gt_u", ">", Opcode.I32_GTU)
+    val I32LEU = CompareU32Instr("i32.le_u", "<=", Opcode.I32_LEU)
+    val I32LTU = CompareU32Instr("i32.lt_u", "<", Opcode.I32_LTU)
 
     val I64GES = Compare0Instr("i64.ge_s", ">=", i64, Opcode.I64_GES)
     val I64GTS = Compare0Instr("i64.gt_s", ">", i64, Opcode.I64_GTS)
     val I64LES = Compare0Instr("i64.le_s", "<=", i64, Opcode.I64_LES)
     val I64LTS = Compare0Instr("i64.lt_s", "<", i64, Opcode.I64_LTS)
+
+    val I64GEU = CompareU64Instr("i64.ge_u", ">=", Opcode.I64_GEU)
+    val I64GTU = CompareU64Instr("i64.gt_u", ">", Opcode.I64_GTU)
+    val I64LEU = CompareU64Instr("i64.le_u", "<=", Opcode.I64_LEU)
+    val I64LTU = CompareU64Instr("i64.lt_u", "<", Opcode.I64_LTU)
 
     val I32EQZ = EqualsZeroInstruction("i32.eqz", i32, "== 0", Opcode.I32_EQZ)
     val I64EQZ = EqualsZeroInstruction("i64.eqz", i64, "== 0", Opcode.I64_EQZ)

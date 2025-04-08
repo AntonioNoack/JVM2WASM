@@ -50,7 +50,25 @@ public class ThrowJS {
     }
 
     @NoThrow
+    public static void throwJs(String s, Pointer a, String b) {
+        log(s, a, b);
+        crash();
+    }
+
+    @NoThrow
     public static void throwJs(String s, int a, int b, int c) {
+        log(s, a, b, c);
+        crash();
+    }
+
+    @NoThrow
+    public static void throwJs(String s, Pointer a, int b, int c) {
+        log(s, a, b, c);
+        crash();
+    }
+
+    @NoThrow
+    public static void throwJs(String s, int a, long b, int c) {
         log(s, a, b, c);
         crash();
     }

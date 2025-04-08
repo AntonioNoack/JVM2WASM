@@ -1,22 +1,28 @@
 package jvm.gc;
 
 import annotations.NoThrow;
+import jvm.Pointer;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.JVM32.*;
-import static jvm.JVMShared.*;
+import static jvm.JVM32.getAllocationStart;
+import static jvm.JVM32.getNextPtr;
+import static jvm.JVMShared.arrayOverhead;
+import static jvm.JVMShared.unsignedLessThan;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.add;
+import static jvm.Pointer.ptrTo;
 import static jvm.gc.GCGapFinder.getInstanceSize;
 import static jvm.gc.GCGapFinder.insertGapMaybe;
-import static jvm.gc.GarbageCollector.*;
+import static jvm.gc.GarbageCollector.largestGaps;
+import static jvm.gc.GarbageCollector.largestGapsTmp;
 
 @SuppressWarnings("unused")
 public class GCUtils {
 
     @NoThrow
     private static void mergeGaps() {
-        for (int gap : largestGapsTmp) {
-            if (instanceOf(ptrTo(gap), BYTE_ARRAY_CLASS)) {
+        for (byte[] gap : largestGapsTmp) {
+            if (gap != null) {
                 int available = arrayLength(gap) + arrayOverhead;
                 insertGapMaybe(gap, available, largestGaps);
             }
@@ -25,14 +31,14 @@ public class GCUtils {
 
     @NoThrow
     public static void validateAllClassIds() {
-        int ptr = getAllocationStart();
-        int end = getNextPtr();
+        Pointer ptr = getAllocationStart();
+        Pointer end = getNextPtr();
         // log("Validating all dynamic instances", ptr, end, getStackDepth());
-        while (unsignedLessThan(ptr, end)) {
-            int size = getInstanceSize(ptr);
+        while (Pointer.unsignedLessThan(ptr, end)) {
+            Pointer size = getInstanceSize(ptr);
             // String className = classIdToInstance(readClassIdImpl(ptr)).getName();
             // log(className, ptr, size);
-            ptr += size;
+            ptr = add(ptr, size);
         }
         if (ptr != end) {
             log("Invalid end", ptr, end);

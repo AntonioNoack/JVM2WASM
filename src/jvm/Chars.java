@@ -20,7 +20,7 @@ public class Chars {
     @Alias(names = "java_lang_Character_toUpperCase_CC")
     public static char java_lang_Character_toUpperCase_CC(char c) {
         if (unsignedLessThan(c - 'a', 26)) {
-            c += 'A' - 'a';
+            c += (char) ('A' - 'a');
         }
         return c;
     }

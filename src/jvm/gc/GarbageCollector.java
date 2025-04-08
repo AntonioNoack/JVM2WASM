@@ -4,30 +4,34 @@ import annotations.Alias;
 import annotations.Export;
 import annotations.JavaScript;
 import annotations.NoThrow;
+import jvm.Pointer;
 import jvm.custom.WeakRef;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.gc.GCGapFinder.findLargestGaps;
-import static jvm.gc.GCTraversal.traverseStaticInstances;
 import static jvm.JVM32.*;
+import static jvm.JVMFlags.is32Bits;
+import static jvm.JVMShared.unsignedGreaterThanEqual;
 import static jvm.JVMShared.*;
 import static jvm.JVMValues.failedToAllocateMemory;
 import static jvm.JVMValues.reachedMemoryLimit;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.unsignedLessThan;
+import static jvm.Pointer.*;
+import static jvm.gc.GCGapFinder.findLargestGaps;
+import static jvm.gc.GCTraversal.traverseStaticInstances;
 
 public class GarbageCollector {
 
-    public static int freeMemory = 0;
+    public static long freeMemory = 0;
 
     public static byte iteration = 0;
+    public static int generation = 1;
 
     public static final int GC_OFFSET = 3;
     public static final int BYTE_ARRAY_CLASS = 5;
 
-    public static int[] largestGaps = new int[16];// 16 pointers
-    static int[] largestGapsTmp = new int[16];
-
-    public static int generation = 1;
+    public static byte[][] largestGaps = new byte[16][];// 16 pointers
+    static byte[][] largestGapsTmp = new byte[16][];
 
     @NoThrow
     @JavaScript(code = "markJSReferences()")
@@ -46,7 +50,7 @@ public class GarbageCollector {
         findLargestGaps(largestGaps, null);
         GarbageCollectorFlags.hasGaps = hasGaps();
         long t2 = System.nanoTime();
-        log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
+        log("GC-Nanos:", (t1 - t0), (t2 - t1), generation);
     }
 
     @Export
@@ -59,7 +63,7 @@ public class GarbageCollector {
         long t1 = System.nanoTime();
         GCGapFinder.findLargestGapsInit(largestGaps);
         long t2 = System.nanoTime();
-        log("GC-Nanos:", (int) (t1 - t0), (int) (t2 - t1), generation);
+        log("GC-Nanos:", (t1 - t0), (t2 - t1), generation);
     }
 
     @Export
@@ -117,34 +121,34 @@ public class GarbageCollector {
 
     @NoThrow
     private static void swapGaps() {
-        int[] tmp = largestGapsTmp;
+        byte[][] tmp = largestGapsTmp;
         largestGapsTmp = largestGaps;
         largestGaps = tmp;
     }
 
     @NoThrow
     private static boolean hasGaps() {
-        for (int gap : largestGaps) {
-            if (instanceOf(ptrTo(gap), BYTE_ARRAY_CLASS)) {
+        for (byte[] gap : largestGaps) {
+            if (gap != null) {
                 return true;
             }
         }
         return false;
     }
 
-    public static int allocateNewSpace(int size) {
+    public static Pointer allocateNewSpace(Pointer size) {
         lockMallocMutex();
-        int ptr = allocateNewSpace0(size);
+        Pointer ptr = allocateNewSpace0(size);
         unlockMallocMutex();
         return ptr;
     }
 
-    private static int allocateNewSpace0(int size) {
-        int ptr = getNextPtr();
+    private static Pointer allocateNewSpace0(Pointer size) {
+        Pointer ptr = getNextPtr();
         // log("allocated", ptr, size);
 
         // clean memory
-        int endPtr = ptr + size;
+        Pointer endPtr = add(ptr, size);
 
         // if ptr + size has a memory overflow over 0, throw OOM
         if (unsignedLessThan(endPtr, ptr)) {
@@ -153,17 +157,17 @@ public class GarbageCollector {
         }
 
         // check if we have enough size
-        int allocatedSize = getAllocatedSize() - (b2i(!criticalAlloc) << 16);
+        Pointer allocatedSize = sub(getAllocatedSize(), b2i(!criticalAlloc) << 16);
         if (unsignedLessThan(allocatedSize, endPtr)) {
 
             // if not, call grow()
             // how much do we want to grow?
-            int allocatedPages = allocatedSize >>> 16;
+            long allocatedPages = getAddrS(allocatedSize) >>> 16;
             // once this limit has been hit, only throw once
-            int maxNumPages = 65536;// 128 ~ 16 MB; 4 GB = 65536;
-            int remainingPages = maxNumPages - allocatedPages;
-            int amountToGrow = allocatedPages >> 1;
-            int minPagesToGrow = (endPtr >>> 16) + 1 - allocatedPages;
+            long maxNumPages = is32Bits ? 65536 : Integer.MAX_VALUE;// 128 ~ 16 MB; 4 GB = 65536;
+            long remainingPages = maxNumPages - allocatedPages;
+            long amountToGrow = allocatedPages >> 1;
+            long minPagesToGrow = (getAddrS(endPtr) >>> 16) + 1 - allocatedPages;
             if (amountToGrow > remainingPages) amountToGrow = remainingPages;
             // should be caught by ptr<0 && endPtr > 0
             if (minPagesToGrow > remainingPages) {
@@ -171,7 +175,7 @@ public class GarbageCollector {
                 throw reachedMemoryLimit;
             }
             if (amountToGrow < minPagesToGrow) amountToGrow = minPagesToGrow;
-            if (!grow(amountToGrow)) {
+            if (!growS(amountToGrow)) {
                 // if grow() fails, throw OOM error
                 log("grow() failed", amountToGrow);
                 throw failedToAllocateMemory;
@@ -183,53 +187,43 @@ public class GarbageCollector {
 
         // prevent the very first allocations from overlapping
         ptr = getNextPtr();
-        setNextPtr(ptr + size);
+        setNextPtr(add(ptr, size));
         return ptr;
     }
 
     @NoThrow
-    public static int findGap(int size) {
-        int ptr = getAddr(largestGaps);
-        final int numGaps = arrayLength(ptr);
-        ptr += arrayOverhead;
-        final int endPtr = ptr + (numGaps << 2);
+    public static Pointer findGap(int size) {
         final int sizeWithoutHelper = size - arrayOverhead;
-        while (ptr < endPtr) {
-            int array = read32(ptr);
-            if (array != 0) {
+        for (int i = 0, l = largestGaps.length; i < l; i++) {
+            byte[] array = largestGaps[i];
+            if (array != null) {
                 int available = arrayLength(array);
                 // three cases:
                 //  a) we fit perfectly
                 //  b) we fit, and let stuff remain
                 //  c) we don't fit
                 if (available == sizeWithoutHelper) {
-                    findGapReplace(ptr, size);
-                    return array; // the new instance is placed where the array was
+                    // if (printCtr++ < 0) log("GC replacing", size);
+                    largestGaps[i] = null; // nothing is remaining -> set entry to null
+                    freeMemory -= size;
+                    return castToPtr(array); // the new instance is placed where the array was
                 } else if (unsignedGreaterThanEqual(available, size)) {
-                    return findGapFitIntoSpace(array, size, available + arrayOverhead);
+                    return findGapFitIntoSpace(castToPtr(array), size, available + arrayOverhead);
                 }
             }
-            ptr += 4;
         }
-        return 0; // no gap was found
+        return null; // no gap was found
     }
 
     @NoThrow
-    private static void findGapReplace(int ptr, int size) {
-        // if (printCtr++ < 0) log("GC replacing", size);
-        write32(ptr, 0); // nothing is remaining -> set entry to null
-        freeMemory -= size;
-    }
-
-    @NoThrow
-    private static int findGapFitIntoSpace(final int arrayPtr, final int size, final int available) {
+    private static Pointer findGapFitIntoSpace(final Pointer arrayPtr, final int size, final int available) {
         final int sizeWithHelper = size + arrayOverhead;
         // if (printCtr++ < 0) log("GC shrinking", ptr, available, size);
         // shrink array
-        write32(arrayPtr + objectOverhead, available - sizeWithHelper);
+        writeI32AtOffset(arrayPtr, objectOverhead, available - sizeWithHelper);
         freeMemory -= size;
         // calculate new pointer, and we're done :D
-        return arrayPtr + available - size; // the new object is placed at the end
+        return add(arrayPtr, available - size); // the new object is placed at the end
     }
 
     @NoThrow
@@ -241,7 +235,7 @@ public class GarbageCollector {
     static boolean unregisterWeakRef(Object instance) {
         lockMallocMutex();
         @SuppressWarnings("rawtypes")
-        WeakRef weakRef = WeakRef.weakRefInstances.remove(getAddr(instance));
+        WeakRef weakRef = WeakRef.weakRefInstances.remove(getAddrS(instance));
         boolean wasReferenced = weakRef != null;
         unlockMallocMutex();
         while (weakRef != null) {
@@ -255,16 +249,15 @@ public class GarbageCollector {
     }
 
     @NoThrow
-    static boolean contains(int gapStart, int[] gapsInUse) {
+    static boolean contains(Object gapStart, byte[][] gapsInUse) {
+        return gapStart instanceof byte[] && contains((byte[]) gapStart, gapsInUse);
+    }
+
+    @NoThrow
+    static boolean contains(byte[] gapStart, byte[][] gapsInUse) {
         if (gapsInUse == null) return false;
-        int ptr = getAddr(gapsInUse);
-        int length = arrayLength(ptr); // will be 16
-        int endPtr = ptr + arrayOverhead + (length << 2);
-        while (ptr < endPtr) {
-            if (read32(ptr) == gapStart) {
-                return true;
-            }
-            ptr += 4;
+        for (byte[] ptr : gapsInUse) {
+            if (ptr == gapStart) return true;
         }
         return false;
     }

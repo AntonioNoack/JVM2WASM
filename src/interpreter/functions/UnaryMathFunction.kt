@@ -5,6 +5,7 @@ import wasm.instr.Instruction
 
 class UnaryMathFunction<V>(val impl: (V) -> Number) : Instruction {
     override fun execute(engine: WASMEngine): String? {
+        @Suppress("UNCHECKED_CAST")
         val input = engine.pop() as V
         val output = impl(input)
         engine.push(output)

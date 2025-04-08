@@ -1,5 +1,6 @@
 package utils
 
+import jvm.JVMFlags.is32Bits
 import org.apache.logging.log4j.LogManager
 
 private val LOGGER = LogManager.getLogger("JSCreator")
@@ -35,7 +36,8 @@ fun writeJavaScriptImportsFile(
         printer.append(") { throw ('").append(name).append(" not implemented'); },\n")
     }
     printer.append("  \n  // Initially required memory in 64 kiB pages:\n")
-    printer.append("  initialMemorySize: ").append(numPages).append('\n')
+    printer.append("  initialMemorySize: ").append(numPages).append(",\n")
+    printer.append("  is32Bits: ").append(is32Bits).append('\n')
     printer.append("}\nexport { lib as \"autoJS\" }")
     wasmFolder.getChild("index0.js")
         .writeBytes(printer.values, 0, printer.size)

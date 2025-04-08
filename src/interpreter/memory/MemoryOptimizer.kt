@@ -4,16 +4,16 @@ import allocationStart
 import gIndex
 import globals
 import interpreter.WASMEngine
-import jvm.JVM32.*
+import jvm.JVM32.adjustCallocSize
 import jvm.JVMFlags.is32Bits
 import jvm.JVMFlags.ptrSize
 import jvm.JVMShared.arrayOverhead
 import jvm.JVMShared.objectOverhead
+import me.anno.utils.algorithms.Recursion.processRecursive2
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.algorithms.Recursion.processRecursive2
 import me.anno.utils.structures.lists.Lists.createList
 import org.apache.logging.log4j.LogManager
 import utils.*
@@ -296,12 +296,12 @@ object MemoryOptimizer {
         // increase allocation start after everything that was static-inited:
         //  that way we can decrease our GC efforts
         allocationStart += newBytes.size
-        setGlobal("allocationStart", allocationStart)
-        setGlobal("allocationPointer", allocationStart)
+        setGlobal("allocationStart", if (is32Bits) allocationStart else allocationStart.toLong())
+        setGlobal("allocationPointer", if (is32Bits) allocationStart else allocationStart.toLong())
         return allocationStart
     }
 
-    private fun setGlobal(name: String, value: Int) {
+    private fun setGlobal(name: String, value: Number) {
         globals[name]!!.initialValue = value
     }
 
@@ -312,10 +312,10 @@ object MemoryOptimizer {
         return addr >= allocationStart
     }
 
-    private fun getArraySize(memory: ByteBuffer, addr: Int): Int {
+    private fun getArraySize(memory: ByteBuffer, addr: Int): Long {
         val classId = readClassId(memory, addr)
         assertTrue(classId in FIRST_ARRAY..LAST_ARRAY)
-        val length = readArrayLength(memory, addr)
+        val length = readArrayLength(memory, addr).toLong()
         val typeShift = getTypeShift(classId)
         val rawSize = arrayOverhead + length.shl(typeShift)
         return adjustCallocSize(rawSize)
@@ -350,7 +350,7 @@ object MemoryOptimizer {
     private fun getInstanceSize(memory: ByteBuffer, addr: Int): Int {
         val classId = readClassId(memory, addr)
         return if (classId in FIRST_ARRAY..LAST_ARRAY) {
-            getArraySize(memory, addr)
+            getArraySize(memory, addr).toInt()
         } else classSizes[classId]
     }
 

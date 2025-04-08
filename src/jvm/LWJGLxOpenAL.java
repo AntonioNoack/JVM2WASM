@@ -10,8 +10,8 @@ import java.nio.ByteBuffer;
 import java.nio.ShortBuffer;
 import java.util.function.IntFunction;
 
-import static jvm.JVM32.getAddr;
-import static jvm.JVM32.ptrTo;
+import static jvm.Pointer.getAddrS;
+import static jvm.Pointer.ptrTo;
 
 public class LWJGLxOpenAL {
 
@@ -97,7 +97,7 @@ public class LWJGLxOpenAL {
     @NoThrow
     @Alias(names = "org_lwjgl_openal_ALC10_alcOpenDevice_Ljava_nio_ByteBufferJ")
     public static long ALC10_alcOpenDevice_Ljava_nio_ByteBufferJ(ByteBuffer name) {
-        return getAddr(name);
+        return getAddrS(name);
     }
 
     @NoThrow

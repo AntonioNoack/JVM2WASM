@@ -21,7 +21,8 @@ data class Const(val type: ConstType, val value: Number) : Instruction {
         }
 
         fun ptrConst(value: Int): Const {
-            return if (is32Bits) i32Const(value) else i64Const(value.toLong())
+            return if (is32Bits) i32Const(value)
+            else i64Const(value.toLong())
         }
 
         fun i32Const(value: Int): Const = i32ConstCache.getOrNull(value) ?: Const(ConstType.I32, value)

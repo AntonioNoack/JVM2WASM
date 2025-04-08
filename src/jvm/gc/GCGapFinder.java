@@ -1,18 +1,19 @@
 package jvm.gc;
 
 import annotations.NoThrow;
-import annotations.WASM;
+import jvm.Pointer;
 import jvm.custom.WeakRef;
 
 import java.util.ArrayList;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.gc.GCTraversal.instanceFieldOffsets;
-import static jvm.gc.GarbageCollector.*;
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.*;
 import static jvm.ThrowJS.throwJs;
+import static jvm.gc.GCTraversal.instanceFieldOffsets;
+import static jvm.gc.GarbageCollector.*;
 import static utils.StaticClassIndices.FIRST_ARRAY;
 import static utils.StaticClassIndices.LAST_ARRAY;
 
@@ -28,10 +29,10 @@ public class GCGapFinder {
     private static int smallestGapSize, smallestGapSizeIndex;
 
     @NoThrow
-    private static void fillZeros(int[] largestGaps) {
+    private static void fillZeros(byte[][] largestGaps) {
         // must not use Arrays.fill, because that uses the stack-ptr, and we might run async
         for (int i = 0; i < 16; i++) {
-            largestGaps[i] = 0;
+            largestGaps[i] = null;
         }
     }
 
@@ -71,10 +72,10 @@ public class GCGapFinder {
         }
     }
 
-    private static int currPtr, endPtr, gapStart;
+    private static Pointer currPtr, endPtr, gapStart;
     private static boolean wasUsed;
 
-    public static void findLargestGapsInit(int[] largestGaps) {
+    public static void findLargestGapsInit(byte[][] largestGaps) {
         // log("Finding largest gaps");
         fillZeros(largestGaps);
 
@@ -93,31 +94,31 @@ public class GCGapFinder {
         prepareWeakRefs();
     }
 
-    public static boolean findLargestGapsStep(int[] largestGaps, int[] gapsInUse) {
+    public static boolean findLargestGapsStep(byte[][] largestGaps, byte[][] gapsInUse) {
         int remainingBudget = 20_000;
 
         // - find the largest gaps to reuse the memory there
         // for that, iterate over all allocated memory
-        int instancePtr = currPtr;
-        int gapStart = GCGapFinder.gapStart;
+        Pointer instancePtr = currPtr;
+        Pointer gapStart = GCGapFinder.gapStart;
         final int iteration = GarbageCollector.iteration;
-        final int endPtr = GCGapFinder.endPtr;
+        final Pointer endPtr = GCGapFinder.endPtr;
         boolean wasUsed = GCGapFinder.wasUsed;
 
         // log("[Gaps]", instancePtr);
 
-        int freedMemory = 0;
+        long freedMemory = 0;
         while (unsignedLessThan(instancePtr, endPtr)) {
 
             // when we find a not-used section, replace it with byte[] for faster future traversal (if possible)
-            int classId = readClassIdImpl(instancePtr);
-            int size = getInstanceSize(instancePtr, classId);
+            int classId = readClassId(instancePtr);
+            Pointer size = getInstanceSize(instancePtr, classId);
             // log("Gaps", instancePtr, classId, size);
             validateClassId(classId);
 
-            boolean isUsed = read8(instancePtr + GC_OFFSET) == iteration;
+            boolean isUsed = readI8AtOffset(instancePtr, GC_OFFSET) == iteration;
             if (!isUsed) {
-                isUsed = handleWeakRefs(ptrTo(instancePtr));
+                isUsed = handleWeakRefs(instancePtr);
             }
 
             if (!isUsed && contains(instancePtr, gapsInUse)) {
@@ -128,16 +129,20 @@ public class GCGapFinder {
 
             if (isUsed != wasUsed) {
                 if (isUsed) {
-                    int available = instancePtr - gapStart;
+                    long available = diff(instancePtr, gapStart);
                     freedMemory += available;
-                    handleGap(gapStart, available, largestGaps);
+                    if (available > Integer.MAX_VALUE) {
+                        // todo if gap.length > 2B, create multiple arrays
+                        throwJs("Gap too large to handle");
+                    }
+                    handleGap(gapStart, (int) available, largestGaps);
                 } else {
                     gapStart = instancePtr;
                 }
                 wasUsed = isUsed;
             }
 
-            instancePtr += size;
+            instancePtr = add(instancePtr, size);
 
             if (remainingBudget-- == 0) {
                 // save temporary state
@@ -169,7 +174,7 @@ public class GCGapFinder {
      * - find the largest unused memory spaces for reusing old space
      */
     @NoThrow
-    public static void findLargestGaps(int[] largestGaps, int[] gapsInUse) {
+    public static void findLargestGaps(byte[][] largestGaps, byte[][] gapsInUse) {
         findLargestGapsInit(largestGaps);
         while (true) {
             boolean done = findLargestGapsStep(largestGaps, gapsInUse);
@@ -178,34 +183,34 @@ public class GCGapFinder {
     }
 
     @NoThrow
-    private static void finishFindingGaps(int endPtr, int gapStart) {
+    private static void finishFindingGaps(Pointer endPtr, Pointer gapStart) {
         lockMallocMutex();
         if (getNextPtr() == endPtr) {
             setNextPtr(gapStart);
-            log("Reduced max memory to, by", gapStart, endPtr - gapStart);
+            log("Reduced max memory to, by", gapStart, sub(endPtr, gapStart));
         }
         unlockMallocMutex();
     }
 
     @NoThrow
-    private static void replaceWithByteArray(int gapStart, int available) {
+    private static void replaceWithByteArray(Pointer gapStart, int available) {
         // log("Replacing Gap", gapStart, available);
         write32(gapStart, BYTE_ARRAY_CLASS); // byte array, generation 0
-        write32(gapStart + objectOverhead, available - arrayOverhead); // length
+        writeI32AtOffset(gapStart, objectOverhead, available - arrayOverhead); // length
     }
 
     @NoThrow
-    static void handleGap(int gapStart, int available, int[] largestGaps) {
+    static void handleGap(Pointer gapStart, int available, byte[][] largestGaps) {
         // to do if a gap was > 2B elements, we'd have an issue...
         if (unsignedGreaterThanEqual(available, arrayOverhead)) { // should always be true
             // first step: replace with byte array, so that next time we can skip over it faster
             replaceWithByteArray(gapStart, available);
-            insertGapMaybe(gapStart, available, largestGaps);
+            insertGapMaybe(unsafeCast(gapStart), available, largestGaps);
         }
     }
 
     @NoThrow
-    static void insertGapMaybe(int gapStart, int available, int[] largestGaps) {
+    static void insertGapMaybe(byte[] gapStart, int available, byte[][] largestGaps) {
 
         if (unsignedLessThanEqual(available, smallestGapSize)) {
             // gap too small for us to care for
@@ -218,10 +223,10 @@ public class GCGapFinder {
         // reevaluate smallest size
         int smallestSize = available;
         for (int i = 0; i < 16; i++) {
-            int array = largestGaps[i];
-            int prev = array == 0 ? 0 : arrayLength(array);
-            if (unsignedLessThan(prev, smallestSize)) {
-                smallestSize = prev;
+            byte[] array = largestGaps[i];
+            int size = array == null ? 0 : array.length;
+            if (unsignedLessThan(size, smallestSize)) {
+                smallestSize = size;
                 smallestSizeIndex = i;
             }
         }
@@ -232,8 +237,8 @@ public class GCGapFinder {
     }
 
     @NoThrow
-    public static int getInstanceSize(int addr) {
-        int classId = readClassIdImpl(addr);
+    public static Pointer getInstanceSize(Pointer addr) {
+        int classId = readClassId(addr);
         if (classId < 0 || classId >= numClasses()) {
             log("Invalid class ID", addr, classId);
             throwJs();
@@ -242,14 +247,14 @@ public class GCGapFinder {
     }
 
     @NoThrow
-    public static int getInstanceSize(int addr, int classId) {
+    public static Pointer getInstanceSize(Pointer addr, int classId) {
         if (classId >= FIRST_ARRAY && classId <= LAST_ARRAY) {
             // handle arrays by size
             int length = arrayLength(addr);
             return getArraySizeInBytes(length, classId);
         } else {
             // handle class instance
-            return getInstanceSizeNonArray(classId);
+            return ptrTo(getInstanceSizeNonArray(classId));
         }
     }
 

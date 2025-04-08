@@ -12,6 +12,8 @@ import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.getAddrS;
+import static jvm.Pointer.ptrTo;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticClassIndices.*;
 
@@ -144,7 +146,7 @@ public class JVMShared {
     static void failCastCheck(Object instance, int classId) {
         Class<Object> isClass = classIdToInstance(readClassId(instance));
         Class<Object> checkClass = classIdToInstance(classId);
-        log(isClass.getName(), "is not instance of", checkClass.getName(), getAddr(instance));
+        log(isClass.getName(), "is not instance of", checkClass.getName(), castToPtr(instance));
         throw new ClassCastException();
     }
 
@@ -223,7 +225,7 @@ public class JVMShared {
     public static void init() {
         staticInit();
         // access static, so it is initialized
-        getAddr(System.out);
+        getAddrS(System.out);
         // could be used to initialize classes or io
         System.setOut(new PrintStream(new JavaLang.JSOutputStream(true)));
         System.setErr(new PrintStream(new JavaLang.JSOutputStream(false)));
@@ -245,59 +247,109 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "i64.store")
+    @Deprecated
     public static native void write64(int addr, long value);
 
     @NoThrow
     @WASM(code = "f64.store")
+    @Deprecated
     public static native void write64(int addr, double value);
 
     @NoThrow
     @WASM(code = "i32.store")
+    @Deprecated
     public static native void write32(int addr, int value);
 
     @NoThrow
     @WASM(code = "f32.store")
+    @Deprecated
     public static native void write32(int addr, float value);
 
     @NoThrow
     @WASM(code = "i32.store16")
+    @Deprecated
     public static native void write16(int addr, short value);
 
     @NoThrow
     @WASM(code = "i32.store16")
+    @Deprecated
     public static native void write16(int addr, char value);
 
     @NoThrow
     @WASM(code = "i32.store8")
+    @Deprecated
     public static native void write8(int addr, byte value);
 
     @NoThrow
-    @WASM(code = "i64.load")
-    public static native long read64(int addr);
-
-    @NoThrow
     @WASM(code = "i32.load")
+    @Deprecated
     public static native int read32(int addr);
 
     @NoThrow
-    @WASM(code = "f64.load")
-    public static native double read64f(int addr);
-
-    @NoThrow
-    @WASM(code = "f32.load")
-    public static native float read32f(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load16_s")
-    public static native short read16s(int addr);
-
-    @NoThrow
     @WASM(code = "i32.load16_u")
+    @Deprecated
     public static native char read16u(int addr);
 
     @NoThrow
     @WASM(code = "i32.load8_s")
+    @Deprecated
     public static native byte read8(int addr);
+
+    @NoThrow
+    @WASM(code = "i64.store")
+    public static native void write64(Pointer addr, long value);
+
+    @NoThrow
+    @WASM(code = "f64.store")
+    public static native void write64(Pointer addr, double value);
+
+    @NoThrow
+    @WASM(code = "i32.store")
+    public static native void write32(Pointer addr, int value);
+
+    @NoThrow
+    @WASM(code = "f32.store")
+    public static native void write32(Pointer addr, float value);
+
+    @NoThrow
+    @WASM(code = "i32.store16")
+    public static native void write16(Pointer addr, short value);
+
+    @NoThrow
+    @WASM(code = "i32.store16")
+    public static native void write16(Pointer addr, char value);
+
+    @NoThrow
+    @WASM(code = "i32.store8")
+    public static native void write8(Pointer addr, byte value);
+
+    @NoThrow
+    @WASM(code = "i64.load")
+    public static native long read64(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "i32.load")
+    public static native int read32(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "f64.load")
+    public static native double read64f(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "f32.load")
+    public static native float read32f(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "i32.load16_s")
+    public static native short read16s(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "i32.load16_u")
+    public static native char read16u(Pointer addr);
+
+    @NoThrow
+    @WASM(code = "i32.load8_s")
+    public static native byte read8(Pointer addr);
 
     @NoThrow
     @WASM(code = "i32.div_s")
@@ -637,11 +689,26 @@ public class JVMShared {
             "console.log('Growing by ' + (arg0<<6) + ' kiB, total: '+(memory.buffer.byteLength>>20)+' MiB');\n" +
             "try { memory.grow(arg0); return true; }\n" +
             "catch(e) { console.error(e.stack); return false; }")
-    public static native boolean grow(int numPages);
+    private static native boolean grow(int numPages);
+
+    @NoThrow
+    public static boolean growS(long numPages) {
+        int limit = 1 << 30;
+        while (numPages > limit) {
+            if (!grow(limit)) return false;
+            numPages -= limit;
+        }
+        return grow((int) numPages);
+    }
 
     @NoThrow
     @WASM(code = "") // auto
+    @Deprecated
     public static native <V> V unsafeCast(Object obj);
+
+    @NoThrow
+    @WASM(code = "") // auto
+    public static native Pointer castToPtr(Object obj);
 
     @Alias(names = "createNativeArray2")
     public static Object[] createNativeArray2(int l0, int l1, int clazz) {
@@ -705,7 +772,7 @@ public class JVMShared {
 
     @Alias(names = "resolveIndirectFail")
     public static void resolveIndirectFail(Object instance, String methodName) {
-        throwJs("Resolving non constructable method", getAddr(instance), methodName);
+        throwJs("Resolving non constructable method", castToPtr(instance), methodName);
     }
 
     @NoThrow
@@ -719,13 +786,6 @@ public class JVMShared {
         return classId * getClassSize() + getClassInstanceTable();
     }
 
-    @NoThrow
-    private static void checkAddress(int instance) {
-        if (ge_ub(instance, getAllocatedSize())) {
-            throwJs("Not a valid address!", instance);
-        }
-    }
-
     @Alias(names = "createInstance")
     public static Object createInstance(int classId) {
         validateClassId(classId);
@@ -735,7 +795,7 @@ public class JVMShared {
         if (instanceSize == 0) return getClassIdPtr(classId); // pseudo-instance
 
         if (trackAllocations) trackCalloc(classId);
-        Object newInstance = calloc(instanceSize);
+        Object newInstance = calloc(ptrTo(instanceSize));
         writeClass(newInstance, classId);
         // log("Created", classId, newInstance, instanceSize);
         // if (newInstance > 10_300_000) validateAllClassIds();

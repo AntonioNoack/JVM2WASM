@@ -109,7 +109,7 @@ public class ArrayAccessSafe {
         // checkAddress(instance);
         int actualClassId = readClassId(instance);
         if (actualClassId != expectedClassId1 && actualClassId != expectedClassId2) {
-            throwJs("Incorrect clazz!", getAddr(instance), actualClassId, expectedClassId1);
+            throwJs("Incorrect clazz!", castToPtr(instance), actualClassId, expectedClassId1);
         }
         int length = readI32AtOffset(instance, objectOverhead);
         if (ge_ub(index, length)) {

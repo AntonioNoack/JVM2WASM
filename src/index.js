@@ -18,6 +18,8 @@ try {
         // maximum: 100
     });
 
+    window.is32Bits = autoJS.is32Bits;
+
     var imports = {
         jvm: { },
         js: { mem: memory }

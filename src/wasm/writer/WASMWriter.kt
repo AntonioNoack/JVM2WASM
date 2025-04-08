@@ -8,8 +8,13 @@ import translator.JavaTypes.convertTypeToWASM
 import utils.WASMType
 import utils.WASMTypes.*
 import wasm.instr.*
+import wasm.instr.Const.Companion.f32Const
+import wasm.instr.Const.Companion.f64Const
 import wasm.instr.Const.Companion.i32Const
-import wasm.parser.*
+import wasm.instr.Const.Companion.i64Const
+import wasm.parser.DataSection
+import wasm.parser.FunctionImpl
+import wasm.parser.GlobalVariable
 import wasm.parser.Import
 
 object WASMWriter {
@@ -153,10 +158,15 @@ object WASMWriter {
             tags = emptyList(), // tags???
             globals = globalsList.mapIndexed { i, global ->
                 assertEquals(i, globalToIndex[global.name])
-                assertEquals(WASMType.I32, global.wasmType)
+                val constInstr = when (global.wasmType) {
+                    WASMType.I32 -> i32Const(global.initialValue.toInt())
+                    WASMType.I64 -> i64Const(global.initialValue.toLong())
+                    WASMType.F32 -> f32Const(global.initialValue.toFloat())
+                    WASMType.F64 -> f64Const(global.initialValue.toDouble())
+                }
                 Global(
                     global.name,
-                    listOf(i32Const(global.initialValue)),
+                    listOf(constInstr),
                     typeToType[global.wasmType.wasmName]!!,
                     global.isMutable
                 )

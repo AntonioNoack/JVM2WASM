@@ -116,7 +116,7 @@ object NativeHelperFunctions {
             )
         }
 
-        // setField-functions
+        // setField-functions (instance,value,offset)
         for ((call, type, storeInstr) in listOf(
             Triple(Call.setFieldI8, i32, I32Store8),
             Triple(Call.setFieldI16, i32, I32Store16),
@@ -126,13 +126,20 @@ object NativeHelperFunctions {
             Triple(Call.setFieldF64, f64, F64Store),
         )) {
             register(
-                call.name, listOf(i32, type, i32), emptyList(),
-                listOf(
-                    // ParamGet[0], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
+                call.name, listOf(ptrType, type, i32), emptyList(),
+                if (is32Bits) {
+                    listOf(
+                        // ParamGet[0], ParamGet[2], i32Const(storeInstr.numBytes), Call.checkWrite,
 
-                    ParamGet[0], ParamGet[2], I32Add,
-                    ParamGet[1], storeInstr, Return
-                )
+                        ParamGet[0], ParamGet[2], I32Add,
+                        ParamGet[1], storeInstr, Return
+                    )
+                } else {
+                    listOf(
+                        ParamGet[0], ParamGet[2], I64_EXTEND_I32S, I64Add,
+                        ParamGet[1], storeInstr, Return
+                    )
+                }
             )
         }
 

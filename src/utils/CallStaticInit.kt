@@ -142,8 +142,8 @@ object CallStaticInit {
 
         // calculate how much new memory was used
         val timeI = System.nanoTime()
-        val allocationStart = engine.globals["allocationStart"]!!.toInt()
-        val allocationPointer = engine.globals["allocationPointer"]!!.toInt()
+        val allocationStart = engine.globals["allocationStart"]!!.toLong()
+        val allocationPointer = engine.globals["allocationPointer"]!!.toLong()
         LOGGER.info("Base Memory: ($allocationStart) ${allocationStart.formatFileSize()}")
         LOGGER.info("Allocated ${(allocationPointer - allocationStart).formatFileSize()} during StaticInit")
         LOGGER.info("Executed ${engine.instructionCounter} instructions for StaticInit")

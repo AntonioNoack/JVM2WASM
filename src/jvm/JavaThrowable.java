@@ -6,8 +6,9 @@ import annotations.NoThrow;
 
 import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
-import static jvm.JavaLang.*;
+import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.ptrTo;
 import static utils.StaticFieldOffsets.*;
 
 public class JavaThrowable {
