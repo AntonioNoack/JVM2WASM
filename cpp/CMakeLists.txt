@@ -38,7 +38,7 @@ if (MSVC)
 endif()
 
 # Create the executable
-add_executable(JVM2CPP jvm2wasm-base.cpp jvm2wasm-funcTable.cpp
+add_executable(JVM2CPP jvm2wasm-base.cpp jvm2wasm-funcTable.cpp jvm2wasm-nativeLog.cpp
     jvm2wasm-part0.cpp jvm2wasm-part1.cpp jvm2wasm-part2.cpp jvm2wasm-part3.cpp jvm2wasm-part4.cpp
     jvm2wasm-part5.cpp jvm2wasm-part6.cpp jvm2wasm-part7.cpp jvm2wasm-part8.cpp jvm2wasm-part9.cpp
     jvm2wasm-part10.cpp jvm2wasm-part11.cpp jvm2wasm-part12.cpp jvm2wasm-part13.cpp jvm2wasm-part14.cpp

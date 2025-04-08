@@ -9,6 +9,7 @@ import jvm.JVMFlags.is32Bits
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
+import me.anno.utils.assertions.assertEquals
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import utils.*
@@ -100,6 +101,7 @@ fun wasm2cpp(
     }
     writeStructs()
     writeFuncTable(functions, functionTable)
+    writeNativeLogFunctions(imports)
     clock.stop("Writing FuncTable")
 }
 
@@ -387,6 +389,57 @@ fun writeFuncTable(functions: Collection<FunctionImpl>, functionTable: List<Stri
         e.printStackTrace()
     }
     cppFolder.getChild("jvm2wasm-funcTable.cpp")
+        .writeBytes(writer.values, 0, writer.size)
+    writer.clear()
+}
+
+fun writeNativeLogFunctions(imports: List<Import>) {
+    val prefix = "jvm_NativeLog_log_"
+    val suffix = "V"
+
+    writer.append("#include <string>\n")
+    writer.append("#include <iostream>\n")
+    writer.append("#include \"jvm2wasm-types.h\"\n\n")
+
+    writer.append("std::string strToCpp(i32 addr);\n\n")
+
+    for (i in imports.indices) {
+        val func = imports[i]
+        val name = func.funcName
+        if (!name.startsWith(prefix) || !name.endsWith(suffix)) continue
+
+        // extract params from name, so we can translate WASM directly
+        val paramsFromName =
+            name.substring(prefix.length, name.length - suffix.length)
+                .replace("Ljava_lang_String", "$")
+                .replace("Ljvm_Pointer", "I")
+
+        assertEquals(paramsFromName.length, func.params.size)
+
+        writer.append("void ").append(name).append("(")
+        for (j in func.params.indices) {
+            val param = func.params[j]
+            if (j > 0) writer.append(", ")
+            writer.append(param.wasmType).append(" arg").append(j)
+        }
+        writer.append(") {\n")
+        writer.append("  std::cout")
+
+        for (j in func.params.indices) {
+            val param = func.params[j]
+            writer.append(" << ")
+            if (paramsFromName[j] == '$') {
+                writer.append("strToCpp(arg").append(j).append(")")
+            } else {
+                writer.append("arg").append(j)
+            }
+        }
+
+        writer.append(" << std::endl;\n")
+        writer.append("}\n")
+    }
+
+    cppFolder.getChild("jvm2wasm-nativeLog.cpp")
         .writeBytes(writer.values, 0, writer.size)
     writer.clear()
 }
