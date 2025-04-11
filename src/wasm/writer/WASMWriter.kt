@@ -1,5 +1,6 @@
 package wasm.writer
 
+import jvm.JVMFlags
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNull
 import me.anno.utils.assertions.assertTrue
@@ -102,7 +103,7 @@ object WASMWriter {
 
         val memory = Memory(
             Limits(
-                false, false, false,
+                false, false, is64Bit = !JVMFlags.is32Bits,
                 memorySizeInBlocks.toLong(), 0L
             )
         )

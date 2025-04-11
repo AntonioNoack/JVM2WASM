@@ -321,7 +321,7 @@ public class JavaLang {
 
     @NoThrow
     @WASM(code = "global.get $stackTraceTable")
-    public static native int getStackTraceTablePtr();
+    public static native Pointer getStackTraceTablePtr();
 
     @NoThrow
     public static void resetStackPtr() {

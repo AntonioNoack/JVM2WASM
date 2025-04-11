@@ -6,6 +6,7 @@ import annotations.NoThrow;
 
 import static jvm.JVM32.readClassId;
 import static jvm.JVMShared.*;
+import static jvm.Pointer.ptrTo;
 
 public class MemDebug {
 
@@ -33,8 +34,8 @@ public class MemDebug {
     @Export
     @NoThrow
     @Alias(names = "r32")
-    public static int r32(Pointer addr) {
-        return read32(addr);
+    public static int r32(int addr) {
+        return read32(ptrTo(addr));
     }
 
     @Export
@@ -48,56 +49,56 @@ public class MemDebug {
     @NoThrow
     @Alias(names = "r16")
     public static int r16(int addr) {
-        return read16u(addr);
+        return read16u(ptrTo(addr));
     }
 
     @Export
     @NoThrow
     @Alias(names = "r8")
     public static int r8(int addr) {
-        return read8(addr);
+        return read8(ptrTo(addr));
     }
 
     @Export
     @NoThrow
     @Alias(names = "w64f")
     public static void w64f(int addr, double v) {
-        write64(addr, v);
+        write64(ptrTo(addr), v);
     }
 
     @Export
     @NoThrow
     @Alias(names = "w64")
     public static void w64(int addr, long v) {
-        write64(addr, v);
+        write64(ptrTo(addr), v);
     }
 
     @Export
     @NoThrow
     @Alias(names = "w32f")
     public static void w32f(int addr, float v) {
-        write32(addr, v);
+        write32(ptrTo(addr), v);
     }
 
     @Export
     @NoThrow
     @Alias(names = "w32")
     public static void w32(int addr, int v) {
-        write32(addr, v);
+        write32(ptrTo(addr), v);
     }
 
     @Export
     @NoThrow
     @Alias(names = "w16")
     public static void w16(int addr, short s) {
-        write16(addr, s);
+        write16(ptrTo(addr), s);
     }
 
     @Export
     @NoThrow
     @Alias(names = "w8")
     public static void w8(int addr, byte b) {
-        write8(addr, b);
+        write8(ptrTo(addr), b);
     }
 
 }

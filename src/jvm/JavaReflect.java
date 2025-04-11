@@ -17,6 +17,7 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflectMethod.Constructor_invoke;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.add;
 import static jvm.Pointer.getAddrS;
 import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
@@ -507,23 +508,23 @@ public class JavaReflect {
 
     @NoThrow
     @WASM(code = "global.get $resourceTable")
-    static native int getResourcePtr();
+    static native Pointer getResourcePtr();
 
     @Alias(names = "java_lang_ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream")
     public static InputStream ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream(ClassLoader cl, String name) {
         if (name == null) return null;
-        int ptr = getResourcePtr();
+        Pointer ptr = getResourcePtr();
         int length = read32(ptr);
         // todo if we have more than 16 resources, use a HashMap
-        ptr += 4;
-        int endPtr = ptr + (length << 3);
-        while (ptr < endPtr) {
-            String key = readPtrAtOffset(null, ptr);
+        ptr = add(ptr, 4);
+        Pointer endPtr = add(ptr, length << 3);
+        while (Pointer.unsignedLessThan(ptr, endPtr)) {
+            String key = readPtrAtOffset(ptr, 0);
             if (name.equals(key)) {
-                byte[] bytes = readPtrAtOffset(null, ptr + 4);
+                byte[] bytes = readPtrAtOffset(ptr, 4);
                 return new ByteArrayInputStream(bytes);
             }
-            ptr += 8;
+            ptr = add(ptr, 8);
         }
         return null;
     }

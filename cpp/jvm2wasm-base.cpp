@@ -20,18 +20,35 @@ size_t allocatedSize = 0;
 #include "jvm2wasm-types.h"
 #include "jvm2wasm-base.h"
 
-#ifdef NO_ERRORS
-#define ret32 i32
-#define ret64 i64
-#define roid void
-#define RET_VOID
-#define RET_NULL 0
+#ifdef IS32BITS
+    #define isz i32
+    #define usz u32
 #else
-#define ret32 i32i32
-#define ret64 i64i32
-#define roid i32
-#define RET_VOID 0
-#define RET_NO_ERR {}
+    #define isz i64
+    #define usz u64
+#endif
+
+#ifdef NO_ERRORS
+    #define ret32 i32
+    #define ret64 i64
+    #define retsz isz
+    #define roid void
+    #define RET_VOID
+    #define RET_NULL 0
+#else
+    #ifdef IS32BITS
+        #define ret32 i32i32
+        #define ret64 i64i32
+        #define retsz i32i32
+        #define roid i32
+    #else
+        #define ret32 i32i64
+        #define ret64 i64i64
+        #define retsz i64
+        #define roid i64
+    #endif
+    #define RET_VOID 0
+    #define RET_NO_ERR {}
 #endif
 
 // list imported functions:
@@ -41,8 +58,8 @@ i32 r32(i32);
 i64 r64(i32);
 void w16(i32,i32);
 void w32(i32,i32);
-i32 findClass(i32);
-roid runRunnable(i32);
+isz findClass(i32);
+roid runRunnable(isz);
 void parallelGC0();
 void parallelGC1();
 void parallelGC2();
@@ -51,8 +68,8 @@ i32 concurrentGC1();
 void initFunctionTable();
 void gc();
 
-ret32 java_lang_Class_getName_Ljava_lang_String(i32);
-ret32 createInstance(i32);
+retsz java_lang_Class_getName_Ljava_lang_String(isz);
+retsz createInstance(i32);
 roid engine_Engine_keyModState_IV(i32);
 roid engine_Engine_keyUp_IV(i32);
 roid engine_Engine_keyDown_IV(i32);
@@ -64,12 +81,12 @@ roid engine_Engine_mouseWheel_FFV(f32,f32);
 roid engine_Engine_charTyped_IIV(i32,i32);
 roid engine_Engine_focusState_ZV(i32);
 roid engine_Engine_minimizedState_ZV(i32);
-roid java_lang_Throwable_printStackTrace_V(i32);
+roid java_lang_Throwable_printStackTrace_V(isz);
 roid engine_Engine_update_IIFV(i32, i32, f32);
-roid new_java_lang_Throwable_V(i32);
-roid finishTexture(i32, i32, i32, i32);
-roid prepareTexture(i32);
-roid engine_Engine_main_Ljava_lang_StringV(i32);
+roid new_java_lang_Throwable_V(isz);
+roid finishTexture(isz, i32, i32, isz);
+roid prepareTexture(isz);
+roid engine_Engine_main_Ljava_lang_StringV(isz);
 roid init();
 
 // todo implement that variable and parameter names are kept as far as possible in C++ code
@@ -106,7 +123,7 @@ double mouseX = width * 0.5, mouseY = height * 0.5;
 
 #include <sstream>
 #include <iostream>
-std::string strToCpp(i32 addr) {
+std::string strToCpp(i64 addr) {
     if(!addr) return "null";
     i32 chars = r32(addr + objectOverhead + 4); // for hash
     i32 charLen = r32(chars + objectOverhead);
@@ -131,17 +148,17 @@ i32 isParallelGC() {
 }
 
 // imports
-void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(i32 runnable, i32 namePtr) {
+void engine_Engine_runAsyncImpl_Lkotlin_jvm_functions_Function0Ljava_lang_StringV(isz runnable, isz namePtr) {
     std::string name = strToCpp(namePtr);
     std::cerr << "Running async as sync: " << name << std::endl;
     if(name != "Saving main.config") runRunnable(runnable);
 }
-void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
-void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
-void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(i32, i32) { }
+void engine_WebRef2_readBytes_Ljava_lang_StringLjava_lang_ObjectV(isz, isz) { }
+void engine_WebRef2_readStream_Ljava_lang_StringLjava_lang_ObjectV(isz, isz) { }
+void engine_WebRef2_readText_Ljava_lang_StringLjava_lang_ObjectV(isz, isz) { }
 void java_lang_System_gc_V() { gcCtr = 1000000; }
 void jvm_gc_GarbageCollector_markJSReferences_V() { }
-void jvm_JVM32_debugArray_Ljava_lang_ObjectV(i32) { }
+void jvm_JVM32_debugArray_Ljava_lang_ObjectV(isz) { }
 
 std::vector<i32> callocStatistics;
 void jvm_JVMShared_trackCalloc_IV(i32 classId) {
@@ -225,7 +242,7 @@ void jvm_JavaLang_printFlush_ZV(i32 logNotErr) {
     }
 }
 
-void jvm_JavaLang_printString_Ljava_lang_StringZV(i32 line, i32 logNotErr) {
+void jvm_JavaLang_printString_Ljava_lang_StringZV(isz line, i32 logNotErr) {
     std::string str = strToCpp(line);
     if(logNotErr) {
         std::cout << str << std::endl;
@@ -236,9 +253,9 @@ void jvm_JavaLang_printString_Ljava_lang_StringZV(i32 line, i32 logNotErr) {
 }
 
 void jvm_LWJGLxGLFW_disableCursor_V() { }
-void jvm_LWJGLxOpenGL_texImage2DAny_IIIIIIIILjvm_PointerIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+void texImage2DAny(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, isz addr, i32 j) {
     // i=data, j=length in elements
-    glTexImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
+    glTexImage2D(a,b,c,d,e,f,g,h,((char*)memory + (usz)addr));
 }
 void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
     // std::cout << "glTexImage2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ", " << f << ", " << g << ", " << h << ")" << std::endl;
@@ -247,16 +264,16 @@ void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i3
     if(c == 0x8D70) c = 0x805B; // GL_RGBA32UI -> GL_RGBA16
     glTexImage2D(a,b,c,d,e,f,g,h,nullptr);
 }
-void jvm_LWJGLxOpenGL_texImage3DAny_IIIIIIIIILjvm_PointerIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j, i32 k) {
+void texImage3DAny(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, isz addr, i32 k) {
     // j=data, k=length in elements
-    glTexImage3D(a,b,c,d,e,f,g,h,i,((char*)memory + j));
+    glTexImage3D(a,b,c,d,e,f,g,h,i,((char*)memory + (usz)addr));
 }
 void jvm_LWJGLxOpenGL_texImage3DNullptr_IIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i) {
     glTexImage3D(a,b,c,d,e,f,g,h,i,nullptr);
 }
-void jvm_LWJGLxOpenGL_texSubImage2D_IIIIIIIILjvm_PointerIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, i32 j) {
+void texSubImage2D(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, isz addr, i32 j) {
     // i=data, j=length in elements
-    glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + i));
+    glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + (usz)addr));
 }
 f32 org_lwjgl_opengl_GL11C_glGetFloat_IF(i32 type) { float v = 0.0; glGetFloatv(type,&v); return v; }
 
@@ -269,18 +286,18 @@ void jvm_LWJGLxOpenGL_drawBuffersExec_V() {
 void jvm_LWJGLxOpenGL_drawBuffersPush_IV(i32 i) {
     drawBufferTmp.push_back(i);
 }
-void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32 shader, i32 index, i32 name) {
+void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32 shader, i32 index, isz name) {
     std::string name1 = strToCpp(name);
     glBindAttribLocation(shader, index, name1.c_str()); // is 0-terminated
 }
-void jvm_LWJGLxOpenGL_readPixelsF32_IIIIIILjvm_PointerIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
-    glReadnPixels(a,b,c,d,e,f,h<<2,(char*)memory+g);
+void readPixelsF32(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, isz addr, i32 h) {
+    glReadnPixels(a,b,c,d,e,f,h<<2,(char*)memory + (usz)addr);
 }
-void jvm_LWJGLxOpenGL_readPixelsU8_IIIIIILjvm_PointerIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
+void readPixelsU8(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, isz addr, i32 h) {
     // (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, void * data)
-    glReadnPixels(a,b,c,d,e,f,h,(char*)memory+g);
+    glReadnPixels(a,b,c,d,e,f,h,(char*)memory + (usz)addr);
 }
-void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(i32, i32) { }
+void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(isz, isz) { }
 void org_lwjgl_glfw_GLFW_glfwSetCursor_JJV(i64, i64) { }
 
 i32 org_lwjgl_opengl_GL15C_glGetQueryObjecti_III(i32 a, i32 b) { GLint r = 0; glGetQueryObjectiv(a,b,&r); return r; }
@@ -330,7 +347,7 @@ void org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV(i32 a, i32 b, i32 c, i
 void jvm_LWJGLxOpenGL_glGetTextureSubImageAny_IIIIIIIIIIIIV(
     i32 ptr, i32 level, i32 x, i32 y, i32 z, i32 w, i32 h, i32 d,
     i32 format, i32 type, i32 dataPtr, i32 dataLength) {
-    glGetTextureSubImage(ptr, level, x, y, z, w, h, d, format, type, (GLsizei) dataLength, (char*) memory + (u32)dataPtr);
+    glGetTextureSubImage(ptr, level, x, y, z, w, h, d, format, type, (GLsizei) dataLength, (char*) memory + (usz)dataPtr);
 }
 void org_lwjgl_opengl_GL46C_glGenerateMipmap_IV(i32 x) { glGenerateMipmap(x); }
 void org_lwjgl_opengl_GL46C_glLinkProgram_IV(i32 x) { glLinkProgram(x); }
@@ -351,48 +368,48 @@ void org_lwjgl_opengl_GL46C_glVertexAttrib1f_IFV(i32 x, f32 y) { glVertexAttrib1
 void org_lwjgl_opengl_GL46C_glVertexAttribDivisor_IIV(i32 x, i32 y) { glVertexAttribDivisor(x,y); }
 void org_lwjgl_opengl_GL46C_glVertexAttribPointer_IIIZIJV(i32 a, i32 b, i32 c, i32 d, i32 e, i64 f) { glVertexAttribPointer(a,b,c,d,e,(void*)f); }
 void org_lwjgl_opengl_GL46C_glViewport_IIIIV(i32 x, i32 y, i32 w, i32 h) { glViewport(x,y,w,h); }
-void org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV(i32, i32, i32) { /* todo */ } // GL_TEXTURE_BORDER_COLOR
+void org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV(i32 target, i32 key, isz buffer) { /* todo */ } // GL_TEXTURE_BORDER_COLOR
 void org_lwjgl_opengl_GL15C_glBeginQuery_IIV(i32 a, i32 b) { glBeginQuery(a,b); }
 void org_lwjgl_opengl_GL15C_glEndQuery_IV(i32 a) { glEndQuery(a); }
 void org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV(i32 a, i32 b, i32 c) { glBindBufferBase(a,b,c); }
 void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(i32 x) { GLuint xi = x; glDrawBuffers(1, &xi); }
 void org_lwjgl_opengl_GL40C_glDrawArraysIndirect_IJV(i32 x, i64 y) { glDrawArraysIndirect(x, (void*)y); }
 void org_lwjgl_opengl_GL40C_glDrawElementsIndirect_IIJV(i32 x, i32 y, i64 z) { glDrawElementsIndirect(x, y, (void*)z); }
-void jvm_LWJGLxOpenGL_bufferData8_ILjvm_PointerIIV(i32 buffer, i32 data, i32 length, i32 usage) {
-    glBufferData(buffer, (u32) length, (char*) memory + (u32)data, usage);
+void bufferData8(i32 buffer, isz data, i32 length, i32 usage) {
+    glBufferData(buffer, (usz) length, (char*) memory + (usz)data, usage);
 }
-void jvm_LWJGLxOpenGL_bufferData16_ILjvm_PointerIIV(i32 buffer, i32 data, i32 length, i32 usage) {
-    glBufferData(buffer, (u32) length<<1, (char*) memory + (u32)data, usage);
+void bufferData16(i32 buffer, isz data, i32 length, i32 usage) {
+    glBufferData(buffer, (usz) length<<1, (char*) memory + (usz)data, usage);
 }
-void jvm_LWJGLxOpenGL_bufferSubData8_IJLjvm_PointerIV(i32 buffer, i64 offset, i32 data, i32 length) {
-    glBufferSubData(buffer, offset, (u32) (length), (char*) memory + (u32)data);
+void bufferSubData8(i32 buffer, i64 offset, isz data, i32 length) {
+    glBufferSubData(buffer, offset, (usz) (length), (char*) memory + (usz)data);
 }
-void jvm_LWJGLxOpenGL_bufferSubData16_IJLjvm_PointerIV(i32 buffer, i64 offset, i32 data, i32 length) {
-    glBufferSubData(buffer, offset, (u32) (length << 1), (char*) memory + (u32)data);
+void bufferSubData16(i32 buffer, i64 offset, isz data, i32 length) {
+    glBufferSubData(buffer, offset, (usz) (length << 1), (char*) memory + (usz)data);
 }
-void jvm_LWJGLxOpenGL_glUniform1fv_ILjvm_PointerIV(i32 u, i32 addr, i32 count) {
-    glUniform1fv(u, count, (float*)((char*)memory+addr));
+void uniform1fv(i32 u, isz addr, i32 count) {
+    glUniform1fv(u, count, (float*)((char*)memory + (usz)addr));
 }// (GLint location, GLsizei count, const GLfloat * value)
-void jvm_LWJGLxOpenGL_glUniform4fv_ILjvm_PointerIV(i32 u, i32 addr, i32 count) {
-    glUniform4fv(u, count>>2, (float*)((char*)memory+addr)); // correct??
+void uniform4fv(i32 u, isz addr, i32 count) {
+    glUniform4fv(u, count>>2, (float*)((char*)memory + (usz)addr)); // correct??
 }
-void jvm_LWJGLxOpenGL_uniformMatrix2fv_IZLjvm_PointerIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (u32)data)); // correct???
+void uniformMatrix2fv(i32 u, i32 t, isz data, i32 len) {
+    glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (usz)data)); // correct???
 }
-void jvm_LWJGLxOpenGL_uniformMatrix3fv_IZLjvm_PointerIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix3fv(u,len/9,t,(float*)((char*) memory + (u32)data)); // correct???
+void uniformMatrix3fv(i32 u, i32 t, isz data, i32 len) {
+    glUniformMatrix3fv(u,len/9,t,(float*)((char*) memory + (usz)data)); // correct???
 }
-void jvm_LWJGLxOpenGL_uniformMatrix4x3fv_IZLjvm_PointerIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix4x3fv(u,len/12,t,(float*)((char*) memory + (u32)data));
+void uniformMatrix4x3fv(i32 u, i32 t, isz data, i32 len) {
+    glUniformMatrix4x3fv(u,len/12,t,(float*)((char*) memory + (usz)data));
 }
-void jvm_LWJGLxOpenGL_uniformMatrix4fv_IZLjvm_PointerIV(i32 u, i32 t, i32 data, i32 len) {
-    glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (u32)data));
+void uniformMatrix4fv(i32 u, i32 t, isz data, i32 len) {
+    glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (usz)data));
 }
 
-i32 engine_Engine_fillBaseURL_ACI(i32) { return 0; }
+i32 engine_Engine_fillBaseURL_ACI(isz buffer) { return 0; }
 
 roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(
-    i32 pathPtr, i32 texturePtr, i32 callback
+    isz pathPtr, isz texturePtr, isz callback
 ) {
     std::string path = "../src/" + strToCpp(pathPtr);
     std::cout << "Loading image '" << path << "'" << std::endl;
@@ -412,13 +429,13 @@ roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture
     return RET_VOID;
 }
 void engine_TextGen_genASCIITexture_Ljava_lang_StringFIIIIIIFV(
-    i32 fontName, f32 fontSize, i32 text0, i32 width, i32 height, i32 depth, i32 textColor, i32 backgroundColor, f32 y0
+    isz fontName, f32 fontSize, i32 text0, i32 width, i32 height, i32 depth, i32 textColor, i32 backgroundColor, f32 y0
 ) { }
 i32 engine_TextGen_genTexTexture_Ljava_lang_StringFLjava_lang_StringIII(
-    i32 fontName, f32 fontSize, i32 text, i32 widthLimit, i32 heightLimit
+    isz fontName, f32 fontSize, isz text, i32 widthLimit, i32 heightLimit
 ) { return 0; }
 i32 engine_TextGen_measureText1_Ljava_lang_StringFLjava_lang_StringI(
-    i32 fontName, f32 fontSize, i32 text
+    isz fontName, f32 fontSize, isz text
 ) { return 0; }
 
 i32 java_lang_Math_round_FI(f32 x) { return (i32) std::round(x); }
@@ -449,18 +466,18 @@ i64 java_lang_System_nanoTime_J() {
     auto time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(time_since_start).count();
     return time_in_ns;
 }
-i32 arrayLength1(i32 instance) {
+i32 arrayLength1(isz instance) {
     return r32(instance + objectOverhead);
 }
 
 void jvm_JavaThrowable_printStackTraceEnd_V() {}
-void jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV(i32 name, i32 message) {
+void jvm_JavaThrowable_printStackTraceHead_Ljava_lang_StringLjava_lang_StringV(isz name, isz message) {
     std::string msg = strToCpp(message);
     std::string name1 = strToCpp(name);
     std::cerr << name1 << ": " << msg << std::endl;
 }
 
-void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isError) {
+void printStackTraceLine(i32 depth, isz clazz, isz method, i32 line, bool isError) {
     std::string clazz1 = strToCpp(clazz);
     std::string name = strToCpp(method);
     if (isError) {
@@ -473,14 +490,14 @@ void printStackTraceLine(i32 depth, i32 clazz, i32 method, i32 line, bool isErro
 }
 
 i64 instrCtr = 0;
-void jvm_JVMShared_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, i32 clazz, i32 method, i32 line) {
+void jvm_JVMShared_printStackTraceLine_ILjava_lang_StringLjava_lang_StringIV(i32 depth, isz clazz, isz method, i32 line) {
     if (instrCtr++ > -1) {
         std::cout << instrCtr << ":";
         printStackTraceLine(depth, clazz, method, line, false);
     }
 }
 
-void jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV(i32 clazz, i32 method, i32 line) {
+void jvm_JavaThrowable_printStackTraceLine_Ljava_lang_StringLjava_lang_StringIV(isz clazz, isz method, i32 line) {
     printStackTraceLine(1, clazz, method, line, true);
 }
 
@@ -491,16 +508,16 @@ roid java_util_zip_Inflater_end_JV(i64) { return RET_VOID; }
 roid java_util_zip_Inflater_initIDs_V() { return RET_VOID; }
 roid static_java_util_concurrent_TimeUnit_V() { return RET_VOID; }
 roid static_java_util_GregorianCalendar_V() { return RET_VOID; }
-ret32 java_util_Date_normalize_Lsun_util_calendar_BaseCalendarXDate(i32) { return RET_NULL; }
-ret32 java_util_GregorianCalendar_clone_Ljava_lang_Object(i32) { return RET_NULL; }
-ret32 java_util_Date_getCalendarSystem_Lsun_util_calendar_BaseCalendarXDateLsun_util_calendar_BaseCalendar(i32) { return RET_NULL; }
-ret32 java_util_Date_getJulianCalendar_Lsun_util_calendar_BaseCalendar() { return RET_NULL; }
-roid new_java_util_GregorianCalendar_Ljava_util_TimeZoneLjvm_custom_LocaleV(i32,i32,i32) { return RET_VOID; }
-roid java_util_GregorianCalendar_setZoneShared_ZV(i32,i32) { return RET_VOID; }
-void engine_Engine_discoverGLNamesImpl_ACLjava_util_HashMapV(i32,i32) {} // not properly implementable in C++...
+retsz java_util_Date_normalize_Lsun_util_calendar_BaseCalendarXDate(isz) { return RET_NULL; }
+retsz java_util_GregorianCalendar_clone_Ljava_lang_Object(isz) { return RET_NULL; }
+retsz java_util_Date_getCalendarSystem_Lsun_util_calendar_BaseCalendarXDateLsun_util_calendar_BaseCalendar(isz) { return RET_NULL; }
+retsz java_util_Date_getJulianCalendar_Lsun_util_calendar_BaseCalendar() { return RET_NULL; }
+roid new_java_util_GregorianCalendar_Ljava_util_TimeZoneLjvm_custom_LocaleV(isz,isz,isz) { return RET_VOID; }
+roid java_util_GregorianCalendar_setZoneShared_ZV(isz,i32) { return RET_VOID; }
+void engine_Engine_discoverGLNamesImpl_ACLjava_util_HashMapV(isz buffer, isz dstMap) {} // not properly implementable in C++...
 
 std::vector<void*> garbageWhileGC;
-i32 jvm_JVM32_getAllocatedSize_Ljvm_Pointer() { return allocatedSize; }
+isz getAllocatedSize() { return allocatedSize; }
 i32 jvm_JVMShared_grow_IZ(i32 numExtraPages) {
     size_t extraSize = numExtraPages << 16;
     if(parallelGCStage == 1) {
@@ -520,7 +537,7 @@ i32 jvm_JVMShared_grow_IZ(i32 numExtraPages) {
 
 GLchar tmpLog[1024];
 
-i32 strToJVM(i32 data, std::string str) {
+i32 strToJVM(isz data, std::string str) {
     if(!data) return 0;
     i32 length = std::min(arrayLength1(data), (i32) str.size());
     for(i32 i=0;i<length;i++) {
@@ -529,18 +546,18 @@ i32 strToJVM(i32 data, std::string str) {
     return length;
 }
 
-i32 jvm_JavaLang_fillD2S_ACDI(i32 data, f64 v) {
+i32 jvm_JavaLang_fillD2S_ACDI(isz data, f64 v) {
     return strToJVM(data, std::to_string(v));
 }
 
-i32 jvm_JavaLang_fillD2S_ACDII(i32 data, f64 v, i32 digits) {
+i32 jvm_JavaLang_fillD2S_ACDII(isz data, f64 v, i32 digits) {
     if(!data) return 0;
     std::stringstream stream;
     stream << std::fixed << std::setprecision(digits) << v;
     return strToJVM(data, stream.str());
 }
 
-i32 jvm_JavaX_fillDate_ACI(i32 data) {
+i32 jvm_JavaX_fillDate_ACI(isz data) {
     // Get current time as a time_point
     auto now = std::chrono::system_clock::now();
     // Convert time_point to a time_t to get calendar time
@@ -563,7 +580,7 @@ f64 jvm_LWJGLxGLFW_getMouseX_D() { return mouseX; }
 f64 jvm_LWJGLxGLFW_getMouseY_D() { return mouseY; }
 i32 jvm_LWJGLxGLFW_getWindowHeight_I() { return height; }
 i32 jvm_LWJGLxGLFW_getWindowWidth_I() { return width; }
-i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32 data, i32 shader) {
+i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(isz data, i32 shader) {
     GLsizei len = 0;
     glGetProgramInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
     len = std::min(len, (GLsizei) arrayLength1(data));
@@ -573,7 +590,7 @@ i32 jvm_LWJGLxOpenGL_fillProgramInfoLog_ACII(i32 data, i32 shader) {
     return len;
 }
 
-i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32 data, i32 shader) { 
+i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(isz data, i32 shader) { 
     // (GLuint shader, GLsizei bufSize, GLsizei * length, GLchar * infoLog
     GLsizei len = 0;
     glGetShaderInfoLog(shader, sizeof(tmpLog)/sizeof(GLchar), &len, tmpLog);
@@ -585,7 +602,7 @@ i32 jvm_LWJGLxOpenGL_fillShaderInfoLog_ACII(i32 data, i32 shader) {
 }
 
 i32 jvm_LWJGLxOpenGL_glGenTexture_I() { GLuint result = 0; glGenTextures(1, &result); return result; }
-i32 jvm_LWJGLxOpenGL_glGetUniformLocationString_ILjava_lang_StringI(i32 a, i32 b) { 
+i32 jvm_LWJGLxOpenGL_glGetUniformLocationString_ILjava_lang_StringI(i32 a, isz b) { 
     std::string name = strToCpp(b);
     return glGetUniformLocation(a, name.c_str());
 }
@@ -603,8 +620,8 @@ void org_lwjgl_opengl_GL46C_glEndQuery_IV(i32 x) { glEndQuery(x); }
 void org_lwjgl_opengl_GL46C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glFramebufferTextureLayer(a,b,c,d,e); }
 void org_lwjgl_opengl_GL46C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL46C_glRenderbufferStorageMultisample_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glRenderbufferStorageMultisample(a,b,c,d,e); }
-void org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV(i32 a, i32 b) {
-    std::string code = strToCpp(b);
+void org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV(i32 a, isz code0) {
+    std::string code = strToCpp(code0);
     // (GLuint shader, GLsizei count, const GLchar *const* string, const GLint * length);
     GLchar* codePtr = (GLchar*) code.c_str();
     GLint length = code.size();
@@ -624,7 +641,7 @@ void org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV(i32 a, i32 b, i32 c
 void org_lwjgl_opengl_GL42C_glMemoryBarrier_IV(i32 a) { glMemoryBarrier(a); }
 void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e) { glBlendFuncSeparatei(a,b,c,d,e); }
 void org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV(i32 a, i32 b) { glVertexAttribI1i(a,b); }
-void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(i32 a, i32 b, i32 c, i32 d, i32 data) {
+void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(i32 a, i32 b, i32 c, i32 d, isz data) {
     // (GLenum target, GLint level, GLenum format, GLenum type, void * pixels)
     glGetTexImage(a,b,c,d,(void*)((char*)memory+data));
 }
@@ -639,11 +656,11 @@ i32 org_lwjgl_opengl_GL46C_glGenRenderbuffers_I() { GLuint result = 0; glGenRend
 i32 org_lwjgl_opengl_GL46C_glGetError_I() { return glGetError(); }
 i32 org_lwjgl_opengl_GL46C_glGetProgrami_III(i32 a, i32 b) { GLint result = 0; glGetProgramiv(a,b,&result); return result; }
 i32 org_lwjgl_opengl_GL46C_glGetInteger_II(i32 a) { GLint result = 0; glGetIntegerv(a, &result); return result; }
-void jvm_LWJGLxOpenGL_objectLabel_IILjava_lang_StringV(i32 type, i32 ptr, i32 name) {
+void jvm_LWJGLxOpenGL_objectLabel_IILjava_lang_StringV(i32 type, i32 ptr, isz name) {
     std::string name1 = strToCpp(name);
     glObjectLabel(type, ptr, name1.size(), name1.c_str());
 }
-void jvm_LWJGLxOpenGL_glPushDebugGroup_IILjava_lang_StringV(i32 a, i32 b, i32 name) {
+void jvm_LWJGLxOpenGL_glPushDebugGroup_IILjava_lang_StringV(i32 a, i32 b, isz name) {
     // (GLenum source, GLuint id, GLsizei length, const GLchar * message)
     std::string name1 = strToCpp(name);
     glPushDebugGroup(a, b, name1.size(), name1.c_str());
@@ -651,7 +668,7 @@ void jvm_LWJGLxOpenGL_glPushDebugGroup_IILjava_lang_StringV(i32 a, i32 b, i32 na
 void org_lwjgl_opengl_GL46C_glPopDebugGroup_V() {
     glPopDebugGroup();
 }
-void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, i32 dstArray) {
+void org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV(i32 type, i32 index, isz dstArray) {
     if(arrayLength1(dstArray) < 1) return;
     GLint dst = 0;
     glGetIntegeri_v(type, index, &dst);
@@ -666,45 +683,25 @@ roid static_java_lang_reflect_AccessibleObject_V() { }
 roid static_java_util_Date_V() { }
 roid static_java_util_Formatter_V() { }
 
-roid java_io_BufferedInputStream_fill_V(i32) { return RET_VOID; }
-roid java_io_RandomAccessFile_close0_V(i32) { return RET_VOID; }
-roid java_io_RandomAccessFile_open0_Ljava_lang_StringIV(i32, i32, i32) { return RET_VOID; }
-roid java_io_RandomAccessFile_seek0_JV(i32, i64) { return RET_VOID; }
-roid java_io_RandomAccessFile_writeBytes_ABIIV(i32, i32, i32, i32) { return RET_VOID; }
-ret32 java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(i32, i32) { return RET_NULL; }
-ret32 java_lang_reflect_Field_acquireFieldAccessor_ZLsun_reflect_FieldAccessor(i32, i32) { return RET_NULL; }
-ret32 java_text_DateFormatSymbols_getProviderInstance_Ljava_util_LocaleLjava_text_DateFormatSymbols(i32) { return RET_NULL; }
-ret32 java_text_DecimalFormatSymbols_getInstance_Ljava_util_LocaleLjava_text_DecimalFormatSymbols(i32) { return RET_NULL; }
-ret32 java_text_NumberFormat_getInstance_Ljava_util_LocaleILjava_text_NumberFormat(i32, i32) { return RET_NULL; }
-ret32 java_util_Date_clone_Ljava_lang_Object(i32) { return RET_NULL; }
-ret64 java_util_Date_getMillisOf_Ljava_util_DateJ(i32) { return RET_NULL; }
-ret64 java_util_Date_getTimeImpl_J(i32) { return RET_NULL; }
-ret32 java_util_Date_toString_Ljava_lang_String(i32) { return RET_NULL; }
+roid java_io_BufferedInputStream_fill_V(isz) { return RET_VOID; }
+retsz java_lang_Throwable_getStackTraceElement_ILjava_lang_StackTraceElement(isz, i32) { return RET_NULL; }
+retsz java_util_Date_clone_Ljava_lang_Object(isz) { return RET_NULL; }
+ret64 java_util_Date_getMillisOf_Ljava_util_DateJ(isz) { return RET_NULL; }
+ret64 java_util_Date_getTimeImpl_J(isz) { return RET_NULL; }
+retsz java_util_Date_toString_Ljava_lang_String(isz) { return RET_NULL; }
 ret32 java_util_Formatter_parse_Ljava_lang_StringALjava_util_FormatterXFormatString(i32, i32) { return RET_NULL; }
-ret32 java_util_Properties_isEmpty_Z(i32) { return RET_NULL; }
-ret32 java_util_zip_Deflater_deflateBytes_JABIIII(i32, i64, i32, i32, i32, i32) { return RET_NULL; }
-ret64 java_util_zip_Deflater_init_IIZJ(i32, i32, i32) { return RET_NULL; }
-ret32 java_util_zip_Inflater_inflateBytes_JABIII(i32, i64, i32, i32, i32) { return RET_NULL; }
-ret64 java_util_zip_Inflater_init_ZJ(i32) { return RET_NULL; }
+ret32 java_util_Properties_isEmpty_Z(isz) { return RET_NULL; }
 ret32 kotlin_text_Regex_matches_Ljava_lang_CharSequenceZ(i32, i32) { return RET_NULL; }
 ret32 kotlin_text_Regex_toString_Ljava_lang_String(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX1_Lme_anno_gpu_OSWindowJIJVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX2_Lme_anno_gpu_OSWindowJIIVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX3_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX4_Lme_anno_gpu_OSWindowJIIIVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX5_Lme_anno_gpu_OSWindowJDDVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret64 me_anno_input_Input_initForGLFWXlambdaX6_Lme_anno_gpu_OSWindowJIIIIVxd26ac3d_address_J(i32) { return RET_NULL; }
-ret32 me_anno_ui_editor_stacked_StackPanel_getValue_Ljava_lang_Object(i32) { return RET_NULL; }
-ret32 me_anno_ui_editor_stacked_StackPanel_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return RET_NULL; }
-ret32 me_anno_ui_input_NumberInput_getValue_Ljava_lang_Object(i32) { return RET_NULL; }
-ret32 me_anno_ui_input_NumberInput_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(i32, i32, i32, i32) { return RET_NULL; }
+retsz me_anno_ui_editor_stacked_StackPanel_getValue_Ljava_lang_Object(isz) { return RET_NULL; }
+retsz me_anno_ui_editor_stacked_StackPanel_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(isz, isz, i32, i32) { return RET_NULL; }
+retsz me_anno_ui_input_NumberInput_getValue_Ljava_lang_Object(isz) { return RET_NULL; }
+retsz me_anno_ui_input_NumberInput_setValue_Ljava_lang_ObjectIZLme_anno_ui_Panel(isz, isz, i32, i32) { return RET_NULL; }
 ret64 me_anno_gpu_WindowManagement_runRenderLoop0XlambdaX5_IIIIIJJVxv1311c2a2_address_J(i32) { return RET_NULL; }
-ret32 java_util_TreeMapXPrivateEntryIterator_next_Ljava_lang_Object(i32) { return RET_NULL; }
-ret32 java_util_WeakHashMapXHashIterator_next_Ljava_lang_Object(i32) { return RET_NULL; }
-ret32 kotlin_collections_CharIterator_hasNext_Z(i32) { return RET_NULL; }
-roid me_anno_io_base_BaseReader_readAllInList_V(i32) { return RET_VOID; }
-ret32 kotlin_jvm_internal_MutablePropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return RET_NULL; }
-ret32 kotlin_jvm_internal_PropertyReference_getGetter_Lkotlin_reflect_KPropertyXGetter(i32) { return RET_NULL; }
+retsz java_util_TreeMapXPrivateEntryIterator_next_Ljava_lang_Object(isz) { return RET_NULL; }
+retsz java_util_WeakHashMapXHashIterator_next_Ljava_lang_Object(isz) { return RET_NULL; }
+ret32 kotlin_collections_CharIterator_hasNext_Z(isz) { return RET_NULL; }
+roid me_anno_io_base_BaseReader_readAllInList_V(isz) { return RET_VOID; }
 f64 jvm_JavaUtil_seedUniquifier_D() {
     return java_lang_System_currentTimeMillis_J();
 }
@@ -713,7 +710,7 @@ i32 engine_Engine_runsInBrowser_Z(){
 }
 
 GLFWwindow* window = nullptr;
-void jvm_LWJGLxGLFW_setTitle_Ljava_lang_StringV(i32 str) {
+void jvm_LWJGLxGLFW_setTitle_Ljava_lang_StringV(isz str) {
     std::string string = strToCpp(str);
     glfwSetWindowTitle(window, string.c_str());
 }

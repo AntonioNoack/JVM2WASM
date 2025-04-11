@@ -13,12 +13,15 @@ window.inited = false
 
 try {
 
-    var memory = window.memory = new WebAssembly.Memory({
-        initial: autoJS.initialMemorySize,
-        // maximum: 100
-    });
-
     window.is32Bits = autoJS.is32Bits;
+
+    var memory = window.memory = new WebAssembly.Memory(is32Bits ? {
+        initial: autoJS.initialMemorySize,
+    } : {
+        initial: BigInt(autoJS.initialMemorySize),
+        maximum: BigInt(1000),
+        memory64: true
+    });
 
     var imports = {
         jvm: { },

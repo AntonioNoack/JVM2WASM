@@ -2,6 +2,7 @@ package jvm;
 
 import annotations.*;
 import jvm.lang.JavaLangAccessImpl;
+import org.jetbrains.annotations.Nullable;
 import sun.misc.SharedSecrets;
 
 import java.io.PrintStream;
@@ -12,8 +13,7 @@ import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMValues.emptyArray;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
-import static jvm.Pointer.getAddrS;
-import static jvm.Pointer.ptrTo;
+import static jvm.Pointer.*;
 import static jvm.ThrowJS.throwJs;
 import static utils.StaticClassIndices.*;
 
@@ -31,16 +31,16 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "global.get $inheritanceTable")
-    public static native int inheritanceTable();
+    public static native Pointer inheritanceTable();
 
     @NoThrow
     @WASM(code = "global.get $staticTable")
-    public static native int staticInstancesOffset();
+    public static native Pointer staticInstancesOffset();
 
     @NoThrow
     @Alias(names = "findStatic")
     public static int findStatic(int classId, int offset) {
-        return read32(staticInstancesOffset() + (classId << 2)) + offset;
+        return read32(add(staticInstancesOffset(), classId << 2)) + offset;
     }
 
     @NoThrow
@@ -141,7 +141,7 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "global.get $classInstanceTable")
-    public static native int getClassInstanceTable();
+    public static native Pointer getClassInstanceTable();
 
     static void failCastCheck(Object instance, int classId) {
         Class<Object> isClass = classIdToInstance(readClassId(instance));
@@ -153,7 +153,7 @@ public class JVMShared {
     @NoThrow
     @Alias(names = "stackPop")
     public static void stackPop() {
-        stackPopImpl();
+        setStackPtr(add(getStackPtr(), 4));
     }
 
     @NoThrow
@@ -163,29 +163,25 @@ public class JVMShared {
     }
 
     @NoThrow
-    public static int getStackDepth(int stackPointer) {
-        return (getStackStart() - stackPointer) >> 2;
+    public static int getStackDepth(Pointer stackPointer) {
+        return (int) (diff(getStackStart(), stackPointer) >> 2);
     }
 
     @NoThrow
-    @WASM(code = "global.get $stackPointer i32.const 4 i32.add global.set $stackPointer")
-    public static native void stackPopImpl();
-
-    @NoThrow
     @WASM(code = "global.get $stackPointer")
-    public static native int getStackPtr();
+    public static native Pointer getStackPtr();
 
     @NoThrow
     @WASM(code = "global.get $stackPointerStart")
-    public static native int getStackStart();
+    public static native Pointer getStackStart();
 
     @NoThrow
     @WASM(code = "global.get $stackEndPointer")
-    public static native int getStackLimit();
+    public static native Pointer getStackLimit();
 
     @NoThrow
     @WASM(code = "global.set $stackPointer")
-    public static native void setStackPtr(int addr);
+    public static native void setStackPtr(Pointer addr);
 
     private static boolean canWarnStackOverflow = true;
 
@@ -193,18 +189,18 @@ public class JVMShared {
     @Alias(names = "stackPush")
     public static void stackPush(int idx) {
         if (false) printStackTraceLine(idx);
-        int stackPointer = getStackPtr() - 4;
-        int limit = getStackLimit();
-        if (unsignedGreaterThanEqual(stackPointer, limit)) {
+        Pointer stackPointer = sub(getStackPtr(), 4);
+        Pointer limit = getStackLimit();
+        if (Pointer.unsignedGreaterThanEqual(stackPointer, limit)) {
             write32(stackPointer, idx);
-        } else if (stackPointer == limit - 4) {
+        } else if (stackPointer == sub(limit, 4)) {
             // stack overflow
             // we can do different things here -> let's just keep running;
             // just the stack is no longer tracked :)
             if (canWarnStackOverflow) {
                 canWarnStackOverflow = false;
                 log("Warning: Exited stack space, meaning",
-                        (getStackStart() - getStackLimit()) >> 2, " recursive calls");
+                        (int) (diff(getStackStart(), getStackLimit()) >> 2), " recursive calls");
             }
         }
         setStackPtr(stackPointer);
@@ -247,56 +243,6 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "i64.store")
-    @Deprecated
-    public static native void write64(int addr, long value);
-
-    @NoThrow
-    @WASM(code = "f64.store")
-    @Deprecated
-    public static native void write64(int addr, double value);
-
-    @NoThrow
-    @WASM(code = "i32.store")
-    @Deprecated
-    public static native void write32(int addr, int value);
-
-    @NoThrow
-    @WASM(code = "f32.store")
-    @Deprecated
-    public static native void write32(int addr, float value);
-
-    @NoThrow
-    @WASM(code = "i32.store16")
-    @Deprecated
-    public static native void write16(int addr, short value);
-
-    @NoThrow
-    @WASM(code = "i32.store16")
-    @Deprecated
-    public static native void write16(int addr, char value);
-
-    @NoThrow
-    @WASM(code = "i32.store8")
-    @Deprecated
-    public static native void write8(int addr, byte value);
-
-    @NoThrow
-    @WASM(code = "i32.load")
-    @Deprecated
-    public static native int read32(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load16_u")
-    @Deprecated
-    public static native char read16u(int addr);
-
-    @NoThrow
-    @WASM(code = "i32.load8_s")
-    @Deprecated
-    public static native byte read8(int addr);
-
-    @NoThrow
-    @WASM(code = "i64.store")
     public static native void write64(Pointer addr, long value);
 
     @NoThrow
@@ -330,6 +276,10 @@ public class JVMShared {
     @NoThrow
     @WASM(code = "i32.load")
     public static native int read32(Pointer addr);
+
+    public static Pointer read32Ptr(Pointer addr) {
+        return ptrTo(read32(addr));
+    }
 
     @NoThrow
     @WASM(code = "f64.load")
@@ -396,12 +346,12 @@ public class JVMShared {
 
     @NoThrow
     @WASM(code = "global.get $staticInitTable")
-    public static native int getStaticInitTable();
+    public static native Pointer getStaticInitTable();
 
     @Alias(names = "wasStaticInited")
     public static boolean wasStaticInited(int index) {
         validateClassId(index);
-        int address = getStaticInitTable() + index;
+        Pointer address = add(getStaticInitTable(), index);
         boolean answer = read8(address) != 0;
         write8(address, (byte) 1);
         return answer;
@@ -435,24 +385,25 @@ public class JVMShared {
 
     @NoThrow
     public static int getSuperClassId(int classId) {
-        int tableAddress = getInheritanceTableEntry(classId);
+        Pointer tableAddress = getInheritanceTableEntry(classId);
         return getSuperClassIdFromInheritanceTableEntry(tableAddress);
     }
 
     @NoThrow
     public static int getInstanceSizeNonArray(int classId) {
         // look up class table for size
-        int tableAddress = getInheritanceTableEntry(classId);
-        return read32(tableAddress + 4);
+        Pointer tableAddress = getInheritanceTableEntry(classId);
+        return read32(add(tableAddress, 4));
     }
 
     @NoThrow
-    static int getInheritanceTableEntry(int classId) {
-        return read32(inheritanceTable() + (classId << 2));
+    @Nullable
+    static Pointer getInheritanceTableEntry(int classId) {
+        return read32Ptr(add(inheritanceTable(), classId << 2));
     }
 
     @NoThrow
-    private static int getSuperClassIdFromInheritanceTableEntry(int tableAddress) {
+    private static int getSuperClassIdFromInheritanceTableEntry(Pointer tableAddress) {
         return read32(tableAddress);
     }
 
@@ -462,7 +413,7 @@ public class JVMShared {
             if (childClassIdx == parentClassIdx) return true;
             // find super classes in table
             validateClassId(childClassIdx);
-            int tableAddress = getInheritanceTableEntry(childClassIdx);
+            Pointer tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
             if (childClassIdx == 0) return false;
             // check for interfaces
@@ -476,7 +427,7 @@ public class JVMShared {
         while (true) {
             if (childClassIdx == parentClassIdx) return true;
             validateClassId(childClassIdx);
-            int tableAddress = getInheritanceTableEntry(childClassIdx);
+            Pointer tableAddress = getInheritanceTableEntry(childClassIdx);
             // we can return here if childClassIdx = 0, because java/lang/Object has no interfaces
             if (childClassIdx == 0) return false;
             childClassIdx = read32(tableAddress); // switch to parent class
@@ -484,12 +435,12 @@ public class JVMShared {
     }
 
     @NoThrow
-    public static boolean isInInterfaceTable(int tableAddress, int interfaceClassIdx) {
+    public static boolean isInInterfaceTable(Pointer tableAddress, int interfaceClassIdx) {
         // handle interfaces
-        tableAddress += 8; // skip over super class and instance size
+        tableAddress = add(tableAddress, 8); // skip over super class and instance size
         int length = read32(tableAddress);
         for (int i = 0; i < length; i++) {
-            tableAddress += 4; // skip to next entry
+            tableAddress = add(tableAddress, 4); // skip to next entry
             if (read32(tableAddress) == interfaceClassIdx) return true;
         }
         return false;
@@ -506,22 +457,22 @@ public class JVMShared {
     public static int resolveInterfaceByClass(int classId, int methodId) {
         // log("resolveInterfaceByClass", classId, methodId);
         validateClassId(classId);
-        int tablePtr = getInheritanceTableEntry(classId);
+        Pointer tablePtr = getInheritanceTableEntry(classId);
         // log("tablePtr", tablePtr);
-        if (tablePtr == 0) {
+        if (tablePtr == null) {
             log("No class table entry was found!", classId);
             log("method:", methodId);
             throwJs("No class table entry was found!");
         }
-        int numInterfaces = read32(tablePtr + 8);
+        int numInterfaces = read32(add(tablePtr, 8));
         /*log("#interfaces:", numInterfaces);
         for (int i = 0; i < numInterfaces; i++) {
             log("interface[i]:", read32(tablePtr + 12 + i * 4));
         }*/
-        tablePtr += 12 + (numInterfaces << 2); // 12 for super class + instance size + numInterfaces
+        tablePtr = add(tablePtr, 12 + (numInterfaces << 2)); // 12 for super class + instance size + numInterfaces
 
         int tableLength = read32(tablePtr);
-        tablePtr += 4; // table length
+        tablePtr = add(tablePtr, 4); // table length
         /*log("#interfaceMethods:", tableLength);
         for (int i = 0; i < tableLength; i++) {
             log("interfaceMethod[i]:", read32(tablePtr + i * 8), read32(tablePtr + i * 8 + 4));
@@ -542,24 +493,24 @@ public class JVMShared {
         return id;
     }
 
-    static void reportNotFound(int clazz, int methodId, int tableLength, int tablePtr) {
+    static void reportNotFound(int clazz, int methodId, int tableLength, Pointer tablePtr) {
         // return -1 - min
         log("Method could not be found", clazz);
         log("  id, length:", methodId, tableLength);
         for (int i = 0; i < tableLength; i++) {
-            int addr = tablePtr + (i << 3);
-            log("  ", read32(addr), read32(addr + 4));
+            Pointer addr = add(tablePtr, i << 3);
+            log("  ", read32(addr), read32(add(addr, 4)));
         }
         throwJs("Method could not be found");
     }
 
-    private static int searchInterfaceBinary(int min, int max, int methodId, int tablePtr) {
+    private static int searchInterfaceBinary(int min, int max, int methodId, Pointer tablePtr) {
         while (max >= min) {
             int mid = (min + max) >> 1;
-            int addr = tablePtr + (mid << 3);
+            Pointer addr = add(tablePtr, mid << 3);
             int cmp = read32(addr) - methodId;
             if (cmp == 0) {
-                return read32(addr + 4);
+                return read32(add(addr, 4));
             }
             if (cmp < 0) {
                 // search right
@@ -572,18 +523,17 @@ public class JVMShared {
         return -1;
     }
 
-    private static int searchInterfaceLinear(int min, int max, int methodId, int tablePtr) {
-        max = (max << 3) + tablePtr;
-        min = (min << 3) + tablePtr;
-        while (max >= min) {
+    private static int searchInterfaceLinear(int minI, int maxI, int methodId, Pointer tablePtr) {
+        Pointer max = add(tablePtr, maxI << 3);
+        Pointer min = add(tablePtr, minI << 3);
+        while (Pointer.unsignedGreaterThanEqual(max, min)) {
             if (read32(min) == methodId) {
-                return read32(min + 4);
+                return read32(add(min, 4));
             }
-            min += 8;
+            min = add(min, 8);
         }
         return -1;
     }
-
 
     @NoThrow
     @Alias(names = "resolveInterface")
@@ -627,30 +577,22 @@ public class JVMShared {
     }
 
     @NoThrow
-    @WASM(code = "" +
-            "  local.get 0 i32.const 2 i32.shl\n" + // clazz << 2
-            "  global.get $resolveIndirectTable i32.add i32.load\n" + // memory[resolveIndirectTable + clazz << 2]
-            "  local.get 1 i32.add i32.load") // memory[methodPtr + memory[resolveIndirectTable + clazz << 2]]
-    private static native int resolveIndirectByClassUnsafe(int classId, int methodPtr);
+    @WASM(code = "global.get $resolveIndirectTable")
+    private static native Pointer getResolveIndirectTable();
 
     @NoThrow
     public static int resolveIndirectByClass(int classId, int methodPtr) {
-        // unsafe memory -> from ~8ms/frame to ~6.2ms/frame
         // log("resolveIndirectByClass", classId, methodPtr);
-        int x = resolveIndirectByClassUnsafe(classId, methodPtr);
-        if (x < 0) {
+        Pointer tablePtr = add(getResolveIndirectTable(), classId << 2);
+        Pointer table = read32Ptr(tablePtr);
+        int resolvedIndex = read32(add(table, methodPtr));
+        if (resolvedIndex < 0) {
             Class<Object> class1 = classIdToInstance(classId);
             log("resolveIndirectByClass", class1.getName());
-            throwJs("classIndex, methodPtr, resolved:", classId, methodPtr, x);
+            throwJs("classIndex, methodPtr, resolved:", classId, methodPtr, resolvedIndex);
         }
-        return x;
+        return resolvedIndex;
     }
-
-    @NoThrow
-    public static int getDynamicTableSize(int classIdx) {
-        return resolveIndirectByClass(classIdx, 0);
-    }
-
 
     // instance, class -> instance, error
     @Alias(names = "checkCast")
@@ -757,12 +699,12 @@ public class JVMShared {
 
     @NoThrow
     static void printStackTraceLine(int index) {
-        int lookupBasePtr = getStackTraceTablePtr();
-        if (lookupBasePtr <= 0) return;
-        int throwableLookup = lookupBasePtr + index * 12;
-        String className = ptrTo(read32(throwableLookup));
-        String methodName = ptrTo(read32(throwableLookup + 4));
-        int line = read32(throwableLookup + 8);
+        Pointer lookupBasePtr = getStackTraceTablePtr();
+        if (lookupBasePtr == null) return;
+        Pointer throwableLookup = add(lookupBasePtr, index * 12);
+        String className = unsafeCast(read32Ptr(throwableLookup));
+        String methodName = unsafeCast(read32Ptr(add(throwableLookup, 4)));
+        int line = read32(add(throwableLookup, 8));
         printStackTraceLine(getStackDepth(), className, methodName, line);
     }
 
@@ -778,12 +720,7 @@ public class JVMShared {
     @NoThrow
     @Alias(names = "findClass")
     public static Class<Object> classIdToInstance(int classId) {
-        return ptrTo(classIdToInstancePtr(classId));
-    }
-
-    @NoThrow
-    public static int classIdToInstancePtr(int classId) {
-        return classId * getClassSize() + getClassInstanceTable();
+        return unsafeCast(add(getClassInstanceTable(), classId * getClassSize()));
     }
 
     @Alias(names = "createInstance")

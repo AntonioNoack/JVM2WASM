@@ -1,5 +1,6 @@
 package jvm.custom;
 
+@SuppressWarnings("unused")
 public class Deflater {
     int deflate(byte[] bytes, int i0, int i1) {
         return 0;

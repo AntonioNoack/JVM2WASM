@@ -172,19 +172,19 @@ object GeneratorIndex {
         }
     }
 
-    fun getClassIndexOrNull(name: String): Int? {
+    fun getClassIdOrNull(name: String): Int? {
         if ('.' in name) throw IllegalArgumentException(name)
         if (name in classIndex) return classIndex[name]!!
         if ("[]" in name) throw IllegalArgumentException(name)
         return if (!name.startsWith("[")) classIndex[name] else classIndex["[]"]!!
     }
 
-    fun getClassIndexOrParents(name: String): Int {
+    fun getClassIdOrParents(name: String): Int {
         if ('.' in name) throw IllegalArgumentException(name)
         if (name in classIndex) return classIndex[name]!!
         if ("[]" in name) throw IllegalArgumentException(name)
         return if (!name.startsWith("[")) {
-            if (lockClasses) getClassIndexOrParents(
+            if (lockClasses) getClassIdOrParents(
                 hIndex.superClass[name]
                     ?: "java/lang/Object"
             )
@@ -412,7 +412,7 @@ object GeneratorIndex {
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {
         assertTrue(!descriptor.endsWith(';'), descriptor)
         // best sort all fields, and then call this function for all cases, so we get aligned accesses :)
-        if (lockClasses && getClassIndexOrNull(clazz) == null) return null
+        if (lockClasses && getClassIdOrNull(clazz) == null) return null
         val fieldOffsets = getFieldOffsets(clazz, static)
         return if (lockFields) fieldOffsets.getOffset(name) else {
             fieldOffsets.getOrPut(name) {

@@ -635,9 +635,9 @@ private fun defineGlobalsForValidator() {
     defineGlobal("inheritanceTable", ptrTypeI) // class table
     defineGlobal("staticTable", ptrTypeI) // static table
     defineGlobal("resolveIndirectTable", ptrTypeI)
-    defineGlobal("numClasses", ptrTypeI)
+    defineGlobal("numClasses", WASMType.I32)
+    defineGlobal("classSize", WASMType.I32)
     defineGlobal("classInstanceTable", ptrTypeI)
-    defineGlobal("classSize", ptrTypeI)
     defineGlobal("staticInitTable", ptrTypeI)
     defineGlobal("stackTraceTable", ptrTypeI)
     defineGlobal("resourceTable", ptrTypeI)
@@ -656,9 +656,9 @@ private fun defineGlobals(classTableStart: Int, numClasses: Int, ptr0: Int): Int
     defineGlobal("inheritanceTable", ptrTypeI, classTableStart) // class table
     defineGlobal("staticTable", ptrTypeI, staticFieldOffsetsPtr) // static table
     defineGlobal("resolveIndirectTable", ptrTypeI, resolveIndirectTablePtr)
-    defineGlobal("numClasses", ptrTypeI, numClasses)
+    defineGlobal("numClasses", WASMType.I32, numClasses)
+    defineGlobal("classSize", WASMType.I32, gIndex.getInstanceSize("java/lang/Class"))
     defineGlobal("classInstanceTable", ptrTypeI, classInstanceTablePtr)
-    defineGlobal("classSize", ptrTypeI, gIndex.getInstanceSize("java/lang/Class"))
     defineGlobal("staticInitTable", ptrTypeI, staticInitFlagsPtr)
     defineGlobal("stackTraceTable", ptrTypeI, stackTraceTablePtr)
     defineGlobal("resourceTable", ptrTypeI, resourceTablePtr)

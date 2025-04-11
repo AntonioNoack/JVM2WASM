@@ -44,7 +44,8 @@ public class GCGapFinder {
         // WeakRef-references need to be deleted in ordinary and parallel GC
 
         // jump to next entry; zero iterations in most cases
-        while (nextWeakRefInstance != null && unsignedLessThanI(instance, nextWeakRefInstance)) {
+        while (nextWeakRefInstance != null &&
+                unsignedLessThan(castToPtr(instance), castToPtr(nextWeakRefInstance))) {
             nextWeakRefInstance = nextWeakRef.get(nextWeakRefIndex++);
         }
 

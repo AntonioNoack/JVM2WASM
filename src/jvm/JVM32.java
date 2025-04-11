@@ -65,6 +65,7 @@ public class JVM32 {
 
     // @WASM(code = "memory.size i32.const 16 i32.shl")
     @NoThrow
+    @Alias(names = "getAllocatedSize")
     @JavaScript(code = "return memory.buffer.byteLength;")
     public static native Pointer getAllocatedSize();
 
@@ -101,10 +102,6 @@ public class JVM32 {
         fill64(ptr, add(ptr, size), 0);
         return ptr;
     }
-
-    @NoThrow
-    @WASM(code = "i32.and i32.eqz i32.eqz")
-    public static native boolean hasFlag(Pointer addr, int mask);
 
     /**
      * finds the position of the next different byte;
@@ -246,25 +243,6 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "i32.add")
-    private static native Pointer addr(Object p, int offset);
-
-    @NoThrow
-    public static void writeI8AtOffset(Object instance, int offset, byte value) {
-        write8(addr(instance, offset), value);
-    }
-
-    @NoThrow
-    public static void writeI16AtOffset(Object instance, int offset, short value) {
-        write16(addr(instance, offset), value);
-    }
-
-    @NoThrow
-    public static void writeI16AtOffset(Object instance, int offset, char value) {
-        write16(addr(instance, offset), value);
-    }
-
-    @NoThrow
     public static byte readI8AtOffset(Object instance, int offset) {
         return read8(addr(instance, offset));
     }
@@ -291,7 +269,6 @@ public class JVM32 {
 
     @NoThrow
     public static int readI32AtOffset(Object instance, int offset) {
-        // todo offset must become long for ptrSize=8
         return read32(addr(instance, offset));
     }
 
@@ -303,6 +280,21 @@ public class JVM32 {
     @NoThrow
     public static <V> V readPtrAtOffset(Object instance, int offset) {
         return ptrTo(readI32AtOffset(instance, offset));
+    }
+
+    @NoThrow
+    public static void writeI8AtOffset(Object instance, int offset, byte value) {
+        write8(addr(instance, offset), value);
+    }
+
+    @NoThrow
+    public static void writeI16AtOffset(Object instance, int offset, short value) {
+        write16(addr(instance, offset), value);
+    }
+
+    @NoThrow
+    public static void writeI16AtOffset(Object instance, int offset, char value) {
+        write16(addr(instance, offset), value);
     }
 
     @NoThrow
@@ -337,22 +329,18 @@ public class JVM32 {
     }
 
     @NoThrow
-    @WASM(code = "i32.lt_u")
-    public static native boolean unsignedLessThanI(Object a, Object b);
-
-    @NoThrow
     @Alias(names = "getClassIdPtr")
     public static <V> Object getClassIdPtr(int classId) {
         // todo this won't be supported in a JavaScript implementation...
         validateClassId(classId);
-        int classIdPtr = classIdToInstancePtr(classId) + OFFSET_CLASS_INDEX;
+        Pointer classIdPtr = add(castToPtr(classIdToInstance(classId)), OFFSET_CLASS_INDEX);
 
         int actualIndex = read32(classIdPtr);
         if (actualIndex != classId) {
             log("addr = {} * {}", classId, getClassSize());
             log("+ {} + {}", getClassInstanceTable(), OFFSET_CLASS_INDEX);
-            throwJs("Expected {} at {}, got {}", classId, classIdPtr, actualIndex);
+            throwJs("Expected {} at {}, got {}", classId, getAddrS(classIdPtr), actualIndex);
         }
-        return ptrTo(classIdPtr);
+        return classIdPtr;
     }
 }

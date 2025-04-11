@@ -8,7 +8,7 @@ import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaLang.getStackTraceTablePtr;
 import static jvm.NativeLog.log;
-import static jvm.Pointer.ptrTo;
+import static jvm.Pointer.add;
 import static utils.StaticFieldOffsets.*;
 
 public class JavaThrowable {
@@ -78,7 +78,7 @@ public class JavaThrowable {
 
         insideFIST = true;
 
-        int sp = getStackPtr();
+        Pointer sp = getStackPtr();
         int stackLength = getStackDepth(sp);// each element is 4 bytes in size currently
         final int stackLength0 = stackLength;
         // log("stack ptr", sp);
@@ -96,8 +96,8 @@ public class JavaThrowable {
             reachedLimit = true;
         }
 
-        int lookupBasePtr = getStackTraceTablePtr();
-        if (lookupBasePtr <= 0) {
+        Pointer lookupBasePtr = getStackTraceTablePtr();
+        if (lookupBasePtr == null) {
             insideFIST = false;
             return th;
         }
@@ -118,13 +118,13 @@ public class JavaThrowable {
 
         for (int i = 0; i < stackLength; i++) {
             int stackData = read32(sp);
-            int throwableLookup = lookupBasePtr + stackData * 12;
+            Pointer throwableLookup = add(lookupBasePtr, stackData * 12);
             // log("stack data", i, stackData);
-            String className = ptrTo(read32(throwableLookup));
-            String methodName = ptrTo(read32(throwableLookup + 4));
-            int line = read32(throwableLookup + 8);
+            String className = unsafeCast(read32Ptr(throwableLookup));
+            String methodName = unsafeCast(read32Ptr(add(throwableLookup, 4)));
+            int line = read32(add(throwableLookup, 8));
             fillInElement(className, methodName, line, array1, i);
-            sp += 4;
+            sp = add(sp, 4);
         }
 
         if (reachedLimit) {
@@ -161,24 +161,24 @@ public class JavaThrowable {
     @Alias(names = "java_lang_Thread_getStackTrace_AW")
     public static StackTraceElement[] Thread_getStackTrace(Thread thread) {
 
-        int sp = getStackPtr();
+        Pointer sp = getStackPtr();
         int stackLength = getStackDepth(sp);// each element is 4 bytes in size currently
         if (stackLength < 1) return new StackTraceElement[0];
         if (stackLength >= stackReportLimit) stackLength = stackReportLimit;
-        int lookupBasePtr = getStackTraceTablePtr();
-        if (lookupBasePtr <= 0) return new StackTraceElement[0];
+        Pointer lookupBasePtr = getStackTraceTablePtr();
+        if (lookupBasePtr == null) return new StackTraceElement[0];
 
         StackTraceElement[] array = new StackTraceElement[stackLength];
         for (int i = 0; i < stackLength; i++) {
             int stackData = read32(sp);
-            int throwableLookup = lookupBasePtr + stackData * 12;
+            Pointer throwableLookup = add(lookupBasePtr, stackData * 12);
             log("STE/0", sp, stackData, throwableLookup);
-            String clazz = ptrTo(read32(throwableLookup));
-            String name = ptrTo(read32(throwableLookup + 4));
-            int line = read32(throwableLookup + 8);
+            String clazz = unsafeCast(read32Ptr(throwableLookup));
+            String name = unsafeCast(read32Ptr(add(throwableLookup, 4)));
+            int line = read32(add(throwableLookup, 8));
             log("Created STE", clazz, name, line);
             array[i] = new StackTraceElement(clazz, name, clazz, line);
-            sp += 4;
+            sp = add(sp, 4);
         }
         return array;
     }

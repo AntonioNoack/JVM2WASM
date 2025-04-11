@@ -46,6 +46,7 @@ import wasm.instr.Instructions.I64Load
 import wasm.instr.Instructions.I64Store
 import wasm.instr.Instructions.I64Sub
 import wasm.instr.Instructions.I64_EXTEND_I32S
+import wasm.instr.Instructions.I64_EXTEND_I32U
 import wasm.instr.Instructions.Return
 import wasm.instr.Instructions.Unreachable
 import wasm.instr.ParamGet
@@ -181,11 +182,17 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(type, i32), emptyList(),
-                listOf(
-                    // i32Const0, ParamGet[1], i32Const(storeInstr.numBytes), Call.checkWrite,
-
-                    ParamGet[1], ParamGet[0], storeInstr, Return
-                )
+                if(is32Bits) {
+                    listOf(
+                        // i32Const0, ParamGet[1], i32Const(storeInstr.numBytes), Call.checkWrite,
+                        ParamGet[1], ParamGet[0], storeInstr, Return
+                    )
+                } else {
+                    listOf(
+                        // i32Const0, ParamGet[1], i32Const(storeInstr.numBytes), Call.checkWrite,
+                        ParamGet[1], I64_EXTEND_I32U, ParamGet[0], storeInstr, Return
+                    )
+                }
             )
         }
 
@@ -218,7 +225,8 @@ object NativeHelperFunctions {
         )) {
             register(
                 call.name, listOf(i32), listOf(type),
-                listOf(ParamGet[0], loadInstr, Return)
+                if (is32Bits) listOf(ParamGet[0], loadInstr, Return)
+                else listOf(ParamGet[0], I64_EXTEND_I32U, loadInstr, Return)
             )
         }
 

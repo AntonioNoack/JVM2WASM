@@ -1,5 +1,6 @@
 package jvm.custom;
 
+@SuppressWarnings("unused")
 public class Inflater {
 
     void end() {

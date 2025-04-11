@@ -242,7 +242,7 @@ object MemoryOptimizer {
             writePointer(memory, fieldAddr, mapAddress(oldAddr))
         }
 
-        val weakRefClassId = gIndex.getClassIndexOrNull("jvm/custom/WeakRef")
+        val weakRefClassId = gIndex.getClassIdOrNull("jvm/custom/WeakRef")
         val weakRefAddressOffset = gIndex.getFieldOffset("jvm/custom/WeakRef", "address", "I", false)
         val dstOffset = allocationStart
         for (k in usedAddresses.indices) {

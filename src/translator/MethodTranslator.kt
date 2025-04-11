@@ -185,8 +185,7 @@ class MethodTranslator(
         ).toSet()
 
         fun isLookingAtSpecial(sig: MethodSig): Boolean {
-            // return sig.name == "allocateNewSpace0"
-            // return methodName(sig) == "me_anno_mesh_vox_VOXReader_applyMapping_V"
+            // return sig.clazz == "me/anno/gpu/framebuffer/Renderbuffer" && sig.name == "attachToFramebuffer"
             return false
         }
     }

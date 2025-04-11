@@ -157,7 +157,8 @@ class WATParser : Module() {
                         "data" -> {
                             // (data (i32.const 64) "\00\00\00\00\00\00\00\0
                             list.consume(TokenType.OPEN_BRACKET, i++)
-                            list.consume(TokenType.NAME, "i32.const", i++)
+                            val addrType = list.consume(TokenType.NAME, i++)
+                            assertTrue(addrType == "i32.const" || addrType == "i64.const", addrType)
                             val startIndex = list.consume(TokenType.NUMBER, i++).toInt()
                             list.consume(TokenType.CLOSE_BRACKET, i++)
                             assertEquals(TokenType.STRING, list.getType(i))

@@ -1,5 +1,6 @@
 package wasm.writer
 
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
@@ -8,8 +9,8 @@ import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
 import utils.WASMType
 import wasm.instr.*
-import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Const.Companion.i32Const0
+import wasm.instr.Const.Companion.ptrConst
 import wasm.parser.FunctionImpl
 import wasm.parser.LocalVariable
 
@@ -59,6 +60,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     }
 
     private fun writeSectionHeader(type: SectionType): Int {
+        println("starting section $type @${stream.size}")
         stream.write(type.ordinal)
         return writeU32Leb128Space()
     }
@@ -81,7 +83,6 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     }
 
     private fun writeU64Leb128(v: Long) {
-        println("U --- writing $v (0x${v.toString(16)}) @${stream.size.toString(16)}")
         stream.ensureExtra(MAX_U32_LEB128_BYTES)
         var x = v
         do {
@@ -625,15 +626,31 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
             val dataSection = dataSections[i]
             val flags = 0
             stream.write(flags)
-            writeInitExpr(listOf(i32Const(dataSection.startIndex)))
+            writeInitExpr(listOf(ptrConst(dataSection.startIndex)))
             writeS32Leb128(dataSection.content.size)
             stream.write(dataSection.content)
         }
         endSection(ptr)
     }
 
+    /**
+     * Needed for 64-bit memory. In Chrome, you need to also enable experimental WASM in
+     * chrome://flags/#enable-experimental-webassembly-features
+     * */
+    private fun writeFeaturesSection() {
+        val features = if (is32Bits) emptyList() else listOf("memory64")
+        if (features.isEmpty()) return
+        val ptr = beginCustomSection("features")
+        writeU32Leb128(features.size)
+        for (i in features.indices) {
+            writeStr(features[i])
+        }
+        endSection(ptr)
+    }
+
     fun write() {
         writeHeader()
+        writeFeaturesSection()
         writeTypeSection()
         writeImportSection() // must come before the rest
         writeFunctionSection()

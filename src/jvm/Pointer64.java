@@ -51,4 +51,12 @@ public class Pointer64 {
     @NoThrow
     @WASM(code = "i64.ge_u")
     public static native boolean unsignedGreaterThanEqual(Pointer a, Pointer b);
+
+    @NoThrow
+    @WASM(code = "i64.extend_i32_s i64.and i64.eqz i32.eqz")
+    public static native boolean hasFlag(Pointer addr, int mask);
+
+    @NoThrow
+    @WASM(code = "i64.extend_i32_s i64.add")
+    public static native Pointer addr(Object p, int offset);
 }

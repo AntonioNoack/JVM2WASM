@@ -127,7 +127,7 @@ fun writeStructField(name: String, field: GeneratorIndex.FieldData) {
     if (is32Bits || field.type in NativeTypes.nativeTypes) {
         writer.append(jvmNameToCppName2(field.type))
     } else if (!field.type.startsWith("[") || field.type in NativeTypes.nativeArrays) {
-        val cppType = structNames[gIndex.getClassId(field.type)]
+        val cppType = structNames[gIndex.getClassIdOrParents(field.type)]
         writer.append("struct ").append(cppType).append('*')
     } else {
         val cppType = structNames[StaticClassIndices.OBJECT_ARRAY]
@@ -341,6 +341,7 @@ fun writeHeader(
     writer.append("#include <string>\n") // for debugging
     writer.append("#include \"jvm2wasm-types.h\"\n") // for debugging
     if (crashOnAllExceptions) writer.append("#define NO_ERRORS\n")
+    if (is32Bits) writer.append("#define IS32BITS\n")
     writer.append('\n')
 
     writer.append("// header\n")
@@ -401,7 +402,7 @@ fun writeNativeLogFunctions(imports: List<Import>) {
     writer.append("#include <iostream>\n")
     writer.append("#include \"jvm2wasm-types.h\"\n\n")
 
-    writer.append("std::string strToCpp(i32 addr);\n\n")
+    writer.append("std::string strToCpp(i64 addr);\n\n")
 
     for (i in imports.indices) {
         val func = imports[i]
@@ -412,12 +413,15 @@ fun writeNativeLogFunctions(imports: List<Import>) {
         val paramsFromName =
             name.substring(prefix.length, name.length - suffix.length)
                 .replace("Ljava_lang_String", "$")
+                .replace("Ljvm_Pointer64", "J")
                 .replace("Ljvm_Pointer", "I")
 
-        assertEquals(paramsFromName.length, func.params.size)
+        assertEquals(paramsFromName.length, func.params.size) {
+            "Expected to parse ${func.params}, but only got $paramsFromName, '$name'"
+        }
 
         writer.append("void ").append(name).append("(")
-        for (j in func.params.indices) {
+        for (j in paramsFromName.indices) {
             val param = func.params[j]
             if (j > 0) writer.append(", ")
             writer.append(param.wasmType).append(" arg").append(j)
@@ -425,8 +429,7 @@ fun writeNativeLogFunctions(imports: List<Import>) {
         writer.append(") {\n")
         writer.append("  std::cout")
 
-        for (j in func.params.indices) {
-            val param = func.params[j]
+        for (j in paramsFromName.indices) {
             writer.append(" << ")
             if (paramsFromName[j] == '$') {
                 writer.append("strToCpp(arg").append(j).append(")")

@@ -207,7 +207,7 @@ private fun getTypeClassIndex(typeName: String): Int {
             } else if (typeName.startsWith("[")) {
                 gIndex.getClassId("[]")
             } else {
-                gIndex.getClassIndexOrParents(typeName)
+                gIndex.getClassIdOrParents(typeName)
             }
         }
     }
@@ -400,7 +400,7 @@ fun appendParamsArray(
     classData.writeClass(OBJECT_ARRAY)
     classData.writeLE32(params.size)
     for (i in params.indices) {
-        val typeIndex = gIndex.getClassIndexOrParents(params[i])
+        val typeIndex = gIndex.getClassIdOrParents(params[i])
         classData.writePointer(getClassInstancePtr(typeIndex, indexStartPtr, classSize))
     }
     // ensure alignment? done
@@ -411,7 +411,7 @@ private fun getReturnTypePtr(returnType0: String?, indexStartPtr: Int, classSize
     val returnType = returnType0 ?: "void"
     // return type; if unknown = not constructable, just return java/lang/Object
     // that isn't really wrong, null is java/lang/Object
-    val returnTypeClass = gIndex.getClassIndexOrNull(returnType) ?: 0
+    val returnTypeClass = gIndex.getClassIdOrNull(returnType) ?: 0
     return getClassInstancePtr(returnTypeClass, indexStartPtr, classSize)
 }
 

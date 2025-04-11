@@ -50,4 +50,11 @@ public class Pointer {
     @WASM(code = "i32.ge_u")
     public static native boolean unsignedGreaterThanEqual(Pointer a, Pointer b);
 
+    @NoThrow
+    @WASM(code = "i32.and i32.eqz i32.eqz")
+    public static native boolean hasFlag(Pointer addr, int mask);
+
+    @NoThrow
+    @WASM(code = "i32.add")
+    public static native Pointer addr(Object p, int offset);
 }
