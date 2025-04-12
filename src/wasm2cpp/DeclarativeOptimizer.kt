@@ -304,7 +304,12 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         if (isComment) {
             writer.add(Comment("$prefix${instr.jvmType} ${instr.name} = 0"))
         } else {
-            val zero = StackElement(ConstExpr(0, instr.jvmType), emptyList(), false)
+            val zeroValue = when (instr.jvmType) {
+                "float", "f32" -> 0f
+                "double", "f64" -> 0.0
+                else -> 0
+            }
+            val zero = StackElement(ConstExpr(zeroValue, instr.jvmType), emptyList(), false)
             writer.add(Declaration(instr.jvmType, instr.name, zero))
         }
     }

@@ -47,7 +47,7 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             }
             "i64", "long" -> {
                 if (expr.value == Long.MIN_VALUE) dst.append("(i64)(1llu << 63)")
-                else dst.append(expr.value)
+                else dst.append(expr.value).append("ll")
             }
             else -> {
                 assertTrue(expr.value == 0 || expr.value == 0L) {

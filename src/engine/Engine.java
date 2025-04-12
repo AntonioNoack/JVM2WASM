@@ -797,7 +797,7 @@ public class Engine {
 
     // todo why is Cold-LUT RenderMode still hanging???
     //  in the worst case, we'll have to replace TextureCache.getLUT
-    @Alias(names = "me_anno_cache_AsyncCacheData_waitFor_Ljava_lang_Object")
+    /*@Alias(names = "me_anno_cache_AsyncCacheData_waitFor_Ljava_lang_Object")
     public static Object waitFor(AsyncCacheData<?> self) {
         if (self.getHasValue()) return self.getValue();
         throw new IllegalStateException("Cannot wait in Web");
@@ -813,5 +813,5 @@ public class Engine {
     public static boolean waitUntilReturnWhetherIncomplete(boolean canBeKilled, long timeoutNanos, Function0<Boolean> condition) {
         if (condition.invoke()) return false;
         throw new IllegalStateException("Cannot wait in Web");
-    }
+    }*/
 }
