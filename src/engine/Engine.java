@@ -368,7 +368,7 @@ public class Engine {
     @Alias(names = "loadImageAsync")
     @JavaScript(code = "" +
             "console.log('Loading image from bytes...');\n" +
-            "let bytes = arg1, numBytes = arg2, callback = arg3;\n" +
+            "let bytes = arg0, numBytes = arg1, callback = arg2;\n" +
             "let img = new Image();\n" +
             "gcLock(callback);\n" + // callback
             "img.onload=function(){\n" +
@@ -793,5 +793,25 @@ public class Engine {
         if (length <= 0) return;
         String glName = new String(buffer, 0, length);
         dst.put(Integer.valueOf(value), glName);
+    }
+
+    // todo why is Cold-LUT RenderMode still hanging???
+    //  in the worst case, we'll have to replace TextureCache.getLUT
+    @Alias(names = "me_anno_cache_AsyncCacheData_waitFor_Ljava_lang_Object")
+    public static Object waitFor(AsyncCacheData<?> self) {
+        if (self.getHasValue()) return self.getValue();
+        throw new IllegalStateException("Cannot wait in Web");
+    }
+
+    @Alias(names = "me_anno_utils_Sleep_waitUntil_ZLkotlin_jvm_functions_Function0V")
+    public static void waitUntil(boolean canBeKilled, Function0<Boolean> condition) {
+        if (condition.invoke()) return;
+        throw new IllegalStateException("Cannot wait in Web");
+    }
+
+    @Alias(names = "me_anno_utils_Sleep_waitUntilReturnWhetherIncomplete_ZJLkotlin_jvm_functions_Function0Z")
+    public static boolean waitUntilReturnWhetherIncomplete(boolean canBeKilled, long timeoutNanos, Function0<Boolean> condition) {
+        if (condition.invoke()) return false;
+        throw new IllegalStateException("Cannot wait in Web");
     }
 }

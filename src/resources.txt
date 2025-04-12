@@ -5,3 +5,5 @@ lang/de.lang
 meshes/arrowX.obj
 saveables.yaml
 textures/ASCIIAtlas.png
+textures/lut/coldLUT.png
+textures/lut/sepiaLUT.png
