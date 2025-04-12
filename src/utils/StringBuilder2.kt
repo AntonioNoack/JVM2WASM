@@ -2,6 +2,7 @@ package utils
 
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.arrays.ByteArrayList
+import wasm2cpp.expr.Expr
 
 class StringBuilder2(initCapacity: Int = 1024) : ByteArrayList(initCapacity) {
 

@@ -9,6 +9,7 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
+import utils.FieldSig
 import utils.StringBuilder2
 import utils.WASMType
 import utils.WASMTypes.*
@@ -34,6 +35,7 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm.parser.LocalVariable
+import wasm2cpp.expr.*
 import wasm2cpp.instr.*
 
 /**
@@ -49,7 +51,10 @@ class StackToDeclarative(
         private val LOGGER = LogManager.getLogger(StackToDeclarative::class)
 
         private const val SYMBOLS = "+-*/:&|%<=>!"
-        private val zeroForStaticInited = StackElement(i32, "0", emptyList(), true)
+        private val zeroForStaticInited = StackElement(ConstExpr(0, i32), emptyList(), true)
+
+        private val CONST_ZERO = ConstExpr(0, "i32")
+        private val CONST_ONE = ConstExpr(1, "i32")
 
         /**
          * find the next instruction after i
@@ -62,36 +67,70 @@ class StackToDeclarative(
             return -1
         }
 
-        private fun isNameOrNumber(expression: String): Boolean {
-            return expression.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '.' } ||
-                    expression.toDoubleOrNull() != null
+        fun isNameOrNumber(expr: Expr): Boolean {
+            return isNumber(expr) || expr is VariableExpr
         }
 
-        private fun isNumber(expression: String): Boolean {
-            for (i in expression.indices) {
-                val char = expression[i]
-                when (char) {
-                    in '0'..'9' -> {} // ok
-                    // difficult -> just use built-in, even if a little slow
-                    '+', '-', 'e', 'E' -> return expression.toDoubleOrNull() != null
-                    else -> return false
+        fun isNumber(expr: Expr): Boolean {
+            return expr is ConstExpr && expr.value is Number
+        }
+
+        fun canAppendWithoutBrackets(expr: Expr, symbol: String, isLeft: Boolean): Boolean {
+            when (symbol) {
+                "+" -> {
+                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                            when (expr.instr.cppOperator) {
+                                "+", "-", "*", "/", "%" -> true
+                                else -> false
+                            }
                 }
+                "-" -> {
+                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                            when (expr.instr.cppOperator) {
+                                "*", "/", "%" -> true
+                                "+" -> isLeft
+                                else -> false
+                            }
+                }
+                "*" -> {
+                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                            when (expr.instr.cppOperator) {
+                                "*" -> true
+                                else -> false
+                            }
+                }
+                // / -> no symbols are supported
+                /* "^" -> {
+                     val symbols = extractSymbolsFromExpression(expr)
+                     return symbols.all { it == '^' }
+                 }
+                 "!" -> {
+                     val symbols = extractSymbolsFromExpression(expr)
+                     return symbols.all { it == '!' }
+                 }
+                 "<=", "<", ">", ">=", "!=", "==" -> {
+                     val symbols = extractSymbolsFromExpression(expr)
+                     return symbols.all { it in "+*-/" }
+                 }*/
+                /*"&" -> {
+                    // todo this is somehow incorrect: we're getting a segfault, when using this
+                    val symbols = extractSymbolsFromExpression(expr)
+                    // theoretically, '|' is supported, but I want clear code
+                    return symbols.all { it == '&' }
+                }*/
+                "|" -> {
+                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                            when (expr.instr.cppOperator) {
+                                "|" -> true
+                                else -> false
+                            }
+                }
+                else -> return false
             }
-            return true // all digits -> a number
-        }
-
-        fun StringBuilder2.appendExpr(expression: StackElement): StringBuilder2 {
-            if (isNameOrNumber(expression.expr)) {
-                append(expression.expr)
-            } else {
-                append('(').append(expression.expr).append(')')
-            }
-            return this
         }
     }
 
     private var localsByName: Map<String, LocalVariable> = emptyMap()
-    private val tmpExprBuilder = StringBuilder2()
 
     private val stack = ArrayList<StackElement>()
     private var genI = 0
@@ -158,20 +197,19 @@ class StackToDeclarative(
     }
 
     private fun push(type: String, name: String) {
-        val names = listOf(name)
-        pushWithNames(type, name, names, false)
+        pushWithNames(VariableExpr(name, type), listOf(name), false)
     }
 
-    private fun joinNames(a: StackElement, b: StackElement): List<String> {
-        return (a.names + b.names).distinct()
+    private fun joinDependencies(a: StackElement, b: StackElement): List<String> {
+        return (a.dependencies + b.dependencies).distinct()
     }
 
-    private fun pushConstant(type: WASMType, expression: String) {
-        pushWithNames(type.wasmName, expression, emptyList(), false)
+    private fun pushConstant(expression: Expr) {
+        pushWithNames(expression, emptyList(), false)
     }
 
-    private fun pushWithNames(type: String, expression: String, names: List<String>, isBoolean: Boolean) {
-        stack.add(StackElement(type, expression, names, isBoolean))
+    private fun pushWithNames(expression: Expr, names: List<String>, isBoolean: Boolean) {
+        stack.add(StackElement(expression, names, isBoolean))
         // println("push -> $stack")
     }
 
@@ -227,19 +265,6 @@ class StackToDeclarative(
         return true
     }
 
-    private fun inlineCall(funcName: String, popped: List<StackElement>): String {
-        val tmp = tmpExprBuilder
-        tmp.append(funcName).append('(')
-        for (i in popped.indices) {
-            if (i > 0) tmp.append(", ")
-            tmp.append(popped[i].expr)
-        }
-        tmp.append(')')
-        val inlinedCall = tmp.toString()
-        tmp.clear()
-        return inlinedCall
-    }
-
     private fun writeCall3(funcName: String, params: List<WASMType>, results: List<String>) {
         writeCall(funcName, params.map { it.wasmName }, results)
     }
@@ -260,8 +285,8 @@ class StackToDeclarative(
         if (results.size == 1 && funcName in pureFunctions) {
             // can be inlined :)
             val type = results[0]
-            val joinedNames = popped.flatMap { it.names }.distinct()
-            stack.add(StackElement(type, inlineCall(funcName, popped), joinedNames, false))
+            val joinedNames = popped.flatMap { it.dependencies }.distinct()
+            stack.add(StackElement(CallExpr(funcName, popped.map { it.expr }, type), joinedNames, false))
             return
         }
 
@@ -273,10 +298,14 @@ class StackToDeclarative(
         }
 
         // too complicated to be inlined for now
+        val totalType = results.joinToString("")
+        val resultVar = VariableExpr(resultName, totalType)
         for (j in results.indices) {
             val newName = nextTemporaryVariable()
             val typeJ = results[j]
-            append(Declaration(typeJ, newName, StackElement(typeJ, "$resultName.v$j", listOf(resultName), false)))
+            val field = FieldSig(totalType, "v$j", typeJ, false)
+            val expr = FieldGetExpr(field, resultVar)
+            append(Declaration(typeJ, newName, StackElement(expr, listOf(resultName), false)))
             push(typeJ, newName)
         }
     }
@@ -316,43 +345,37 @@ class StackToDeclarative(
     private fun unaryInstr(
         aType: String, rType: String,
         k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
-        combine: (StackElement, StringBuilder2) -> Unit,
+        combine: (Expr) -> Expr,
     ) {
         val a = popElement(aType)
-        val tmp = tmpExprBuilder
-        combine(a, tmp)
-        val newValue = tmp.toString()
-        if (a.names.any2 { name -> needsNewVariable(name, assignments, k) }) {
+        val newValue = combine(a.expr)
+        if (a.dependencies.any2 { name -> needsNewVariable(name, assignments, k) }) {
             val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, a.names, isBoolean)))
+            append(Declaration(rType, newName, StackElement(newValue, a.dependencies, isBoolean)))
             push(rType, newName)
         } else {
-            pushWithNames(rType, newValue, a.names, isBoolean)
+            pushWithNames(newValue, a.dependencies, isBoolean)
         }
-        tmp.clear()
     }
 
     private fun binaryInstr(
         aType: String, bType: String, rType: String,
         k: Int, assignments: Map<String, Int>?, isBoolean: Boolean,
-        combine: (StackElement, StackElement, StringBuilder2) -> Unit
+        combine: (Expr, Expr) -> Expr
     ) {
         val i1 = popElement(aType)
         val i0 = popElement(bType)
-        val tmp = tmpExprBuilder
-        combine(i0, i1, tmp)
-        val newValue = tmp.toString()
-        val dependencies = joinNames(i0, i1)
-        if (needsNewVariable(i0.names, assignments, k) ||
-            needsNewVariable(i1.names, assignments, k)
+        val newValue = combine(i0.expr, i1.expr)
+        val dependencies = joinDependencies(i0, i1)
+        if (needsNewVariable(i0.dependencies, assignments, k) ||
+            needsNewVariable(i1.dependencies, assignments, k)
         ) {
             val newName = nextTemporaryVariable()
-            append(Declaration(rType, newName, StackElement(rType, newValue, dependencies, false)))
+            append(Declaration(rType, newName, StackElement(newValue, dependencies, false)))
             push(rType, newName)
         } else {
-            pushWithNames(rType, newValue, dependencies, isBoolean)
+            pushWithNames(newValue, dependencies, isBoolean)
         }
-        tmp.clear()
     }
 
     private fun writeGetInstruction(
@@ -361,67 +384,11 @@ class StackToDeclarative(
     ) {
         if (needsNewVariable(name, assignments, k)) {
             val newName = nextTemporaryVariable()
-            append(Declaration(type, newName, StackElement(type, name, listOf(name), false)))
+            val expr = VariableExpr(name, type)
+            append(Declaration(type, newName, StackElement(expr, listOf(name), false)))
             push(type, newName)
         } else {
             push(type, name)
-        }
-    }
-
-    private fun extractSymbolsFromExpression(expr: String): String {
-        val builder = StringBuilder2()
-        var depth = 0
-        for (char in expr) {
-            // if '(', skip until ')'
-            if (char == '(') depth++
-            if (char == ')') depth--
-            if (depth == 0) {
-                if (char in SYMBOLS) {
-                    builder.append(char)
-                }
-            }
-        }
-        return builder.toString()
-    }
-
-    private fun canAppendWithoutBrackets(expr: String, symbol: String, isLeft: Boolean): Boolean {
-        when (symbol) {
-            "+" -> {
-                val symbols = extractSymbolsFromExpression(expr)
-                return symbols.all { it in "*/+-" }
-            }
-            "-" -> {
-                val symbols = extractSymbolsFromExpression(expr)
-                return symbols.all { it in "*/" || (it == '+' && isLeft) }
-            }
-            "*" -> {
-                val symbols = extractSymbolsFromExpression(expr)
-                return symbols.all { it == '*' }
-            }
-            // / -> no symbols are supported
-            /* "^" -> {
-                 val symbols = extractSymbolsFromExpression(expr)
-                 return symbols.all { it == '^' }
-             }
-             "!" -> {
-                 val symbols = extractSymbolsFromExpression(expr)
-                 return symbols.all { it == '!' }
-             }
-             "<=", "<", ">", ">=", "!=", "==" -> {
-                 val symbols = extractSymbolsFromExpression(expr)
-                 return symbols.all { it in "+*-/" }
-             }*/
-            /*"&" -> {
-                // todo this is somehow incorrect: we're getting a segfault, when using this
-                val symbols = extractSymbolsFromExpression(expr)
-                // theoretically, '|' is supported, but I want clear code
-                return symbols.all { it == '&' }
-            }*/
-            "|" -> {
-                val symbols = extractSymbolsFromExpression(expr)
-                return symbols.all { it == '|' }
-            }
-            else -> return false
         }
     }
 
@@ -497,25 +464,11 @@ class StackToDeclarative(
             F32Store -> store(f32)
             F64Store -> store(f64)
             // other operations
-            is EqualsZeroInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, true) { expr, dst ->
-                if (expr.isBoolean) {
-                    dst.append('!').appendExpr(expr)
-                } else {
-                    dst.appendExpr(expr).append(" == 0")
-                }
+            is EqualsZeroInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, true) {
+                UnaryExpr(i, it, "boolean")
             }
-            is ShiftInstr -> {
-                binaryInstr(i.popType, i.popType, i.pushType, k, assignments, false) { i0, i1, dst ->
-                    val needsCast = i.isRight && i.isUnsigned
-                    if (needsCast) {
-                        dst.append(if (i.popType == i32) "(i32)((u32) " else "(i64)((u64) ")
-                    }
-                    val operator = if (i.isRight) " >> " else " << "
-                    dst.appendExpr(i0).append(operator).appendExpr(i1)
-                    if (needsCast) {
-                        dst.append(')')
-                    }
-                }
+            is ShiftInstr -> binaryInstr(i.popType, i.popType, i.pushType, k, assignments, false) { i0, i1 ->
+                BinaryExpr(i, i0, i1, i.pushType)
             }
             Return -> {
                 val results = function.results
@@ -524,68 +477,16 @@ class StackToDeclarative(
             Unreachable -> append(i)
             is Const -> {
                 // will be integrated into expressions
-                when (i.type) {
-                    ConstType.F32 -> pushConstant(i.type, i.value.toString() + "f")
-                    ConstType.F64 -> pushConstant(i.type, i.value.toString())
-                    ConstType.I32 -> {
-                        val v =
-                            if (i.value == Int.MIN_VALUE) "(i32)(1u << 31)"
-                            else i.value.toString()
-                        pushConstant(i.type, v)
-                    }
-                    ConstType.I64 -> {
-                        val v =
-                            if (i.value == Long.MIN_VALUE) "(i64)(1llu << 63)"
-                            else i.value.toString() + "ll"
-                        pushConstant(i.type, v)
-                    }
-                }
+                pushConstant(ConstExpr(i.value, i.type.wasmName))
             }
-            is UnaryFloatInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr, dst ->
-                dst.append(i.call).append('(').append(expr.expr).append(')')
+            is UnaryFloatInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr ->
+                UnaryExpr(i, expr, i.pushType)
             }
-            is NumberCastInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr, dst ->
-                dst.append(i.prefix).append(expr.expr).append(i.suffix)
+            is NumberCastInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr ->
+                UnaryExpr(i, expr, i.pushType)
             }
-            is CompareInstr -> {
-                binaryInstr(i.type, i.type, i32, k, assignments, true) { i0, i1, dst ->
-                    // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
-                    if (isNumber(i0.expr) && !isNumber(i1.expr)) {
-                        // flipped
-                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        dst.appendExpr(i1).append(' ').append(i.flipped).append(' ')
-                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        dst.appendExpr(i0)
-                    } else {
-                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        if (canAppendWithoutBrackets(i0.expr, i.operator, true)) dst.append(i0.expr)
-                        else dst.appendExpr(i0)
-                        dst.append(' ').append(i.operator).append(' ')
-                        if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                        if (canAppendWithoutBrackets(i1.expr, i.operator, false)) dst.append(i1.expr)
-                        else dst.appendExpr(i1)
-                    }
-                }
-            }
-            is BinaryInstruction -> binaryInstr(
-                i.popType, i.popType, i.pushType, k, assignments, false
-            ) { i0, i1, dst ->
-                if (i.cppOperator.endsWith("(")) {
-                    if (i.cppOperator.startsWith("std::rot")) {
-                        dst.append(i.cppOperator)
-                            .append(if (i.popType == i32) "(u32) " else "(u64) ") // cast to unsigned required
-                            .append(i0.expr).append(", ").append(i1.expr).append(')')
-                    } else {
-                        dst.append(i.cppOperator) // call(i1, i0)
-                            .append(i0.expr).append(", ").append(i1.expr).append(')')
-                    }
-                } else {
-                    if (canAppendWithoutBrackets(i0.expr, i.cppOperator, true)) dst.append(i0.expr)
-                    else dst.appendExpr(i0)
-                    dst.append(' ').append(i.cppOperator).append(' ')
-                    if (canAppendWithoutBrackets(i1.expr, i.cppOperator, false)) dst.append(i1.expr)
-                    else dst.appendExpr(i1)
-                }
+            is BinaryInstruction -> binaryInstr(i.popType, i.popType, i.pushType, k, assignments, false) { i0, i1 ->
+                BinaryExpr(i, i0, i1, i.pushType)
             }
             is IfBranch -> {
 
@@ -606,7 +507,8 @@ class StackToDeclarative(
                     if (!isNameOrNumber(stackJ.expr)) {
                         val newName = nextTemporaryVariable()
                         append(Declaration(stackJ.type, newName, stackJ))
-                        stack[j1] = StackElement(stackJ.type, newName, listOf(newName), false)
+                        val expr = VariableExpr(newName, stackJ.type)
+                        stack[j1] = StackElement(expr, listOf(newName), false)
                     }
                 }
                 /*val paramPopped = popInReverse(function.funcName, i.params)
@@ -654,28 +556,31 @@ class StackToDeclarative(
                     packResultsIntoOurStack(instructions)
                 }
 
-                when (condition.expr) {
-                    "1" -> writeBranchContents(i.ifTrue)
-                    "0" -> writeBranchContents(i.ifFalse)
-                    else -> {
-                        val newIfTrue = ArrayList<Instruction>()
-                        writer.add(newIfTrue)
+                val conditionExpr = condition.expr
+                if (conditionExpr is ConstExpr && conditionExpr.value is Boolean) {
+                    val value = conditionExpr.value
+                    writeBranchContents(if (value) i.ifTrue else i.ifFalse)
+                } else if (conditionExpr is ConstExpr && conditionExpr.value is Int) {
+                    val value = conditionExpr.value.toInt()
+                    writeBranchContents(if (value != 0) i.ifTrue else i.ifFalse)
+                } else {
+                    val newIfTrue = ArrayList<Instruction>()
+                    writer.add(newIfTrue)
 
-                        writeBranchContents(i.ifTrue)
+                    writeBranchContents(i.ifTrue)
 
-                        writer.removeLast()
-                        val newIfFalse = ArrayList<Instruction>()
-                        writer.add(newIfFalse)
+                    writer.removeLast()
+                    val newIfFalse = ArrayList<Instruction>()
+                    writer.add(newIfFalse)
 
-                        // reset stack to before "if"
-                        stack.clear()
-                        stack.addAll(stackForReset)
+                    // reset stack to before "if"
+                    stack.clear()
+                    stack.addAll(stackForReset)
 
-                        writeBranchContents(i.ifFalse)
+                    writeBranchContents(i.ifFalse)
 
-                        writer.removeLast()
-                        append(ExprIfBranch(condition, newIfTrue, newIfFalse))
-                    }
+                    writer.removeLast()
+                    append(ExprIfBranch(condition, newIfTrue, newIfFalse))
                 }
 
                 // rescue stack

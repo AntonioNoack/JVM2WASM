@@ -4,6 +4,7 @@ import translator.JavaTypes.convertTypeToWASM
 import utils.Param
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
+import wasm2cpp.language.LowLevelCpp
 
 fun defineFunctionHead(function: FunctionImpl, parameterNames: Boolean) {
     defineFunctionHead(function.funcName, function.params, function.results, parameterNames)
@@ -37,7 +38,7 @@ fun defineFunctionImplementations(
     writer.append("#include <cmath> // trunc, ...\n")
     val stackToDeclarative = StackToDeclarative(globals, functionsByName, pureFunctions)
     val optimizer = DeclarativeOptimizer(globals)
-    val functionWriter = FunctionWriter(globals)
+    val functionWriter = FunctionWriter(globals, LowLevelCpp(writer))
     for (fi in functions.indices) {
         val function = functions[fi]
         // if (function.funcName != "org_joml_Vector4f_hashCode_I") continue

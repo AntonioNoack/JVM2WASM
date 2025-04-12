@@ -8,6 +8,9 @@ import wasm.instr.Instructions.Unreachable
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm2cpp.StackToDeclarative.Companion.nextInstr
+import wasm2cpp.expr.ConstExpr
+import wasm2cpp.expr.Expr
+import wasm2cpp.expr.VariableExpr
 import wasm2cpp.instr.*
 
 // todo inherit from this class and...
@@ -56,7 +59,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
     }
 
     private fun incUsages(expr: StackElement) {
-        incUsages(expr.names)
+        incUsages(expr.dependencies)
     }
 
     private fun getAssignCount(name: String): Int {
@@ -130,7 +133,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         var i = 0
         while (i < instructions.size) {
             fun removeNames(expr: StackElement) {
-                for (name in expr.names) previousAssignments.remove(name)
+                for (name in expr.dependencies) previousAssignments.remove(name)
             }
             when (val instr = instructions[i]) {
                 is Assignment -> {
@@ -273,7 +276,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
 
     private fun writeDebugInfo(instr: Instruction) {
         val text = if (instr is Declaration) {
-            "${instr.javaClass.simpleName}, ${instr.initialValue.names}"
+            "${instr.javaClass.simpleName}, ${instr.initialValue.dependencies}"
         } else instr.javaClass.simpleName
         writer.add(Comment(text))
     }
@@ -301,7 +304,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         if (isComment) {
             writer.add(Comment("$prefix${instr.jvmType} ${instr.name} = 0"))
         } else {
-            val zero = StackElement(instr.jvmType, "0", emptyList(), false)
+            val zero = StackElement(ConstExpr(0, instr.jvmType), emptyList(), false)
             writer.add(Declaration(instr.jvmType, instr.name, zero))
         }
     }
@@ -311,7 +314,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         if (unused && !debugInstructions) return false
         val inlineReturn = !unused &&
                 nextInstr is ExprReturn && nextInstr.results.size == 1 &&
-                nextInstr.results[0].expr == instr.name
+                checkIsName(nextInstr.results[0].expr, instr.name)
         val newInstr = if (unused) {
             Comment("unused: ${instr.type} ${instr.name} = ${instr.initialValue.expr}")
         } else if (inlineReturn) {
@@ -338,17 +341,21 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         writer.add(newInstr)
     }
 
+    private fun checkIsName(expr: Expr, name: String?): Boolean {
+        return expr is VariableExpr && expr.name == name
+    }
+
     private fun writeExprCall(instr: ExprCall, nextInstr: Instruction?): Boolean {
         val returnsImmediately =
             if (nextInstr is ExprReturn) {
-                nextInstr.results.size == 1 && nextInstr.results[0].expr == instr.resultName
+                nextInstr.results.size == 1 && checkIsName(nextInstr.results[0].expr, instr.resultName)
             } else false
 
         val assignsImmediately =
             instr.resultTypes.size == 1 && usageCounts[instr.resultName] == 1 &&
                     when (nextInstr) {
-                        is Assignment -> nextInstr.newValue.expr == instr.resultName
-                        is Declaration -> nextInstr.initialValue.expr == instr.resultName
+                        is Assignment -> checkIsName(nextInstr.newValue.expr, instr.resultName)
+                        is Declaration -> checkIsName(nextInstr.initialValue.expr, instr.resultName)
                         else -> false
                     }
 

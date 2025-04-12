@@ -1,5 +1,6 @@
 package wasm2cpp
 
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
@@ -11,9 +12,9 @@ import wasm.instr.Instructions.Unreachable
 import wasm.instr.LoopInstr
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
-import wasm2cpp.StackToDeclarative.Companion.appendExpr
 import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import wasm2cpp.instr.*
+import wasm2cpp.language.TargetLanguage
 
 // todo inherit from this class and...
 //  - using HighLevel getters, setters and local-variables, pass around true structs
@@ -28,7 +29,7 @@ import wasm2cpp.instr.*
 //  - inline pure functions (incl. potential reordering) into expressions
 //  - discard unused expressions
 
-class FunctionWriter(val globals: Map<String, GlobalVariable>) {
+class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: TargetLanguage) {
 
     companion object {
         val cppKeywords = (
@@ -126,23 +127,28 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
 
     private fun writeDebugInfo(instr: Instruction) {
         begin().append("/* ").append(instr.javaClass.simpleName)
-        if (instr is Declaration) writer.append(", ").append(instr.initialValue.names)
+        if (instr is Declaration) writer.append(", ").append(instr.initialValue.dependencies)
         writer.append(" */\n")
     }
 
+    private val usz = if (is32Bits) "(u32)" else "(u64)"
+
     private fun writeLoadInstr(instr: CppLoadInstr) {
         begin().append(instr.type).append(' ').append(instr.newName).append(" = ")
-            .append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + (u32)")
-            .appendExpr(instr.addrExpr).append("))[0]").end()
+            .append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
+        language.appendExprSafely(instr.addrExpr.expr)
+        writer.append("))[0]").end()
     }
 
     private fun writeStoreInstr(instr: CppStoreInstr) {
-        begin().append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + (u32)")
-            .appendExpr(instr.addrExpr).append("))[0] = ")
+        begin().append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
+        language.appendExprSafely(instr.addrExpr.expr)
+        writer.append("))[0] = ")
         if (instr.type != instr.memoryType) {
             writer.append('(').append(instr.memoryType).append(") ")
         }
-        writer.append(instr.valueExpr.expr).end()
+        language.appendExpr(instr.valueExpr.expr)
+        writer.end()
     }
 
     private fun writeNullDeclaration(instr: NullDeclaration) {
@@ -153,11 +159,14 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
     private fun writeDeclaration(instr: Declaration) {
         begin()
             .append(convertTypeToWASM(instr.type)).append(' ').append(instr.name).append(" = ")
-            .append(instr.initialValue.expr).end()
+        language.appendExpr(instr.initialValue.expr)
+        writer.end()
     }
 
     private fun writeAssignment(instr: Assignment) {
-        begin().append(instr.name).append(" = ").append(instr.newValue.expr).end()
+        begin().append(instr.name).append(" = ")
+        language.appendExpr(instr.newValue.expr)
+        writer.end()
     }
 
     private fun writeExprReturn(instr: ExprReturn) {
@@ -165,12 +174,16 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         assertEquals(function.results.size, results.size)
         when (results.size) {
             0 -> begin().append("return").end()
-            1 -> begin().append("return ").append(results.first().expr).end()
+            1 -> {
+                begin().append("return ")
+                language.appendExpr(results.first().expr)
+                writer.end()
+            }
             else -> {
                 begin().append("return { ")
                 for (ri in results.indices) {
                     if (ri > 0) writer.append(", ")
-                    writer.append(results[ri].expr)
+                    language.appendExpr(results[ri].expr)
                 }
                 writer.append(" }").end()
             }
@@ -198,7 +211,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         writer.append(instr.funcName).append('(')
         for (param in instr.params) {
             if (!writer.endsWith("(")) writer.append(", ")
-            writer.append(param.expr)
+            language.appendExpr(param.expr)
         }
         writer.append(")").end()
     }
@@ -224,7 +237,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
         }
         writer.append(")").end()
         begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
-            .append(tmpType).append(">(indirect[").append(instr.indexExpr.expr).append("])").end()
+            .append(tmpType).append(">(indirect[")
+        language.appendExpr(instr.indexExpr.expr)
+        writer.append("])").end()
     }
 
     private fun writeLoopInstr(instr: LoopInstr) {
@@ -237,7 +252,8 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>) {
 
     private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>) {
         if (!writer.endsWith("else if (")) begin().append("if (")
-        writer.append(instr.expr.expr).append(") {")
+        language.appendExpr(instr.expr.expr)
+        writer.append(") {")
         for (i in extraComments.indices) {
             val comment = extraComments[i] as Comment
             writer.append(if (i == 0) " // " else ", ").append(comment.text)
