@@ -60,16 +60,15 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     }
 
     private fun writeSectionHeader(type: SectionType): Int {
-        println("starting section $type @${stream.size}")
+        println("starting section $type @${stream.size} (#${stream.size.toString(16)})")
         stream.write(type.ordinal)
         return writeU32Leb128Space()
     }
 
     private fun writeU32Leb128Space(): Int {
         val startAddress = stream.size
-        for (i in 0 until MAX_U32_LEB128_BYTES) {
-            stream.add(0)
-        }
+        stream.ensureExtra(MAX_U32_LEB128_BYTES)
+        stream.size = startAddress + MAX_U32_LEB128_BYTES
         return startAddress
     }
 
@@ -82,29 +81,25 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         } while (x != 0)
     }
 
-    private fun writeU64Leb128(v: Long) {
-        stream.ensureExtra(MAX_U32_LEB128_BYTES)
-        var x = v
-        do {
-            stream.addUnsafe(x.toByte())
-            x = x ushr 7
-        } while (x != 0L)
-    }
+    private fun writeFixupU32Leb128Size(startPtr: Int) {
+        val endPtrBeforeFixup = stream.size
+        val contentSize = endPtrBeforeFixup - (startPtr + MAX_U32_LEB128_BYTES)
+        assertTrue(contentSize > 0)
 
-    private fun writeFixupU32Leb128Size(offset: Int) {
-        val size = stream.size - offset - MAX_U32_LEB128_BYTES
-        assertTrue(size > 0)
-        writeFixedU32Leb128At(offset, size)
-    }
+        writeS32Leb128(contentSize)
 
-    private fun writeFixedU32Leb128At(offset: Int, x: Int) {
-        stream.ensureCapacity(offset + 5)
-        stream[offset] = (x or 0x80).toByte()
-        stream[offset + 1] = ((x ushr 7) or 0x80).toByte()
-        stream[offset + 2] = ((x ushr 14) or 0x80).toByte()
-        stream[offset + 3] = ((x ushr 21) or 0x80).toByte()
-        stream[offset + 4] = (x ushr 28).and(0x7f).toByte()
-        assertEquals(5, MAX_U32_LEB128_BYTES)
+        val numBytesForSize = stream.size - endPtrBeforeFixup
+        if (numBytesForSize < MAX_U32_LEB128_BYTES) {
+            val values = stream.values
+            val dstI0 = startPtr + numBytesForSize
+            val srcI0 = startPtr + MAX_U32_LEB128_BYTES
+            values.copyInto(values, dstI0, srcI0, endPtrBeforeFixup)
+        }
+
+        stream.size = startPtr
+        writeS32Leb128(contentSize)
+        assertEquals(stream.size, startPtr + numBytesForSize)
+        stream.size = startPtr + numBytesForSize + contentSize
     }
 
     private fun beginKnownSection(type: SectionType): Int {
@@ -186,16 +181,17 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
 
     private fun writeLimits(limits: Limits) {
         var flags = 0
-        if (limits.hasMax) flags = flags or BINARY_LIMITS_HAS_MAX_FLAG
+        val max = limits.max
+        if (max != null) flags = flags or BINARY_LIMITS_HAS_MAX_FLAG
         if (limits.isShared) flags = flags or BINARY_LIMITS_IS_SHARED_FLAG
         if (limits.is64Bit) flags = flags or BINARY_LIMITS_IS_64_FLAG
         writeS32Leb128(flags)
         if (limits.is64Bit) {
-            writeU64Leb128(limits.initial)
-            if (limits.hasMax) writeU64Leb128(limits.max)
+            writeS64Leb128(limits.initial)
+            if (max != null) writeS64Leb128(max)
         } else {
-            writeU32Leb128(limits.initial.toInt())
-            if (limits.hasMax) writeU32Leb128(limits.max.toInt())
+            writeS32Leb128(limits.initial.toInt())
+            if (max != null) writeS32Leb128(max.toInt())
         }
     }
 
@@ -224,8 +220,8 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
                     is StoreInstr -> instr.numBytes
                     else -> 0
                 }.countTrailingZeroBits()
-                writeU32Leb128(alignment) // todo is this alignment ok???
-                writeU32Leb128(0) // todo is this address/offset ok???
+                writeS32Leb128(alignment) // todo is this alignment ok???
+                writeS32Leb128(0) // this would be the memory index, I think
             }
             is SimpleInstr -> writeOpcode(instr.opcode)
             is ParamGet -> {
@@ -428,6 +424,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     private fun writeTableSection() {
         val numTables = module.tables.size - numTableImports
         assertTrue(numTables >= 0)
+        println("num tables: $numTables, ${module.tables}")
         if (numTables == 0) return
         val ptr = beginSection(SectionType.TABLE, numTables)
         for (i in numTableImports until module.tables.size) {
@@ -489,7 +486,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
             stream.write(elemSegment.flags)
             assertEquals(0, elemSegment.flags) // nothing else was implemented
             writeInitExpr(listOf(i32Const0))
-            writeU32Leb128(elemSegment.functionTable.size)
+            writeS32Leb128(elemSegment.functionTable.size)
             for (i in elemSegment.functionTable.indices) {
                 writeS32Leb128(elemSegment.functionTable[i])
             }
@@ -641,7 +638,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
         val features = if (is32Bits) emptyList() else listOf("memory64")
         if (features.isEmpty()) return
         val ptr = beginCustomSection("features")
-        writeU32Leb128(features.size)
+        writeS32Leb128(features.size)
         for (i in features.indices) {
             writeStr(features[i])
         }

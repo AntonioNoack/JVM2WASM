@@ -1,6 +1,7 @@
 package jvm.gc;
 
 import annotations.NoThrow;
+import annotations.UnsafePointerField;
 import jvm.Pointer;
 import jvm.custom.WeakRef;
 
@@ -8,8 +9,11 @@ import java.util.ArrayList;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.JVM32.*;
+import static jvm.JVMShared.unsignedGreaterThanEqual;
+import static jvm.JVMShared.unsignedLessThan;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.unsignedLessThan;
 import static jvm.Pointer.*;
 import static jvm.ThrowJS.throwJs;
 import static jvm.gc.GCTraversal.instanceFieldOffsets;
@@ -27,14 +31,6 @@ public class GCGapFinder {
     private static Object nextWeakRefInstance;
 
     private static int smallestGapSize, smallestGapSizeIndex;
-
-    @NoThrow
-    private static void fillZeros(byte[][] largestGaps) {
-        // must not use Arrays.fill, because that uses the stack-ptr, and we might run async
-        for (int i = 0; i < 16; i++) {
-            largestGaps[i] = null;
-        }
-    }
 
     private static boolean handleWeakRefs(Object instance) {
 
@@ -73,12 +69,17 @@ public class GCGapFinder {
         }
     }
 
+    @UnsafePointerField
     private static Pointer currPtr, endPtr, gapStart;
+
     private static boolean wasUsed;
 
     public static void findLargestGapsInit(byte[][] largestGaps) {
         // log("Finding largest gaps");
-        fillZeros(largestGaps);
+        // must not use Arrays.fill, because that uses the stack-ptr, and we might run async
+        for (int i = 0, l = largestGaps.length; i < l; i++) {
+            largestGaps[i] = null;
+        }
 
         // log("Scanning", instance, endPtr, iter);
         checkStatistics();
@@ -160,6 +161,9 @@ public class GCGapFinder {
             finishFindingGaps(endPtr, gapStart);
         }
         GarbageCollector.freeMemory += freedMemory;
+        GCGapFinder.currPtr = null;
+        GCGapFinder.endPtr = null;
+        GCGapFinder.gapStart = null;
 
         // log("Done Scanning :), instances:", numInstances);
         // log("Gaps:", gapCounter);
@@ -194,18 +198,13 @@ public class GCGapFinder {
     }
 
     @NoThrow
-    private static void replaceWithByteArray(Pointer gapStart, int available) {
-        // log("Replacing Gap", gapStart, available);
-        write32(gapStart, BYTE_ARRAY_CLASS); // byte array, generation 0
-        writeI32AtOffset(gapStart, objectOverhead, available - arrayOverhead); // length
-    }
-
-    @NoThrow
     static void handleGap(Pointer gapStart, int available, byte[][] largestGaps) {
         // to do if a gap was > 2B elements, we'd have an issue...
         if (unsignedGreaterThanEqual(available, arrayOverhead)) { // should always be true
             // first step: replace with byte array, so that next time we can skip over it faster
-            replaceWithByteArray(gapStart, available);
+            // log("Replacing Gap", gapStart, available);
+            write32(gapStart, BYTE_ARRAY_CLASS); // byte array, generation 0
+            writeI32AtOffset(gapStart, objectOverhead, available - arrayOverhead); // length
             insertGapMaybe(unsafeCast(gapStart), available, largestGaps);
         }
     }

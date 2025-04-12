@@ -134,6 +134,10 @@ std::string strToCpp(i64 addr) {
     return os.str();
 }
 
+char* addrToCpp(isz addr) {
+    return (char*) memory + (usz) addr;
+}
+
 // realloc could be handled with a mutex, too...
 std::recursive_mutex mallocMutex;
 void lockMallocMutex(){
@@ -255,7 +259,7 @@ void jvm_JavaLang_printString_Ljava_lang_StringZV(isz line, i32 logNotErr) {
 void jvm_LWJGLxGLFW_disableCursor_V() { }
 void texImage2DAny(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, isz addr, i32 j) {
     // i=data, j=length in elements
-    glTexImage2D(a,b,c,d,e,f,g,h,((char*)memory + (usz)addr));
+    glTexImage2D(a,b,c,d,e,f,g,h,addrToCpp(addr));
 }
 void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h) {
     // std::cout << "glTexImage2D(" << a << ", " << b << ", " << c << ", " << d << ", " << e << ", " << f << ", " << g << ", " << h << ")" << std::endl;
@@ -266,14 +270,14 @@ void jvm_LWJGLxOpenGL_texImage2DNullptr_IIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i3
 }
 void texImage3DAny(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i, isz addr, i32 k) {
     // j=data, k=length in elements
-    glTexImage3D(a,b,c,d,e,f,g,h,i,((char*)memory + (usz)addr));
+    glTexImage3D(a,b,c,d,e,f,g,h,i,addrToCpp(addr));
 }
 void jvm_LWJGLxOpenGL_texImage3DNullptr_IIIIIIIIIV(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, i32 i) {
     glTexImage3D(a,b,c,d,e,f,g,h,i,nullptr);
 }
 void texSubImage2D(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, i32 g, i32 h, isz addr, i32 j) {
     // i=data, j=length in elements
-    glTexSubImage2D(a,b,c,d,e,f,g,h,((char*)memory + (usz)addr));
+    glTexSubImage2D(a,b,c,d,e,f,g,h,addrToCpp(addr));
 }
 f32 org_lwjgl_opengl_GL11C_glGetFloat_IF(i32 type) { float v = 0.0; glGetFloatv(type,&v); return v; }
 
@@ -291,11 +295,11 @@ void jvm_LWJGLxOpenGL_glBindAttribLocation2_IILjava_lang_StringV(i32 shader, i32
     glBindAttribLocation(shader, index, name1.c_str()); // is 0-terminated
 }
 void readPixelsF32(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, isz addr, i32 h) {
-    glReadnPixels(a,b,c,d,e,f,h<<2,(char*)memory + (usz)addr);
+    glReadnPixels(a,b,c,d,e,f,h<<2,addrToCpp(addr));
 }
 void readPixelsU8(i32 a, i32 b, i32 c, i32 d, i32 e, i32 f, isz addr, i32 h) {
     // (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, void * data)
-    glReadnPixels(a,b,c,d,e,f,h,(char*)memory + (usz)addr);
+    glReadnPixels(a,b,c,d,e,f,h,addrToCpp(addr));
 }
 void me_anno_input_Input_setClipboardContent_Ljava_lang_StringV(isz, isz) { }
 void org_lwjgl_glfw_GLFW_glfwSetCursor_JJV(i64, i64) { }
@@ -347,7 +351,7 @@ void org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV(i32 a, i32 b, i32 c, i
 void jvm_LWJGLxOpenGL_glGetTextureSubImageAny_IIIIIIIIIIIIV(
     i32 ptr, i32 level, i32 x, i32 y, i32 z, i32 w, i32 h, i32 d,
     i32 format, i32 type, i32 dataPtr, i32 dataLength) {
-    glGetTextureSubImage(ptr, level, x, y, z, w, h, d, format, type, (GLsizei) dataLength, (char*) memory + (usz)dataPtr);
+    glGetTextureSubImage(ptr, level, x, y, z, w, h, d, format, type, (GLsizei) dataLength, addrToCpp(dataPtr));
 }
 void org_lwjgl_opengl_GL46C_glGenerateMipmap_IV(i32 x) { glGenerateMipmap(x); }
 void org_lwjgl_opengl_GL46C_glLinkProgram_IV(i32 x) { glLinkProgram(x); }
@@ -376,39 +380,39 @@ void org_lwjgl_opengl_GL20C_glDrawBuffers_IV(i32 x) { GLuint xi = x; glDrawBuffe
 void org_lwjgl_opengl_GL40C_glDrawArraysIndirect_IJV(i32 x, i64 y) { glDrawArraysIndirect(x, (void*)y); }
 void org_lwjgl_opengl_GL40C_glDrawElementsIndirect_IIJV(i32 x, i32 y, i64 z) { glDrawElementsIndirect(x, y, (void*)z); }
 void bufferData8(i32 buffer, isz data, i32 length, i32 usage) {
-    glBufferData(buffer, (usz) length, (char*) memory + (usz)data, usage);
+    glBufferData(buffer, (usz) length, addrToCpp(data), usage);
 }
 void bufferData16(i32 buffer, isz data, i32 length, i32 usage) {
-    glBufferData(buffer, (usz) length<<1, (char*) memory + (usz)data, usage);
+    glBufferData(buffer, (usz) length<<1, addrToCpp(data), usage);
 }
 void bufferSubData8(i32 buffer, i64 offset, isz data, i32 length) {
-    glBufferSubData(buffer, offset, (usz) (length), (char*) memory + (usz)data);
+    glBufferSubData(buffer, offset, (usz) (length), addrToCpp(data));
 }
 void bufferSubData16(i32 buffer, i64 offset, isz data, i32 length) {
-    glBufferSubData(buffer, offset, (usz) (length << 1), (char*) memory + (usz)data);
+    glBufferSubData(buffer, offset, (usz) (length << 1), addrToCpp(data));
 }
-void uniform1fv(i32 u, isz addr, i32 count) {
-    glUniform1fv(u, count, (float*)((char*)memory + (usz)addr));
+void uniform1fv(i32 u, isz data, i32 count) {
+    glUniform1fv(u, count, (float*)addrToCpp(data));
 }// (GLint location, GLsizei count, const GLfloat * value)
-void uniform4fv(i32 u, isz addr, i32 count) {
-    glUniform4fv(u, count>>2, (float*)((char*)memory + (usz)addr)); // correct??
+void uniform4fv(i32 u, isz data, i32 count) {
+    glUniform4fv(u, count>>2, (float*)addrToCpp(data)); // correct??
 }
 void uniformMatrix2fv(i32 u, i32 t, isz data, i32 len) {
-    glUniformMatrix2fv(u,len/4,t,(float*)((char*) memory + (usz)data)); // correct???
+    glUniformMatrix2fv(u,len/4,t,(float*)addrToCpp(data)); // correct???
 }
 void uniformMatrix3fv(i32 u, i32 t, isz data, i32 len) {
-    glUniformMatrix3fv(u,len/9,t,(float*)((char*) memory + (usz)data)); // correct???
+    glUniformMatrix3fv(u,len/9,t,(float*)addrToCpp(data)); // correct???
 }
 void uniformMatrix4x3fv(i32 u, i32 t, isz data, i32 len) {
-    glUniformMatrix4x3fv(u,len/12,t,(float*)((char*) memory + (usz)data));
+    glUniformMatrix4x3fv(u,len/12,t,(float*)addrToCpp(data));
 }
 void uniformMatrix4fv(i32 u, i32 t, isz data, i32 len) {
-    glUniformMatrix4fv(u,len/16,t,(float*)((char*) memory + (usz)data));
+    glUniformMatrix4fv(u,len/16,t,(float*)addrToCpp(data));
 }
 
 i32 engine_Engine_fillBaseURL_ACI(isz buffer) { return 0; }
 
-roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture2DLme_anno_utils_async_CallbackV(
+roid loadTextureAsync(
     isz pathPtr, isz texturePtr, isz callback
 ) {
     std::string path = "../src/" + strToCpp(pathPtr);
@@ -425,6 +429,30 @@ roid engine_Engine_generateTexture_Ljava_lang_StringLme_anno_gpu_texture_Texture
     } else {
         std::cout << "Image Size: undefined" << std::endl;
         finishTexture(0, -1, -1, callback);
+    }
+    return RET_VOID;
+}
+
+retsz createIntArray(i32 size);
+roid finishImage(isz intArray, i32 width, i32 height, i32 hasAlpha, isz callback);
+
+roid loadImageAsync(
+    isz bytesPtr, i32 numBytes, isz callback
+) {
+    std::cout << "Loading image from bytes" << std::endl;
+    int w, h, numChannels; // todo load async?
+    stbi_set_flip_vertically_on_load(false);
+    unsigned char *data = stbi_load_from_memory((uint8_t*)addrToCpp(bytesPtr), numBytes, &w, &h, &numChannels, 4);
+    if (data != nullptr && w > 0 && h > 0) {
+        std::cout << "Image Size: " << w << " x " << h << std::endl;
+        isz intArrayPtr = createIntArray(w * h);
+        memcpy(addrToCpp(intArrayPtr + arrayOverhead), data, w * h * 4); // dst, src, n
+        // todo convert RGBA into ARGB with corresponding signed-ness
+        stbi_image_free(data);
+        finishImage(intArrayPtr, w, h, numChannels > 3, callback);
+    } else {
+        std::cout << "Image Size: undefined" << std::endl;
+        finishImage(0, -1, -1, 0, callback);
     }
     return RET_VOID;
 }
@@ -643,7 +671,7 @@ void org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV(i32 a, i32 b, i32 c, i32
 void org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV(i32 a, i32 b) { glVertexAttribI1i(a,b); }
 void org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV(i32 a, i32 b, i32 c, i32 d, isz data) {
     // (GLenum target, GLint level, GLenum format, GLenum type, void * pixels)
-    glGetTexImage(a,b,c,d,(void*)((char*)memory+data));
+    glGetTexImage(a,b,c,d,(void*)addrToCpp(data));
 }
 i32 org_lwjgl_opengl_GL45C_glCreateVertexArrays_I() { GLuint result = 0; glCreateVertexArrays(1, &result); return result; }
 i32 org_lwjgl_opengl_GL15C_glGenQueries_I() { GLuint r = 0; glGenQueries(1, &r); return r; }
@@ -769,7 +797,7 @@ void initMemory() {
     std::string path = "runtime-data.bin";
     std::ifstream file(path, std::ios::binary);
     size_t size = std::min(std::filesystem::file_size(path), allocatedSize);
-    file.read((char*) memory, size);
+    file.read(addrToCpp(0), size);
     if(!file) std::cerr << "Failed reading file " << path << std::endl;
     std::cout << "Loaded " << file.gcount() << "/" << size << " bytes into memory" << std::endl;
 

@@ -4,7 +4,7 @@ import annotations.NoThrow;
 import annotations.WASM;
 
 /**
- * pseudo-class to represent pointers
+ * pseudo-class to represent pointers or sizes (like size_t in C++)
  */
 public class Pointer {
     @NoThrow

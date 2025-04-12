@@ -3,9 +3,9 @@ package jvm.custom;
 import annotations.NoThrow;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Objects;
 
-import static jvm.JVMFlags.ptrSize;
 import static jvm.Pointer.ptrTo;
 
 /**
@@ -189,7 +189,7 @@ public class LongHashMap<V> {
      * @return the value to which this map maps the specified key.
      */
     @NoThrow
-    public V get(int key) {
+    public V get(long key) {
         IEntry[] tab = this.table;
         int index = hashKey(key, tab.length);
         for (IEntry e = tab[index]; e != null; e = e.next) {
@@ -313,9 +313,7 @@ public class LongHashMap<V> {
      */
     @NoThrow
     public void clear() {
-        IEntry[] tab = this.table;
-        for (int index = tab.length; --index >= 0; )
-            tab[index] = null;
+        Arrays.fill(table, null);
         count = 0;
     }
 
@@ -349,8 +347,6 @@ public class LongHashMap<V> {
 
     @NoThrow
     public void collectKeys(ArrayList<Object> dst) {
-        if (ptrSize == 8) throw new IllegalStateException("Please implement GC for 64-bits");
-
         dst.clear();
         dst.ensureCapacity(size() + 1);
         for (IEntry entry : table) {

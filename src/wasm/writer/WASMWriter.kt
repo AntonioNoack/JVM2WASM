@@ -103,13 +103,14 @@ object WASMWriter {
 
         val memory = Memory(
             Limits(
-                false, false, is64Bit = !JVMFlags.is32Bits,
-                memorySizeInBlocks.toLong(), 0L
+                false, is64Bit = !JVMFlags.is32Bits,
+                memorySizeInBlocks.toLong(), null
             )
         )
+
         val table = Table(
             Type(TypeKind.FUNC_REF),
-            Limits(false, false, false, functionTable.size.toLong(), 0L)
+            Limits(false, false, functionTable.size.toLong(), null)
         )
 
         // imports come first

@@ -3,6 +3,7 @@ package engine;
 import annotations.*;
 import jvm.FillBuffer;
 import jvm.JavaLang;
+import jvm.Pointer;
 import jvm.custom.ThreadLocalRandom;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
@@ -31,6 +32,7 @@ import me.anno.graph.visual.render.RenderGraph;
 import me.anno.image.Image;
 import me.anno.image.ImageCache;
 import me.anno.image.raw.GPUImage;
+import me.anno.image.raw.IntImage;
 import me.anno.input.Clipboard;
 import me.anno.input.Input;
 import me.anno.input.Key;
@@ -59,9 +61,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
+import static jvm.JVMShared.arrayOverhead;
+import static jvm.JVMShared.castToPtr;
 import static jvm.JavaLang.Object_toString;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
+import static jvm.Pointer.add;
 import static jvm.ThrowJS.throwJs;
 
 @SuppressWarnings("unused")
@@ -81,19 +86,6 @@ public class Engine {
                 font.getItalic())));
         FontStats.INSTANCE.setGetTextLengthImpl((font, text) ->
                 Double.valueOf(TextGen.measureText1(font.getName(), font.getSize(), text)));
-    }
-
-    @Alias(names = "me_anno_io_files_BundledRef_getExists_Z")
-    private static boolean BundledRef_getExists_Z(BundledRef self) {
-        return true;
-    }
-
-    private static void initAtlasFonts() {
-        // todo setup "png" in ImageCache.streamReaders, so we can use it...
-        //   not yet working like that... it's crashing
-        if (false) ImageCache.INSTANCE.registerStreamReader("png", (fileReference, inputStream, callback) ->
-                callback.err(new IOException("Cannot read image yet"))
-        );
     }
 
     @NoThrow
@@ -119,6 +111,8 @@ public class Engine {
             OS.isLinux = true;
         }
 
+        initImageReader();
+
         // Build.setShipped(true);
 
         // LuaTest.test();
@@ -126,8 +120,6 @@ public class Engine {
 
         if (runsInBrowser()) {
             initBrowserFonts();
-        } else {
-            initAtlasFonts();
         }
 
         EngineBase instance;
@@ -286,6 +278,11 @@ public class Engine {
         return baseURL;
     }
 
+    @Alias(names = "me_anno_io_files_BundledRef_getExists_Z")
+    private static boolean BundledRef_getExists_Z(BundledRef self) {
+        return true;
+    }
+
     @Alias(names = "me_anno_io_utils_StringMap_saveMaybe_Ljava_lang_StringV")
     private static void saveMaybe(StringMap self, String name) { // engine gets stuck after calling this :/
         // todo make this work???
@@ -333,6 +330,11 @@ public class Engine {
     public static void me_anno_gpu_GFXBase_setIcon_JV(long window) {
     }
 
+    private static void initImageReader() {
+        ImageCache.INSTANCE.registerByteArrayReader("png,jpg", Engine::loadImageAsync);
+    }
+
+    @Alias(names = "loadTextureAsync")
     @JavaScript(code = "" +
             "let img = new Image();\n" +
             "gcLock(arg1);\n" +
@@ -361,7 +363,57 @@ public class Engine {
             "}\n" +
             "img.src = str(arg0);\n" +
             "")
-    private static native void generateTexture(String path, Texture2D texture, Callback<?> textureCallback);
+    private static native void loadTextureAsync(String path, Texture2D texture, Callback<?> textureCallback);
+
+    @Alias(names = "loadImageAsync")
+    @JavaScript(code = "" +
+            "console.log('Loading image from bytes...');\n" +
+            "let bytes = arg1, numBytes = arg2, callback = arg3;\n" +
+            "let img = new Image();\n" +
+            "gcLock(callback);\n" + // callback
+            "img.onload=function(){\n" +
+            "   let w=img.width,h=img.height;\n" +
+            "   let canvas=document.createElement('canvas')\n" +
+            "   canvas.width=w;canvas.height=h;\n" +
+            "   let ctx=canvas.getContext('2d');\n" +
+            "   ctx.save(); ctx.scale(1,-1);\n" +
+            "   ctx.drawImage(img,0,0,w,-h);\n" +
+            "   ctx.restore();\n" +
+            //  Uint8ClampedArray representing a one-dimensional array containing the data in the RGBA order
+            "   let data = ctx.getImageData(0,0,w,h).data;\n" +
+            "   let intArray = lib.createIntArray(w*h);\n" +
+            "   memory.buffer.set(data, intArray + arrayOverhead);\n" +
+            "   let x=window.lib.finishImage(intArray,w,h,callback);\n" +
+            "   if(x) throw x;\n" +
+            "   gcUnlock(callback);\n" +
+            "}\n" +
+            "lib.onerror=function(){\n" +
+            "   let x=window.lib.finishImage(0,-1,-1,0,callback);\n" +
+            "   if(x) throw x;\n" +
+            "   gcUnlock(callback);\n" +
+            "}\n" +
+            "const uint8Array = new Uint8Array(memory.buffer,bytes,numBytes);\n" +
+            "const blob = new Blob([uint8Array]);\n" +
+            "img.src = URL.createObjectURL(blob);\n" +
+            "")
+    private static native void loadImageAsync(Pointer bytes, int numBytes, Callback<?> callback);
+
+    private static void loadImageAsync(FileReference sourceFile, byte[] bytes, Callback<?> callback) {
+        Pointer bytesPtr = add(castToPtr(bytes), arrayOverhead);
+        loadImageAsync(bytesPtr, bytes.length, callback);
+    }
+
+    @Alias(names = "finishImage")
+    private static void finishImage(int[] data, int width, int height, boolean hasAlpha, Callback<IntImage> callback) {
+        if (data != null) callback.ok(new IntImage(width, height, data, hasAlpha));
+        else callback.err(new IOException("Failed reading image"));
+    }
+
+    @NoThrow
+    @Alias(names = "createIntArray")
+    private static int[] createIntArray(int length) {
+        return new int[length];
+    }
 
     @Export
     @UsedIfIndexed
@@ -411,7 +463,7 @@ public class Engine {
                     path = "assets/" + path.substring(prefix.length());
                 }
                 Texture2D newTexture = new Texture2D(file.getName(), 1, 1, 1);
-                generateTexture(path, newTexture, callback);
+                loadTextureAsync(path, newTexture, callback);
             } else {
                 System.err.println("Reading other images hasn't been implemented yet, '" +
                         file.getAbsolutePath() + "', '" + Object_toString(file) + "'");

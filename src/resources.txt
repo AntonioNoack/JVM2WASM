@@ -4,3 +4,4 @@ lang/en.lang
 lang/de.lang
 meshes/arrowX.obj
 saveables.yaml
+textures/ASCIIAtlas.png

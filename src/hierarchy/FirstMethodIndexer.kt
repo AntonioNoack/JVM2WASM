@@ -22,7 +22,6 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     private val readFields = HashSet<FieldSig>()
     private val writtenFields = HashSet<FieldSig>()
     private val constructedClasses = HashSet<String>()
-
     private val interfaceCalls = HashSet<MethodSig>()
 
     private var usesSelf = false
@@ -34,13 +33,16 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     // local.get 1
     // field.set
     // return nothing
-    private var isSetter = sig.descriptor.params.size == 2 && sig.descriptor.returnType == null
+    private var isSetter = sig.descriptor.returnType == null &&
+            ((sig.descriptor.params.size == 2 && isStatic) ||
+                    (sig.descriptor.params.size == 1))
 
     // not static,
     // local.get 0
     // field.get
     // return sth
-    private var isGetter = sig.descriptor.params.isEmpty() && sig.descriptor.returnType != null
+    private var isGetter = sig.descriptor.returnType != null &&
+            sig.descriptor.params.isEmpty()
 
     override fun visitIincInsn(varIndex: Int, increment: Int) {
         isSetter = false
@@ -49,6 +51,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     }
 
     override fun visitIntInsn(opcode: Int, operand: Int) {
+        // constant Byte, Short, or new multi-array
         isSetter = false
         isGetter = false
         instructionIndex++
@@ -312,8 +315,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
         gIndex.types.add(funcType)
     }
 
-    override fun visitEnd() {
-
+    private fun registerDependencies() {
         if (calledMethods.isNotEmpty()) dIndex.methodDependencies[sig] = calledMethods
         if (readFields.isNotEmpty()) dIndex.getterDependencies[sig] = readFields
         if (writtenFields.isNotEmpty()) dIndex.setterDependencies[sig] = writtenFields
@@ -322,8 +324,20 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             dIndex.constructorDependencies[sig] = constructedClasses
         }
 
-        val throws = useResultForThrowables && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
+        if (interfaceCalls.isNotEmpty()) {
+            dIndex.interfaceDependencies[sig] = interfaceCalls
+            dIndex.knownInterfaceDependencies.addAll(interfaceCalls)
+        }
 
+        hIndex.usesSelf[sig] = usesSelf
+
+        if (instructionIndex == 1) { // only Return
+            hIndex.emptyFunctions.add(sig)
+        }
+    }
+
+    private fun addCallIndirect() {
+        val throws = useResultForThrowables && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
         if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
             defineCallIndirectWASM(listOf(ptrTypeI), if (throws) listOf(ptrTypeI) else emptyList())
         } else if (sig.clazz == "jvm/JavaReflect" && sig.name == "callStaticInit") {
@@ -334,24 +348,21 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
             hIndex.implementedCallSignatures.add(callSignature)
             defineCallIndirectWASM(callSignature.toFuncType())
         }
+    }
 
-        if (interfaceCalls.isNotEmpty()) {
-            dIndex.interfaceDependencies[sig] = interfaceCalls
-            dIndex.knownInterfaceDependencies.addAll(interfaceCalls)
-        }
-
-        if (lastField != null) {
+    private fun findIsGetterOrSetter() {
+        if (lastField != null && (isGetter || isSetter)) {
             if (isGetter && instructionIndex != 3) isGetter = false
             if (isSetter && instructionIndex != 4) isSetter = false
             if (isGetter) hIndex.getterMethods[sig] = lastField!!
             if (isSetter) hIndex.setterMethods[sig] = lastField!!
         }
+    }
 
-        if (instructionIndex == 1) { // only Return
-            hIndex.emptyFunctions.add(sig)
-        }
-
-        hIndex.usesSelf[sig] = usesSelf
+    override fun visitEnd() {
+        registerDependencies()
+        addCallIndirect()
+        findIsGetterOrSetter()
     }
 
 }
