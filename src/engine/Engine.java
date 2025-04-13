@@ -264,7 +264,7 @@ public class Engine {
     @NoThrow
     @JavaScript(code = "let loc = window.location.href;\n" +
             "let dir = loc.substring(0, loc.lastIndexOf('/'));" +
-            "return fill(arg0,dir+'/assets/')")
+            "return fill(arg0,dir+'/../../assets/')")
     private static native int fillBaseURL(char[] chars);
 
     private static String baseURL;
@@ -460,7 +460,7 @@ public class Engine {
                 String path = file.getAbsolutePath();
                 String prefix = BundledRef.PREFIX;
                 if (path.startsWith(prefix)) {
-                    path = "assets/" + path.substring(prefix.length());
+                    path = getBaseURL() + path.substring(prefix.length());
                 }
                 Texture2D newTexture = new Texture2D(file.getName(), 1, 1, 1);
                 loadTextureAsync(path, newTexture, callback);
