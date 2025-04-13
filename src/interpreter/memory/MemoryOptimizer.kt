@@ -4,11 +4,9 @@ import allocationStart
 import gIndex
 import globals
 import interpreter.WASMEngine
-import jvm.JVM32.adjustCallocSize
 import jvm.JVMFlags.is32Bits
 import jvm.JVMFlags.ptrSize
-import jvm.JVMShared.arrayOverhead
-import jvm.JVMShared.objectOverhead
+import jvm.JVMShared.*
 import me.anno.utils.algorithms.Recursion.processRecursive2
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals

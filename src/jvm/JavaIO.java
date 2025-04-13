@@ -10,7 +10,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 
-import static jvm.JVM32.readPtrAtOffset;
+import static jvm.JVMShared.readPtrAtOffset;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.ThrowJS.throwJs;
 

@@ -16,7 +16,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.ToIntFunction;
 
 import static jvm.ArrayAccessSafe.arrayLength;
-import static jvm.JVM32.fill64;
 import static jvm.JVMFlags.is32Bits;
 import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMShared.*;

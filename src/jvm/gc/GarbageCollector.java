@@ -8,7 +8,6 @@ import jvm.Pointer;
 import jvm.custom.WeakRef;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.JVM32.*;
 import static jvm.JVMFlags.is32Bits;
 import static jvm.JVMShared.unsignedGreaterThanEqual;
 import static jvm.JVMShared.*;

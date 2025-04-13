@@ -4,13 +4,9 @@ import annotations.NoThrow;
 import jvm.Pointer;
 
 import static jvm.ArrayAccessUnchecked.arrayLength;
-import static jvm.JVM32.getAllocationStart;
-import static jvm.JVM32.getNextPtr;
-import static jvm.JVMShared.arrayOverhead;
-import static jvm.JVMShared.unsignedLessThan;
+import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.add;
-import static jvm.Pointer.ptrTo;
 import static jvm.gc.GCGapFinder.getInstanceSize;
 import static jvm.gc.GCGapFinder.insertGapMaybe;
 import static jvm.gc.GarbageCollector.largestGaps;

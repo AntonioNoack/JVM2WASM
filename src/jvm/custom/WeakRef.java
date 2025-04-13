@@ -4,10 +4,10 @@ import annotations.UnsafePointerField;
 
 import java.lang.ref.ReferenceQueue;
 
+import static jvm.JVMShared.isDynamicInstance;
 import static jvm.Pointer.getAddrS;
 import static jvm.gc.GarbageCollector.lockMallocMutex;
 import static jvm.gc.GarbageCollector.unlockMallocMutex;
-import static jvm.JVM32.*;
 
 @SuppressWarnings("rawtypes")
 public class WeakRef<V> {

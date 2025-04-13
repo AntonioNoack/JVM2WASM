@@ -17,7 +17,6 @@ import java.security.AccessControlContext;
 import java.util.Random;
 
 import static jvm.ArrayAccessSafe.arrayLength;
-import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.unsignedLessThan;

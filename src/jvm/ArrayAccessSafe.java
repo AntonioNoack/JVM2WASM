@@ -2,7 +2,6 @@ package jvm;
 
 import annotations.Alias;
 
-import static jvm.JVM32.*;
 import static jvm.JVMFlags.ptrSize;
 import static jvm.JVMShared.*;
 import static jvm.ThrowJS.throwJs;

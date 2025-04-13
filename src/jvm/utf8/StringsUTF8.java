@@ -7,7 +7,6 @@ import jvm.Pointer;
 import java.nio.charset.Charset;
 import java.util.Locale;
 
-import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getClassId;
 import static jvm.Pointer.add;

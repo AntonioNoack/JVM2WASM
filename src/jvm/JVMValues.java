@@ -1,6 +1,6 @@
 package jvm;
 
-import static jvm.JVM32.createNativeArray1;
+import static jvm.JVMShared.createNativeArray1;
 import static utils.StaticClassIndices.OBJECT_ARRAY;
 
 public class JVMValues {

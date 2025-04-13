@@ -8,7 +8,6 @@ import annotations.UnsafePointerField;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import static jvm.JVM32.*;
 import static jvm.JVMShared.*;
 import static jvm.JavaReflect.getFieldOffset;
 import static jvm.JavaReflect.getFields;

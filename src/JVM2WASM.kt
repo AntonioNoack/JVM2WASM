@@ -4,8 +4,8 @@ import dependency.DependencyIndex
 import dependency.DependencyIndex.constructableClasses
 import dependency.StaticDependencies
 import hierarchy.HierarchyIndex
-import jvm.JVM32
 import jvm.JVMFlags.is32Bits
+import jvm.JVMShared
 import me.anno.io.Streams.readText
 import me.anno.maths.Maths.ceilDiv
 import me.anno.utils.Clock
@@ -240,7 +240,7 @@ fun canThrowError(methodSig: MethodSig): Boolean {
     return methodName(methodSig) !in cannotThrow
 }
 
-val cl: ClassLoader = JVM32::class.java.classLoader
+val cl: ClassLoader = JVMShared::class.java.classLoader
 val resources = cl.getResourceAsStream("resources.txt")!!.readText()
     .split("\n").map { it.trim() }.filter { !it.startsWith("//") && it.isNotBlank() }
     .map { Pair(it, (cl.getResourceAsStream(it) ?: throw FileNotFoundException("Missing $it")).readBytes()) }
@@ -249,7 +249,6 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
     clazz("engine/Engine")
 
-    clazz("jvm/JVM32")
     clazz("jvm/JVMShared")
     clazz("jvm/gc/GarbageCollector")
     clazz("jvm/MemDebug")
@@ -275,7 +274,6 @@ fun listEntryPoints(clazz: (String) -> Unit, method: (MethodSig) -> Unit) {
 
 fun listLibrary(clazz: (String) -> Unit) {
 
-    clazz("jvm/JVM32")
     clazz("jvm/JVMShared")
     clazz("jvm/MemDebug")
 
