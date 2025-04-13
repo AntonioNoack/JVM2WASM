@@ -31,7 +31,7 @@ val numTargetClusters = 20
 var disableClustersForInspection = true
 
 val writer = StringBuilder2(1 shl 16)
-val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/cpp")
+val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/cpp")
 
 val clock = Clock(LOGGER)
 

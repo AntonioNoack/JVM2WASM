@@ -10,10 +10,10 @@ import wasm.writer.WASMWriter.writeWASM
 
 private val LOGGER = LogManager.getLogger("CompileInvoker")
 
-val wasmFolder = documents.getChild("IdeaProjects/JVM2WASM/wasm")
+val wasmFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/wasm")
 val wasmTextFile = wasmFolder.getChild("jvm2wasm.wat")
 val wasmOutputFile = wasmFolder.getChild("jvm2wasm.wasm")
-val debugFolder = wasmFolder.getChild("debug").apply {
+val debugFolder = wasmFolder.getSibling("debug").apply {
     delete()
     mkdirs()
 }
