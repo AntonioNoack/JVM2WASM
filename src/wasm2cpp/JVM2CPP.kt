@@ -8,7 +8,7 @@ fun main() {
     jvm2wasm()
     val testWATParser = true
     if (testWATParser) {
-        validate()
+        validateWAT()
     }
     wasm2cppFromMemory()
     clock.total("JVM2CPP")

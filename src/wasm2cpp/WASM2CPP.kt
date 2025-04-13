@@ -45,7 +45,7 @@ fun main() {
     wasm2cpp()
 }
 
-fun validate() {
+fun validateWAT() {
     clock.start()
     val text = wasmTextFile.readTextSync()
     clock.stop("Loading WAT")
@@ -219,8 +219,11 @@ fun writeStructs() {
     }
     // todo for each valid static field, create a static-struct-thingy?
 
-    structFile
-        .writeBytes(writer.values, 0, writer.size)
+    structFile.write()
+}
+
+fun FileReference.write() {
+    writeBytes(writer.values, 0, writer.size)
     writer.clear()
 }
 
@@ -314,7 +317,7 @@ fun parseWAT(text: String): Module {
     return parser
 }
 
-private fun createFunctionByNameMap(
+fun createFunctionByNameMap(
     functions: ArrayList<FunctionImpl>, imports: List<Import>
 ): Map<String, FunctionImpl> {
     val size = functions.size + imports.size
@@ -359,10 +362,7 @@ fun writeHeader(
     defineReturnStructs(functions)
     defineImports(imports)
 
-    cppFolder.getChild("jvm2wasm-base.h")
-        .writeBytes(writer.values, 0, writer.size)
-    writer.clear()
-
+    cppFolder.getChild("jvm2wasm-base.h").write()
 }
 
 fun writeCluster(
@@ -372,8 +372,7 @@ fun writeCluster(
     writer.append("#include \"jvm2wasm-base.h\"\n\n")
     defineFunctionHeads(clustering.imports)
     defineFunctionImplementations(clustering.functions, globals, functionsByName, pureFunctions)
-    getClusterFile(i).writeBytes(writer.values, 0, writer.size)
-    writer.clear()
+    getClusterFile(i).write()
 }
 
 fun getClusterFile(i: Int): FileReference {
@@ -389,9 +388,7 @@ fun writeFuncTable(functions: Collection<FunctionImpl>, functionTable: List<Stri
     } catch (e: Throwable) {
         e.printStackTrace()
     }
-    cppFolder.getChild("jvm2wasm-funcTable.cpp")
-        .writeBytes(writer.values, 0, writer.size)
-    writer.clear()
+    cppFolder.getChild("jvm2wasm-funcTable.cpp").write()
 }
 
 fun writeNativeLogFunctions(imports: List<Import>) {
@@ -442,7 +439,5 @@ fun writeNativeLogFunctions(imports: List<Import>) {
         writer.append("}\n")
     }
 
-    cppFolder.getChild("jvm2wasm-nativeLog.cpp")
-        .writeBytes(writer.values, 0, writer.size)
-    writer.clear()
+    cppFolder.getChild("jvm2wasm-nativeLog.cpp").write()
 }

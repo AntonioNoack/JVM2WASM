@@ -4,7 +4,6 @@ import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
-import translator.JavaTypes.convertTypeToWASM
 import utils.StringBuilder2
 import wasm.instr.Comment
 import wasm.instr.Instruction
@@ -56,7 +55,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         this.function = function
         depth = 1
 
-        defineFunctionHead(function, true)
+        language.defineFunctionHead(function, true)
         writer.append(" {\n")
 
         if (function.funcName.startsWith("static_")) {
@@ -76,7 +75,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         begin().append("wasCalled = true").end()
     }
 
-    private fun begin(): StringBuilder2 {
+    fun begin(): StringBuilder2 {
         for (i in 0 until depth) writer.append("  ")
         return writer
     }
@@ -103,7 +102,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             Unreachable -> writeUnreachable()
             is ExprIfBranch -> writeIfBranch(instr, emptyList())
             is ExprCall -> writeExprCall(instr)
-            is FunctionTypeDefinition -> writeFunctionTypeDefinition(instr)
+            is FunctionTypeDefinition -> language.writeFunctionTypeDefinition(instr, this)
             is LoopInstr -> writeLoopInstr(instr)
             is GotoInstr -> writeGoto(instr)
             is BreakThisLoopInstr -> writeBreakThisLoop()
@@ -152,13 +151,14 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     }
 
     private fun writeNullDeclaration(instr: NullDeclaration) {
-        begin().append(convertTypeToWASM(instr.jvmType)).append(' ').append(instr.name)
-            .append(" = 0").end()
+        begin()
+        language.beginDeclaration(instr.name, instr.jvmType)
+        writer.append("0").end()
     }
 
     private fun writeDeclaration(instr: Declaration) {
         begin()
-            .append(convertTypeToWASM(instr.type)).append(' ').append(instr.name).append(" = ")
+        language.beginDeclaration(instr.name, instr.type)
         language.appendExpr(instr.initialValue.expr)
         writer.end()
     }
@@ -203,9 +203,10 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             writer.append("return ")
         } else if (instr.resultName != null) {
             if (instr.resultType != null) {
-                writer.append(instr.resultType).append(' ')
+                language.beginDeclaration(instr.resultName, instr.resultType)
+            } else {
+                writer.append(instr.resultName).append(" = ")
             }
-            writer.append(instr.resultName).append(" = ")
         }
 
         writer.append(instr.funcName).append('(')
@@ -214,32 +215,6 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             language.appendExpr(param.expr)
         }
         writer.append(")").end()
-    }
-
-    private fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition) {
-        val type = instr.funcType
-        val tmpType = instr.typeName
-        val tmpVar = instr.instanceName
-        // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
-        // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
-        begin().append("using ").append(tmpType).append(" = ")
-        if (type.results.isEmpty()) {
-            writer.append("void")
-        } else {
-            for (ri in type.results.indices) {
-                writer.append(type.results[ri])
-            }
-        }
-        writer.append("(*)(")
-        for (pi in type.params.indices) {
-            if (pi > 0) writer.append(", ")
-            writer.append(type.params[pi])
-        }
-        writer.append(")").end()
-        begin().append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
-            .append(tmpType).append(">(indirect[")
-        language.appendExpr(instr.indexExpr.expr)
-        writer.append("])").end()
     }
 
     private fun writeLoopInstr(instr: LoopInstr) {

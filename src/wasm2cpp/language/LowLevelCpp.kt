@@ -1,21 +1,29 @@
 package wasm2cpp.language
 
 import me.anno.utils.assertions.assertTrue
+import translator.JavaTypes.convertTypeToWASM
 import utils.StringBuilder2
 import utils.WASMTypes.i32
 import wasm.instr.*
+import wasm.parser.FunctionImpl
+import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
 import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
+import wasm2cpp.instr.FunctionTypeDefinition
 
-class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
+open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
+
+    override fun defineFunctionHead(function: FunctionImpl, needsParameterNames: Boolean) {
+        wasm2cpp.defineFunctionHead(function.funcName, function.params, function.results, needsParameterNames)
+    }
 
     override fun appendExpr(expr: Expr) {
         when (expr) {
-            is ConstExpr -> toConstString(expr)
-            is CallExpr -> toCallString(expr)
-            is UnaryExpr -> toUnaryString(expr)
-            is BinaryExpr -> toBinaryString(expr)
+            is ConstExpr -> appendConstExpr(expr)
+            is CallExpr -> appendCallExpr(expr)
+            is UnaryExpr -> appendUnaryExpr(expr)
+            is BinaryExpr -> appendBinaryExpr(expr)
             is VariableExpr -> dst.append(expr.name)
             is FieldGetExpr -> {
                 appendExprSafely(expr.instance)
@@ -37,7 +45,7 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         if (needsBrackets) dst.append(')')
     }
 
-    private fun toConstString(expr: ConstExpr) {
+    open fun appendConstExpr(expr: ConstExpr) {
         when (expr.type) {
             "f32", "float" -> dst.append(expr.value).append('f')
             "f64", "double" -> dst.append(expr.value)
@@ -58,7 +66,7 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         }
     }
 
-    private fun toCallString(expr: CallExpr) {
+    open fun appendCallExpr(expr: CallExpr) {
         dst.append(expr.funcName).append('(')
         val popped = expr.params
         for (i in popped.indices) {
@@ -68,7 +76,7 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         dst.append(')')
     }
 
-    private fun toUnaryString(expr: UnaryExpr) {
+    open fun appendUnaryExpr(expr: UnaryExpr) {
         when (val i = expr.instr) {
             is EqualsZeroInstruction -> {
                 if (expr.type == "boolean") {
@@ -85,16 +93,43 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                 appendExpr(expr.input)
                 dst.append(')')
             }
-            is NumberCastInstruction -> {
-                dst.append(i.prefix)
-                appendExprSafely(expr.input)
-                dst.append(i.suffix)
-            }
+            is NumberCastInstruction -> appendNumberCastExpr(expr, i)
             else -> throw NotImplementedError(expr.instr.toString())
         }
     }
 
-    private fun toBinaryString(expr: BinaryExpr) {
+    open fun appendNumberCastExpr(expr: UnaryExpr, instr: NumberCastInstruction) {
+        val prefix = getNumberCastPrefix(instr)
+        dst.append(prefix)
+        appendExprSafely(expr.input)
+        val remainingBrackets = prefix.count { it == '(' } - prefix.count { it == ')' }
+        for (i in 0 until remainingBrackets) {
+            dst.append(')')
+        }
+    }
+
+    private fun getNumberCastPrefix(i: NumberCastInstruction): String {
+        return when (i) {
+            Instructions.I32_TRUNC_F32S, Instructions.I32_TRUNC_F64S -> "static_cast<i32>(std::trunc("
+            Instructions.I64_TRUNC_F32S, Instructions.I64_TRUNC_F64S -> "static_cast<i64>(std::trunc("
+            Instructions.F64_PROMOTE_F32 -> "static_cast<f64>("
+            Instructions.F32_DEMOTE_F64 -> "static_cast<f32>("
+            Instructions.I64_EXTEND_I32S -> "static_cast<i64>("
+            Instructions.I64_EXTEND_I32U -> "static_cast<u64>((u32)("
+            Instructions.I32_WRAP_I64 -> "static_cast<i32>("
+            Instructions.F32_CONVERT_I32S, Instructions.F32_CONVERT_I64S -> "static_cast<f32>("
+            Instructions.F64_CONVERT_I32S, Instructions.F64_CONVERT_I64S -> "static_cast<f64>("
+            Instructions.F32_CONVERT_I32U, Instructions.F32_CONVERT_I64U -> "static_cast<f32>((u32)("
+            Instructions.F64_CONVERT_I32U, Instructions.F64_CONVERT_I64U -> "static_cast<f64>((u64)("
+            Instructions.I32_REINTERPRET_F32 -> "std::bit_cast<i32>("
+            Instructions.F32_REINTERPRET_I32 -> "std::bit_cast<f32>("
+            Instructions.I64_REINTERPRET_F64 -> "std::bit_cast<i64>("
+            Instructions.F64_REINTERPRET_I64 -> "std::bit_cast<f64>("
+            else -> throw NotImplementedError()
+        }
+    }
+
+    open fun appendBinaryExpr(expr: BinaryExpr) {
         val i0 = expr.compA
         val i1 = expr.compB
         when (val i = expr.instr) {
@@ -151,5 +186,37 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             }
             else -> throw NotImplementedError(i.toString())
         }
+    }
+
+    override fun beginDeclaration(name: String, type: String) {
+        dst.append(convertTypeToWASM(type)).append(' ').append(name).append(" = ")
+    }
+
+    override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {
+        val type = instr.funcType
+        val tmpType = instr.typeName
+        val tmpVar = instr.instanceName
+        // using CalculateFunc = int32_t(*)(int32_t, int32_t, float);
+        // CalculateFunc calculateFunc = reinterpret_cast<CalculateFunc>(funcPtr);
+        writer.begin()
+            .append("using ").append(tmpType).append(" = ")
+        if (type.results.isEmpty()) {
+            dst.append("void")
+        } else {
+            for (ri in type.results.indices) {
+                dst.append(type.results[ri])
+            }
+        }
+        dst.append("(*)(")
+        for (pi in type.params.indices) {
+            if (pi > 0) dst.append(", ")
+            dst.append(type.params[pi])
+        }
+        dst.append(");\n")
+        writer.begin()
+            .append(tmpType).append(' ').append(tmpVar).append(" = reinterpret_cast<")
+            .append(tmpType).append(">(indirect[")
+        appendExpr(instr.indexExpr.expr)
+        dst.append("]);\n")
     }
 }

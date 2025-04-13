@@ -10,7 +10,7 @@ fun defineFunctionHead(function: FunctionImpl, parameterNames: Boolean) {
     defineFunctionHead(function.funcName, function.params, function.results, parameterNames)
 }
 
-fun defineFunctionHead(funcName: String, params: List<Param>, results: List<String>, parameterNames: Boolean) {
+fun defineFunctionHead(funcName: String, params: List<Param>, results: List<String>, needsParameterNames: Boolean) {
     if (results.isEmpty()) {
         writer.append("void")
     } else {
@@ -23,7 +23,7 @@ fun defineFunctionHead(funcName: String, params: List<Param>, results: List<Stri
         val param = params[i]
         if (i > 0) writer.append(", ")
         writer.append(param.wasmType)
-        if (parameterNames) {
+        if (needsParameterNames) {
             writer.append(' ').append(param.name)
         }
     }
