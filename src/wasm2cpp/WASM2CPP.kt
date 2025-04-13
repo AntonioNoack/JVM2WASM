@@ -19,7 +19,7 @@ import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
-var generateHighLevelCpp = true
+var generateHighLevelCpp = false
 
 var enableCppTracing = true
 
