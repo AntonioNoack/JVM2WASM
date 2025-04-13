@@ -40,3 +40,4 @@ targets/cpp/jvm2wasm-structs.hpp
 targets/cpp/jvm2wasm-nativeLog.cpp
 targets/cpp/compile-log.txt
 targets/debug/
+targets/javascript/jvm2js.js

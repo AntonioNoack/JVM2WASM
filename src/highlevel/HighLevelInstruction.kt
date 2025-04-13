@@ -1,5 +1,6 @@
 package highlevel
 
+import interpreter.WASMEngine
 import me.anno.utils.assertions.assertTrue
 import utils.StringBuilder2
 import wasm.instr.Comment
@@ -12,6 +13,10 @@ import wasm.instr.Instruction
 abstract class HighLevelInstruction : Instruction {
 
     abstract fun toLowLevel(): List<Instruction>
+
+    override fun execute(engine: WASMEngine): String? {
+        return engine.executeInstructions(toLowLevel())
+    }
 
     override fun toString(depth: Int, builder: StringBuilder2) {
         val instructions = toLowLevel()

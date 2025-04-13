@@ -1,5 +1,7 @@
 package wasm2cpp
 
+import highlevel.FieldGetInstr
+import highlevel.FieldSetInstr
 import highlevel.HighLevelInstruction
 import highlevel.PtrDupInstr
 import me.anno.utils.Warning.unused
@@ -170,7 +172,7 @@ class StackToDeclarative(
         assertTrue(stack.size >= types.size) { "Expected $types for $funcName, got $stack" }
         val offset = stack.size - types.size
         val hasMismatch = types.indices.any { i ->
-            convertTypeToWASM(types[i]) != convertTypeToWASM(stack[i + offset].type)
+            convertTypeToWASM(types[i]) != convertTypeToWASM(stack[i + offset].jvmType)
         }
         assertFalse(hasMismatch) { "Expected $types for $funcName, got $stack" }
         val result = ArrayList<StackElement>(types.size)
@@ -185,7 +187,7 @@ class StackToDeclarative(
         val i0 = stack.removeLastOrNull()
             ?: assertFail("Tried popping $type, but stack was empty")
         // println("pop -> $i0 + $stack")
-        assertEquals(convertTypeToWASM(type), convertTypeToWASM(i0.type)) { "pop($type) vs $stack + $i0" }
+        assertEquals(convertTypeToWASM(type), convertTypeToWASM(i0.jvmType)) { "pop($type) vs $stack + $i0" }
         return i0
     }
 
@@ -297,7 +299,7 @@ class StackToDeclarative(
             val newName = nextTemporaryVariable()
             val typeJ = results[j]
             val field = FieldSig(totalType, "v$j", typeJ, false)
-            val expr = FieldGetExpr(field, resultVar)
+            val expr = FieldGetExpr(field, resultVar, true)
             append(Declaration(typeJ, newName, StackElement(expr, listOf(resultName), false)))
             push(typeJ, newName)
         }
@@ -489,7 +491,7 @@ class StackToDeclarative(
 
                 // confirm parameters to branch are correct
                 for (j in i.params.indices) {
-                    assertEquals(convertTypeToWASM(stack[baseSize + j].type), convertTypeToWASM(i.params[j]))
+                    assertEquals(convertTypeToWASM(stack[baseSize + j].jvmType), convertTypeToWASM(i.params[j]))
                 }
 
                 // only pop them, if their content is complicated expressions
@@ -499,8 +501,8 @@ class StackToDeclarative(
                     val stackJ = stack[j1]
                     if (!isNameOrNumber(stackJ.expr)) {
                         val newName = nextTemporaryVariable()
-                        append(Declaration(stackJ.type, newName, stackJ))
-                        val expr = VariableExpr(newName, stackJ.type)
+                        append(Declaration(stackJ.jvmType, newName, stackJ))
+                        val expr = VariableExpr(newName, stackJ.jvmType)
                         stack[j1] = StackElement(expr, listOf(newName), false)
                     }
                 }
@@ -645,6 +647,21 @@ class StackToDeclarative(
             Drop -> stack.pop()
             is Comment -> append(i)
             PtrDupInstr -> stack.add(stack.last())
+            is FieldGetInstr -> {
+                if (generateHighLevelCpp) {
+                    val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
+                    val dependencies = self?.dependencies ?: emptyList()
+                    val isBoolean = i.fieldSig.descriptor == "boolean"
+                    stack.add(StackElement(FieldGetExpr(i.fieldSig, self?.expr, false), dependencies, isBoolean))
+                } else writeInstructions(i.toLowLevel())
+            }
+            is FieldSetInstr -> {
+                if (generateHighLevelCpp) {
+                    val value = popElement(i.fieldSig.descriptor)
+                    val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
+                    append(FieldAssignment(i.fieldSig, self, value))
+                } else writeInstructions(i.toLowLevel())
+            }
             is HighLevelInstruction -> writeInstructions(i.toLowLevel())
             else -> assertFail("Unknown instruction type ${i.javaClass}")
         }

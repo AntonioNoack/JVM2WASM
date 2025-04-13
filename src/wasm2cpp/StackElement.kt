@@ -7,5 +7,5 @@ data class StackElement(
     val dependencies: List<String>,
     val isBoolean: Boolean
 ) {
-    val type get() = expr.type
+    val jvmType get() = expr.jvmType
 }

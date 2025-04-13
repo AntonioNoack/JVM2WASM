@@ -1,49 +1,62 @@
 package wasm2cpp.language
 
+import gIndex
 import me.anno.utils.assertions.assertTrue
+import utils.NativeTypes
 import utils.StringBuilder2
 import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.parser.FunctionImpl
 import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
-import wasm2cpp.expr.BinaryExpr
-import wasm2cpp.expr.ConstExpr
-import wasm2cpp.expr.UnaryExpr
+import wasm2cpp.expr.*
+import wasm2cpp.instr.FieldAssignment
 import wasm2cpp.instr.FunctionTypeDefinition
-import wasm2cpp.writer
+import wasm2cpp.instr.GotoInstr
+import wasm2js.classNameToJS
 
 class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
-    override fun defineFunctionHead(function: FunctionImpl, needsParameterNames: Boolean) {
-        writer.append("function ").append(function.funcName).append("(")
+    override fun defineFunctionHead(function: FunctionImpl, writer: FunctionWriter) {
+        if (writer.isStatic) dst.append("static ")
+        dst.append(function.funcName).append("(")
+        // todo if not static, skip first parameter, and replace it with "this"
         val params = function.params
         for (i in params.indices) {
             val param = params[i]
-            if (i > 0) writer.append(", ")
-            writer.append(param.name)
-            writer.append(" /* ").append(param.jvmType).append(" */")
+            if (i > 0) dst.append(", ")
+            dst.append(param.name)
+            dst.append(" /* ").append(param.jvmType).append(" */")
         }
-        writer.append(")")
+        dst.append(")")
+    }
+
+    override fun writeStaticInitCheck(writer: FunctionWriter) {
+        writer.begin().append("// todo check if static inited, only run this once\n")
+    }
+
+    override fun writeGoto(instr: GotoInstr) {
+        // todo make sure that instr.owner is a Loop
+        dst.append("continue ").append(instr.label)
     }
 
     override fun appendConstExpr(expr: ConstExpr) {
-        when (expr.type) {
-            "f32", "float" -> dst.append(expr.value).append('f')
-            "f64", "double" -> dst.append(expr.value)
-            "i32", "int" -> {
-                if (expr.value == Int.MIN_VALUE) dst.append("(i32)(1u << 31)")
-                else dst.append(expr.value)
-            }
-            "i64", "long" -> {
-                if (expr.value == Long.MIN_VALUE) dst.append("(i64)(1llu << 63)")
-                else dst.append(expr.value).append("ll")
-            }
+        when (expr.jvmType) {
+            "i64", "long" -> dst.append(expr.value).append("n")
+            "boolean" -> dst.append(
+                when (expr.value) {
+                    0 -> "false"
+                    1 -> "true"
+                    else -> throw IllegalArgumentException(expr.toString())
+                }
+            )
+            "f32", "f64", "i32",
+            in NativeTypes.nativeTypes -> dst.append(expr.value) // bytes, shorts, chars, ints, floats, doubles, ...
             else -> {
                 assertTrue(expr.value == 0 || expr.value == 0L) {
                     "Weird constant: ${expr.value} (${expr.value.javaClass})"
                 }
-                dst.append("0")
+                dst.append("null")
             }
         }
     }
@@ -160,8 +173,8 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         }
     }
 
-    override fun beginDeclaration(name: String, type: String) {
-        dst.append("let ").append(name).append(" /* ").append(type).append(" */ = ")
+    override fun beginDeclaration(name: String, jvmType: String) {
+        dst.append("let ").append(name).append(" /* ").append(jvmType).append(" */ = ")
     }
 
     override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {
@@ -169,5 +182,42 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             .append("const ").append(instr.instanceName).append(" = indirectFunctions[")
         appendExpr(instr.indexExpr.expr)
         dst.append("];\n")
+    }
+
+    override fun appendCallExpr(expr: CallExpr) {
+        if (expr.funcName == "createInstance" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
+            val classId = (expr.params[0] as ConstExpr).value as Int
+            dst.append("new ").append(classNameToJS(gIndex.classNamesByIndex[classId])).append("()")
+        } else {
+            // todo if is not static, use first argument as caller
+            // todo shorten name
+            dst.append(expr.funcName).append('(')
+            val popped = expr.params
+            for (i in popped.indices) {
+                if (i > 0) dst.append(", ")
+                appendExpr(popped[i])
+            }
+            dst.append(')')
+        }
+    }
+
+    override fun appendFieldGetExpr(expr: FieldGetExpr) {
+        if (expr.instance != null) {
+            appendExprSafely(expr.instance)
+            dst.append('.')
+        } else {
+            writeStaticInstance(expr.field)
+            dst.append('.')
+        }
+        dst.append(expr.field.name)
+    }
+
+    override fun writeFieldAssignment(assignment: FieldAssignment, writer: FunctionWriter) {
+        writer.begin()
+        if (assignment.instance != null) appendExpr(assignment.instance.expr)
+        else writeStaticInstance(assignment.field)
+        dst.append('.').append(assignment.field.name).append(" = ")
+        appendExpr(assignment.newValue.expr)
+        dst.append(";\n")
     }
 }

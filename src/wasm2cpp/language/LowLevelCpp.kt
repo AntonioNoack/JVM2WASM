@@ -1,21 +1,48 @@
 package wasm2cpp.language
 
+import hIndex
+import highlevel.FieldSetInstr
 import me.anno.utils.assertions.assertTrue
-import translator.JavaTypes.convertTypeToWASM
+import translator.LoadStoreHelper.getLoadCall
+import translator.LoadStoreHelper.getStaticLoadCall
+import translator.LoadStoreHelper.getStaticStoreCall
+import translator.LoadStoreHelper.getStoreCall
+import utils.FieldSig
+import utils.NativeTypes
 import utils.StringBuilder2
 import utils.WASMTypes.i32
+import utils.jvm2wasmTyped
 import wasm.instr.*
 import wasm.parser.FunctionImpl
 import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
 import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
+import wasm2cpp.instr.FieldAssignment
 import wasm2cpp.instr.FunctionTypeDefinition
+import wasm2cpp.instr.GotoInstr
 
 open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
 
-    override fun defineFunctionHead(function: FunctionImpl, needsParameterNames: Boolean) {
-        wasm2cpp.defineFunctionHead(function.funcName, function.params, function.results, needsParameterNames)
+    override fun defineFunctionHead(function: FunctionImpl, writer: FunctionWriter) {
+        wasm2cpp.defineFunctionHead(function.funcName, function.params, function.results, true)
+    }
+
+    override fun writeStaticInitCheck(writer: FunctionWriter) {
+        writer.begin().append("static bool wasCalled = false;\n")
+        writer.begin().append(
+            if (writer.function.results.isEmpty()) "if(wasCalled) return;\n"
+            else "if(wasCalled) return 0;\n"
+        )
+        writer.begin().append("wasCalled = true;\n")
+    }
+
+    override fun writeStaticInstance(field: FieldSig) {
+        dst.append(field.clazz.replace("/", "_"))
+    }
+
+    override fun writeGoto(instr: GotoInstr) {
+        dst.append("goto ").append(instr.label)
     }
 
     override fun appendExpr(expr: Expr) {
@@ -25,12 +52,47 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             is UnaryExpr -> appendUnaryExpr(expr)
             is BinaryExpr -> appendBinaryExpr(expr)
             is VariableExpr -> dst.append(expr.name)
-            is FieldGetExpr -> {
-                appendExprSafely(expr.instance)
-                dst.append('.').append(expr.field.name)
-            }
+            is FieldGetExpr -> appendFieldGetExpr(expr)
             else -> throw NotImplementedError(expr.javaClass.toString())
         }
+    }
+
+    open fun appendFieldGetExpr(expr: FieldGetExpr) {
+        if (expr.isResultField) {
+            appendExpr(expr.instance as VariableExpr)
+            dst.append('.')
+            dst.append(expr.field.name)
+        } else {
+            val offsetExpr = getOffsetExpr(expr.field)
+            if (expr.field.isStatic) {
+                val call = getStaticLoadCall(expr.jvmType)
+                appendCallExpr(CallExpr(call.name, listOf(offsetExpr), expr.jvmType))
+            } else {
+                val call = getLoadCall(expr.jvmType)
+                appendCallExpr(CallExpr(call.name, listOf(expr.instance!!, offsetExpr), expr.jvmType))
+            }
+        }
+    }
+
+    override fun writeFieldAssignment(assignment: FieldAssignment, writer: FunctionWriter) {
+        writer.begin()
+        val offsetExpr = getOffsetExpr(assignment.field)
+        val valueExpr = assignment.newValue.expr
+        if (assignment.field.isStatic) {
+            val call = getStaticStoreCall(assignment.jvmType)
+            appendCallExpr(CallExpr(call.name, listOf(valueExpr, offsetExpr), assignment.jvmType))
+        } else {
+            val call = getStoreCall(assignment.jvmType)
+            val instanceExpr = assignment.instance!!.expr
+            appendCallExpr(CallExpr(call.name, listOf(instanceExpr, valueExpr, offsetExpr), assignment.jvmType))
+        }
+        dst.append(";\n")
+    }
+
+    private fun getOffsetExpr(field: FieldSig): ConstExpr {
+        val isStatic = field.isStatic
+        val offset = FieldSetInstr.getFieldAddr(if (isStatic) null else 0, field)
+        return ConstExpr(offset, "int")
     }
 
     override fun appendExprSafely(expr: Expr) {
@@ -46,7 +108,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
     }
 
     open fun appendConstExpr(expr: ConstExpr) {
-        when (expr.type) {
+        when (expr.jvmType) {
             "f32", "float" -> dst.append(expr.value).append('f')
             "f64", "double" -> dst.append(expr.value)
             "i32", "int" -> {
@@ -79,7 +141,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
     open fun appendUnaryExpr(expr: UnaryExpr) {
         when (val i = expr.instr) {
             is EqualsZeroInstruction -> {
-                if (expr.type == "boolean") {
+                if (expr.jvmType == "boolean") {
                     dst.append("!")
                     appendExprSafely(expr.input)
                 } else {
@@ -188,8 +250,14 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         }
     }
 
-    override fun beginDeclaration(name: String, type: String) {
-        dst.append(convertTypeToWASM(type)).append(' ').append(name).append(" = ")
+    override fun beginDeclaration(name: String, jvmType: String) {
+        // todo this should be passed along explicitly
+        val isCustomType = jvmType !in hIndex.classFlags &&
+                jvmType !in NativeTypes.nativeTypes &&
+                !jvmType.startsWith("[") && jvmType != "null"
+        val wasmType = if (isCustomType) jvmType else jvm2wasmTyped(jvmType).wasmName
+        dst.append(wasmType)
+            .append(' ').append(name).append(" = ")
     }
 
     override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {

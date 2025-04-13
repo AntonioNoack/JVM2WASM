@@ -76,6 +76,10 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 incUsages(instr.newValue)
                 incAssign(instr.name)
             }
+            is FieldAssignment -> {
+                if (instr.instance != null) incUsages(instr.instance)
+                incUsages(instr.newValue)
+            }
             is Declaration -> {
                 incUsages(instr.initialValue)
                 incAssign(instr.name)
@@ -142,7 +146,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                     if (previous != null && previous < i) {
                         when (instructions[previous]) {
                             is NullDeclaration, is Declaration -> {
-                                instructions[i] = Declaration(instr.type, instr.name, instr.newValue)
+                                instructions[i] = Declaration(instr.jvmType, instr.name, instr.newValue)
                                 instructions[previous] = NopInstr
                             }
                             is Assignment -> {
@@ -170,7 +174,8 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                     previousAssignments.clear()
                 }
                 is IfBranch, is Jumping, is CppStoreInstr,
-                is ExprCall, is GotoInstr, is ExprReturn, Unreachable -> {
+                is ExprCall, is GotoInstr, is ExprReturn, Unreachable,
+                is FieldAssignment -> {
                     previousAssignments.clear()
                 }
                 BreakThisLoopInstr, is CppLoadInstr, is FunctionTypeDefinition, is Comment -> {}
@@ -206,7 +211,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             val instr = body[i2]
             if (instr is Assignment) {
                 val index = nameToIndex[instr.name]!!
-                body[index] = Declaration(instr.type, instr.name, instr.newValue)
+                body[index] = Declaration(instr.jvmType, instr.name, instr.newValue)
                 i2++
             } else break
         }
@@ -261,7 +266,8 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             is FunctionTypeDefinition,
             is GotoInstr, BreakThisLoopInstr,
             is CppLoadInstr,
-            is CppStoreInstr -> writer.add(instr)
+            is CppStoreInstr,
+            is FieldAssignment -> writer.add(instr)
             is ExprReturn -> writeExprReturn(instr, isLastInstr)
             is NullDeclaration -> writeNullDeclaration(instr)
             is Declaration -> return writeDeclaration(instr, nextInstr)
@@ -321,7 +327,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 nextInstr is ExprReturn && nextInstr.results.size == 1 &&
                 checkIsName(nextInstr.results[0].expr, instr.name)
         val newInstr = if (unused) {
-            Comment("unused: ${instr.type} ${instr.name} = ${instr.initialValue.expr}")
+            Comment("unused: ${instr.jvmType} ${instr.name} = ${instr.initialValue.expr}")
         } else if (inlineReturn) {
             ExprReturn(listOf(instr.initialValue))
         } else instr
@@ -335,13 +341,13 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         val inline = canInlineDeclaration(instr.name)
         val newInstr = if (unused) {
             val text = if (inline) {
-                "unused: ${instr.type} ${instr.name} = ${instr.newValue.expr}"
+                "unused: ${instr.jvmType} ${instr.name} = ${instr.newValue.expr}"
             } else {
                 "unused: ${instr.name} = ${instr.newValue.expr}"
             }
             Comment(text)
         } else if (inline) {
-            Declaration(instr.type, instr.name, instr.newValue)
+            Declaration(instr.jvmType, instr.name, instr.newValue)
         } else instr
         writer.add(newInstr)
     }
@@ -381,7 +387,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 if (unused) {
                     val text = if (declaration) {
                         nextInstr as Declaration
-                        "unused: ${nextInstr.type} $variableName ="
+                        "unused: ${nextInstr.jvmType} $variableName ="
                     } else {
                         "unused: $variableName ="
                     }

@@ -24,7 +24,8 @@ class FieldSetInstr(
     companion object {
         fun getFieldAddr(self: Number?, fieldSig: FieldSig): Int {
             assertEquals(self == null, fieldSig.isStatic)
-            val fieldOffset = GeneratorIndex.getFieldOffset(fieldSig)!!
+            val fieldOffset = GeneratorIndex.getFieldOffset(fieldSig)
+                ?: throw IllegalStateException("Missing field offset for $fieldSig")
             return if (self == null) {
                 lookupStaticVariable(fieldSig.clazz, fieldOffset)
             } else {
@@ -42,7 +43,7 @@ class FieldSetInstr(
     }
 
     override fun toLowLevel(): List<Instruction> {
-        val offset = getFieldAddr(if(fieldSig.isStatic) null else 0, fieldSig)
+        val offset = getFieldAddr(if (fieldSig.isStatic) null else 0, fieldSig)
         return when {
             alwaysUseFieldCalls -> listOf(i32Const(offset), storeCall)
             fieldSig.isStatic -> listOf(ptrConst(offset), storeInstr)

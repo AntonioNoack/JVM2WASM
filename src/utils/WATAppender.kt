@@ -284,9 +284,13 @@ fun appendClassInstanceTable(printer: StringBuilder2, ptr: Int, numClasses: Int)
     return appendData(printer, indexStartPtr, classData)
 }
 
-private fun hasBeenImplemented(sig: MethodSig): Boolean {
+fun hasBeenImplemented(sig: MethodSig): Boolean {
     val resolved = resolveMethod(sig, true) ?: return false
     return methodName(resolved) in implementedMethods
+}
+
+fun isConstructableOrStatic(sig: MethodSig): Boolean {
+    return sig.clazz in dIndex.constructableClasses || hIndex.isStatic(sig)
 }
 
 private fun fillInMethods(
@@ -302,10 +306,6 @@ private fun fillInMethods(
     val className = if (writeConstructors) "java/lang/reflect/Constructor" else "java/lang/reflect/Method"
     val methodClassIndex = gIndex.getClassId(className)
     val methodSize = gIndex.getInstanceSize(className)
-
-    fun isConstructableOrStatic(sig: MethodSig): Boolean {
-        return sig.clazz in dIndex.constructableClasses || hIndex.isStatic(sig)
-    }
 
     fun isInitAsExpected(sig: MethodSig): Boolean {
         return ((sig.name == INSTANCE_INIT) == writeConstructors)

@@ -4,5 +4,5 @@ import wasm.instr.Instruction
 
 data class UnaryExpr(
     val instr: Instruction, val input: Expr,
-    override val type: String
+    override val jvmType: String
 ) : Expr
