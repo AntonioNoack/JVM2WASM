@@ -39,3 +39,4 @@ targets/cpp/jvm2wasm-part*
 targets/cpp/jvm2wasm-structs.hpp
 targets/cpp/jvm2wasm-nativeLog.cpp
 targets/cpp/compile-log.txt
+targets/debug/
