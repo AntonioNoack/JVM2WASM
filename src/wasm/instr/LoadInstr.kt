@@ -9,7 +9,7 @@ import java.nio.ByteBuffer
 class LoadInstr(
     name: String, val wasmType: WASMType, val numBytes: Int,
     opcode: Opcode, val impl: (ByteBuffer) -> Number
-) : UnaryInstruction(name, ptrType, wasmType.wasmName, "This is a LoadInstr!", opcode) {
+) : UnaryInstruction(name, ptrType, wasmType.wasmName, UnaryOperator.ANY_LOAD, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val addr = engine.pop().toInt()

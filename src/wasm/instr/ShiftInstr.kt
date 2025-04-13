@@ -3,8 +3,8 @@ package wasm.instr
 import interpreter.WASMEngine
 import wasm.writer.Opcode
 
-class ShiftInstr(name: String, type: String, opcode: Opcode, val impl: (Number, Int) -> Number) :
-    BinaryInstruction(name, type, type, "This is a ShiftInstr!", opcode) {
+class ShiftInstr(name: String, type: String, operator: BinaryOperator, opcode: Opcode, val impl: (Number, Int) -> Number) :
+    BinaryInstruction(name, type, type, operator, opcode) {
 
     val isRight get() = name[6] == 'r'
     val isUnsigned get() = name[8] == 'u'

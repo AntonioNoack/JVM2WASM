@@ -69,7 +69,7 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
     }
 
     private fun toUnaryString(expr: UnaryExpr) {
-        when (expr.instr) {
+        when (val i = expr.instr) {
             is EqualsZeroInstruction -> {
                 if (expr.type == "boolean") {
                     dst.append("!")
@@ -80,13 +80,12 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                 }
             }
             is UnaryFloatInstruction -> {
-                val i = expr.instr
-                dst.append(i.call).append('(')
-                appendExprSafely(expr.input)
+                if (i.operator != UnaryOperator.NEGATE) dst.append("std::")
+                dst.append(i.operator.symbol).append('(')
+                appendExpr(expr.input)
                 dst.append(')')
             }
             is NumberCastInstruction -> {
-                val i = expr.instr
                 dst.append(i.prefix)
                 appendExprSafely(expr.input)
                 dst.append(i.suffix)
@@ -117,40 +116,36 @@ class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                     // flipped
                     if (i.castType != null) dst.append('(').append(i.castType).append(") ")
                     appendExprSafely(i1)
-                    dst.append(' ').append(i.flipped).append(' ')
+                    dst.append(' ').append(i.flipped.symbol).append(' ')
                     if (i.castType != null) dst.append('(').append(i.castType).append(") ")
                     appendExprSafely(i0)
                 } else {
                     if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                    if (canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
+                    if (i.castType == null && canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
                     else appendExprSafely(i0)
-                    dst.append(' ').append(i.operator).append(' ')
+                    dst.append(' ').append(i.operator.symbol).append(' ')
                     if (i.castType != null) dst.append('(').append(i.castType).append(") ")
-                    if (canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
+                    if (i.castType == null && canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
                     else appendExprSafely(i1)
                 }
             }
             is BinaryInstruction -> {
-                if (i.cppOperator.endsWith("(")) {
-                    if (i.cppOperator.startsWith("std::rot")) {
-                        dst.append(i.cppOperator)
-                            .append(if (i.popType == i32) "(u32) " else "(u64) ") // cast to unsigned required
+                if (i.operator.symbol.length > 1) {
+                    dst.append("std::").append(i.operator.symbol).append('(')
+                    if (i.operator.symbol.startsWith("rot")) {
+                        dst.append(if (i.popType == i32) "(u32) " else "(u64) ") // cast to unsigned required
                         appendExprSafely(i0)
-                        dst.append(", ")
-                        appendExpr(i1)
-                        dst.append(')')
                     } else {
-                        dst.append(i.cppOperator) // call(i1, i0)
                         appendExpr(i0)
-                        dst.append(", ")
-                        appendExpr(i1)
-                        dst.append(')')
                     }
+                    dst.append(", ")
+                    appendExpr(i1)
+                    dst.append(')')
                 } else {
-                    if (canAppendWithoutBrackets(i0, i.cppOperator, true)) appendExpr(i0)
+                    if (canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
                     else appendExprSafely(i0)
-                    dst.append(' ').append(i.cppOperator).append(' ')
-                    if (canAppendWithoutBrackets(i1, i.cppOperator, false)) appendExpr(i1)
+                    dst.append(' ').append(i.operator.symbol).append(' ')
+                    if (canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
                     else appendExprSafely(i1)
                 }
             }

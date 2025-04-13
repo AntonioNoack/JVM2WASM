@@ -5,8 +5,8 @@ import me.anno.utils.structures.lists.Lists.pop
 import utils.WASMTypes.i32
 import wasm.writer.Opcode
 
-class EqualsZeroInstruction(name: String, type: String, call: String, opcode: Opcode) :
-    UnaryInstruction(name, type, i32, call, opcode) {
+class EqualsZeroInstruction(name: String, type: String, opcode: Opcode) :
+    UnaryInstruction(name, type, i32, UnaryOperator.EQUALS_ZERO, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

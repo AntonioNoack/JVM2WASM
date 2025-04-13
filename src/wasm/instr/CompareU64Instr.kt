@@ -4,8 +4,8 @@ import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import wasm.writer.Opcode
 
-class CompareU64Instr(name: String, operator: String, opcode: Opcode) :
-    CompareInstr(name, operator, "i64", "u64", opcode) {
+class CompareU64Instr(name: String, symbol: BinaryOperator, opcode: Opcode) :
+    CompareInstr(name, symbol, "i64", "u64", opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

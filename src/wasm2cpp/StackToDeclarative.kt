@@ -10,7 +10,6 @@ import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
 import utils.FieldSig
-import utils.StringBuilder2
 import utils.WASMType
 import utils.WASMTypes.*
 import utils.ptrType
@@ -48,13 +47,9 @@ class StackToDeclarative(
 ) {
 
     companion object {
+
         private val LOGGER = LogManager.getLogger(StackToDeclarative::class)
-
-        private const val SYMBOLS = "+-*/:&|%<=>!"
         private val zeroForStaticInited = StackElement(ConstExpr(0, i32), emptyList(), true)
-
-        private val CONST_ZERO = ConstExpr(0, "i32")
-        private val CONST_ONE = ConstExpr(1, "i32")
 
         /**
          * find the next instruction after i
@@ -75,27 +70,28 @@ class StackToDeclarative(
             return expr is ConstExpr && expr.value is Number
         }
 
-        fun canAppendWithoutBrackets(expr: Expr, symbol: String, isLeft: Boolean): Boolean {
-            when (symbol) {
-                "+" -> {
+        fun canAppendWithoutBrackets(expr: Expr, operator: BinaryOperator, isLeft: Boolean): Boolean {
+            when (operator) {
+                BinaryOperator.ADD -> {
                     return expr is BinaryExpr && expr.instr is BinaryInstruction &&
-                            when (expr.instr.cppOperator) {
-                                "+", "-", "*", "/", "%" -> true
+                            when (expr.instr.operator) {
+                                BinaryOperator.ADD, BinaryOperator.SUB,
+                                BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER -> true
                                 else -> false
                             }
                 }
-                "-" -> {
+                BinaryOperator.SUB -> {
                     return expr is BinaryExpr && expr.instr is BinaryInstruction &&
-                            when (expr.instr.cppOperator) {
-                                "*", "/", "%" -> true
-                                "+" -> isLeft
+                            when (expr.instr.operator) {
+                                BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER -> true
+                                BinaryOperator.ADD -> isLeft
                                 else -> false
                             }
                 }
-                "*" -> {
+                BinaryOperator.MULTIPLY -> {
                     return expr is BinaryExpr && expr.instr is BinaryInstruction &&
-                            when (expr.instr.cppOperator) {
-                                "*" -> true
+                            when (expr.instr.operator) {
+                                BinaryOperator.MULTIPLY -> true
                                 else -> false
                             }
                 }
@@ -118,12 +114,9 @@ class StackToDeclarative(
                     // theoretically, '|' is supported, but I want clear code
                     return symbols.all { it == '&' }
                 }*/
-                "|" -> {
+                BinaryOperator.AND, BinaryOperator.XOR, BinaryOperator.OR -> {
                     return expr is BinaryExpr && expr.instr is BinaryInstruction &&
-                            when (expr.instr.cppOperator) {
-                                "|" -> true
-                                else -> false
-                            }
+                            expr.instr.operator == operator
                 }
                 else -> return false
             }

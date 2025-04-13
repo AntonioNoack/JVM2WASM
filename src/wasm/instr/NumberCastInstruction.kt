@@ -7,7 +7,7 @@ class NumberCastInstruction(
     name: String, val prefix: String, val suffix: String,
     popType: String, pushType: String, opcode: Opcode,
     val impl: (Number) -> Number
-) : UnaryInstruction(name, popType, pushType, "This is NumberCast!", opcode) {
+) : UnaryInstruction(name, popType, pushType, UnaryOperator.ANY_CAST, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
         val stack = engine.stack

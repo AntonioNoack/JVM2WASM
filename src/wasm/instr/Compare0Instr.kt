@@ -4,7 +4,7 @@ import interpreter.WASMEngine
 import me.anno.utils.structures.lists.Lists.pop
 import wasm.writer.Opcode
 
-class Compare0Instr(name: String, operator: String, type: String, opcode: Opcode) :
+class Compare0Instr(name: String, operator: BinaryOperator, type: String, opcode: Opcode) :
     CompareInstr(name, operator, type, null, opcode) {
 
     override fun execute(engine: WASMEngine): String? {
