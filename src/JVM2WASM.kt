@@ -15,7 +15,7 @@ import me.anno.utils.files.Files.formatFileSize
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
 import translator.GeneratorIndex.alignPointer
-import translator.GeneratorIndex.classNamesByIndex
+import translator.GeneratorIndex.classNames
 import translator.GeneratorIndex.dataStart
 import translator.GeneratorIndex.stringStart
 import translator.MethodTranslator.Companion.comments
@@ -713,7 +713,7 @@ private fun printStats(printer: StringBuilder2) {
         "Number of constant Strings: ${gIndex.stringSet.size}, " +
                 "size: ${gIndex.totalStringSize.formatFileSize()}"
     )
-    LOGGER.info("${constructableClasses.size}/${classNamesByIndex.size} classes are constructable")
+    LOGGER.info("${constructableClasses.size}/${classNames.size} classes are constructable")
 }
 
 val globals = HashMap<String, GlobalVariable>()

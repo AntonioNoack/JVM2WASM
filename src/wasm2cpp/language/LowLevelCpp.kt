@@ -1,5 +1,6 @@
 package wasm2cpp.language
 
+import gIndex
 import hIndex
 import highlevel.FieldSetInstr
 import jvm.JVMFlags.is32Bits
@@ -137,6 +138,14 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             "i64", "long" -> {
                 if (expr.value == Long.MIN_VALUE) dst.append("(i64)(1llu << 63)")
                 else dst.append(expr.value).append("ll")
+            }
+            "java/lang/String" -> {
+                if (expr.value is Int || expr.value is Long) {
+                    dst.append(expr.value)
+                } else {
+                    val stringValue = expr.value as String
+                    dst.append(gIndex.stringSet[stringValue]!!)
+                }
             }
             else -> {
                 assertTrue(expr.value == 0 || expr.value == 0L) {

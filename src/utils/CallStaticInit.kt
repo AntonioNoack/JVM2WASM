@@ -49,7 +49,7 @@ object CallStaticInit {
                 debugInfo.append("   Allocations:\n")
                 for (k in 0 until min(allocations.size, maxPrintedClasses)) {
                     val (classId, count) = allocations[k]
-                    val className = gIndex.classNamesByIndex[classId]
+                    val className = gIndex.classNames[classId]
                     if (classId in FIRST_ARRAY..LAST_ARRAY) {
                         debugInfo.append("   - ${count}x $className [${TrackCallocInstr.arraySize[classId]}]\n")
                     } else {

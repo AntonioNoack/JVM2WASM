@@ -189,7 +189,7 @@ fun writeStructs() {
 
     writer.append("#include \"jvm2wasm-types.h\"\n\n")
 
-    val classNames = gIndex.classNamesByIndex
+    val classNames = gIndex.classNames
     for (classId in classNames.indices) {
         val className = classNames[classId]
         if (className in dIndex.constructableClasses &&

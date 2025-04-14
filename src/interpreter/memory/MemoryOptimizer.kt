@@ -91,7 +91,7 @@ object MemoryOptimizer {
         // val classSizes0 = gIndex.getFieldOffset("jvm/GCTraversal", "classSizes", "[I", true)!!
         // val classSizes1 = lookupStaticVariable("jvm/GCTraversal", classSizes0)
         // val classSizes = readIntArray(memory, memory.getInt(classSizes1))
-        classSizes = gIndex.classNamesByIndex.map(gIndex::getInstanceSize).toIntArray()
+        classSizes = gIndex.classNames.map(gIndex::getInstanceSize).toIntArray()
 
         val instanceFields0 = gIndex.getFieldOffset("jvm/GCTraversal", "instanceFieldOffsets", "[I", true)!!
         val instanceFields1 = lookupStaticVariable("jvm/GCTraversal", instanceFields0)
@@ -184,7 +184,7 @@ object MemoryOptimizer {
                 usedAddresses += addr
 
                 val classId = readClassId(memory, addr)
-                assertTrue(classId in gIndex.classNamesByIndex.indices)
+                assertTrue(classId in gIndex.classNames.indices)
                 // println("Checking $addr, ${gIndex.classNamesByIndex[classId]}")
                 if (classId !in FIRST_ARRAY..LAST_ARRAY) {
                     val offsets = instanceFields[classId]

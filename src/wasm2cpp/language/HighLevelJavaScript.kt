@@ -256,10 +256,13 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     override fun appendCallExpr(expr: CallExpr) {
         if (expr.funcName == "createInstance" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
             val classId = (expr.params[0] as ConstExpr).value as Int
-            dst.append("new ").append(classNameToJS(gIndex.classNamesByIndex[classId])).append("()")
+            dst.append("new ").append(classNameToJS(gIndex.classNames[classId])).append("()")
         } else if (expr.funcName == "getClassIdPtr" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
             val classId = (expr.params[0] as ConstExpr).value as Int
-            dst.append(classNameToJS(gIndex.classNamesByIndex[classId])).append(".LAMBDA_INSTANCE")
+            dst.append(classNameToJS(gIndex.classNames[classId])).append(".LAMBDA_INSTANCE")
+        } else if (expr.funcName == "findClass" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
+            val classId = (expr.params[0] as ConstExpr).value as Int
+            dst.append(classNameToJS(gIndex.classNames[classId])).append(".CLASS_INSTANCE")
         } else {
             // todo if is not static, use first argument as caller
             // todo shorten name
@@ -293,10 +296,10 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter) {
-        writer.begin().append("throw 'loadInstr not yet implemented';\n")
+        writer.begin().append("throw new Error('loadInstr not supported');\n")
     }
 
     override fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter) {
-        writer.begin().append("throw 'storeInstr not yet implemented';\n")
+        writer.begin().append("throw new Error('storeInstr not supported');\n")
     }
 }

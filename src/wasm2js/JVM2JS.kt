@@ -8,6 +8,7 @@ import jvm2wasm
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
 import utils.*
+import utils.DefaultClassLayouts.GC_FIELD_NAME
 import utils.MethodResolver.resolveMethod
 import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
@@ -69,8 +70,28 @@ fun wasm2js(
         }
     }
 
+    // what do we need? name, shortName, fields, methods
+    writer.append("// class instances\n")
+    writer.append("const CLASS_INSTANCES = [];\n") // only named classes
+    writer.append(
+        "" +
+                "function createClass(name) {\n" +
+                "   const clazz = new java_lang_Class();\n" +
+                "   clazz.name = wrapString(name);\n" +
+                "   if(name.length) CLASS_INSTANCES.push(clazz);\n" +
+                "   return clazz;\n" +
+                "}\n\n"
+    )
+
+    fun writeClassInstanceCreateCall(className: String) {
+        var className1 = className
+        if (className1 in hIndex.syntheticClasses) className1 = ""
+        writer.append("createClass(\"").append(className1).append("\");\n")
+    }
+
     // todo group them by package...
-    val classNames = gIndex.classNamesByIndex
+    val classNames = gIndex.classNames
+    var hadJavaClass = false
     for (classId in classNames.indices) {
 
         val className = classNames[classId]
@@ -88,6 +109,13 @@ fun wasm2js(
         val staticFields = staticFields0.fields
         val instanceFields = instanceFields0.fields
         val methods = hIndex.methodsByClass[className] ?: emptyList()
+
+        if (hadJavaClass) {
+            writer.append("  static CLASS_INSTANCE = ")
+            writeClassInstanceCreateCall(className)
+        } else {
+            writer.append("  static CLASS_INSTANCE = null;\n")
+        }
 
         val isConstructable = className in dIndex.constructableClasses
         val isAbstract = hIndex.isAbstractClass(className)
@@ -116,6 +144,7 @@ fun wasm2js(
 
         if (isConstructable && instanceFields.isNotEmpty()) {
             for ((name, data) in instanceFields) {
+                if (name == GC_FIELD_NAME) continue
                 val value = hIndex.finalFields[FieldSig(className, name, data.jvmType, false)]
                 writer.append("  ").append(name).append(" = ")
                 appendValue(value, data.jvmType)
@@ -156,6 +185,17 @@ fun wasm2js(
 
         writer.size-- // delete last \n
         writer.append("}\n\n")
+
+        if (className == "java/lang/Class") {
+            writer.append("// late-init class instances\n")
+            for (classIdI in 0..classId) {
+                val classNameI = classNames[classIdI]
+                writer.append(classNameToJS(classNameI)).append(".CLASS_INSTANCE = ")
+                writeClassInstanceCreateCall(classNameI)
+            }
+            writer.append("\n")
+            hadJavaClass = true
+        }
     }
 
     // todo instead of createArray, create the corresponding arrays

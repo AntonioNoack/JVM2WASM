@@ -102,7 +102,8 @@ fun ByteArrayOutputStream2.writeLE64At(value: Double, at: Int) {
 
 private fun fillInClassNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val name = gIndex.classNamesByIndex[clazz].replace('/', '.') // getName() returns name with dots
+        var name = gIndex.classNames[clazz].replace('/', '.') // getName() returns name with dots
+        if (name in hIndex.syntheticClasses) name = ""
         val strPtr = gIndex.getString(name, classInstanceTablePtr, classData)
         classData.writePointerAt(strPtr, clazz * classSize + OFFSET_CLASS_NAME)
     }
@@ -110,10 +111,15 @@ private fun fillInClassNames(numClasses: Int, classData: ByteArrayOutputStream2,
 
 private fun fillInClassSimpleNames(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val fullName = gIndex.classNamesByIndex[clazz]
-        val simpleName = fullName.split('/', '.').last()
-        val strPtr = gIndex.getString(simpleName, classInstanceTablePtr, classData)
-        classData.writePointerAt(strPtr, clazz * classSize + OFFSET_CLASS_SIMPLE_NAME)
+        val fullName = gIndex.classNames[clazz]
+        if (fullName in hIndex.syntheticClasses) {
+            val strPtr = gIndex.getString("", classInstanceTablePtr, classData)
+            classData.writePointerAt(strPtr, clazz * classSize + OFFSET_CLASS_SIMPLE_NAME)
+        } else {
+            val simpleName = fullName.split('/', '.').last()
+            val strPtr = gIndex.getString(simpleName, classInstanceTablePtr, classData)
+            classData.writePointerAt(strPtr, clazz * classSize + OFFSET_CLASS_SIMPLE_NAME)
+        }
     }
 }
 
@@ -125,7 +131,7 @@ private fun fillInClassIndices(numClasses: Int, classData: ByteArrayOutputStream
 
 private fun fillInClassModifiers(numClasses: Int, classData: ByteArrayOutputStream2, classSize: Int) {
     for (clazz in 0 until numClasses) {
-        val className = gIndex.classNamesByIndex[clazz]
+        val className = gIndex.classNames[clazz]
         val modifiers = hIndex.classFlags[className] ?: 0
         classData.writeLE32At(modifiers, clazz * classSize + OFFSET_CLASS_MODIFIERS)
     }
@@ -144,7 +150,7 @@ private fun fillInFields(
     val fieldCache = HashMap<FieldEntry, Int>()
     for (classIndex in 0 until numClasses) {
 
-        val className = gIndex.classNamesByIndex[classIndex]
+        val className = gIndex.classNames[classIndex]
 
         val instanceFields0 = gIndex.getFieldOffsets(className, false).fields
         val staticFields0 = gIndex.getFieldOffsets(className, true).fields
@@ -323,7 +329,7 @@ private fun fillInMethods(
     val offsetClassMethods = if (writeConstructors) OFFSET_CLASS_CONSTRUCTORS else OFFSET_CLASS_METHODS
     for (classId in 0 until numClasses) {
         // find all methods with valid call signature
-        val clazzName = gIndex.classNamesByIndex[classId]
+        val clazzName = gIndex.classNames[classId]
         val superClass = hIndex.superClass[clazzName]
         val superClassIdx = if (superClass != null) gIndex.getClassId(superClass) else -1
         val superMethods =
@@ -534,7 +540,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
     var ptr = staticFieldsStartPtr
     val staticFieldOffsets = ByteArrayOutputStream2(numClasses * 4)
     for (i in 0 until numClasses) {
-        val className = gIndex.classNamesByIndex[i]
+        val className = gIndex.classNames[i]
         val fieldOffsets = gIndex.getFieldOffsets(className, true)
         val size = fieldOffsets.offset
 

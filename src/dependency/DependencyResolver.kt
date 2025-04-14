@@ -31,7 +31,7 @@ import me.anno.utils.algorithms.Recursion
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.types.Booleans.hasFlag
 import resolvedMethods
-import translator.GeneratorIndex.classNamesByIndex
+import translator.GeneratorIndex.classNames
 import translator.GeneratorIndex.fieldOffsets
 import utils.*
 import utils.Descriptor.Companion.voidDescriptor
@@ -326,7 +326,7 @@ class DependencyResolver {
     private fun addStaticInitsForFields() {
         for ((index, offsets) in fieldOffsets) {
             if (index.hasFlag(1) && offsets.hasFields()) { // static
-                remaining.add(MethodSig.c(classNamesByIndex[index shr 1], STATIC_INIT, voidDescriptor))
+                remaining.add(MethodSig.c(classNames[index shr 1], STATIC_INIT, voidDescriptor))
             }
         }
     }

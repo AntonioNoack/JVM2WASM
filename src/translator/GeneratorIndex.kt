@@ -142,7 +142,7 @@ object GeneratorIndex {
         }.funcName
     }
 
-    val classNamesByIndex = ArrayList<String>(4096)
+    val classNames = ArrayList<String>(4096)
     val classIndex = HashMap<String, Int>(4096)
 
     var lockClasses = false
@@ -167,7 +167,7 @@ object GeneratorIndex {
 
     private fun addClassIndex(name: String): Int {
         return classIndex.getOrPut(name) {
-            classNamesByIndex.add(name)
+            classNames.add(name)
             classIndex.size
         }
     }

@@ -548,8 +548,8 @@ fun ensureIndexForConstructableClasses() {
 fun ensureIndexForInterfacesAndSuperClasses() {
     LOGGER.info("[ensureIndexForInterfacesAndSuperClasses]")
     var i = 0 // size could change
-    while (i < gIndex.classNamesByIndex.size) {
-        val clazzName = gIndex.classNamesByIndex[i++]
+    while (i < gIndex.classNames.size) {
+        val clazzName = gIndex.classNames[i++]
         val superClass = hIndex.superClass[clazzName]
         if (superClass != null) gIndex.getClassId(superClass)
         val interfaces = hIndex.interfaces[clazzName]

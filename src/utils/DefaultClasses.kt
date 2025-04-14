@@ -32,7 +32,7 @@ object DefaultClasses {
         for (i in predefinedClasses.indices) {
             val clazz = predefinedClasses[i]
             gIndex.classIndex[clazz] = i
-            gIndex.classNamesByIndex.add(clazz)
+            gIndex.classNames.add(clazz)
         }
 
         StaticClassIndices.validateClassIndices()

@@ -12,6 +12,9 @@ import utils.StaticFieldOffsets.*
 import wasm.instr.FuncType
 
 object DefaultClassLayouts {
+
+    const val GC_FIELD_NAME = "__classId_gcGen"
+
     fun <V> eq(a: V, b: V) {
         if (a != b) throw IllegalStateException("$a != $b")
     }
@@ -51,7 +54,7 @@ object DefaultClassLayouts {
         gIndex.stringArrayClass = gIndex.getClassId(if (byteStrings) "[B" else "[C")
 
         // object overhead
-        eq(object0, "__classId_gcGen", "int", -objectOverhead, OFFSET_OBJECT_CLASS_ID)
+        eq(object0, GC_FIELD_NAME, "int", -objectOverhead, OFFSET_OBJECT_CLASS_ID)
 
         // instance arrays
         eq("[]", "length", "int", 0, OFFSET_ARRAY_LENGTH)

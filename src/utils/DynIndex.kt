@@ -113,7 +113,7 @@ object DynIndex {
         val pic = gIndex.dynMethodIndices[clazz]
         if (pic != null) return pic
         if (clazz == 0) throw IllegalStateException("java/lang/Object must have dynamic function table!")
-        val superClazz = hIndex.superClass[gIndex.classNamesByIndex[clazz]] ?: "java/lang/Object"
+        val superClazz = hIndex.superClass[gIndex.classNames[clazz]] ?: "java/lang/Object"
         return getDynamicMethodsByClassIndex(gIndex.getClassId(superClazz))
     }
 
@@ -226,14 +226,14 @@ object DynIndex {
 
         for (classId in 0 until numClasses) {
             val dynamicMethods = getDynamicMethodsByClassIndex(classId)
-            val clazz = gIndex.classNamesByIndex[classId]
+            val clazz = gIndex.classNames[classId]
 
             val print = false
             if (print) println("  dynMethodIndex[$classId: $clazz]: $dynamicMethods")
             printDynamicIndex = print
 
             if (printDebug) debugInfo.append("[").append(classId).append("]: ").append(clazz)
-            if (gIndex.classNamesByIndex[classId] !in dIndex.constructableClasses) {
+            if (gIndex.classNames[classId] !in dIndex.constructableClasses) {
                 if (printDebug) debugInfo.append(" not constructable\n")
                 if (print) println("  writing $classId: $clazz to null, because not constructable")
                 methodTable.writeLE32(0)
@@ -290,7 +290,7 @@ object DynIndex {
         ptr += 16
 
         for (classId in 0 until numClasses) {
-            val clazz = gIndex.classNamesByIndex[classId]
+            val clazz = gIndex.classNames[classId]
             if (clazz in NativeTypes.nativeTypes) {
                 // link empty node, shouldn't be ever instantiated
                 // link empty instead of creating an exception for runtime speed

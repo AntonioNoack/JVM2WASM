@@ -127,7 +127,7 @@ class WASMEngine(memorySize: Int) {
         val stringClassId = data.getInt() and 0xffffff
         assertEquals(StaticClassIndices.STRING, stringClassId) {
             "Expected string class for $addr, got $stringClassId" +
-                    " (${gIndex.classNamesByIndex.getOrNull(stringClassId)})"
+                    " (${gIndex.classNames.getOrNull(stringClassId)})"
         }
         data.position(addr + StaticFieldOffsets.OFFSET_STRING_VALUE)
         val dataAddr = if (is32Bits) data.getInt() else data.getLong().toInt()
