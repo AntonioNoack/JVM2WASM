@@ -1,11 +1,11 @@
 package wasm2cpp
 
-import jvm.JVMFlags.is32Bits
+import hIndex
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
+import utils.MethodSig
 import utils.StringBuilder2
-import utils.jvm2wasmTyped
 import wasm.instr.Comment
 import wasm.instr.Instruction
 import wasm.instr.Instructions.Unreachable
@@ -14,6 +14,7 @@ import wasm.parser.FunctionImpl
 import wasm.parser.GlobalVariable
 import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import wasm2cpp.expr.CallExpr
+import wasm2cpp.expr.VariableExpr
 import wasm2cpp.instr.*
 import wasm2cpp.language.TargetLanguage
 
@@ -33,34 +34,22 @@ import wasm2cpp.language.TargetLanguage
 class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: TargetLanguage) {
 
     companion object {
-        val cppKeywords = (
-                "alignas,alignof,and,and_eq,asm,atomic_cancel,atomic_commit,atomic_noexcept,auto,bitand,bitor,bool,break," +
-                        "case,catch,char,char8_t,char16_t,char32_t,class,compl,concept,const,consteval,constexpr,constinit," +
-                        "const_cast,continue,contract_assert,co_await,co_return,co_yield,,decltype,default,delete,do," +
-                        "double,dynamic_cast,else,enum,explicit,export,extern,false,float,for,friend,goto,if,inline,int," +
-                        "long,mutable,namespace,new,noexcept,not,not_eq,nullptr,operator,or,or_eq,private,protected,public," +
-                        "reflexpr,register,reinterpret_cast,requires,return,short,signed,sizeof,static,static_assert," +
-                        "static_cast,struct,switch,synchronized,template,this,thread_local,throw,true,try,typedef," +
-                        "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq," +
-                        // reserved by default imports :/
-                        "OVERFLOW,_OVERFLOW,UNDERFLOW,_UNDERFLOW,NULL"
-                ).split(',').toHashSet()
-
         private var debugInstructions = false
     }
 
     var depth = 0
     lateinit var function: FunctionImpl
     var isStatic = false
+    var className: String = ""
 
-    fun write(function: FunctionImpl, isStatic: Boolean) {
+    fun write(function: FunctionImpl, className: String, isStatic: Boolean) {
 
         this.function = function
         this.isStatic = isStatic
+        this.className = className
 
         begin()
-        language.defineFunctionHead(function, this)
-        writer.append(" {\n")
+        language.writeFunctionStart(function, this)
         depth++
 
         if (function.funcName.startsWith("static_")) {
@@ -91,8 +80,8 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     private fun writeInstruction(instr: Instruction) {
         if (debugInstructions) writeDebugInfo(instr)
         when (instr) {
-            is CppLoadInstr -> writeLoadInstr(instr)
-            is CppStoreInstr -> writeStoreInstr(instr)
+            is CppLoadInstr -> language.writeLoadInstr(instr, this)
+            is CppStoreInstr -> language.writeStoreInstr(instr, this)
             is NullDeclaration -> writeNullDeclaration(instr)
             is Declaration -> writeDeclaration(instr)
             is Assignment -> writeAssignment(instr)
@@ -100,6 +89,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             is ExprReturn -> writeExprReturn(instr)
             Unreachable -> writeUnreachable()
             is ExprIfBranch -> writeIfBranch(instr, emptyList())
+            is UnresolvedCallAssignment -> writeUnresolvedCallAssignment(instr)
+            is CallAssignment -> writeCallAssignment(instr)
+            is UnresolvedExprCall -> writeUnresolvedExprCall(instr)
             is ExprCall -> writeExprCall(instr)
             is FunctionTypeDefinition -> language.writeFunctionTypeDefinition(instr, this)
             is LoopInstr -> writeLoopInstr(instr)
@@ -129,26 +121,6 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         begin().append("/* ").append(instr.javaClass.simpleName)
         if (instr is Declaration) writer.append(", ").append(instr.initialValue.dependencies)
         writer.append(" */\n")
-    }
-
-    private val usz = if (is32Bits) "(u32)" else "(u64)"
-
-    private fun writeLoadInstr(instr: CppLoadInstr) {
-        begin().append(instr.type).append(' ').append(instr.newName).append(" = ")
-            .append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
-        language.appendExprSafely(instr.addrExpr.expr)
-        writer.append("))[0]").end()
-    }
-
-    private fun writeStoreInstr(instr: CppStoreInstr) {
-        begin().append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
-        language.appendExprSafely(instr.addrExpr.expr)
-        writer.append("))[0] = ")
-        if (instr.type != instr.memoryType) {
-            writer.append('(').append(instr.memoryType).append(") ")
-        }
-        language.appendExpr(instr.valueExpr.expr)
-        writer.end()
     }
 
     private fun writeNullDeclaration(instr: NullDeclaration) {
@@ -200,8 +172,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             .append(function.funcName).append("\")").end()
     }
 
-    private fun writeExprCall(instr: ExprCall) {
-
+    private fun writeCallAssignmentBegin(instr: CallAssignment) {
         begin()
 
         if (instr.isReturn) {
@@ -213,8 +184,52 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
                 writer.append(instr.resultName).append(" = ")
             }
         }
+    }
 
+    private fun writeCalled(self: StackElement?, isSpecial: Boolean, sig: MethodSig) {
+        var appendSuper = false
+        if (isSpecial && !isStatic) {
+            // todo is this good enough???
+            val expr = self!!.expr
+            if (expr is VariableExpr &&
+                expr.name == function.params[0].name &&
+                sig.className == hIndex.superClass[className]
+            ) appendSuper = true
+        }
+        if (appendSuper) {
+            writer.append("super")
+        } else if (self != null) {
+            language.appendExpr(self.expr)
+        } else {
+            language.writeStaticInstance(sig.className)
+        }
+    }
+
+    private fun writeCallAssignment(instr: CallAssignment) {
+        writeCallAssignmentBegin(instr)
         language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, instr.resultType ?: "?"))
+        writer.end()
+    }
+
+    private fun writeUnresolvedCallAssignment(instr: UnresolvedCallAssignment) {
+        writeCallAssignmentBegin(instr)
+        writeCalled(instr.self, instr.isSpecial, instr.sig)
+        writer.append('.')
+        language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, instr.resultType ?: "?"))
+        writer.end()
+    }
+
+    private fun writeExprCall(instr: ExprCall) {
+        begin()
+        language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, "?"))
+        writer.end()
+    }
+
+    private fun writeUnresolvedExprCall(instr: UnresolvedExprCall) {
+        begin()
+        writeCalled(instr.self, instr.isSpecial, instr.sig)
+        writer.append('.')
+        language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, "?"))
         writer.end()
     }
 

@@ -156,14 +156,14 @@ private fun fillInFields(
         }
 
         val instanceFields = instanceFields0.map { (name, field) ->
-            val sig = FieldSig(className, name, field.type, false)
-            val modifiers = isNativeType(field.type).toInt(ACC_NATIVE)
+            val sig = FieldSig(className, name, field.jvmType, false)
+            val modifiers = isNativeType(field.jvmType).toInt(ACC_NATIVE)
             FieldEntry(field, sig, modifiers)
         }
 
         val staticFields = staticFields0.map { (name, field) ->
-            val sig = FieldSig(className, name, field.type, true)
-            val modifiers = ACC_STATIC + isNativeType(field.type).toInt(ACC_NATIVE)
+            val sig = FieldSig(className, name, field.jvmType, true)
+            val modifiers = ACC_STATIC + isNativeType(field.jvmType).toInt(ACC_NATIVE)
             FieldEntry(field, sig, modifiers)
         }
 
@@ -235,7 +235,7 @@ private fun appendFieldInstance(
     classData.writeClass(fieldClassIndex)
     classData.writeLE32(field.field.offset) // slot
     classData.writePointer(namePtr) // name
-    val typeClassIndex = getTypeClassIndex(field.field.type)
+    val typeClassIndex = getTypeClassIndex(field.field.jvmType)
     classData.writePointer(getClassInstancePtr(typeClassIndex, indexStartPtr, classSize)) // type
     classData.writePointer(getClassInstancePtr(declaringClassIndex, indexStartPtr, classSize)) // declaring class
     classData.writePointer(annotationsPtr)
@@ -290,7 +290,7 @@ fun hasBeenImplemented(sig: MethodSig): Boolean {
 }
 
 fun isConstructableOrStatic(sig: MethodSig): Boolean {
-    return sig.clazz in dIndex.constructableClasses || hIndex.isStatic(sig)
+    return sig.className in dIndex.constructableClasses || hIndex.isStatic(sig)
 }
 
 private fun fillInMethods(
@@ -316,8 +316,8 @@ private fun fillInMethods(
             hasBeenImplemented(sig) &&
                     isConstructableOrStatic(sig) &&
                     isInitAsExpected(sig) &&
-                    isCallable(sig)
-        }.groupBy { it.clazz }
+                    isCallableUsingReflections(sig)
+        }.groupBy { it.className }
 
     val methodsForClass = ArrayList<Collection<MethodSig>>(numClasses)
     val offsetClassMethods = if (writeConstructors) OFFSET_CLASS_CONSTRUCTORS else OFFSET_CLASS_METHODS
@@ -386,7 +386,7 @@ private fun fillInMethods(
     }
 }
 
-fun isCallable(sig: MethodSig): Boolean {
+fun isCallableUsingReflections(sig: MethodSig): Boolean {
     return CallSignature.c(sig) in hIndex.implementedCallSignatures
 }
 
@@ -547,7 +547,7 @@ fun appendStaticInstanceTable(printer: StringBuilder2, ptr0: Int, numClasses: In
                 .append(className).append(": *").append(ptr).append("\n")
             fieldOffsets.allFields().entries.sortedBy { it.value.offset }.forEach { (name, data) ->
                 debugInfo.append("  *").append(data.offset).append(": ").append(name)
-                    .append(": ").append(data.type).append("\n")
+                    .append(": ").append(data.jvmType).append("\n")
             }
         }
         ptr += size

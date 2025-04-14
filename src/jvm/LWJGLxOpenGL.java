@@ -17,7 +17,8 @@ import java.nio.*;
 import java.util.function.Consumer;
 
 import static engine.Engine.runsInBrowser;
-import static jvm.JVMShared.*;
+import static jvm.JVMShared.arrayOverhead;
+import static jvm.JVMShared.castToPtr;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.add;
 import static jvm.Pointer.getAddrS;
@@ -645,41 +646,19 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @WASM(code = "i32.const 8 i32.rotl")
-    public static native int argb2rgba(int data);
-
-    @NoThrow
-    @WASM(code = "i32.const 8 i32.rotr")
-    public static native int rgba2argb(int data);
-
-    @NoThrow
-    @SuppressWarnings("CommentedOutCode")
     public static void argb2rgba(int[] data) {
-        Pointer addr = add(castToPtr(data), arrayOverhead);
-        Pointer end = add(addr, (long) data.length << 2);
-        while (Pointer.unsignedLessThan(addr, end)) {
-            write32(addr, argb2rgba(read32(addr)));
-            addr = add(addr, 4);
-        }
-        /*for (int i = 0, l = data.length; i < l; i++) {
+        for (int i = 0, l = data.length; i < l; i++) {
             int di = data[i];
             data[i] = (di << 8) | (di >>> 24);
-        }*/
+        }
     }
 
     @NoThrow
-    @SuppressWarnings("CommentedOutCode")
     public static void rgba2argb(int[] data) {
-        Pointer addr = add(castToPtr(data), arrayOverhead);
-        Pointer end = add(addr, (long) data.length << 2);
-        while (Pointer.unsignedLessThan(addr, end)) {
-            write32(addr, rgba2argb(read32(addr)));
-            addr = add(addr, 4);
-        }
-        /*for (int i = 0, l = data.length; i < l; i++) {
+        for (int i = 0, l = data.length; i < l; i++) {
             int di = data[i];
             data[i] = (di >>> 8) | (di << 24);
-        }*/
+        }
     }
 
     @NoThrow

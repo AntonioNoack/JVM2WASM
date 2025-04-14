@@ -128,7 +128,7 @@ class DelayedLambdaUpdate(
     }
 
     private val isInterface
-        get() = hIndex.isInterfaceClass(calledMethod.clazz) &&
+        get() = hIndex.isInterfaceClass(calledMethod.className) &&
                 hIndex.isAbstract(calledMethod)
     private val callingStatic get() = hIndex.isStatic(calledMethod)
     private val needsSelf get() = (!callingStatic || !isInterface)
@@ -137,7 +137,7 @@ class DelayedLambdaUpdate(
     fun generateSyntheticMethod() {
 
         // build synthetic method code
-        val mt = MethodTranslator(0, bridgeMethod.clazz, bridgeMethod.name, bridgeMethod.descriptor)
+        val mt = MethodTranslator(0, bridgeMethod.className, bridgeMethod.name, bridgeMethod.descriptor)
         val wantedDescriptor = calledMethod.descriptor
         val wantedParams = wantedDescriptor.params
 
@@ -217,7 +217,7 @@ class DelayedLambdaUpdate(
         val isConstructor = calledMethod.name == INSTANCE_INIT
         if (isConstructor) {
             // to do we have to register this potentially as creating a new class
-            val clazz = calledMethod.clazz
+            val clazz = calledMethod.className
             mt.visitTypeInsn(NEW_INSTR, clazz)
             // if is new instance, duplicate result
             mt.visitInsn(DUP_INSTR)

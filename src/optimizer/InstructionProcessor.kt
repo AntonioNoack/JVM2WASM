@@ -10,5 +10,5 @@ fun interface InstructionProcessor : InstructionReplacer {
         }
     }
 
-    fun processInstruction(instruction: Instruction)
+    fun processInstruction(instr: Instruction)
 }

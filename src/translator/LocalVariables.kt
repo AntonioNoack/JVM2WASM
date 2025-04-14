@@ -8,10 +8,17 @@ import translator.MethodTranslator.Companion.renameVariables
 import utils.*
 import utils.Param.Companion.getSampleJVMType
 import wasm.instr.*
-import wasm2cpp.FunctionWriter
+import wasm2cpp.language.HighLevelJavaScript.Companion.jsKeywords
+import wasm2cpp.language.LowLevelCpp.Companion.cppKeywords
 import kotlin.math.max
 
 class LocalVariables {
+
+    companion object {
+        fun isKeyword(name: String): Boolean {
+            return name in cppKeywords || name in jsKeywords
+        }
+    }
 
     // name,type -> newName, because types can change in JVM, but they can't in WASM
     val localVars = ArrayList<LocalVariableOrParam>()
@@ -119,7 +126,7 @@ class LocalVariables {
     private fun sanitizeVariableName(name: String): String? {
         if (name.length > 32) return null // we want it readable
         if (name == "this") return "self"
-        if (name in FunctionWriter.cppKeywords) return "_$name"
+        if (isKeyword(name)) return "_$name"
         // check if name is fine
         if (name.all { it in 'A'..'Z' || it in 'a'..'z' }) {
             return name
@@ -147,7 +154,7 @@ class LocalVariables {
         if (builder.length == 0) return null
         val name1 = builder.toString()
         if (name1 == "this") return "self"
-        if (name1 in FunctionWriter.cppKeywords ||
+        if (isKeyword(name1) ||
             name1.startsWith("tmp") ||
             name1.startsWith("global_")
         ) return "_$name1"

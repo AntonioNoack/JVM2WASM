@@ -21,7 +21,7 @@ object MethodResolver {
     }
 
     private fun checkNotConstructable(methodSig: MethodSig) {
-        val clazz = methodSig.clazz
+        val clazz = methodSig.className
         val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
         val isStatic = hIndex.isStatic(methodSig)
         if (!(clazz2 in dIndex.constructableClasses || isStatic) &&
@@ -51,7 +51,7 @@ object MethodResolver {
      * checking whether method maybe is abstract
      * */
     private fun getAbstractMethod(methodSig: MethodSig, superClass: String?): MethodSig? {
-        val clazz = methodSig.clazz
+        val clazz = methodSig.className
         if (hIndex.isAbstractClass(clazz) && hIndex.isAbstract(methodSig)) {
             if (debugFindMethod) println("method & clazz are abstract -> returning $methodSig")
             val superMethodSig = if (superClass != null) {
@@ -76,7 +76,7 @@ object MethodResolver {
      * check interfaces for default methods
      * */
     private fun getInterfaceMethod(methodSig: MethodSig, superClass: String?): MethodSig? {
-        val clazz = methodSig.clazz
+        val clazz = methodSig.className
         val interfaces1 = hIndex.interfaces[clazz] ?: emptyList()
         val superInterfaces = hIndex.interfaces[superClass] ?: emptyList()
         for (interfaceI in interfaces1) {
@@ -89,7 +89,7 @@ object MethodResolver {
     }
 
     private fun resolveMethod(methodSig: MethodSig): MethodSig? {
-        val clazz = methodSig.clazz
+        val clazz = methodSig.className
         val superClass = hIndex.superClass[clazz]
         if (debugFindMethod) println("searching $clazz")
 

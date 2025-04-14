@@ -1,10 +1,18 @@
 package highlevel
 
-import utils.InterfaceSig
-import wasm.instr.Instruction
+import utils.MethodSig
+import wasm.instr.Call
+import wasm.instr.FuncType
 
-class InvokeInterfaceInstr(val sig: InterfaceSig): HighLevelInstruction() {
-    override fun toLowLevel(): List<Instruction> {
-        TODO("Not yet implemented")
+class InvokeInterfaceInstr(
+    original: MethodSig, resolvedMethods: Set<MethodSig>, funcType: FuncType,
+    stackPushId: Int, val interfaceId: Int,
+) : UnresolvedMethodInstr(original, resolvedMethods, funcType, stackPushId) {
+    override fun getResolutionCall(): Call {
+        return Call.resolveInterface
+    }
+
+    override fun getResolutionId(): Int {
+        return interfaceId
     }
 }

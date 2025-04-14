@@ -23,6 +23,18 @@ object ActuallyUsedIndex {
         }
     }
 
+    fun add(caller: MethodSig, called: Collection<MethodSig>) {
+        val callerName = methodName(caller)
+        val calledName = called.map { calledI -> methodName(calledI) }
+        val changed0 = calledName.any { calledNameI ->
+            usedBy.getOrPut(calledNameI) { HashSet() }.add(callerName)
+        }
+        val changed1 = uses.getOrPut(callerName) { HashSet() }.addAll(calledName)
+        if ((changed0 || changed1) && isLocked) {
+            throw IllegalStateException("Cannot add dependencies after resolution!, $callerName -> $calledName")
+        }
+    }
+
     fun addEntryPointsToActuallyUsed() {
         listEntryPoints({
             for (sig in hIndex.methodsByClass[it]!!) {

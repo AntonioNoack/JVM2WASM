@@ -21,9 +21,7 @@ import hIndex
 import hierarchy.DelayedLambdaUpdate
 import hierarchy.DelayedLambdaUpdate.Companion.getSynthClassName
 import hierarchy.FirstClassIndexer
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
-import highlevel.PtrDupInstr
+import highlevel.*
 import ignoreNonCriticalNullPointers
 import jvm.JVMFlags.is32Bits
 import me.anno.io.Streams.writeLE32
@@ -58,7 +56,6 @@ import translator.LoadStoreHelper.getStaticStoreCall
 import translator.LoadStoreHelper.getStoreCall
 import translator.LoadStoreHelper.getStoreInstr
 import translator.LoadStoreHelper.getVIOStoreCall
-import translator.ResolveIndirect.resolveIndirect
 import useHighLevelInstructions
 import useResultForThrowables
 import useWASMExceptions
@@ -69,7 +66,6 @@ import utils.CommonInstructions.ATHROW_INSTR
 import utils.CommonInstructions.MONITOR_ENTER
 import utils.CommonInstructions.MONITOR_EXIT
 import utils.CommonInstructions.NEW_ARRAY_INSTR
-import utils.CommonInstructions.NEW_INSTR
 import utils.PrintUsed.printUsed
 import wasm.instr.*
 import wasm.instr.Const.Companion.f32Const
@@ -985,8 +981,7 @@ class MethodTranslator(
                 // Optimizing them against being dropped isn't worth it, because these are parameter names,
                 // and in most cases (99%), there is a field with that same name.
                 printer.push("java/lang/String")
-                val address = gIndex.getString(value)
-                printer.append(ptrConst(address))
+                printer.append(StringConst(value, gIndex.getString(value)))
                 if (comments) {
                     printer.comment(
                         "\"" + value.shorten(100)
@@ -1049,8 +1044,8 @@ class MethodTranslator(
     fun checkNotNull0(clazz: String, name: String, getCaller: (Builder) -> Unit) {
         if (checkNullPointers) {
             getCaller(printer)
-            printer.append(i32Const(gIndex.getString(clazz)))
-            printer.append(i32Const(gIndex.getString(name)))
+            printer.append(StringConst(clazz, gIndex.getString(clazz)))
+            printer.append(StringConst(name, gIndex.getString(name)))
             printer.append(Call("checkNotNull"))
             if (useResultForThrowables) handleThrowable()
         }
@@ -1084,7 +1079,7 @@ class MethodTranslator(
 
     fun visitMethodInsn2(opcode0: Int, sig0: MethodSig, isInterface: Boolean, checkThrowable: Boolean): Boolean {
 
-        val owner = sig0.clazz
+        val owner = sig0.className
         val name = sig0.name
         val descriptor = sig0.descriptor
         val isStatic = opcode0 == INVOKESTATIC || name == STATIC_INIT
@@ -1119,22 +1114,17 @@ class MethodTranslator(
                 assertTrue(sig0 in dIndex.usedInterfaceCalls)
                 beforeDynamicCall(owner, getCaller)
                 val options = findConstructableChildImplementations(sig0)
-                if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow, options)) {
+                ActuallyUsedIndex.add(this.sig, options)
 
-                    // load interface/function index
-                    getCaller(printer)
-                    printer.append(i32Const(gIndex.getInterfaceIndex(InterfaceSig.c(name, sig0.descriptor))))
-                    // looks up class, goes to interface list, binary searches function, returns func-ptr
-                    // instance, function index -> function-ptr
+                // looks up class, goes to interface list, binary searches function, returns func-ptr
+                // instance, function index -> function-ptr
 
-                    printer.push(i32).append(Call.resolveInterface)
-                    val callInstr = CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow))
-                    callInstr.options = options
-                    printer.pop(i32).append(callInstr)
-                    ActuallyUsedIndex.add(this.sig, sig1)
-                    if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
+                getCaller(printer)
+                val interfaceId = gIndex.getInterfaceIndex(InterfaceSig.c(name, sig0.descriptor))
+                val funcType = gIndex.getType(false, sig0.descriptor, calledCanThrow)
+                printer.append(InvokeInterfaceInstr(sig0, options, funcType, getStackPushId(), interfaceId))
+                if (comments) printer.comment("invoke interface $owner, $name, $descriptor")
 
-                }
                 afterDynamicCall(splitArgs, ret)
             }
             INVOKEVIRTUAL -> {
@@ -1144,9 +1134,10 @@ class MethodTranslator(
                     getCaller(printer)
 
                     if (comments) printer.comment("not constructable class, $sig1, $owner, $name, $descriptor")
-                    val methodNamePtr = gIndex.getString(methodName(sig1))
+                    val methodName = methodName(sig1)
+                    val methodNamePtr = gIndex.getString(methodName)
                     printer
-                        .append(ptrConst(methodNamePtr))
+                        .append(StringConst(methodName, methodNamePtr))
                         // instance, function index -> function-ptr
                         .append(Call.resolveIndirectFail)
                         .append(Unreachable)
@@ -1211,67 +1202,46 @@ class MethodTranslator(
                                 printer.append(inline)
                                 printer.comment("virtual-inlined $sig2")
                             } else {
-                                stackPush()
-                                val name2 = methodName(sig2)
-                                val name3 = methodName(sig0)
-                                if (name3 == "java_lang_Object_hashCode_I" ||
-                                    name3 == "java_util_function_Consumer_accept_Ljava_lang_ObjectV_accept_JV" ||
-                                    name3 == "me_anno_gpu_OSWindow_addCallbacks_V"
-                                ) throw IllegalStateException("$sig0 -> $sig2 must not be final!!!")
-                                if (hIndex.isAbstract(sig2)) {
-                                    throw IllegalStateException("Calling abstract method: $sig0 -> $sig1 -> $sig2")
-                                }
+                                assertFalse(hIndex.isAbstract(sig2))
                                 ActuallyUsedIndex.add(this.sig, sig2)
-                                printer.append(Call(name2))
-                                stackPop()
+                                printer.append(InvokeFinalInstr(sig0, sig2, getStackPushId()))
                             }
                         }
                     }
                 } else {
                     beforeDynamicCall(owner, getCaller)
                     val options = findConstructableChildImplementations(sig0)
-                    if (!resolveIndirect(sig0, splitArgs, ret, getCaller, calledCanThrow, options)) {
-                        // method can have well-defined place in class :) -> just precalculate that index
-                        // looks up the class, and in the class-function lut, it looks up the function ptr
-                        // get the Nth element on the stack, where N = |args|
-                        // problem: we don't have generic functions, so we need all combinations
-                        getCaller(printer)
-                        val funcPtr = gIndex.getDynMethodIdxOffset(sig0)
-                        printer.append(i32Const(funcPtr))
-                            // instance, function index -> function-ptr
-                            .append(Call.resolveIndirect)
-                            .push(i32)
-                        val callInstr = CallIndirect(gIndex.getType(false, sig0.descriptor, calledCanThrow))
-                        callInstr.options = options
-                        printer.pop(i32).append(callInstr)
-                        ActuallyUsedIndex.add(this.sig, sig1)
-                        if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
-                    }
+                    ActuallyUsedIndex.add(this.sig, options)
+
+                    // method can have well-defined place in class :) -> just precalculate that index
+                    // looks up the class, and in the class-function lut, it looks up the function ptr
+                    // get the Nth element on the stack, where N = |args|
+                    // problem: we don't have generic functions, so we need all combinations
+                    getCaller(printer)
+
+                    val dynMethodIdOffset = gIndex.getDynMethodIdOffset(sig0)
+                    val funcType = gIndex.getType(false, sig0.descriptor, calledCanThrow)
+                    printer.append(InvokeDynamicInstr(sig0, options, funcType, getStackPushId(), dynMethodIdOffset))
+                    if (comments) printer.comment("invoke virtual $owner, $name, $descriptor")
+
                     afterDynamicCall(splitArgs, ret)
                 }
             }
-            // typically, <init>, but also can be private or super function; -> no resolution required
+            // typically, <init>, but also can be super function; -> no resolution required
             INVOKESPECIAL -> {
                 if (!ignoreNonCriticalNullPointers) {
                     checkNotNull0(owner, name, getCaller)
                 }
+                assertFalse(hIndex.isAbstract(sig1))
                 pop(splitArgs, false, ret)
                 val inline = hIndex.inlined[sig1]
                 if (inline != null) {
                     printer.append(inline)
                     if (comments) printer.comment("special-inlined $sig1")
                 } else {
-                    if (sig1.descriptor == Descriptor.voidDescriptor && sig1 in hIndex.emptyFunctions) {
-                        printer.drop()
-                        if (comments) printer.comment("skipping empty $sig1")
-                    } else {
-                        stackPush()
-                        val name2 = methodName(sig1)
-                        assertFalse(hIndex.isAbstract(sig1))
-                        ActuallyUsedIndex.add(this.sig, sig1)
-                        printer.append(Call(name2))
-                        stackPop()
-                    }
+                    ActuallyUsedIndex.add(this.sig, sig1)
+                    val stackPushId = getStackPushId()
+                    printer.append(InvokeSpecialInstr(sig0, sig1, stackPushId))
                 }
             }
             // static, no resolution required
@@ -1282,13 +1252,9 @@ class MethodTranslator(
                     printer.append(inline)
                     if (comments) printer.comment("static-inlined $sig1")
                 } else {
-                    stackPush()
-                    val name2 = methodName(sig1)
                     assertFalse(hIndex.isAbstract(sig1))
                     ActuallyUsedIndex.add(this.sig, sig1)
-                    printer.append(Call(name2))
-                    if (comments) printer.comment("static call")
-                    stackPop()
+                    printer.append(InvokeStaticInstr(sig0, sig1, getStackPushId()))
                 }
             }
             else -> throw NotImplementedError("unknown call ${OpCode[opcode0]}, $owner, $name, $descriptor, $isInterface\n")
@@ -1301,9 +1267,9 @@ class MethodTranslator(
         return calledCanThrow
     }
 
-    fun stackPush() {
+    private fun stackPush() {
         if (enableStackPush) {
-            val callIndex = getCallIndex()
+            val callIndex = getStackPushId()
             val callConst = i32Const(callIndex)
             // if previous and before that is stackPop, and before that is call,
             //  and before that is stackPush, and before that is same constant, drop popping and skip pushing
@@ -1327,7 +1293,7 @@ class MethodTranslator(
         }
     }
 
-    fun stackPop() {
+    private fun stackPop() {
         if (enableStackPush) {
             printer.append(Call.stackPop)
         }
@@ -1631,8 +1597,7 @@ class MethodTranslator(
         val type = Descriptor.parseTypeMixed(type0)
         if (printOps) println("  [${OpCode[opcode]}] $type")
         when (opcode) {
-            NEW_INSTR -> {
-                // new instance
+            NEW -> {
                 stackPush()
                 printer.push(ptrType)
                     .append(i32Const(gIndex.getClassId(type)))
@@ -1641,8 +1606,9 @@ class MethodTranslator(
                 stackPop()
                 if (useResultForThrowables) handleThrowable()
             }
-            0xbd -> {
-                // a-new array, type doesn't matter
+            ANEWARRAY -> {
+                // we don't care about the type here,
+                // because an Object array is always just an array of pointers
                 stackPush()
                 printer.pop(i32).push(ptrType)
                 printer.append(Call.createObjectArray)
@@ -1650,8 +1616,7 @@ class MethodTranslator(
                 stackPop()
                 if (useResultForThrowables) handleThrowable()
             }
-            0xc0 -> {
-                // check cast
+            CHECKCAST -> {
                 if (checkClassCasts) {
                     stackPush()
                     printer.pop(ptrType).push(ptrType)
@@ -1661,8 +1626,7 @@ class MethodTranslator(
                     if (useResultForThrowables) handleThrowable()
                 }
             }
-            0xc1 -> {
-                // instance of
+            INSTANCEOF -> {
                 printer.pop(ptrType).push(i32)
                 printer.appendInstanceOf(type)
                 if (comments) printer.comment(type)
@@ -1827,10 +1791,8 @@ class MethodTranslator(
             if (comments) printer.comment("skipped <clinit>, because empty")
             return
         }
-        stackPush()
-        printer.append(Call(methodName(sig)))
         ActuallyUsedIndex.add(this.sig, sig)
-        stackPop()
+        printer.append(InvokeStaticInstr(sig, sig, getStackPushId()))
         if (useResultForThrowables && canThrowError(sig)) {
             handleThrowable()
         }
@@ -2029,11 +1991,12 @@ class MethodTranslator(
     }
 
     private var lastLine = -1
-    private fun getCallIndex(): Int {
+    private fun getStackPushId(): Int {
+        if (!enableStackPush) return -1
         val stackTraceTable = stackTraceTable
         if (line != lastLine) {
             lastLine = line
-            stackTraceTable.writeLE32(gIndex.getString(sig.clazz))
+            stackTraceTable.writeLE32(gIndex.getString(sig.className))
             stackTraceTable.writeLE32(gIndex.getString(sig.name))
             stackTraceTable.writeLE32(line)
         }

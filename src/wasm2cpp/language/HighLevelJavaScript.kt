@@ -1,38 +1,56 @@
 package wasm2cpp.language
 
 import gIndex
+import me.anno.utils.Color.hex16
 import me.anno.utils.assertions.assertTrue
 import utils.NativeTypes
 import utils.StringBuilder2
-import utils.WASMTypes.i32
 import wasm.instr.*
 import wasm.parser.FunctionImpl
 import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
+import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
-import wasm2cpp.instr.FieldAssignment
-import wasm2cpp.instr.FunctionTypeDefinition
-import wasm2cpp.instr.GotoInstr
+import wasm2cpp.instr.*
 import wasm2js.classNameToJS
+import kotlin.streams.toList
 
-class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
+class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
-    override fun defineFunctionHead(function: FunctionImpl, writer: FunctionWriter) {
+    companion object {
+        private val allowedCodepoints = " .,-#+%!?:;§&/()[]{}=*^".codePoints().toList()
+
+        val jsKeywords = "function,var,let,const".split(',').toHashSet()
+    }
+
+    private var thisVariable: String? = null
+
+    override fun appendName(name: String) {
+        dst.append(if (name == thisVariable) "this" else name)
+    }
+
+    override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
         if (writer.isStatic) dst.append("static ")
         dst.append(function.funcName).append("(")
-        // todo if not static, skip first parameter, and replace it with "this"
+        // if not static, skip first parameter, and replace it with "this"
         val params = function.params
+        assertTrue(writer.isStatic || params.isNotEmpty()) {
+            "${function.funcName} isn't static, but also doesn't have params, $params"
+        }
         for (i in params.indices) {
+            if (i == 0 && !writer.isStatic) continue
             val param = params[i]
-            if (i > 0) dst.append(", ")
+            if (!dst.endsWith("(")) dst.append(", ")
             dst.append(param.name)
             dst.append(" /* ").append(param.jvmType).append(" */")
         }
-        dst.append(")")
+        dst.append(") {\n")
+        thisVariable = if (!writer.isStatic) params[0].name else null
     }
 
     override fun writeStaticInitCheck(writer: FunctionWriter) {
-        writer.begin().append("// todo check if static inited, only run this once\n")
+        val className = classNameToJS(writer.className)
+        writer.begin().append("").append(className).append(".static_V = DO_NOTHING;\n")
     }
 
     override fun writeGoto(instr: GotoInstr) {
@@ -52,6 +70,27 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             )
             "f32", "f64", "i32",
             in NativeTypes.nativeTypes -> dst.append(expr.value) // bytes, shorts, chars, ints, floats, doubles, ...
+            "java/lang/String" -> {
+                if (expr.value == 0 || expr.value == 0L) {
+                    dst.append("null")
+                } else {
+                    val stringValue = expr.value as String
+                    // todo escape string as necessary
+                    dst.append("wrapString(\"")
+                    for (codepoint in stringValue.codePoints()) {
+                        when (codepoint) {
+                            in '0'.code..'9'.code,
+                            in 'A'.code..'Z'.code,
+                            in 'a'.code..'z'.code,
+                            in allowedCodepoints -> {
+                                dst.append(codepoint.toChar())
+                            }
+                            else -> dst.append("\\u").append(hex16(codepoint))
+                        }
+                    }
+                    dst.append("\")")
+                }
+            }
             else -> {
                 assertTrue(expr.value == 0 || expr.value == 0L) {
                     "Weird constant: ${expr.value} (${expr.value.javaClass})"
@@ -121,8 +160,7 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             Instructions.I64_EXTEND_I32U -> dst.append(" >>> 0)")
             Instructions.I32_WRAP_I64 -> dst.append(" & 0xFFFFFFFFn) | 0")
             Instructions.F32_CONVERT_I32U, Instructions.F64_CONVERT_I32U -> dst.append(" >>> 0")
-            Instructions.F32_CONVERT_I64U -> dst.append(" & 0xFFFFFFFFn)")
-            Instructions.F64_CONVERT_I64U -> dst.append(" & 0xFFFFFFFFFFFFFFFFn)")
+            Instructions.F32_CONVERT_I64U, Instructions.F64_CONVERT_I64U -> dst.append(" & 0xFFFFFFFFFFFFFFFFn)")
             else -> {
                 val remainingBrackets = prefix.count { it == '(' } - prefix.count { it == ')' }
                 for (i in 0 until remainingBrackets) {
@@ -137,36 +175,65 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         val i1 = expr.compB
         when (val i = expr.instr) {
             is ShiftInstr -> {
-                val needsCast = i.isRight && i.isUnsigned
-                if (needsCast) {
-                    dst.append(if (i.popType == i32) "(i32)((u32) " else "(i64)((u64) ")
-                }
                 appendExprSafely(i0)
-                dst.append(if (i.isRight) " >> " else " << ")
+                dst.append(
+                    when (i.operator) {
+                        BinaryOperator.SHIFT_LEFT -> " << "
+                        BinaryOperator.SHIFT_RIGHT_SIGNED -> " >> "
+                        BinaryOperator.SHIFT_RIGHT_UNSIGNED -> " >>> "
+                        else -> throw NotImplementedError()
+                    }
+                )
                 appendExprSafely(i1)
-                if (needsCast) {
-                    dst.append(')')
+            }
+            is CompareInstr -> {
+                val castType = when (i.castType) {
+                    "u32" -> " >>> 0"
+                    "u64" -> " & 0xffffffffffffffffn"
+                    null -> null
+                    else -> throw NotImplementedError()
+                }
+                // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
+                if (isNumber(i0) && !isNumber(i1)) {
+                    // flipped
+                    appendExprSafely(i1)
+                    if (castType != null) dst.append(castType)
+                    dst.append(' ').append(i.flipped.symbol).append(' ')
+                    appendExprSafely(i0)
+                    if (castType != null) dst.append(castType)
+                } else {
+                    if (castType == null && canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
+                    else appendExprSafely(i0)
+                    if (castType != null) dst.append(castType)
+                    dst.append(' ').append(i.operator.symbol).append(' ')
+                    if (castType == null && canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
+                    else appendExprSafely(i1)
+                    if (castType != null) dst.append(castType)
                 }
             }
-            is CompareInstr -> super.appendBinaryExpr(expr)
             is BinaryInstruction -> {
-                if (i.operator.symbol.length > 1) {
-                    dst.append("std::").append(i.operator.symbol).append('(')
-                    if (i.operator.symbol.startsWith("rot")) {
-                        dst.append(if (i.popType == i32) "(u32) " else "(u64) ") // cast to unsigned required
-                        appendExprSafely(i0)
-                    } else {
-                        appendExpr(i0)
+                when (i.operator) {
+                    BinaryOperator.ADD, BinaryOperator.SUB,
+                    BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER,
+                    BinaryOperator.AND, BinaryOperator.OR, BinaryOperator.XOR -> {
+                        if (canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
+                        else appendExprSafely(i0)
+                        dst.append(' ').append(i.operator.symbol).append(' ')
+                        if (canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
+                        else appendExprSafely(i1)
                     }
-                    dst.append(", ")
-                    appendExpr(i1)
-                    dst.append(')')
-                } else {
-                    if (canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
-                    else appendExprSafely(i0)
-                    dst.append(' ').append(i.operator.symbol).append(' ')
-                    if (canAppendWithoutBrackets(i1, i.operator, false)) appendExpr(i1)
-                    else appendExprSafely(i1)
+                    else -> {
+                        dst.append("Math.").append(i.operator.symbol).append('(')
+                        if (i.operator.symbol.startsWith("rot")) {
+                            // todo implement rotation somehow...
+                            appendExprSafely(i0)
+                        } else {
+                            appendExpr(i0)
+                        }
+                        dst.append(", ")
+                        appendExpr(i1)
+                        dst.append(')')
+                    }
                 }
             }
             else -> throw NotImplementedError(i.toString())
@@ -174,7 +241,9 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun beginDeclaration(name: String, jvmType: String) {
-        dst.append("let ").append(name).append(" /* ").append(jvmType).append(" */ = ")
+        dst.append("let ")
+        appendName(name)
+        dst.append(" /* ").append(jvmType).append(" */ = ")
     }
 
     override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {
@@ -188,6 +257,9 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         if (expr.funcName == "createInstance" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
             val classId = (expr.params[0] as ConstExpr).value as Int
             dst.append("new ").append(classNameToJS(gIndex.classNamesByIndex[classId])).append("()")
+        } else if (expr.funcName == "getClassIdPtr" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
+            val classId = (expr.params[0] as ConstExpr).value as Int
+            dst.append(classNameToJS(gIndex.classNamesByIndex[classId])).append(".LAMBDA_INSTANCE")
         } else {
             // todo if is not static, use first argument as caller
             // todo shorten name
@@ -204,20 +276,27 @@ class LowLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     override fun appendFieldGetExpr(expr: FieldGetExpr) {
         if (expr.instance != null) {
             appendExprSafely(expr.instance)
-            dst.append('.')
         } else {
-            writeStaticInstance(expr.field)
-            dst.append('.')
+            writeStaticInstance(expr.field.clazz)
         }
+        dst.append('.')
         dst.append(expr.field.name)
     }
 
     override fun writeFieldAssignment(assignment: FieldAssignment, writer: FunctionWriter) {
         writer.begin()
         if (assignment.instance != null) appendExpr(assignment.instance.expr)
-        else writeStaticInstance(assignment.field)
+        else writeStaticInstance(assignment.field.clazz)
         dst.append('.').append(assignment.field.name).append(" = ")
         appendExpr(assignment.newValue.expr)
         dst.append(";\n")
+    }
+
+    override fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter) {
+        writer.begin().append("throw 'loadInstr not yet implemented';\n")
+    }
+
+    override fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter) {
+        writer.begin().append("throw 'storeInstr not yet implemented';\n")
     }
 }

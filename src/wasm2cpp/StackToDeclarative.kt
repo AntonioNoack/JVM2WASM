@@ -1,9 +1,8 @@
 package wasm2cpp
 
-import highlevel.FieldGetInstr
-import highlevel.FieldSetInstr
-import highlevel.HighLevelInstruction
-import highlevel.PtrDupInstr
+import canThrowError
+import hIndex
+import highlevel.*
 import me.anno.utils.Warning.unused
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.any2
@@ -11,9 +10,11 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
+import useUTF8Strings
 import utils.FieldSig
 import utils.WASMType
 import utils.WASMTypes.*
+import utils.methodName
 import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instruction.Companion.emptyArrayList
@@ -45,7 +46,9 @@ import wasm2cpp.instr.*
 class StackToDeclarative(
     val globals: Map<String, GlobalVariable>,
     private val functionsByName: Map<String, FunctionImpl>,
-    private val pureFunctions: Set<String>
+    private val pureFunctions: Set<String>,
+    private val useHighLevelMemoryAccess: Boolean,
+    private val useHighLevelMethodResolution: Boolean
 ) {
 
     companion object {
@@ -270,28 +273,40 @@ class StackToDeclarative(
 
     private fun writeCall(funcName: String, params: List<String>, results: List<String>) {
         if (handleSpecialCall(funcName, params, results)) return
-        if (results.isEmpty()) {
-            // empty function -> nothing to be inlined
-            val popped = popInReverse(funcName, params)
-            append(ExprCall(funcName, popped, results, null, null))
-            return
-        }
+
         val popped = popInReverse(funcName, params)
-        if (results.size == 1 && funcName in pureFunctions) {
-            // can be inlined :)
-            val type = results[0]
-            val joinedNames = popped.flatMap { it.dependencies }.distinct()
-            stack.add(StackElement(CallExpr(funcName, popped.map { it.expr }, type), joinedNames, false))
-            return
+        val canInlinePureCall = results.size == 1 && funcName in pureFunctions
+        when {
+            results.isEmpty() -> {
+                // empty function -> nothing to be inlined
+                append(ExprCall(funcName, popped))
+            }
+            canInlinePureCall -> {
+                inlinePureCall(funcName, popped, results[0])
+            }
+            else -> {
+                val resultName = nextTemporaryVariable()
+                append(CallAssignment(funcName, popped, results, resultName, null))
+                writeResults(results, resultName)
+            }
         }
+    }
 
-        val resultName = nextTemporaryVariable()
-        append(ExprCall(funcName, popped, results, resultName, null))
-        if (results.size == 1) {
+    private fun inlinePureCall(funcName: String, popped: List<StackElement>, type: String) {
+        // can be inlined :)
+        val joinedNames = popped.flatMap { it.dependencies }.distinct()
+        stack.add(StackElement(CallExpr(funcName, popped.map { it.expr }, type), joinedNames, false))
+    }
+
+    private fun writeResults(results: List<String>, resultName: String) {
+        if (results.size > 1) {
+            writeMultipleResults(results, resultName)
+        } else {
             push(results[0], resultName)
-            return
         }
+    }
 
+    private fun writeMultipleResults(results: List<String>, resultName: String) {
         // too complicated to be inlined for now
         val totalType = results.joinToString("")
         val resultVar = VariableExpr(resultName, totalType)
@@ -474,6 +489,14 @@ class StackToDeclarative(
                 // will be integrated into expressions
                 pushConstant(ConstExpr(i.value, i.type.wasmName))
             }
+            is StringConst -> {
+                // will be integrated into expressions
+                if (useHighLevelMemoryAccess) {
+                    pushConstant(ConstExpr(i.string, "java/lang/String"))
+                } else {
+                    pushConstant(ConstExpr(i.address, "java/lang/String"))
+                }
+            }
             is UnaryFloatInstruction -> unaryInstr(i.popType, i.pushType, k, assignments, false) { expr ->
                 UnaryExpr(i, expr, i.pushType)
             }
@@ -648,7 +671,7 @@ class StackToDeclarative(
             is Comment -> append(i)
             PtrDupInstr -> stack.add(stack.last())
             is FieldGetInstr -> {
-                if (generateHighLevelCpp) {
+                if (useHighLevelMemoryAccess) {
                     val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
                     val dependencies = self?.dependencies ?: emptyList()
                     val isBoolean = i.fieldSig.descriptor == "boolean"
@@ -656,14 +679,77 @@ class StackToDeclarative(
                 } else writeInstructions(i.toLowLevel())
             }
             is FieldSetInstr -> {
-                if (generateHighLevelCpp) {
+                if (useHighLevelMemoryAccess) {
                     val value = popElement(i.fieldSig.descriptor)
                     val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
                     append(FieldAssignment(i.fieldSig, self, value))
                 } else writeInstructions(i.toLowLevel())
             }
+            is InvokeMethodInstr -> {
+                if (useHighLevelMethodResolution) {
+                    appendHighLevelCall(i)
+                } else writeInstructions(i.toLowLevel())
+            }
             is HighLevelInstruction -> writeInstructions(i.toLowLevel())
             else -> assertFail("Unknown instruction type ${i.javaClass}")
+        }
+    }
+
+    private fun appendHighLevelCall(i: InvokeMethodInstr) {
+
+        // stackPush
+        val stackId = i.stackPushId
+        if (stackId >= 0) {
+            val constExpr = ConstExpr(stackId, "int")
+            val constStack = StackElement(constExpr, emptyList(), false)
+            append(ExprCall(Call.stackPush.name, listOf(constStack)))
+        }
+
+        val sig = i.original
+
+        // actual call
+        val isStatic = hIndex.isStatic(sig)
+        val expectStatic = i is InvokeStaticInstr
+        assertEquals(expectStatic, isStatic)
+
+        val params = sig.descriptor.params
+        val results = sig.descriptor.getResultTypes(canThrowError(sig))
+
+        val tmpFuncName = methodName(sig)
+
+        if (i is ResolvedMethodInstr) {
+            // self for resolution isn't needed
+            val isSpecial = i is InvokeSpecialInstr
+            val popped = popInReverse(tmpFuncName, params)
+            val self = if (isStatic) null else popElement(sig.className)
+            if (results.isEmpty()) {
+                append(UnresolvedExprCall(self, sig, isSpecial , popped))
+            } else {
+                val resultName = nextTemporaryVariable()
+                append(UnresolvedCallAssignment(self, sig, isSpecial, popped, results, resultName, null))
+                writeResults(results, resultName)
+            }
+        } else {
+            assertFalse(isStatic)
+
+            i as UnresolvedMethodInstr
+            val isSpecial = false
+            val selfForResolution = popElement(sig.className)
+            val popped = popInReverse(tmpFuncName, params)
+            val self = popElement(sig.className)
+            assertEquals(self, selfForResolution)
+            if (results.isEmpty()) {
+                append(UnresolvedExprCall(self, sig, isSpecial, popped))
+            } else {
+                val resultName = nextTemporaryVariable()
+                append(UnresolvedCallAssignment(self, sig, isSpecial, popped, results, resultName, null))
+                writeResults(results, resultName)
+            }
+        }
+
+        // stackPop
+        if (stackId >= 0) {
+            append(ExprCall(Call.stackPop.name, emptyList()))
         }
     }
 }

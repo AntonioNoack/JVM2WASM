@@ -39,7 +39,7 @@ object MissingFunctions {
             usedButNotImplemented.mapNotNull { hIndex.methodByName[it] }
 
         for (sig in usedBotNotImplementedMethods) {
-            if (sig.clazz in hIndex.interfaceClasses &&
+            if (sig.className in hIndex.interfaceClasses &&
                 sig !in hIndex.jvmImplementedMethods &&
                 sig !in hIndex.customImplementedMethods
             ) {

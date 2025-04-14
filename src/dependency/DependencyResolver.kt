@@ -48,14 +48,14 @@ class DependencyResolver {
     private val dependencies = HashSet<MethodSig>(64)
 
     private fun depAdd(sig0: MethodSig, sig: MethodSig) {
-        if (isForbiddenClass(sig.clazz)) {
+        if (isForbiddenClass(sig.className)) {
             // ignore that dependency
             methodsWithForbiddenDependencies.add(sig0)
             return
         }
         dependencies.add(sig)
-        if (sig.name == INSTANCE_INIT && sig.clazz !in constructableClasses) {
-            handleBecomingConstructable(sig, sig.clazz)
+        if (sig.name == INSTANCE_INIT && sig.className !in constructableClasses) {
+            handleBecomingConstructable(sig, sig.className)
         }
     }
 
@@ -166,10 +166,10 @@ class DependencyResolver {
     }
 
     private fun processDependency(method: MethodSig) {
-        if (method.name == INSTANCE_INIT || isStatic(method) || method.clazz in constructableClasses) {
+        if (method.name == INSTANCE_INIT || isStatic(method) || method.className in constructableClasses) {
             addRemaining(method)
         } else {
-            depsIfConstructable.getOrPut(method.clazz, ::HashSet).add(method)
+            depsIfConstructable.getOrPut(method.className, ::HashSet).add(method)
         }
     }
 
@@ -184,7 +184,7 @@ class DependencyResolver {
         // println("adding used-as-interface: $usedInterface")
         if (!usedInterfaceCalls.add(usedInterface)) return
 
-        Recursion.processRecursive(usedInterface.clazz) { interfaceI, remaining1 ->
+        Recursion.processRecursive(usedInterface.className) { interfaceI, remaining1 ->
             handleBecomingConstructable(sig, interfaceI)
             remaining1.addAll(interfaces[interfaceI] ?: emptyList())
         }
@@ -193,7 +193,7 @@ class DependencyResolver {
         addRemaining(interfaceDefaults[usedInterface] ?: emptySet())
         checkState(6)
 
-        Recursion.processRecursive(usedInterface.clazz) { clazz, remaining1 ->
+        Recursion.processRecursive(usedInterface.className) { clazz, remaining1 ->
             processDependency(usedInterface.withClass(clazz))
             remaining1.addAll(childClasses[clazz] ?: emptySet())
         }
@@ -251,14 +251,14 @@ class DependencyResolver {
             checkState(1)
 
             val isStatic = isStatic(sig)
-            if (!isStatic && sig.clazz !in constructableClasses) {
-                LOGGER.warn("${sig.clazz} became constructable by $sig")
-                handleBecomingConstructable(sig, sig.clazz)
+            if (!isStatic && sig.className !in constructableClasses) {
+                LOGGER.warn("${sig.className} became constructable by $sig")
+                handleBecomingConstructable(sig, sig.className)
             }
 
             val resolved = resolveMethod(sig, true)
             if (!isStatic) {
-                usedByClass.getOrPut(sig.clazz, ::HashSet).add(sig)
+                usedByClass.getOrPut(sig.className, ::HashSet).add(sig)
             }
 
             checkState(2)
@@ -274,7 +274,7 @@ class DependencyResolver {
 
                 setAlias(sig, alias)
                 addRemaining(alias)
-                findChildImplementations(sig, sig.clazz, dependencies)
+                findChildImplementations(sig, sig.className, dependencies)
                 processDependencies()
 
             } else {
@@ -282,7 +282,7 @@ class DependencyResolver {
                 checkState(3)
 
                 if (sig.name != INSTANCE_INIT && sig.name != STATIC_INIT) {
-                    assertTrue(isStatic || sig.clazz in constructableClasses)
+                    assertTrue(isStatic || sig.className in constructableClasses)
                     if (resolved != null && resolved != sig) {
                         addRemaining(resolved)
                         continue
@@ -307,7 +307,7 @@ class DependencyResolver {
 
                 // println("  handling $sig")
                 if (sig.name != INSTANCE_INIT && !isStatic) {
-                    findChildImplementations(sig, sig.clazz, dependencies)
+                    findChildImplementations(sig, sig.className, dependencies)
                 }
 
                 checkState(9)
@@ -336,19 +336,19 @@ class DependencyResolver {
         val usedSetters1 = setterDependencies[sig] ?: emptySet()
         // if a method touches sth forbidden, and it's no entry point, remove it
         // because we have to implement it ourselves anyway
-        if (usedMethods1.any { isForbiddenClass(it.clazz) }
+        if (usedMethods1.any { isForbiddenClass(it.className) }
             || usedGetters1.any { isForbiddenClass(it.clazz) }
             || usedSetters1.any { isForbiddenClass(it.clazz) }
         ) {
-            if (sig.clazz == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor.raw == "hashCode()I")
+            if (sig.className == "java/lang/Object" && sig.name == "hashCode" && sig.descriptor.raw == "hashCode()I")
                 throw IllegalStateException("$sig is native, not forbidden")
             methodsWithForbiddenDependencies.add(sig)
             checkState(10)
         } else {
 
             // abstract classes cannot be constructed, even if they have constructors; interfaces neither
-            if (sig.clazz != INTERFACE_CALL_NAME && sig.name == INSTANCE_INIT) {
-                handleBecomingConstructable(sig, sig.clazz)
+            if (sig.className != INTERFACE_CALL_NAME && sig.name == INSTANCE_INIT) {
+                handleBecomingConstructable(sig, sig.className)
                 checkState(11)
             }
 

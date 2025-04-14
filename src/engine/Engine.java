@@ -511,7 +511,7 @@ public class Engine {
     }
 
     @Alias(names = "me_anno_audio_openal_AudioManager_checkIsDestroyed_V")
-    public static void AudioManager_checkIsDestroyed_V() {
+    public static void AudioManager_checkIsDestroyed_V(Object self) {
         // cannot be destroyed, as far as I know :)
     }
 

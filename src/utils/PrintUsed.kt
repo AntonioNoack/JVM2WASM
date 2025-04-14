@@ -10,7 +10,7 @@ import kotlin.math.min
 
 object PrintUsed {
 
-    private fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.clazz): String? {
+    private fun isUsedAsInterface(sig: MethodSig, clazz: String = sig.className): String? {
         val interfaces = hIndex.interfaces[clazz] ?: emptyList()
         if (interfaces.any2 { sig.withClass(it) in dIndex.usedInterfaceCalls }) {
             return clazz
@@ -24,11 +24,11 @@ object PrintUsed {
     private val builder = StringBuilder2(512)
     fun printUsed(sig: MethodSig, errorStream: Boolean = false) {
         builder.append("  ").append(sig).append(":")
-        if (sig in (hIndex.methodsByClass[sig.clazz] ?: emptySet())) builder.append(" known")
+        if (sig in (hIndex.methodsByClass[sig.className] ?: emptySet())) builder.append(" known")
         if (sig in dIndex.usedMethods) builder.append(" used")
         else {
             // check all super classes
-            var parent = hIndex.superClass[sig.clazz]
+            var parent = hIndex.superClass[sig.className]
             while (parent != null) {
                 val sig2 = sig.withClass(parent)
                 if (sig2 in dIndex.usedMethods) {
@@ -52,12 +52,12 @@ object PrintUsed {
         val uaiClass = isUsedAsInterface(sig)
         if (uaiClass != null) {
             builder.append(" used-as-interface")
-            if (uaiClass != sig.clazz) builder.append("[$uaiClass]")
+            if (uaiClass != sig.className) builder.append("[$uaiClass]")
         } else if (sig in dIndex.knownInterfaceDependencies) {
             builder.append(" interface")
         }
 
-        if (sig.clazz in dIndex.constructableClasses) builder.append(" constructable")
+        if (sig.className in dIndex.constructableClasses) builder.append(" constructable")
 
         val name = methodName(sig)
         if (name in ActuallyUsedIndex.resolved) builder.append(" actually-used(${ActuallyUsedIndex.usedBy[name]})")

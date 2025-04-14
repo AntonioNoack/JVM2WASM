@@ -4,25 +4,25 @@ import replaceClass
 
 @Suppress("DataClassPrivateConstructor")
 data class MethodSig private constructor(
-    val clazz: String, val name: String,
+    val className: String, val name: String,
     val descriptor: Descriptor
 ) {
 
     fun withClass(clazz: String): MethodSig {
-        if (clazz == this.clazz) return this
+        if (clazz == this.className) return this
         return MethodSig(validateClassName(clazz), name, descriptor)
     }
 
-    override fun toString() = "$clazz/$name$descriptor"
+    override fun toString() = "$className/$name$descriptor"
 
     // saving the hash brings a ~5% speedup, but it's very random :/
-    private val hash = (clazz.hashCode() * 31 + name.hashCode()) * 31 + descriptor.hashCode()
+    private val hash = (className.hashCode() * 31 + name.hashCode()) * 31 + descriptor.hashCode()
     override fun hashCode(): Int = hash
 
     override fun equals(other: Any?): Boolean {
         return other === this || other is MethodSig &&
                 other.hash == hash &&
-                other.clazz == clazz &&
+                other.className == className &&
                 other.name == name &&
                 other.descriptor == descriptor
     }

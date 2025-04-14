@@ -6,6 +6,10 @@ import utils.StringBuilder2
 
 data class CallIndirect(val type: FuncType) : Instruction {
 
+    constructor(type: FuncType, options: Set<MethodSig>) : this(type) {
+        this.options = options
+    }
+
     var typeIndex = -1
 
     var options: Set<MethodSig>? = null

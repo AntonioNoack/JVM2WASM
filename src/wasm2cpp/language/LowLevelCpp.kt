@@ -2,30 +2,49 @@ package wasm2cpp.language
 
 import hIndex
 import highlevel.FieldSetInstr
+import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertTrue
 import translator.LoadStoreHelper.getLoadCall
 import translator.LoadStoreHelper.getStaticLoadCall
 import translator.LoadStoreHelper.getStaticStoreCall
 import translator.LoadStoreHelper.getStoreCall
-import utils.FieldSig
-import utils.NativeTypes
-import utils.StringBuilder2
+import utils.*
 import utils.WASMTypes.i32
-import utils.jvm2wasmTyped
 import wasm.instr.*
 import wasm.parser.FunctionImpl
 import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
 import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
-import wasm2cpp.instr.FieldAssignment
-import wasm2cpp.instr.FunctionTypeDefinition
-import wasm2cpp.instr.GotoInstr
+import wasm2cpp.instr.*
 
 open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
 
-    override fun defineFunctionHead(function: FunctionImpl, writer: FunctionWriter) {
+    companion object {
+        val cppKeywords = (
+                "alignas,alignof,and,and_eq,asm,atomic_cancel,atomic_commit,atomic_noexcept,auto,bitand,bitor,bool,break," +
+                        "case,catch,char,char8_t,char16_t,char32_t,class,compl,concept,const,consteval,constexpr,constinit," +
+                        "const_cast,continue,contract_assert,co_await,co_return,co_yield,,decltype,default,delete,do," +
+                        "double,dynamic_cast,else,enum,explicit,export,extern,false,float,for,friend,goto,if,inline,int," +
+                        "long,mutable,namespace,new,noexcept,not,not_eq,nullptr,operator,or,or_eq,private,protected,public," +
+                        "reflexpr,register,reinterpret_cast,requires,return,short,signed,sizeof,static,static_assert," +
+                        "static_cast,struct,switch,synchronized,template,this,thread_local,throw,true,try,typedef," +
+                        "typeid,typename,union,unsigned,using,virtual,void,volatile,wchar_t,while,xor,xor_eq," +
+                        // reserved by default imports :/
+                        "OVERFLOW,_OVERFLOW,UNDERFLOW,_UNDERFLOW,NULL"
+                ).split(',').toHashSet()
+
+        private val usz = if (is32Bits) "(u32)" else "(u64)"
+
+    }
+
+    override fun appendName(name: String) {
+        dst.append(name)
+    }
+
+    override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
         wasm2cpp.defineFunctionHead(function.funcName, function.params, function.results, true)
+        dst.append(" {\n")
     }
 
     override fun writeStaticInitCheck(writer: FunctionWriter) {
@@ -37,8 +56,8 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         writer.begin().append("wasCalled = true;\n")
     }
 
-    override fun writeStaticInstance(field: FieldSig) {
-        dst.append(field.clazz.replace("/", "_"))
+    override fun writeStaticInstance(className: String) {
+        dst.append(className.escapeChars())
     }
 
     override fun writeGoto(instr: GotoInstr) {
@@ -51,7 +70,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             is CallExpr -> appendCallExpr(expr)
             is UnaryExpr -> appendUnaryExpr(expr)
             is BinaryExpr -> appendBinaryExpr(expr)
-            is VariableExpr -> dst.append(expr.name)
+            is VariableExpr -> appendName(expr.name)
             is FieldGetExpr -> appendFieldGetExpr(expr)
             else -> throw NotImplementedError(expr.javaClass.toString())
         }
@@ -256,8 +275,9 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                 jvmType !in NativeTypes.nativeTypes &&
                 !jvmType.startsWith("[") && jvmType != "null"
         val wasmType = if (isCustomType) jvmType else jvm2wasmTyped(jvmType).wasmName
-        dst.append(wasmType)
-            .append(' ').append(name).append(" = ")
+        dst.append(wasmType).append(' ')
+        appendName(name)
+        dst.append(" = ")
     }
 
     override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {
@@ -286,5 +306,23 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             .append(tmpType).append(">(indirect[")
         appendExpr(instr.indexExpr.expr)
         dst.append("]);\n")
+    }
+
+    override fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter) {
+        writer.begin().append(instr.type).append(' ').append(instr.newName).append(" = ")
+            .append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
+        appendExprSafely(instr.addrExpr.expr)
+        dst.append("))[0];\n")
+    }
+
+    override fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter) {
+        writer.begin().append("((").append(instr.memoryType).append("*) ((uint8_t*) memory + ").append(usz)
+        appendExprSafely(instr.addrExpr.expr)
+        dst.append("))[0] = ")
+        if (instr.type != instr.memoryType) {
+            dst.append('(').append(instr.memoryType).append(") ")
+        }
+        appendExpr(instr.valueExpr.expr)
+        dst.append(";\n")
     }
 }

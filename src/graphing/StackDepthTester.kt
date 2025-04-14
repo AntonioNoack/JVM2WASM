@@ -56,6 +56,7 @@ object StackDepthTester {
                     minDepth = min(minDepth, depth)
                     depth += instr.results.size
                 }
+                is Const, is StringConst -> depth++
                 is HighLevelInstruction -> {
                     for (low in instr.toLowLevel()) {
                         process(low)
@@ -71,7 +72,6 @@ object StackDepthTester {
                     depth--
                     minDepth = min(minDepth, depth)
                 }
-                is Const -> depth++
                 // loadInstr is handled by unary
                 is StoreInstr -> {
                     depth -= 2

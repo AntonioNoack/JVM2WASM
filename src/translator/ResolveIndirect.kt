@@ -2,7 +2,6 @@ package translator
 
 import canThrowError
 import dIndex
-import dependency.ActuallyUsedIndex
 import gIndex
 import hIndex
 import me.anno.utils.algorithms.Recursion
@@ -46,9 +45,8 @@ object ResolveIndirect {
         }
     }
 
-    private fun MethodTranslator.callSingleOption(sigJ: MethodSig, sig0: MethodSig, calledCanThrow: Boolean) {
+    private fun callSingleOption(sigJ: MethodSig, sig0: MethodSig, calledCanThrow: Boolean, printer: Builder) {
         if (comments) printer.comment("single for $sig0 -> $sigJ")
-        ActuallyUsedIndex.add(this.sig, sigJ)
         printer.append(Call(methodName(sigJ)))
         printer.fixThrowable(calledCanThrow, sigJ)
     }
@@ -58,8 +56,12 @@ object ResolveIndirect {
         getCaller: (Builder) -> Unit, calledCanThrow: Boolean,
         options: Set<MethodSig>
     ): Boolean {
+        // disabled to keep high-level instructions working
+        // in debug-mode C++, I wasn't able to measure a performance difference when rendering depth (540fps in both cases, with stack tracing)
+        // in release-mode C++, 1700 fps without trees, 1750 fps with trees (+1%)
+        return false
         if (options.size == 1) {
-            callSingleOption(options.first(), sig0, calledCanThrow)
+            callSingleOption(options.first(), sig0, calledCanThrow, printer)
             return true
         } else if (options.size < maxOptionsInTree) {
             return resolveIndirectTree(sig0, splitArgs, ret, options, getCaller, calledCanThrow)
@@ -104,7 +106,7 @@ object ResolveIndirect {
      * */
     private fun findMethodsGroupedByClass(sig0: MethodSig, sig: MethodSig): List<Pair<MethodSig, List<String>>>? {
 
-        val allChildren = findAllConstructableChildren(sig0.clazz).map { clazz ->
+        val allChildren = findAllConstructableChildren(sig0.className).map { clazz ->
             clazz to resolveMethod(sig0.withClass(clazz), true)!!
         }
 
@@ -160,7 +162,8 @@ object ResolveIndirect {
         } else {
             val treeCall = getOrPutTree(
                 sig0, splitArgs, ret, options,
-                calledCanThrow, true, groupedByClass
+                calledCanThrow, true, groupedByClass,
+                canThrowError
             )
             printer.append(treeCall)
         }
@@ -206,10 +209,11 @@ object ResolveIndirect {
     }
 
     private val treeGetSelf = { printerI: Builder -> printerI.append(ParamGet[0]); Unit }
-    private fun MethodTranslator.getOrPutTree(
+    private fun getOrPutTree(
         sig0: MethodSig, splitArgs: List<String>, ret: String?,
         options: Set<MethodSig>, calledCanThrow: Boolean,
         returnInBranch: Boolean, groupedByClass: List<Pair<MethodSig, List<String>>>,
+        canThrowError: Boolean
     ): Call {
         val helperName = "tree_${sig0.toString().escapeChars()}"
         helperFunctions.getOrPut(helperName) {

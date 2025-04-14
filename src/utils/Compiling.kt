@@ -303,7 +303,7 @@ fun collectEntryPoints(): Pair<Set<MethodSig>, Set<String>> {
         entryClass(clazz)
     }) {
         if (it.name == INSTANCE_INIT) {
-            entryClass(it.clazz)
+            entryClass(it.className)
         }
         entryPoints.add(it)
     }
@@ -573,7 +573,7 @@ fun ensureIndexForAnnotations() {
 
 fun findClassesToLoad(aliasedMethods: List<MethodSig>): List<String> {
     return (dIndex.usedMethods + aliasedMethods)
-        .map { it.clazz }
+        .map { it.className }
         .filter { clazz ->
             clazz != INTERFACE_CALL_NAME &&
                     clazz !in hIndex.syntheticClasses &&
@@ -593,7 +593,7 @@ fun printAbstractMethods(bodyPrinter: StringBuilder2, missingMethods: HashSet<Me
     for (func in dIndex.usedMethods
         .filter {
             hIndex.isAbstract(it) &&
-                    !hIndex.isInterfaceClass(it.clazz) &&
+                    !hIndex.isInterfaceClass(it.className) &&
                     it !in missingMethods
         }
         .sortedBy { methodName(it) }
@@ -651,7 +651,7 @@ fun printNotImplementedMethods(importPrinter: StringBuilder2, missingMethods: Ha
                 hIndex.setAlias(sig, superMethod)
             }
         } else {
-            if (hIndex.isInterfaceClass(sig.clazz)) {
+            if (hIndex.isInterfaceClass(sig.className)) {
                 // println("Skipping $sig")
                 continue
             }
@@ -734,7 +734,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
                                     // println("lambda: $sig1 -> $synthClassName")
                                     gIndex.getClassId(synthClassName) // add class to index
                                     val calledMethod = MethodSig.c(dst.owner, dst.name, dst.desc)
-                                    dynIndex.getOrPut(calledMethod.clazz) { HashSet() }.add(calledMethod)
+                                    dynIndex.getOrPut(calledMethod.className) { HashSet() }.add(calledMethod)
                                 }
 
                                 override fun visitTypeInsn(opcode: Int, type: String) {

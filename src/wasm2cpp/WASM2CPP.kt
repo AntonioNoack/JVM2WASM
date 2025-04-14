@@ -12,10 +12,13 @@ import me.anno.utils.OS.documents
 import me.anno.utils.assertions.assertEquals
 import org.apache.logging.log4j.LogManager
 import translator.GeneratorIndex
+import translator.LocalVariables.Companion.isKeyword
 import utils.*
 import utils.WASMTypes.*
 import wasm.parser.*
 import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
+import wasm2cpp.language.HighLevelJavaScript.Companion.jsKeywords
+import wasm2cpp.language.LowLevelCpp.Companion.cppKeywords
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
@@ -124,19 +127,19 @@ fun jvmNameToCppName2(className: String): String {
 
 fun writeStructField(name: String, field: GeneratorIndex.FieldData) {
     writer.append("  ")
-    if (is32Bits || field.type in NativeTypes.nativeTypes) {
-        writer.append(jvmNameToCppName2(field.type))
-    } else if (!field.type.startsWith("[") || field.type in NativeTypes.nativeArrays) {
-        val cppType = structNames[gIndex.getClassIdOrParents(field.type)]
+    if (is32Bits || field.jvmType in NativeTypes.nativeTypes) {
+        writer.append(jvmNameToCppName2(field.jvmType))
+    } else if (!field.jvmType.startsWith("[") || field.jvmType in NativeTypes.nativeArrays) {
+        val cppType = structNames[gIndex.getClassIdOrParents(field.jvmType)]
         writer.append("struct ").append(cppType).append('*')
     } else {
         val cppType = structNames[StaticClassIndices.OBJECT_ARRAY]
         writer.append("struct ").append(cppType).append('*')
     }
     var nameI = name
-    while (nameI in FunctionWriter.cppKeywords) nameI += "_"
+    while (isKeyword(nameI)) nameI += "_"
     writer.append(' ').append(nameI).append("; /* @").append(field.offset)
-        .append(", ").append(field.type).append(" */\n")
+        .append(", ").append(field.jvmType).append(" */\n")
 }
 
 private val structNames = ArrayList<String>(512)

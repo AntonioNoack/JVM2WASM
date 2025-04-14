@@ -404,7 +404,7 @@ public class JavaLang {
     public static native void printByte(int i, boolean justLog);
 
     @NoThrow
-    @JavaScript(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)ec++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
+    @JavaScript(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)hasCrashed++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
     public static native void printFlush(boolean justLog);
 
     @NoThrow

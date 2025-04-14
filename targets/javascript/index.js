@@ -1,62 +1,16 @@
 
-// not really well supported yet
-let useWebGPU = false
-
-let module = null
-let instance = null
-let startTime = Date.now()
-
-import { autoJS } from "./index0.js";
-import { webGPU } from './../webgpu/webgpu.js';
+const startTime = Date.now()
+const lib = window
 
 window.inited = false
 
 try {
 
-    window.is32Bits = autoJS.is32Bits;
-
-    var memory = window.memory = new WebAssembly.Memory(is32Bits ? {
-        initial: autoJS.initialMemorySize,
-    } : {
-        initial: BigInt(autoJS.initialMemorySize),
-        maximum: BigInt(1000),
-        memory64: true
-    });
-
-    var imports = {
-        jvm: { },
-        js: { mem: memory }
-    }
-
-    var jvm = imports.jvm
-    for (var key in autoJS) {
-        jvm[key] = autoJS[key]
-    }
-
     window.commandLine = [[],[]]
 
     window.str = function(x) {
         // convert Java string into JavaScript string
-        if(x == 0) return null
-        if(lib.rCl(x) == 10) {
-            let chars = lib.r32(x + objectOverhead + 4)
-            if(chars == 0) return null
-            let cl = lib.rCl(chars)
-            if(cl == 6) {
-                let length = lib.r32(chars + objectOverhead)
-                if(length < 0 || length > 65535) return "STRING TOO LONG OR SHORT11!!: "+length
-                let str = []
-                for(var i=0;i<length;i++){
-                    str.push(String.fromCharCode(lib.r16(chars + arrayOverhead + (i+i))))
-                }
-                return str.join("")
-            } else if(cl == 5) {
-                let length = lib.r32(chars + objectOverhead)
-                if(length < 0 || length > 65535) return "STRING TOO LONG OR SHORT11!!: "+length
-                return new TextDecoder().decode(new Uint8Array(memory.buffer, chars + arrayOverhead, length));
-            } else throw "INCORRECT CLASS IN STRING.CHARS!!!"
-        } else throw "INVALID_STRING!!1! at " + x + ", class " + lib.rCl(x)
-        return x;
+        return x
     }
 
     window.ptr2err = function(ptr){
@@ -126,44 +80,19 @@ try {
         for(key in gl) if(gl[key] == word) return key
     }
 
-    // var depthTexExt = gl.getExtension("WEBGL_depth_texture")
-        // console.log('depth-tex-ext:', depthTexExt)
-
-        /*
-        "EXT_color_buffer_float"
-        "EXT_color_buffer_half_float"
-        "EXT_disjoint_timer_query_webgl2"
-        "EXT_float_blend"
-        "EXT_texture_compression_bptc"
-        "EXT_texture_compression_rgtc"
-        "EXT_texture_filter_anisotropic"
-        "EXT_texture_norm16"
-        "KHR_parallel_shader_compile"
-        "OES_draw_buffers_indexed"
-        "OES_texture_float_linear"
-        "WEBGL_compressed_texture_s3tc"
-        "WEBGL_compressed_texture_s3tc_srgb"
-        "WEBGL_debug_renderer_info"
-        "WEBGL_debug_shaders"
-        "WEBGL_lose_context"
-        "WEBGL_multi_draw"
-        "OVR_multiview2"
-        */
-
     window.stop = false
     var t0 = new Date().getTime()
     window.gcCtr = 0
     window.gcStage = 0
-    async function startEngine() {
+
+    function startEngine() {
 
         if(window.inited) return
 
         console.log("Starting engine")
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
-        window.gl = useWebGPU ?
-        	await webGPU.init(canvas.getContext("webgpu")) :
-        	canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
+        window.gl = canvas.getContext("webgl2",{premultipliedAlpha:false,alpha:false,antialias:false});
         if(!gl) pleaseWait.innerText = "WebGL is not supported!"
 
         /*var supportsFP16 = !!*/gl.getExtension("EXT_color_buffer_half_float")
@@ -173,7 +102,6 @@ try {
         safe(lib.engine_Engine_main_Ljava_lang_StringV(0))
         console.log("Called main function")
 
-        var fi = 0
         var lastTime = 0
         var fakeFpsMultiplier = 1 // not really working, the engine is rendering only necessary frames 😅
         window.inited = true
@@ -336,12 +264,6 @@ try {
     }
 
     window.hasCrashed = 0
-    window.lib = 0
-    var fetched = fetch("./jvm2wasm.wasm")
-	fetched
-        .then(response => response.arrayBuffer())
-        .then(buffer => WebAssembly.instantiate(buffer, imports))
-        .then(data => setTimeout(x => onLoaded(data), 0))
 
     window.measureText = function(font,size,text){
         window.ctx.font=(size|0)+'px '+str(font)
@@ -356,11 +278,7 @@ try {
     }
     window.safe = safe
 
-    function onLoaded(results){
-        window.results = results
-        window.module = results.module
-        window.instance = results.instance
-        window.lib = results.instance.exports
+    function onLoaded() {
         pleaseWait.style.display='none'
         window.objectOverhead = lib.oo()
     	window.arrayOverhead = objectOverhead + 4
@@ -423,11 +341,27 @@ try {
         }
     }
 
+    const encoder = new TextEncoder();
+    const wrapStringCache = {};
+    
+    window.wrapString = function(str) {
+        const cached = wrapStringCache[str];
+        if(cached) return cached;
+        // convert JavaScript-String into a JVM-String
+        const string = wrapStringCache[str] = new java_lang_String()
+        const charArray = new AC();
+        const uint8Array = encoder.encode(str);
+        charArray.values = new Int8Array(uint8Array.buffer);
+        string.value = charArray;
+        return string;
+    }
+
     // alpha is disabled, so we get subpixel rendering
     // https://stackoverflow.com/questions/4550926/subpixel-anti-aliased-text-on-html5s-canvas-element
     window.ctx = txtCanvas.getContext('2d', {alpha: false, willReadFrequently: true})
 
     // querying fonts: console.log(await queryLocalFonts());, works but popup
+    onLoaded()
 
 } catch(e){
 	console.error(e)

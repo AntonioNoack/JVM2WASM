@@ -71,7 +71,7 @@ object HierarchyIndex {
 
     fun registerMethod(method: MethodSig): Boolean {
         methodByName[methodName(method)] = method
-        return methodsByClass.getOrPut(method.clazz, ::HashSet).add(method)
+        return methodsByClass.getOrPut(method.className, ::HashSet).add(method)
     }
 
     fun getAnnotations(sig: MethodSig): List<Annota> {

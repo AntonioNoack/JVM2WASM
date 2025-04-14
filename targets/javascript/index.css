@@ -1,0 +1,23 @@
+body {
+    margin: 0;
+    background: #000;
+    color: white;
+    overflow: hidden;
+}
+.center0 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+.center {
+    width: calc(min(80vh, 80vw));
+    height: calc(min(80vh, 80vw));
+}
+.cvs {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+}

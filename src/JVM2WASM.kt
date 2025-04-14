@@ -229,7 +229,7 @@ fun cannotUseClass(clazz: String): Boolean {
 }
 
 fun listEntryPoints(clazz: (String) -> Unit) {
-    listEntryPoints(clazz) { clazz(it.clazz) }
+    listEntryPoints(clazz) { clazz(it.className) }
 }
 
 val cannotThrow = HashSet<String>(256)

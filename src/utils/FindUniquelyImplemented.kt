@@ -11,14 +11,14 @@ private val LOGGER = LogManager.getLogger("FindUniquelyImplemented")
 
 private val childImplementationMap = HashMap<MethodSig, HashSet<MethodSig>>(1 shl 12)
 fun findConstructableChildImplementations(sig: MethodSig): Set<MethodSig> {
-    return if (sig.clazz in dIndex.constructableClasses) {
+    return if (sig.className in dIndex.constructableClasses) {
         childImplementationMap.getOrPut(sig) {
             val variants = HashSet<MethodSig>()
             val mapped = hIndex.getAlias(sig)
             if (mapped in hIndex.jvmImplementedMethods || mapped in hIndex.customImplementedMethods) {
                 variants.add(mapped)
             }
-            val children = hIndex.childClasses[sig.clazz]
+            val children = hIndex.childClasses[sig.className]
             if (children != null) {
                 for (child in children) {
                     variants.addAll(findConstructableChildImplementations(sig.withClass(child)))
@@ -30,7 +30,7 @@ fun findConstructableChildImplementations(sig: MethodSig): Set<MethodSig> {
 }
 
 fun markChildMethodsFinal(sig: MethodSig) {
-    Recursion.processRecursive(sig.clazz) { clazz, remaining ->
+    Recursion.processRecursive(sig.className) { clazz, remaining ->
         if (clazz in dIndex.constructableClasses) {
             if (hIndex.finalMethods.add(sig.withClass(clazz))) {
                 val children = hIndex.childClasses[clazz]
@@ -95,7 +95,7 @@ fun findUniquelyImplemented(usedMethods: Collection<MethodSig>, implementedMetho
     for (sig in usedMethods) {
         if (
             sig.name != INSTANCE_INIT && // cannot be invoked dynamically
-            sig.clazz != INTERFACE_CALL_NAME &&
+            sig.className != INTERFACE_CALL_NAME &&
             hIndex.getAlias(sig) == sig && // just the same
             !hIndex.isStatic(sig) &&
             !hIndex.isAbstract(sig) && // we can ignore that one

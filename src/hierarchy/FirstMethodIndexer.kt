@@ -338,11 +338,11 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
 
     private fun addCallIndirect() {
         val throws = useResultForThrowables && !hIndex.hasAnnotation(sig, Annotations.NO_THROW)
-        if (sig.clazz == "jvm/JavaReflect" && sig.name == "callConstructor") {
+        if (sig.className == "jvm/JavaReflect" && sig.name == "callConstructor") {
             defineCallIndirectWASM(listOf(ptrTypeI), if (throws) listOf(ptrTypeI) else emptyList())
-        } else if (sig.clazz == "jvm/JavaReflect" && sig.name == "callStaticInit") {
+        } else if (sig.className == "jvm/JavaReflect" && sig.name == "callStaticInit") {
             defineCallIndirectWASM(emptyList(), if (throws) listOf(ptrTypeI) else emptyList())
-        } else if (sig.clazz == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
+        } else if (sig.className == "jvm/JavaReflectMethod" && sig.name.startsWith("invoke")) {
             // confirm that the method is native???
             val callSignature = CallSignature.c(sig, removeLastParam = true)
             hIndex.implementedCallSignatures.add(callSignature)

@@ -231,6 +231,7 @@ object StackValidator {
                 }
             }
             is Const -> stack.push(instr.type.wasmName)
+            is StringConst -> stack.push("java/lang/String")
             is Comment -> {} // ignored
             is UnaryInstruction -> stack.pop(instr.popType).push(instr.pushType)
             is BinaryInstruction -> stack.pop(instr.popType).pop(instr.popType).push(instr.pushType)

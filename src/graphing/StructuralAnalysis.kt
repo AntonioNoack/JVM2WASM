@@ -985,7 +985,7 @@ class StructuralAnalysis(
                         node1.inputs.remove(node2)
                         node1.outputStack = node2.outputStack
                         nodes.remove(node2)
-                        makeNodeLoop("mergeSmallCircleA", node1, i)
+                        makeNodeLoop("mergeSmallCircleA", node1, nodes.indexOf(node1))
                         if (printOps) printState(nodes, "-${node2.index} by mergeSmallCircles/1")
                     } else if (node1 != firstNode) {
                         // append entry1 to entry2
@@ -993,8 +993,7 @@ class StructuralAnalysis(
                         node2.inputs.remove(node1)
                         node2.outputStack = node1.outputStack
                         nodes.remove(node1)
-                        val node2i = nodes.indexOf(node2)
-                        makeNodeLoop("mergeSmallCircleB", node2, node2i)
+                        makeNodeLoop("mergeSmallCircleB", node2, nodes.indexOf(node2))
                         if (printOps) printState(nodes, "-${node1.index} by mergeSmallCircles/2")
                     }
                     checkState()
@@ -1014,7 +1013,7 @@ class StructuralAnalysis(
 
         if (printOps) {
             println()
-            LOGGER.info("${sig.clazz} ${sig.name} ${sig.descriptor}: ${nodes.size}")
+            LOGGER.info("${sig.className} ${sig.name} ${sig.descriptor}: ${nodes.size}")
         }
 
         assertTrue(nodes.isNotEmpty())

@@ -233,8 +233,8 @@ object GeneratorIndex {
             clazzMap[InterfaceSig.c(name, descriptor)]
                 ?: kotlin.run {
                     val mapped = hIndex.getAlias(MethodSig.c(clazz, name, descriptor))
-                    if (mapped.clazz != clazz || mapped.name != name || mapped.descriptor != descriptor) {
-                        getDynMethodIdx(mapped.clazz, mapped.name, mapped.descriptor)
+                    if (mapped.className != clazz || mapped.name != name || mapped.descriptor != descriptor) {
+                        getDynMethodIdx(mapped.className, mapped.name, mapped.descriptor)
                     } else {
                         printUsed(MethodSig.c(clazz, name, descriptor))
                         throw IllegalStateException("Missed $clazz/$name/$descriptor, only found $clazzMap")
@@ -247,16 +247,16 @@ object GeneratorIndex {
     }
 
     fun getDynMethodIdx(sig: MethodSig): Int {
-        return getDynMethodIdx(sig.clazz, sig.name, sig.descriptor)
+        return getDynMethodIdx(sig.className, sig.name, sig.descriptor)
     }
 
-    fun getDynMethodIdxOffset(sig: MethodSig): Int {
+    fun getDynMethodIdOffset(sig: MethodSig): Int {
         // +1 for internal VM offset (length value)
         // << 2 for access without shifting
         return (getDynMethodIdx(sig) + 1) shl 2
     }
 
-    data class FieldData(val offset: Int, val type: String)
+    data class FieldData(val offset: Int, val jvmType: String)
     data class Gap(val offset: Int, val size: Int)
 
     class ClassOffsets(var offset: Int, private val parentFields: ClassOffsets?) {

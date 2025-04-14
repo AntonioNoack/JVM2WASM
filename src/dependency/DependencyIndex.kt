@@ -40,12 +40,12 @@ object DependencyIndex {
         }
 
         // check super class
-        val superClass = hIndex.superClass[method.clazz]
+        val superClass = hIndex.superClass[method.className]
         val bySuper = if (superClass != null) findSuperMethod(method.withClass(superClass)) else null
         if (bySuper != null) return bySuper
 
         // check interfaces for default-implementations
-        val interfaces = hIndex.interfaces[method.clazz] ?: emptyList()
+        val interfaces = hIndex.interfaces[method.className] ?: emptyList()
         for (interfaceI in interfaces) {
             for (method2 in hIndex.methodsByClass[interfaceI] ?: emptySet()) {
                 if (method2.name == method.name && method2.descriptor == method.descriptor &&
@@ -57,7 +57,7 @@ object DependencyIndex {
     }
 
     private fun findSuperMethod1(method: MethodSig): MethodSig? {
-        val superClass = hIndex.superClass[method.clazz] ?: return null
+        val superClass = hIndex.superClass[method.className] ?: return null
         val methodI = method.withClass(superClass)
         if (methodI in (hIndex.methodsByClass[superClass] ?: emptySet())) {
             // if present in parent, return parent method

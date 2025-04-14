@@ -115,7 +115,7 @@ fun methodName(clazz: String, sig: InterfaceSig): String {
 private val methodName2Cache = HashMap<Triple<String, String, String>, String>(1 shl 14)
 
 fun methodName2(sig: MethodSig): String {
-    return methodName2(sig.clazz, sig.name, sig.descriptor.raw)
+    return methodName2(sig.className, sig.name, sig.descriptor.raw)
 }
 
 fun methodName2(clazz: String, name: String, args: String): String {

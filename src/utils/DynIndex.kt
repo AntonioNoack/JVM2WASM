@@ -61,7 +61,7 @@ object DynIndex {
     private fun findDynamicMethods(): List<MutableMap.MutableEntry<String, MethodSig>> {
         return implementedMethods.entries
             .filter { (_, sig) -> // saving space by remove functions that cannot be invoked dynamically
-                sig.clazz != INTERFACE_CALL_NAME &&
+                sig.className != INTERFACE_CALL_NAME &&
                         sig.name != INSTANCE_INIT &&
                         sig.name != STATIC_INIT &&
                         sig.name !in dynIndex &&
@@ -128,11 +128,11 @@ object DynIndex {
 
     private fun methodIsAbstract(sig: MethodSig): Boolean {
         if (hIndex.isAbstract(sig)) return true
-        if (sig.clazz == "java/lang/Object") return false
+        if (sig.className == "java/lang/Object") return false
         if (sig in hIndex.jvmImplementedMethods) return false
-        var superClass = hIndex.superClass[sig.clazz]
+        var superClass = hIndex.superClass[sig.className]
         if (superClass == null) {
-            LOGGER.warn("Super class of ${sig.clazz} is missing")
+            LOGGER.warn("Super class of ${sig.className} is missing")
             superClass = "java/lang/Object"
         }
         return methodIsAbstract(sig.withClass(superClass))
@@ -189,7 +189,7 @@ object DynIndex {
                     debugInfo.append("  ").append(idx).append(": ")
                         .append(sig0).append(" -> -1X // ").append(mapped).append("\n")
                 }
-                if (!(sig.name == INSTANCE_INIT && sig.clazz in initMayBeBrokenFor)) {
+                if (!(sig.name == INSTANCE_INIT && sig.className in initMayBeBrokenFor)) {
                     LOGGER.warn("$sig ($classId/$idx) is missing from dynIndex")
                     printUsed(sig, true)
                     LOGGER.warn("    $idx -> -1*")
@@ -393,7 +393,7 @@ object DynIndex {
         val implFunctions0 = HashMap<Int, MethodSig>()
         for (sig in dIndex.usedInterfaceCalls) {
             // only if is actually instance of interface
-            if (sig.clazz in interfaces) {
+            if (sig.className in interfaces) {
                 val impl = resolveMethod(sig.withClass(clazz), true)
                     ?: continue
                 if (hIndex.isAbstract(impl)) {
@@ -466,7 +466,7 @@ object DynIndex {
 
         fieldOffsets.allFields().entries.sortedBy { it.value.offset }.forEach { (name, data) ->
             debugInfo.append("    *").append(data.offset).append(": ").append(name)
-                .append(": ").append(data.type).append("\n")
+                .append(": ").append(data.jvmType).append("\n")
         }
     }
 

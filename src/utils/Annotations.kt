@@ -63,7 +63,7 @@ object Annotations {
                     // todo if not defined, use default value
                     val value = annota.properties[name] ?: continue // if not defined, just leave it null/0
                     val ptrI = ptr + field.offset - indexStartPtr
-                    when (field.type) {
+                    when (field.jvmType) {
                         "java/lang/String" -> {
                             val str = gIndex.getString(value as String, indexStartPtr, classData)
                             classData.writePointerAt(str, ptrI)

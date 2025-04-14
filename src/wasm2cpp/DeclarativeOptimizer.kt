@@ -92,9 +92,12 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             is ExprReturn -> {
                 for (expr in instr.results) incUsages(expr)
             }
-            is ExprCall -> {
+            is CallAssignment -> {
                 for (expr in instr.params) incUsages(expr)
                 if (instr.resultName != null) incAssign(instr.resultName)
+            }
+            is ExprCall -> {
+                for (expr in instr.params) incUsages(expr)
             }
             is FunctionTypeDefinition -> {
                 incUsages(instr.indexExpr)
@@ -273,8 +276,9 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             is Declaration -> return writeDeclaration(instr, nextInstr)
             is Assignment -> writeAssignment(instr)
             is ExprIfBranch -> writeIfBranch(instr, isLastInstr)
-            is ExprCall -> return writeExprCall(instr, nextInstr)
+            is CallAssignment -> return writeExprCall(instr, nextInstr)
             is LoopInstr -> writeLoopInstr(instr)
+            is ExprCall -> writer.add(instr)
             else -> assertFail("Unknown instruction type ${instr.javaClass}")
         }
         return false
@@ -356,7 +360,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         return expr is VariableExpr && expr.name == name
     }
 
-    private fun writeExprCall(instr: ExprCall, nextInstr: Instruction?): Boolean {
+    private fun writeExprCall(instr: CallAssignment, nextInstr: Instruction?): Boolean {
         val returnsImmediately =
             if (nextInstr is ExprReturn) {
                 nextInstr.results.size == 1 && checkIsName(nextInstr.results[0].expr, instr.resultName)
@@ -374,7 +378,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         var resultName: String? = null
 
         if (returnsImmediately) {
-            resultType = ExprCall.RETURN_TYPE
+            resultType = CallAssignment.RETURN_TYPE
         } else if (instr.resultName != null && getUsageCount(instr.resultName) > 0) {
             if (assignsImmediately) {
                 val variableName = when (nextInstr) {
@@ -407,7 +411,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
             }
         }
 
-        writer.add(ExprCall(instr.funcName, instr.params, instr.resultTypes, resultName, resultType))
+        writer.add(instr.withResult(resultName, resultType))
         return returnsImmediately || assignsImmediately
     }
 
