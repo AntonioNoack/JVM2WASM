@@ -7,6 +7,7 @@ import hIndex
 import jvm2wasm
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
+import org.objectweb.asm.Opcodes.ACC_STATIC
 import utils.*
 import utils.DefaultClassLayouts.GC_FIELD_NAME
 import utils.MethodResolver.resolveMethod
@@ -37,6 +38,7 @@ fun wasm2jsFromMemory() {
 }
 
 fun classNameToJS(jvmType: String): String {
+    if (jvmType == "void") return "_void"
     return jvmType.escapeChars()
 }
 
@@ -70,28 +72,34 @@ fun wasm2js(
         }
     }
 
-    // what do we need? name, shortName, fields, methods
-    writer.append("// class instances\n")
-    writer.append("const CLASS_INSTANCES = [];\n") // only named classes
-    writer.append(
-        "" +
-                "function createClass(name) {\n" +
-                "   const clazz = new java_lang_Class();\n" +
-                "   clazz.name = wrapString(name);\n" +
-                "   if(name.length) CLASS_INSTANCES.push(clazz);\n" +
-                "   return clazz;\n" +
-                "}\n\n"
-    )
+    fun appendField(name: String, type: String, modifiers: Int) {
+        val typeId = gIndex.classIndex[type] ?: 0
+        writer.append(name).append(',')
+            .append(typeId).append(',')
+            .append(modifiers).append(',')
+    }
 
     fun writeClassInstanceCreateCall(className: String) {
         var className1 = className
-        if (className1 in hIndex.syntheticClasses) className1 = ""
-        writer.append("createClass(\"").append(className1).append("\");\n")
+        val isSynthetic = className1 in hIndex.syntheticClasses
+        if (isSynthetic) className1 = ""
+        val superClassName = hIndex.superClass[className] ?: "java/lang/Object"
+        writer.append("createClass(")
+            .append(gIndex.getClassId(className)).append(',')
+            .append(gIndex.getClassId(superClassName)).append(',')
+            .append("\"").append(className1).append("\",\"")
+        val staticFields = gIndex.getFieldOffsets(className, true)
+        val staticModifiers = ACC_STATIC
+        for ((name, field) in staticFields.fields) appendField(name, field.jvmType, staticModifiers)
+        val instanceFields = gIndex.getFieldOffsets(className, false)
+        val instanceModifiers = 0
+        for ((name, field) in instanceFields.fields) appendField(name, field.jvmType, instanceModifiers)
+        writer.append("\");\n")
     }
 
     // todo group them by package...
     val classNames = gIndex.classNames
-    var hadJavaClass = false
+    var canCreateClassInstances = false
     for (classId in classNames.indices) {
 
         val className = classNames[classId]
@@ -110,7 +118,7 @@ fun wasm2js(
         val instanceFields = instanceFields0.fields
         val methods = hIndex.methodsByClass[className] ?: emptyList()
 
-        if (hadJavaClass) {
+        if (canCreateClassInstances) {
             writer.append("  static CLASS_INSTANCE = ")
             writeClassInstanceCreateCall(className)
         } else {
@@ -132,15 +140,13 @@ fun wasm2js(
             writer.append("  static STATIC_INITED = false;\n")
         }
 
-        if (staticFields.isNotEmpty()) {
-            for ((name, data) in staticFields) {
-                val value = hIndex.finalFields[FieldSig(className, name, data.jvmType, true)]
-                writer.append("  static ").append(name).append(" = ")
-                appendValue(value, data.jvmType)
-                writer.append(";\n")
-            }
-            writer.append("\n")
+        for ((name, data) in staticFields) {
+            val value = hIndex.finalFields[FieldSig(className, name, data.jvmType, true)]
+            writer.append("  static ").append(name).append(" = ")
+            appendValue(value, data.jvmType)
+            writer.append(";\n")
         }
+        writer.append("\n") // there is always static fields
 
         if (isConstructable && instanceFields.isNotEmpty()) {
             for ((name, data) in instanceFields) {
@@ -186,15 +192,43 @@ fun wasm2js(
         writer.size-- // delete last \n
         writer.append("}\n\n")
 
-        if (className == "java/lang/Class") {
-            writer.append("// late-init class instances\n")
+        if (className == "java/lang/reflect/Method") {
+
+            // what do we need? name, shortName, fields, methods
+            writer.append("// class instances\n")
+            writer.append("const CLASS_INSTANCES = [];\n") // only named classes
+            writer.append(
+                "" +
+                        "for(let i=0;i<${gIndex.classNames.size};i++){\n" +
+                        "   CLASS_INSTANCES.push(new java_lang_Class());\n" +
+                        "}\n" +
+                        "function createClass(classId,superId,name,fields) {\n" +
+                        "   const clazz = CLASS_INSTANCES[classId];\n" +
+                        "   clazz.name = wrapString(name);\n" +
+                        "   if(name.length) CLASS_INSTANCES.push(clazz);\n" +
+                        "   fields = fields.split(',');\n" +
+                        "   let fields1 = clazz.fields = new AW();\n" +
+                        "   let fields2 = fields1.values = superId < classId ? [...CLASS_INSTANCES[superId].fields.values] : [];\n" +
+                        "   for(let i=0;i+2<fields.length;i+=3){\n" +
+                        "       let field = new java_lang_reflect_Field();\n" +
+                        "       field.name = wrapString(fields[i]);\n" +
+                        "       field.clazz = CLASS_INSTANCES[fields[i+1]*1];\n" +
+                        "       field.modifiers = fields[i+2]*1;\n" +
+                        "       fields2.push(field);\n" +
+                        "   }\n" +
+                        "   return clazz;\n" +
+                        "}\n\n"
+            )
+
             for (classIdI in 0..classId) {
                 val classNameI = classNames[classIdI]
-                writer.append(classNameToJS(classNameI)).append(".CLASS_INSTANCE = ")
+                if (classNameI !in NativeTypes.nativeTypes) {
+                    writer.append(classNameToJS(classNameI)).append(".CLASS_INSTANCE = ")
+                } // else just call the constructor
                 writeClassInstanceCreateCall(classNameI)
             }
             writer.append("\n")
-            hadJavaClass = true
+            canCreateClassInstances = true
         }
     }
 

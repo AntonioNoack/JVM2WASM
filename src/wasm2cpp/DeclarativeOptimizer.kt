@@ -38,6 +38,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
     private val usageCounts = HashMap<String, Int>()
     private val assignCounts = HashMap<String, Int>()
     private val declarationBlocker = HashSet<String>()
+    private val usedJumpLabels = HashSet<String>()
 
     val writer = ArrayList<Instruction>()
 
@@ -104,7 +105,8 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 incAssign(instr.instanceName)
             }
             is ExprIfBranch -> incUsages(instr.expr)
-            BreakThisLoopInstr, is GotoInstr, Unreachable, is NullDeclaration, is Comment, is LoopInstr -> {
+            is GotoInstr -> usedJumpLabels.add(instr.label)
+            BreakThisLoopInstr, Unreachable, is NullDeclaration, is Comment, is LoopInstr -> {
                 // nothing to do
             }
             else -> throw NotImplementedError("Unknown instruction $instr")
@@ -116,6 +118,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         assignCounts.clear()
         usageCounts.clear()
         declarationBlocker.clear()
+        usedJumpLabels.clear()
         depth = 1
     }
 
@@ -174,6 +177,9 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 }
                 is LoopInstr -> {
                     removeRedundantAssignments(instr.body)
+                    if (instr.label !in usedJumpLabels) {
+                        instr.label = ""
+                    }
                     previousAssignments.clear()
                 }
                 is IfBranch, is Jumping, is CppStoreInstr,

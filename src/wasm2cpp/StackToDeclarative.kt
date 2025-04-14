@@ -10,7 +10,6 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
-import useUTF8Strings
 import utils.FieldSig
 import utils.WASMType
 import utils.WASMTypes.*
@@ -76,9 +75,9 @@ class StackToDeclarative(
         }
 
         fun canAppendWithoutBrackets(expr: Expr, operator: BinaryOperator, isLeft: Boolean): Boolean {
-            when (operator) {
+            return when (operator) {
                 BinaryOperator.ADD -> {
-                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                    expr is BinaryExpr && expr.instr is BinaryInstruction &&
                             when (expr.instr.operator) {
                                 BinaryOperator.ADD, BinaryOperator.SUB,
                                 BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER -> true
@@ -86,7 +85,7 @@ class StackToDeclarative(
                             }
                 }
                 BinaryOperator.SUB -> {
-                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                    expr is BinaryExpr && expr.instr is BinaryInstruction &&
                             when (expr.instr.operator) {
                                 BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER -> true
                                 BinaryOperator.ADD -> isLeft
@@ -94,7 +93,7 @@ class StackToDeclarative(
                             }
                 }
                 BinaryOperator.MULTIPLY -> {
-                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                    expr is BinaryExpr && expr.instr is BinaryInstruction &&
                             when (expr.instr.operator) {
                                 BinaryOperator.MULTIPLY -> true
                                 else -> false
@@ -120,10 +119,10 @@ class StackToDeclarative(
                     return symbols.all { it == '&' }
                 }*/
                 BinaryOperator.AND, BinaryOperator.XOR, BinaryOperator.OR -> {
-                    return expr is BinaryExpr && expr.instr is BinaryInstruction &&
+                    expr is BinaryExpr && expr.instr is BinaryInstruction &&
                             expr.instr.operator == operator
                 }
-                else -> return false
+                else -> false
             }
         }
     }
@@ -723,7 +722,7 @@ class StackToDeclarative(
             val popped = popInReverse(tmpFuncName, params)
             val self = if (isStatic) null else popElement(sig.className)
             if (results.isEmpty()) {
-                append(UnresolvedExprCall(self, sig, isSpecial , popped))
+                append(UnresolvedExprCall(self, sig, isSpecial, popped))
             } else {
                 val resultName = nextTemporaryVariable()
                 append(UnresolvedCallAssignment(self, sig, isSpecial, popped, results, resultName, null))

@@ -11,10 +11,7 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes.*
 import replaceClass
 import replaceClassNullable
-import utils.Descriptor
-import utils.FieldSig
-import utils.MethodSig
-import utils.STATIC_INIT
+import utils.*
 import java.io.IOException
 
 /**
@@ -92,6 +89,8 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
 
     var isInterface = false
     var isFinal = false
+
+    val classInstance by lazy { Class.forName(clazz.replace('/', '.')) }
 
     override fun visit(
         version: Int,
@@ -262,8 +261,20 @@ class FirstClassIndexer(val clazz: String) : ClassVisitor(API_LEVEL) {
         //  just hardcode them in the assembly :)
         val type = Descriptor.parseType(descriptor)
         val sig = FieldSig(clazz, name, type, access.hasFlag(ACC_STATIC))
-        if (value != null && access.hasFlag(ACC_FINAL)) {
-            hIndex.finalFields[sig] = value
+        if (access.hasFlag(ACC_FINAL)) {
+            if (value != null) {
+                hIndex.finalFields[sig] = value
+            } else if (sig.isStatic && type in NativeTypes.nativeTypes) {
+                // check if we can read the value just like that
+                try {
+                    val field = classInstance.getDeclaredField(name)
+                    field.isAccessible = true
+                    val newValue = field.get(null)
+                    hIndex.finalFields[sig] = newValue
+                    // println("$sig = $newValue")
+                } catch (ignored: Throwable) {
+                }
+            }
         }
 
         if (signature != null) {

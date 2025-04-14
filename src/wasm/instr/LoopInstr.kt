@@ -10,7 +10,7 @@ import wasm.instr.Instruction.Companion.appendResults
 import wasm2cpp.instr.BreakThisLoopInstr
 
 data class LoopInstr(
-    override val label: String, var body: ArrayList<Instruction>,
+    override var label: String, var body: ArrayList<Instruction>,
     override val params: List<String>, override val results: List<String>
 ) : Instruction, BreakableInstruction {
 

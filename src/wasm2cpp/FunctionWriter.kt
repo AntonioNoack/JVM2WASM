@@ -234,7 +234,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     }
 
     private fun writeLoopInstr(instr: LoopInstr) {
-        begin().append(instr.label).append(": while (true) {\n")
+        begin()
+        if (instr.label.isNotEmpty()) writer.append(instr.label).append(": ")
+        writer.append("while (true) {\n")
         depth++
         writeInstructions(instr.body)
         depth--

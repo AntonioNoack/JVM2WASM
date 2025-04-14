@@ -18,7 +18,7 @@ import kotlin.streams.toList
 class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
     companion object {
-        private val allowedCodepoints = " .,-#+%!?:;§&/()[]{}=*^".codePoints().toList()
+        private val allowedCodepoints = " .,_-#+%!?:;§$&/()[]{}=*^".codePoints().toList()
 
         val jsKeywords = "function,var,let,const".split(',').toHashSet()
     }
