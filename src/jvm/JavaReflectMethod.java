@@ -25,6 +25,17 @@ public class JavaReflectMethod {
     // must be long enough for the longest supported combination, including 'self'
     private static final Object[] joinedCallArguments = new Object[4];
 
+    @PureJavaScript(code = "" +
+            // todo security checks??
+            "let method = arg0, newInstance = arg1, params = arg2.values;\n" +
+            "let jsClass = getJSClassByClass(method.clazz);\n" +
+            // convert parameters to native, where necessary
+            "let params1 = [...params];\n" +
+            "for(let i=0;i<params1.length;i++){\n" +
+            "   params1[i] = applyUnboxing(params1[i], method.parameterTypes[i]);\n" +
+            "}\n" +
+            "let response = jsClass.prototype[method.jsName].apply(newInstance, params1);\n" +
+            "return applyBoxing(response, method.returnType);\n")
     @Alias(names = "java_lang_reflect_Method_invoke_Ljava_lang_ObjectAWLjava_lang_Object")
     public static Object Method_invoke(Method self, Object calledOrNull, Object[] args) {
         if (self == null) throw new IllegalArgumentException("Method must not be null");
@@ -49,8 +60,7 @@ public class JavaReflectMethod {
             // convert parameters to native, where necessary
             "let params1 = [...params];\n" +
             "for(let i=0;i<params1.length;i++){\n" +
-            "   let paramType = constructor.parameterTypes[i].slot;\n" +
-            "   if(paramType >= 16 && paramType <= 23) params1[i] = params1[i].value;\n" +
+            "   params1[i] = applyUnboxing(params1[i], constructor.parameterTypes[i]);\n" +
             "}\n" +
             "jsClass.prototype[constructor.jsName].apply(newInstance, params1);\n")
     public static void Constructor_invoke(Constructor<?> self, Object newInstance, Object[] params) {

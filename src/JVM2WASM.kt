@@ -353,17 +353,26 @@ val implementedMethods = HashMap<String, MethodSig>(1 shl 16)
 
 val clock = Clock("JVM2WASM")
 
-fun listSuperClasses(clazz: String, list: HashSet<String>): Collection<String> {
-    val superClass = hIndex.superClass[clazz]
-    if (superClass != null) {
-        list.add(superClass)
-        listSuperClasses(superClass, list)
-    }
-    val interfaces = hIndex.interfaces[clazz]
-    if (interfaces != null) {
-        for (interfaceI in interfaces) {
-            list.add(interfaceI)
+fun listSuperClasses(ownClass: String, list: HashSet<String>): HashSet<String> {
+    return listSuperClassesImpl(ownClass, list, true)
+}
+
+fun listInterfaces(ownClass: String, list: HashSet<String>): HashSet<String> {
+    return listSuperClassesImpl(ownClass, list, false)
+}
+
+fun listSuperClassesImpl(ownClass: String, list: HashSet<String>, addSuperClasses: Boolean): HashSet<String> {
+    var classI = ownClass
+    while (true) {
+        val interfaces = hIndex.interfaces[classI]
+        if (interfaces != null) {
+            for (interfaceI in interfaces) {
+                list.add(interfaceI)
+                listSuperClassesImpl(interfaceI, list, addSuperClasses)
+            }
         }
+        classI = hIndex.superClass[classI] ?: break
+        if (addSuperClasses) list.add(classI)
     }
     return list
 }

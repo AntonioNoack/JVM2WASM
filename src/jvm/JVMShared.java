@@ -904,7 +904,12 @@ public class JVMShared {
     @Export
     @NoThrow
     @Alias(names = "instanceOf")
-    @PureJavaScript(code = "return arg0 instanceof getJSClassById(arg1)") // todo also check interfaces
+    @PureJavaScript(code = "" +
+            "if(!arg0) return false;\n" +
+            "const classId = arg1;\n" +
+            "const jsClass = getJSClassById(classId);\n" +
+            "const jvmClass = getClassById(readClass(arg0));\n" +
+            "return arg0 instanceof jsClass || jvmClass.interfaceIds.indexOf(classId) >= 0;\n")
     public static boolean instanceOf(Object instance, int classId) {
         // log("instanceOf", instance, clazz);
         if (instance == null) return false;

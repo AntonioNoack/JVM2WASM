@@ -150,6 +150,12 @@ public class JavaReflect {
         return offset;
     }
 
+    @PureJavaScript(code = "" +
+            "let field = arg0, instance = arg1;\n" +
+            "const jsClass = field.type.jsClass;\n" +
+            "if(!instance) instance = jsClass;\n" +
+            "let value = instance[field.jsName];\n" +
+            "return applyBoxing(value, field.type);\n")
     @Alias(names = "java_lang_reflect_Field_get_Ljava_lang_ObjectLjava_lang_Object")
     public static Object Field_get(Field field, Object instance) {
         // log("Field_get", getAddr(field), getAddr(instance));

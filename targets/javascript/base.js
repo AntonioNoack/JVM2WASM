@@ -24,12 +24,52 @@ window.unwrapString = function(str) {
     return decoder.decode(chars);
 }
 
+window.getClassById = function(classId) {
+    return CLASS_INSTANCES[classId];
+}
+
 window.getJSClassByClass = function(clazz) {
     return clazz.jsClass;
 }
 
 window.getJSClassById = function(classId) {
     return getJSClassByClass(CLASS_INSTANCES[classId]);
+}
+
+window.fillArray = function(arr,i0,i1,value) {
+    for(let i=i0;i<i1;i++) arr[i] = value;
+}
+
+window.applyBoxing = function(value, type) {
+    let paramType = type.index;
+    switch (paramType) {
+        case 16: return java_lang_Integer.valueOf_ILjava_lang_Integer(value);
+        case 17: return java_lang_Long.valueOf_JLjava_lang_Long(value);
+        case 18: return java_lang_Float.valueOf_FLjava_lang_Float(value);
+        case 19: return java_lang_Double.valueOf_DLjava_lang_Double(value);
+        case 20: return java_lang_Boolean.valueOf_ZLjava_lang_Boolean(value);
+        case 21: return java_lang_Byte.valueOf_BLjava_lang_Byte(value);
+        case 22: return java_lang_Short.valueOf_SLjava_lang_Short(value);
+        case 23: return java_lang_Character.valueOf_CLjava_lang_Character(value);
+        case 24: return undefined;
+    }
+    if(value && typeof value != 'object') {
+        console.log(value, type);
+        throw new Error('Cannot leave unboxed');
+    }
+    return value;
+}
+
+window.applyUnboxing = function(value, type) {
+    let paramType = type.index;
+    if (paramType >= 16 && paramType <= 24) {
+        if(value.value === undefined) {
+            console.log(value, type);
+            throw new Error('Cannot unbox undefined');
+        }
+        return value.value;
+    }
+    return value;
 }
 
 let annotaCtr = 0;
@@ -53,12 +93,12 @@ window.link = function(jvmName, jsClass){
     jvmClass.simpleName = wrapString(simpleName);
 }
 
-window.init = function(superId,fields,methods){
+window.init = function(superId,interfaces,fields,methods){
     let classId = initCtr++;
-    createClass(classId,superId,fields,methods);
+    createClass(classId,superId,interfaces,fields,methods);
 }
 
-function createClass(classId,superId,fields,methods) {
+function createClass(classId,superId,interfaces,fields,methods) {
     const clazz = CLASS_INSTANCES[classId];
     clazz.superClass = superId != classId ? CLASS_INSTANCES[superId] : null;
     fields = fields.split(';');
@@ -76,7 +116,7 @@ function createClass(classId,superId,fields,methods) {
         field1.annotations.values = field.slice(3).map(id => ANNOTATION_INSTANCES[id]);
         fields2.push(field1);
     }
-    methods = methods.split(';');
+    methods = methods.length ? methods.split(';') : [];
     const methods1 = clazz.methods = new AW();
     const methods2 = methods1.values = [];
     const constructors1 = clazz.constructors = new AW();
@@ -98,6 +138,7 @@ function createClass(classId,superId,fields,methods) {
         const dstList = isConstructor ? constructors2 : methods2;
         dstList.push(method1);
     }
+    clazz.interfaceIds = interfaces
     return clazz;
 }
  
@@ -140,7 +181,7 @@ window.getResourceAsStream = function(jvmName) {
     if(!bytes) return null;
     const byteArray = new AB();
     byteArray.values = new Uint8Array(bytes);
-    result.new_ABV(byteArray);
+    result.new_java_io_ByteArrayInputStream_ABV(byteArray);
     // console.log('Returned', result, 'as stream for', jsName);
     return result;
 }

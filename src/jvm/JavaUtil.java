@@ -1,9 +1,6 @@
 package jvm;
 
-import annotations.Alias;
-import annotations.JavaScript;
-import annotations.NoThrow;
-import annotations.RevAlias;
+import annotations.*;
 import jvm.custom.GMTTimeZone;
 
 import java.math.BigDecimal;
@@ -197,11 +194,13 @@ public class JavaUtil {
     }
 
     @Alias(names = "java_util_Arrays_fill_AZIIZV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(boolean[] data, int start, int end, boolean value) {
         fill(data, start, end, 0, b2i(value) * 0x1010101);
     }
 
     @Alias(names = "java_util_Arrays_fill_ABIIBV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(byte[] data, int start, int end, byte value) {
         int value1 = ((int) value & 0xff);
         value1 = (value1 << 8) | value1;
@@ -210,6 +209,7 @@ public class JavaUtil {
     }
 
     @Alias(names = "java_util_Arrays_fill_ACIICV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(char[] data, int start, int end, char value) {
         int value1 = ((int) value & 0xffff);
         value1 = (value1 << 8) | value1;
@@ -218,6 +218,7 @@ public class JavaUtil {
     }
 
     @Alias(names = "java_util_Arrays_fill_ASIISV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(short[] data, int start, int end, short value) {
         int value1 = ((int) value & 0xffff);
         value1 = (value1 << 8) | value1;
@@ -226,39 +227,44 @@ public class JavaUtil {
     }
 
     @Alias(names = "java_util_Arrays_fill_AFIIFV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(float[] data, int start, int end, float value) {
         fill(data, start, end, 2, Float.floatToRawIntBits(value));
     }
 
     @Alias(names = "java_util_Arrays_fill_AIIIIV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(int[] data, int start, int end, int value) {
         fill(data, start, end, 2, value);
     }
 
     @Alias(names = "java_util_Arrays_fill_ADIIDV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(double[] data, int start, int end, double value) {
         fill(data, start, end, 3, Double.doubleToRawLongBits(value));
     }
 
     @Alias(names = "java_util_Arrays_fill_AJIIJV")
+    @PureJavaScript(code = "fillArray(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(long[] data, int start, int end, long value) {
         fill(data, start, end, 3, value);
     }
 
     @Alias(names = "java_util_Arrays_fill_AWIILjava_lang_ObjectV")
+    @PureJavaScript(code = "fill(arg0.values,arg1,arg2,arg3)")
     public static void Arrays_fill(Object[] data, int start, int end, Object value) {
         long value1 = getAddrS(value);
         if (is32Bits) value1 = (value1 << 32) | value1;
         fill(data, start, end, ptrSizeBits, value1);
     }
 
-    public static void fill(Object data, int start, int end, int shift, int fillValue) {
+    private static void fill(Object data, int start, int end, int shift, int fillValue) {
         long fillValue1 = Integer.toUnsignedLong(fillValue);
         fillValue1 = (fillValue1 << 32) | fillValue1;
         fill(data, start, end, shift, fillValue1);
     }
 
-    public static void fill(Object data, int start, int end, int shift, long fillValue) {
+    private static void fill(Object data, int start, int end, int shift, long fillValue) {
         rangeCheck(arrayLength(data), start, end);
         Pointer ptr = add(castToPtr(data), arrayOverhead);
         fill64(add(ptr, ((long) start << shift)), add(ptr, ((long) end << shift)), fillValue);

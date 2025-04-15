@@ -138,11 +138,14 @@ object Annotations {
             val fieldType = method.descriptor.returnType ?: continue
 
             val sig = method.withClass(implClass)
-            val fieldOffset = gIndex.getFieldOffset(implClass, method.name, fieldType, false)
-                ?: throw IllegalStateException("Missing field $implClass.${method.name}: $fieldType")
+            val fieldName = method.name
+            val fieldOffset = gIndex.getFieldOffset(implClass, fieldName, fieldType, false)
+                ?: throw IllegalStateException("Missing field $implClass.$fieldName: $fieldType")
 
             val funcName = methodName2(sig)
             val selfParam = Param("self", "java/lang/Object", ptrTypeI)
+            hIndex.registerMethod(sig)
+            hIndex.addAnnotation(sig, Annota(PURE_JAVASCRIPT, hashMapOf("code" to "return arg0.$fieldName;")))
             gIndex.translatedMethods[sig] = FunctionImpl(
                 funcName, listOf(selfParam), listOf(fieldType),
                 emptyList(), arrayListOf(

@@ -1218,7 +1218,7 @@ class MethodTranslator(
                     afterDynamicCall(splitArgs, ret)
                 }
             }
-            // typically, <init>, but also can be super function; -> no resolution required
+            // typically, <init>, but also can be final or super function; -> no resolution required
             INVOKESPECIAL -> {
                 if (!ignoreNonCriticalNullPointers) {
                     checkNotNull0(owner, name, getCaller)

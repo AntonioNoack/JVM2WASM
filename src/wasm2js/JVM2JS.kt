@@ -7,6 +7,7 @@ import globals
 import hIndex
 import hierarchy.Annota
 import jvm2wasm
+import listInterfaces
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
 import me.anno.utils.types.Booleans.toInt
@@ -49,6 +50,7 @@ data class Method(val jsName: String, val sig: MethodSig)
 data class Field(val sig: FieldSig, val annotations: List<Int>)
 
 data class ClassInfo(
+    val interfaces: Set<String>,
     val fields: List<Field>,
     val methods: List<Method>
 )
@@ -79,6 +81,7 @@ fun wasm2js(
             null -> {
                 val nullValue = when (type) {
                     "long" -> "0n"
+                    "float", "double" -> "0.0"
                     in NativeTypes.nativeTypes -> "0"
                     else -> "null"
                 }
@@ -90,42 +93,6 @@ fun wasm2js(
     }
 
     val classInfos = ArrayList<ClassInfo>(gIndex.classNames.size)
-    fun writeClassInstanceCreateCall(className: String) {
-        val classId = gIndex.getClassId(className)
-        val classInfo = classInfos[classId]
-        val superClassName = hIndex.superClass[className] ?: "java/lang/Object"
-        writer.append("init(")
-        writer.append(gIndex.getClassId(superClassName)).append(",\"")
-        for ((field, annotationIds) in classInfo.fields) {
-            if (!writer.endsWith("\"")) writer.append(';')
-            val typeId = gIndex.classIndex[field.jvmType] ?: 0
-            val modifiers = field.isStatic.toInt(ACC_STATIC)
-            writer.append(field.name).append(',')
-                .append(typeId).append(',')
-                .append(modifiers)
-            for (id in annotationIds) {
-                writer.append(',').append(id)
-            }
-        }
-        writer.append("\",\"")
-        for ((shortName, method) in classInfo.methods) {
-            if (!writer.endsWith("\"")) writer.append(';')
-            // short-name is for calling it
-            // we need the actual name for finding it...
-            writer.append(if (method.name == INSTANCE_INIT) "" else method.name).append(',')
-            writer.append(shortName).append(',')
-            val modifiers = hIndex.isStatic(method).toInt(ACC_STATIC)
-            writer.append(modifiers).append(',')
-            val returnType = method.descriptor.returnType
-            val returnTypeId = if (returnType != null) gIndex.getClassIdOrParents(returnType) else -1
-            writer.append(returnTypeId)
-            for (param in method.descriptor.params) {
-                writer.append(',').append(gIndex.getClassIdOrParents(param))
-            }
-        }
-        writer.append("\");\n")
-    }
-
     // todo group them by package...
     val classNames = gIndex.classNames
     for (classId in classNames.indices) {
@@ -210,7 +177,7 @@ fun wasm2js(
             val jsImplementation = pureJS ?: hIndex.getAnnotation(resolved, Annotations.JAVASCRIPT)
             val func = functionByName[methodName(resolved)]
             if (jsImplementation != null) {
-                val shortName = shortName(method.name, method.descriptor.raw)
+                val shortName = shortName(method)
                 val numParams = method.descriptor.params.size + (!isStatic).toInt()
                 defineFunctionImplementationPureJS(
                     numParams, shortName, isStatic,
@@ -221,7 +188,7 @@ fun wasm2js(
             }
             // println("  -> ${methodName(resolved)} -> ${func?.javaClass}")
             if (func == null || func is Import) continue
-            val shortName = shortName(method.name, method.descriptor.raw)
+            val shortName = shortName(method)
             // println("  -> '$shortName'")
             defineFunctionImplementation(
                 func, globals, functionByName, pureFunctions,
@@ -232,6 +199,9 @@ fun wasm2js(
             }
         }
 
+        val interfaces = listInterfaces(className, HashSet())
+        // todo link all interface methods/default implementations...
+
         // todo if a function is already defined in the parent class, skip it
         // todo if a function is a default-interface-function, link to it via a bridge method somehow...
         // todo we need to handle super-calls properly, too, with super.(), which we removed...
@@ -239,7 +209,7 @@ fun wasm2js(
         // todo replace tree-calls with actual call
         // todo replace instanceof-function-call with proper instance-of check
 
-        classInfos.add(ClassInfo(fields1, methods1))
+        classInfos.add(ClassInfo(interfaces, fields1, methods1))
 
         writer.append("}\n")
     }
@@ -271,8 +241,46 @@ fun wasm2js(
     }
     writer.append("\n")
 
-    for (classIdI in classNames.indices) {
-        writeClassInstanceCreateCall(classNames[classIdI])
+    for (classId in classNames.indices) {
+        val className = classNames[classId]
+        val classInfo = classInfos[classId]
+        val superClassName = hIndex.superClass[className] ?: "java/lang/Object"
+        writer.append("init(")
+        writer.append(gIndex.getClassId(superClassName)).append(",[")
+        val interfaceIds = classInfo.interfaces
+            .mapNotNull { gIndex.getClassIdOrNull(it) }
+        for (interfaceId in interfaceIds.sorted()) {
+            if (!writer.endsWith("[")) writer.append(',')
+            writer.append(interfaceId)
+        }
+        writer.append("],\"")
+        for ((field, annotationIds) in classInfo.fields) {
+            if (!writer.endsWith("\"")) writer.append(';')
+            val typeId = gIndex.classIndex[field.jvmType] ?: 0
+            val modifiers = field.isStatic.toInt(ACC_STATIC)
+            writer.append(field.name).append(',')
+                .append(typeId).append(',')
+                .append(modifiers)
+            for (id in annotationIds) {
+                writer.append(',').append(id)
+            }
+        }
+        writer.append("\",\"")
+        for ((shortName, method) in classInfo.methods) {
+            if (!writer.endsWith("\"")) writer.append(';')
+            // short-name is for calling it
+            // we need the actual name for finding it...
+            writer.append(if (method.name == INSTANCE_INIT) "" else method.name).append(',')
+            writer.append(shortName).append(',')
+            val modifiers = hIndex.isStatic(method).toInt(ACC_STATIC)
+            writer.append(modifiers).append(',')
+            val returnType = method.descriptor.returnType ?: "void"
+            writer.append(gIndex.getClassIdOrParents(returnType))
+            for (param in method.descriptor.params) {
+                writer.append(',').append(gIndex.getClassIdOrParents(param))
+            }
+        }
+        writer.append("\");\n")
     }
     writer.append("\n")
 
@@ -307,13 +315,13 @@ fun wasm2js(
 }
 
 fun shortName(sig: MethodSig): String {
-    return shortName(sig.name, sig.descriptor.raw)
+    return shortName(sig.className, sig.name, sig.descriptor.raw)
 }
 
-fun shortName(name: String, args: String): String {
+fun shortName(className: String, name: String, args: String): String {
     return when (name) {
         STATIC_INIT -> "static|$args"
-        INSTANCE_INIT -> "new|$args"
+        INSTANCE_INIT -> "new|$className|$args" // must include class-name to avoid inheritance
         else -> "$name|$args"
     }.escapeChars()
 }
