@@ -77,11 +77,12 @@ fun wasm2js(
     fun appendValue(value: Any?, type: String) {
         when (value) {
             null -> {
-                if (type in NativeTypes.nativeTypes) {
-                    writer.append("0")
-                } else {
-                    writer.append("null")
+                val nullValue = when (type) {
+                    "long" -> "0n"
+                    in NativeTypes.nativeTypes -> "0"
+                    else -> "null"
                 }
+                writer.append(nullValue)
             }
             is Number -> writer.append(value)
             else -> throw NotImplementedError("${value.javaClass}, $type")
@@ -258,7 +259,8 @@ fun wasm2js(
     for (classId in classNames.indices) {
         val className = classNames[classId]
         val jsClassName = classNameToJS(className)
-        writer.append("link(\"").append(className).append("\",").append(jsClassName).append(");\n")
+        val jvmClassName = className.replace('/', '.')
+        writer.append("link(\"").append(jvmClassName).append("\",").append(jsClassName).append(");\n")
     }
     writer.append("\n")
 

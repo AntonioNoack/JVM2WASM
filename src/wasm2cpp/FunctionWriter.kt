@@ -1,11 +1,9 @@
 package wasm2cpp
 
-import gIndex
-import hIndex
-import hierarchy.HierarchyIndex.getAlias
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
+import utils.INSTANCE_INIT
 import utils.MethodSig
 import utils.StringBuilder2
 import wasm.instr.Comment
@@ -19,19 +17,6 @@ import wasm2cpp.expr.CallExpr
 import wasm2cpp.expr.VariableExpr
 import wasm2cpp.instr.*
 import wasm2cpp.language.TargetLanguage
-
-// todo inherit from this class and...
-//  - using HighLevel getters, setters and local-variables, pass around true structs
-//  - using that, generate JavaScript
-// todo new highLevel instructions for instanceOf and indirect calls
-
-// todo intermediate stack-less representation with assignments and complex expressions
-
-// todo enable all warnings, and clear them all for truly clean code
-//  - ignore not-used outputs from functions
-//  - mark functions as pure (compile-time constant)
-//  - inline pure functions (incl. potential reordering) into expressions
-//  - discard unused expressions
 
 class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: TargetLanguage) {
 
@@ -195,9 +180,14 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             // todo is this good enough???
             val expr = self!!.expr
             if (expr is VariableExpr &&
-                expr.name == function.params[0].name &&
-                sig.className == hIndex.superClass[className]
+                (expr.name == function.params[0].name || sig.name != INSTANCE_INIT) &&
+                (sig.className != className)
             ) appendSuper = true
+            else {
+                if (function.funcName == "hashCode_I") {
+                    println("called in hashCode without super: $self.$sig")
+                }
+            }
         }
         if (appendSuper) {
             writer.append("super")

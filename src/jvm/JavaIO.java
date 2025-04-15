@@ -2,34 +2,30 @@ package jvm;
 
 import annotations.Alias;
 import annotations.NoThrow;
+import annotations.PureJavaScript;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 
 import static jvm.JVMShared.readPtrAtOffset;
-import static jvm.JavaReflect.getFieldOffset;
+import static jvm.JVMShared.writePtrAtOffset;
 import static jvm.ThrowJS.throwJs;
+import static utils.StaticFieldOffsets.OFFSET_READER_LOCK;
 
 public class JavaIO {
 
-    private static int lockFieldOffset = 0;
-
     @Alias(names = "new_java_io_InputStreamReader_Ljava_io_InputStreamV")
     public static void new_java_io_InputStreamReader_Ljava_io_InputStreamV(
-            InputStreamReader reader, InputStream stream) throws NoSuchFieldException, IllegalAccessException {
-        Class clazz = reader.getClass();
-        Field field = clazz.getField("lock");
-        lockFieldOffset = getFieldOffset(field);
-        field.set(reader, stream);
+            InputStreamReader reader, InputStream stream) {
+        setInputStream(reader, stream);
     }
 
     @Alias(names = "new_java_io_InputStreamReader_Ljava_io_InputStreamLjava_nio_charset_CharsetV")
     public static void new_java_io_InputStreamReader_Ljava_io_InputStreamLjava_nio_charset_CharsetV(
-            InputStreamReader reader, InputStream stream, Charset cs) throws NoSuchFieldException, IllegalAccessException {
+            InputStreamReader reader, InputStream stream, Charset cs) {
         new_java_io_InputStreamReader_Ljava_io_InputStreamV(reader, stream);
     }
 
@@ -58,8 +54,15 @@ public class JavaIO {
     }
 
     @NoThrow
+    @PureJavaScript(code = "return arg0.lock;")
     private static InputStream getInputStream(InputStreamReader reader) {
-        return readPtrAtOffset(reader, lockFieldOffset);
+        return readPtrAtOffset(reader, OFFSET_READER_LOCK);
+    }
+
+    @NoThrow
+    @PureJavaScript(code = "arg0.lock = arg1;")
+    private static void setInputStream(InputStreamReader reader, InputStream value) {
+        writePtrAtOffset(reader, OFFSET_READER_LOCK, value);
     }
 
     @Alias(names = "java_io_InputStreamReader_ready_Z")

@@ -577,7 +577,7 @@ public class Engine {
     // to save space for now
     @NoThrow
     @Alias(names = "me_anno_io_config_ConfigBasics_loadConfig_Ljava_lang_StringLme_anno_io_files_FileReferenceLme_anno_io_utils_StringMapZLme_anno_io_utils_StringMap")
-    private static StringMap ConfigBasics_loadConfig(String name, FileReference workspace, StringMap defaultValue, boolean saveIfMissing) {
+    private static StringMap ConfigBasics_loadConfig(Object self, String name, FileReference workspace, StringMap defaultValue, boolean saveIfMissing) {
         return defaultValue;
     }
 

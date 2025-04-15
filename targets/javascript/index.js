@@ -1,7 +1,7 @@
 
 const startTime = Date.now()
 const lib = window
-
+window.lib = window
 window.inited = false
 
 try {
@@ -344,7 +344,7 @@ try {
     window.ctx = txtCanvas.getContext('2d', {alpha: false, willReadFrequently: true})
 
     // querying fonts: console.log(await queryLocalFonts());, works but popup
-    onLoaded()
+    loadResources(onLoaded)
 
 } catch(e){
 	console.error(e)

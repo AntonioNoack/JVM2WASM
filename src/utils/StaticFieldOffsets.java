@@ -52,4 +52,6 @@ public class StaticFieldOffsets {
     public static final int OFFSET_STE_METHOD = objectOverhead + intSize + ptrSize;
     public static final int OFFSET_STE_FILE = objectOverhead + intSize + ptrSize * 2;
 
+    public static final int OFFSET_READER_LOCK = objectOverhead;
+
 }

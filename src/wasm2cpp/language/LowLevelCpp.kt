@@ -5,6 +5,7 @@ import hIndex
 import highlevel.FieldSetInstr
 import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertTrue
+import translator.JavaTypes.convertTypeToWASM
 import translator.LoadStoreHelper.getLoadCall
 import translator.LoadStoreHelper.getStaticLoadCall
 import translator.LoadStoreHelper.getStaticStoreCall
@@ -44,8 +45,23 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
     }
 
     override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
-        wasm2cpp.defineFunctionHead(function.funcName, function.params, function.results, true)
-        dst.append(" {\n")
+        val results = function.results
+        if (results.isEmpty()) {
+            dst.append("void")
+        } else {
+            for (jvmType in results) {
+                dst.append(convertTypeToWASM(jvmType))
+            }
+        }
+        dst.append(' ').append(function.funcName).append('(')
+        val params = function.params
+        for (i in params.indices) {
+            val param = params[i]
+            if (i > 0) dst.append(", ")
+            dst.append(param.wasmType)
+            dst.append(' ').append(param.name)
+        }
+        dst.append(") {\n")
     }
 
     override fun writeStaticInitCheck(writer: FunctionWriter) {

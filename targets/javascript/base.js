@@ -48,7 +48,7 @@ window.link = function(jvmName, jsClass){
     jvmClass.index = classId;
     
     jvmClass.name = wrapString(jvmName);
-    const sni = jvmName.lastIndexOf('/');
+    const sni = jvmName.lastIndexOf('.');
     const simpleName = jvmName.substring(sni+1);
     jvmClass.simpleName = wrapString(simpleName);
 }
@@ -99,50 +99,77 @@ function createClass(classId,superId,fields,methods) {
         dstList.push(method1);
     }
     return clazz;
- }
+}
  
- const bitcastBuffer = new ArrayBuffer(8);
- const bitcastF32 = new Float32Array(bitcastBuffer);
- const bitcastF64 = new Float64Array(bitcastBuffer);
- const bitcastI32 = new Int32Array(bitcastBuffer);
- const bitcastI64 = new BigInt64Array(bitcastBuffer);
+const bitcastBuffer = new ArrayBuffer(8);
+const bitcastF32 = new Float32Array(bitcastBuffer);
+const bitcastF64 = new Float64Array(bitcastBuffer);
+const bitcastI32 = new Int32Array(bitcastBuffer);
+const bitcastI64 = new BigInt64Array(bitcastBuffer);
 
- window.getF32Bits = function(arg0){
+window.getF32Bits = function(arg0){
     bitcastF32[0] = arg0;
     return bitcastI32[0];
- }
+}
  
- window.getF64Bits = function(arg0){
+window.getF64Bits = function(arg0){
     bitcastF64[0] = arg0;
     return bitcastI64[0];
- }
+}
  
- window.fromF32Bits = function(arg0){
+window.fromF32Bits = function(arg0){
     bitcastI32[0] = arg0;
     return bitcastF32[0];
- }
+}
  
- window.fromF64Bits = function(arg0){
+window.fromF64Bits = function(arg0){
     bitcastI64[0] = arg0;
     return bitcastF64[0];
- }
+}
 
- window.unreachable = function(funcName) {
+window.unreachable = function(funcName) {
     throw new Error('Unreachable in "' + funcName + '"');
- }
+}
 
- // todo fill this buffer with everything necessary
- let resourcesAsBuffers = new Map();
- window.getResourceAsStream = function(jvmName) {
+// todo fill this buffer with everything necessary
+const resourcesAsBuffers = new Map();
+window.getResourceAsStream = function(jvmName) {
     const jsName = unwrapString(jvmName);
     const result = new java_io_ByteArrayInputStream();
-    let bytes = resourcesAsBuffers.get();
-    if(!bytes) {
-        console.log('Looked for missing resource "' + jsName + '"');
-        bytes = new ArrayBuffer(0);
-    }
+    let bytes = resourcesAsBuffers.get(jsName);
+    if(!bytes) return null;
     const byteArray = new AB();
     byteArray.values = new Uint8Array(bytes);
     result.new_ABV(byteArray);
+    // console.log('Returned', result, 'as stream for', jsName);
     return result;
- }
+}
+
+window.loadResources = function(callback) {
+    let urls = ['saveables.yaml']
+    const prefix = '../../assets/'
+    // Create an array of fetch promises
+    const fetchPromises = urls.map(url =>
+        fetch(prefix + url)
+        .then(response => {
+            if (!response.ok) throw new Error(`Failed to load ${url}`);
+            return response.arrayBuffer();
+        })
+        .then(buffer => {
+            return { url, buffer }
+        })
+    );
+
+    // Wait for all promises to resolve
+    Promise.all(fetchPromises)
+        .then(resources => {
+            resources.forEach(resource => {
+                const { url, buffer } = resource;
+                resourcesAsBuffers.set(url, buffer);
+            });
+            callback();
+        })
+        .catch(err => {
+            console.error('Error loading resources :(', err)
+        });
+}

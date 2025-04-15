@@ -45,6 +45,8 @@ object DefaultClassLayouts {
         val accessibleObject = "java/lang/reflect/AccessibleObject"
         val annotation = "java/lang/Annotation"
 
+        val reader = "java/io/Reader"
+
         // todo we might be able to remove instance-init, because we have proper constructors now
         eq(gIndex.getDynMethodIdx(MethodSig.c(object0, INSTANCE_INIT, voidDescriptor)), 0)
         eq(gIndex.getType(true, voidDescriptor, true), FuncType(listOf(), listOf(ptrTypeI)))
@@ -72,6 +74,7 @@ object DefaultClassLayouts {
         hIndex.registerSuperClass(executable, accessibleObject)
         hIndex.registerSuperClass(constructor, executable)
         hIndex.registerSuperClass(method, executable)
+        hIndex.registerSuperClass(reader, object0)
 
         gIndex.getFieldOffset(system, "in", "java/io/InputStream", true)
         gIndex.getFieldOffset(system, "out", "java/io/PrintStream", true)
@@ -114,6 +117,8 @@ object DefaultClassLayouts {
         eq(constructor, "callSignature", string, ptrSize + intSize, OFFSET_CONSTRUCTOR_CALL_SIGNATURE)
         eq(constructor, "clazz", clazz, ptrSize * 2 + intSize, OFFSET_CONSTRUCTOR_DECLARING_CLASS)
         eq(constructor, "modifiers", "int", ptrSize * 3 + intSize, OFFSET_CONSTRUCTOR_MODIFIERS)
+
+        eq(reader, "lock", object0, 0, OFFSET_READER_LOCK)
 
         // for sun/misc
         gIndex.getFieldOffset(thread, "threadLocalRandomSeed", "long", false)

@@ -86,7 +86,7 @@ roid engine_Engine_update_IIFV(i32, i32, f32);
 roid new_java_lang_Throwable_V(isz);
 roid finishTexture(isz, i32, i32, isz);
 roid prepareTexture(isz);
-roid engine_Engine_main_Ljava_lang_StringV(isz);
+roid EngineMain(isz);
 roid init();
 
 // todo implement that variable and parameter names are kept as far as possible in C++ code
@@ -955,7 +955,7 @@ int main() {
     }
 
     init();
-    engine_Engine_main_Ljava_lang_StringV(0);
+    EngineMain(0);
 
     attachGLFWListeners();
     startGCThread();
