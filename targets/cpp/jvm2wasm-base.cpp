@@ -68,25 +68,28 @@ i32 concurrentGC1();
 void initFunctionTable();
 void gc();
 
+// engine functions
+roid EngineKeyModState(i32);
+roid EngineKeyUp(i32);
+roid EngineKeyDown(i32);
+roid EngineKeyTyped(i32);
+roid EngineMouseUp(i32);
+roid EngineMouseDown(i32);
+roid EngineMouseMove(f32,f32);
+roid EngineMouseWheel(f32,f32);
+roid EngineCharTyped(i32,i32);
+roid EngineFocusState(i32);
+roid EngineMinimizedState(i32);
+roid EngineUpdate(i32, i32, f32);
+roid EngineMain(isz);
+
+// runtime functions
 retsz java_lang_Class_getName_Ljava_lang_String(isz);
 retsz createInstance(i32);
-roid engine_Engine_keyModState_IV(i32);
-roid engine_Engine_keyUp_IV(i32);
-roid engine_Engine_keyDown_IV(i32);
-roid engine_Engine_keyTyped_IV(i32);
-roid engine_Engine_mouseUp_IV(i32);
-roid engine_Engine_mouseDown_IV(i32);
-roid engine_Engine_mouseMove_FFV(f32,f32);
-roid engine_Engine_mouseWheel_FFV(f32,f32);
-roid engine_Engine_charTyped_IIV(i32,i32);
-roid engine_Engine_focusState_ZV(i32);
-roid engine_Engine_minimizedState_ZV(i32);
 roid java_lang_Throwable_printStackTrace_V(isz);
-roid engine_Engine_update_IIFV(i32, i32, f32);
 roid new_java_lang_Throwable_V(isz);
 roid finishTexture(isz, i32, i32, isz);
 roid prepareTexture(isz);
-roid EngineMain(isz);
 roid init();
 
 // todo implement that variable and parameter names are kept as far as possible in C++ code
@@ -836,32 +839,32 @@ void handleResize(GLFWwindow* window, int sx, int sy) {
 }
 
 void handleKey(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    handleError(engine_Engine_keyModState_IV(mods));
+    handleError(EngineKeyModState(mods));
     switch(action) {
         case 0: { // release
-            handleError(engine_Engine_keyUp_IV(key));
+            handleError(EngineKeyUp(key));
             break;
         }
         case 1: { // press
-            handleError(engine_Engine_keyDown_IV(key));
+            handleError(EngineKeyDown(key));
             break;
         }
         case 2: { // repeat
-            handleError(engine_Engine_keyTyped_IV(key));
+            handleError(EngineKeyTyped(key));
             break;
         }
     }
 }
 
 void handleMouseButton(GLFWwindow* window, int key, int action, int mods) {
-    handleError(engine_Engine_keyModState_IV(mods));
+    handleError(EngineKeyModState(mods));
     switch(action) {
         case 0: { // release
-            handleError(engine_Engine_mouseUp_IV(key));
+            handleError(EngineMouseUp(key));
             break;
         }
         case 1: { // press
-            handleError(engine_Engine_mouseDown_IV(key));
+            handleError(EngineMouseDown(key));
             break;
         }
     }
@@ -870,15 +873,15 @@ void handleMouseButton(GLFWwindow* window, int key, int action, int mods) {
 void handleCursorPos(GLFWwindow* window, double px, double py) {
     mouseX = px;
     mouseY = py;
-    handleError(engine_Engine_mouseMove_FFV((float) px, (float) py));
+    handleError(EngineMouseMove((float) px, (float) py));
 }
 
 void handleScroll(GLFWwindow* window, double dx, double dy) {
-    handleError(engine_Engine_mouseWheel_FFV((float) dx, (float) dy));
+    handleError(EngineMouseWheel((float) dx, (float) dy));
 }
 
 void handleChar(GLFWwindow* window, unsigned int key, int mods) {
-    handleError(engine_Engine_charTyped_IIV(key, mods));
+    handleError(EngineCharTyped(key, mods));
 }
 
 void APIENTRY debugCallback(GLenum source, 
@@ -895,11 +898,11 @@ void APIENTRY debugCallback(GLenum source,
 }
 
 void handleFocus(GLFWwindow* window, int focus) {
-    handleError(engine_Engine_focusState_ZV(focus ? 1 : 0));
+    handleError(EngineFocusState(focus ? 1 : 0));
 }
 
 void handleMinimized(GLFWwindow* window, int minimized) {
-    handleError(engine_Engine_minimizedState_ZV(minimized ? 1 : 0));
+    handleError(EngineMinimizedState(minimized ? 1 : 0));
 }
 
 void attachGLFWListeners() {
@@ -912,8 +915,8 @@ void attachGLFWListeners() {
     glfwSetWindowFocusCallback(window, handleFocus);
     glfwSetWindowIconifyCallback(window, handleMinimized);
 
-    handleError(engine_Engine_focusState_ZV(1));
-    handleError(engine_Engine_minimizedState_ZV(0));
+    handleError(EngineFocusState(1));
+    handleError(EngineMinimizedState(0));
 
     // (GLDEBUGPROC callback, const void * userParam)
     glDebugMessageCallback(debugCallback, NULL);
@@ -980,7 +983,7 @@ int main() {
         x *= 0.99;
         if(x < 0.05) x = 1.0;
 
-        engine_Engine_update_IIFV(width, height, dt);
+        EngineUpdate(width, height, dt);
 
         // can be used to see how many instances of what type were created
         if(countAllocations && ++csCtr >= 2000) {

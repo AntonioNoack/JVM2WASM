@@ -14,7 +14,6 @@ import static jvm.JVMShared.*;
 import static jvm.JavaReflectMethod.Constructor_invoke;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.add;
-import static jvm.Pointer.getAddrS;
 import static jvm.ThrowJS.throwJs;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
 import static utils.StaticClassIndices.*;
@@ -50,13 +49,13 @@ public class JavaReflect {
 
     @SuppressWarnings("rawtypes")
     @Alias(names = "java_lang_Class_getField_Ljava_lang_StringLjava_lang_reflect_Field")
-    public static Field Class_getField(Class clazz, String name) {
+    public static Field Class_getField(Class self, String name) {
         // using class instance, find fields
-        if (clazz == null || name == null) throw new NullPointerException("Class.getField()");
-        Class originalClass = clazz;
+        if (self == null || name == null) throw new NullPointerException("Class.getField()");
+        Class currClass = self;
         // log("looking for field", name);
         while (true) {
-            Field[] fields = getFields(clazz);
+            Field[] fields = getFields(currClass);
             // log("class for fields", Class_getName_Ljava_lang_String(clazz));
             // log("fields*, length", getAddr(fields), fields.length);
             for (Field field : fields) {
@@ -68,11 +67,12 @@ public class JavaReflect {
                 }
             }
             // use parent class as well, so we need fewer entries in each array
-            clazz = clazz.getSuperclass();
-            if (clazz == null) {
-                log("Missing field", originalClass.getName(), name);
+            Class nextClass = currClass.getSuperclass();
+            if (nextClass == null || currClass == nextClass) {
+                log("Missing field", self.getName(), name);
                 return null; // not really JVM-conform, but we don't want exception-throwing
             }
+            currClass = nextClass;
         }
     }
 
@@ -617,7 +617,8 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_isInstance_Ljava_lang_ObjectZ")
-    @PureJavaScript(code = "return arg1 && arg1 instanceof getJSClassByClass(arg0);")// todo we need to handle interfaces, too
+    @PureJavaScript(code = "return arg1 && arg1 instanceof getJSClassByClass(arg0);")
+// todo we need to handle interfaces, too
     public static boolean Class_isInstance_Ljava_lang_ObjectZ(Class<?> clazz, Object instance) {
         if (instance == null) return false;
         int classIndex = getClassId(clazz);

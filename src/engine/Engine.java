@@ -168,6 +168,7 @@ public class Engine {
 
     @Export
     @NoThrow
+    @Alias(names = "EngineUpdate")
     public static void update(int width, int height, float dt) {
         window.setWidth(width);
         window.setHeight(height);
@@ -192,12 +193,14 @@ public class Engine {
     }
 
     @Export
+    @Alias(names = "EngineMouseMove")
     public static void mouseMove(float mouseX, float mouseY) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onMouseMove(window, mouseX, mouseY));
     }
 
     @Export
+    @Alias(names = "EngineKeyDown")
     public static void keyDown(int key) {
         if (window == null) return;
         long time = System.nanoTime();
@@ -205,53 +208,62 @@ public class Engine {
     }
 
     @Export
+    @Alias(names = "EngineKeyUp")
     public static void keyUp(int key) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key)));
     }
 
     @Export
+    @Alias(names = "EngineKeyTyped")
     public static void keyTyped(int key) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onKeyTyped(window, Key.Companion.byId(key)));
     }
 
     @Export
+    @Alias(names = "EngineCharTyped")
     public static void charTyped(int key, int mods) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onCharTyped(window, key, mods));
     }
 
     @Export
+    @Alias(names = "EngineMouseDown")
     public static void mouseDown(int key) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onMousePress(window, Key.Companion.byId(key)));
     }
 
     @Export
+    @Alias(names = "EngineMouseUp")
     public static void mouseUp(int key) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key)));
     }
 
     @Export
+    @Alias(names = "EngineMouseWheel")
     public static void mouseWheel(float dx, float dy) {
         if (window == null) return;
         addEvent(() -> Input.INSTANCE.onMouseWheel(window, dx, dy, true));
     }
 
     @Export
+    @Alias(names = "EngineKeyModState")
     public static void keyModState(int state) {
         // shift: 1, control: 2, alt: 4, super: 8, capslock: 16
         addEvent(() -> Input.INSTANCE.setKeyModState(state));
     }
 
     @Export
+    @Alias(names = "EngineFocusState")
     public static void focusState(boolean inFocus) {
         addEvent(() -> window.setInFocus(inFocus));
     }
 
     @Export
+    @Alias(names = "EngineMinimizedState")
     public static void minimizedState(boolean isMinimized) {
         addEvent(() -> window.setMinimized(isMinimized));
     }
