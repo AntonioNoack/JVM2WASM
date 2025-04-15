@@ -472,11 +472,13 @@ public class JavaLang {
         return 1;
     }
 
+    @PureJavaScript(code = "return 0n;")
     @Alias(names = "java_lang_Runtime_totalMemory_J")
     public static long java_lang_Runtime_totalMemory_J(Runtime runtime) {
         return getAddrS(getAllocatedSize());
     }
 
+    @PureJavaScript(code = "return 0n;")
     @Alias(names = "java_lang_Runtime_freeMemory_J")
     public static long java_lang_Runtime_freeMemory_J(Runtime runtime) {
         return GarbageCollector.freeMemory + diff(getAllocatedSize(), getNextPtr());

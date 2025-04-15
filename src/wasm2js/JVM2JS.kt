@@ -171,6 +171,13 @@ fun wasm2js(
             val resolved =
                 if (isStatic) hIndex.getAlias(method)
                 else resolveMethod(method, false)
+            if (!isStatic && superClass != null && resolved != null &&
+                resolved.className != className &&
+                resolveMethod(method.withClass(superClass), false) == resolved
+            ) {
+                // redundant override
+                continue
+            }
             // println("  $method -> $resolved")
             resolved ?: continue
             val pureJS = hIndex.getAnnotation(resolved, Annotations.PURE_JAVASCRIPT)
