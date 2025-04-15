@@ -8,10 +8,7 @@ try {
 
     window.commandLine = [[],[]]
 
-    window.str = function(x) {
-        // convert Java string into JavaScript string
-        return x
-    }
+    window.str = window.unwrapString
 
     window.ptr2err = function(ptr){
         var msg = str(lib.r32(ptr + objectOverhead)) // 0 = offset of "detailMessage"
@@ -68,16 +65,17 @@ try {
 
     window.fill = function(buffer, str) {
         if(buffer == 0) return 0
-        str = str + ""
-        var l = Math.max(Math.min(lib.r32(buffer + objectOverhead), str.length), 0)
-        for(var i=0;i<l;i++) {
-            lib.w16(buffer + arrayOverhead + i+i, str.charCodeAt(i))
+        buffer = buffer.values;
+        str = str + ""; // make sure it's a string
+        let l = Math.max(Math.min(buffer.length, str.length), 0)
+        for(let i=0;i<l;i++) {
+            buffer[i] = str.charCodeAt(i);
         }
         return l
     }
 
     window.find = function(word) {
-        for(key in gl) if(gl[key] == word) return key
+        for(let key in gl) if(gl[key] == word) return key
     }
 
     window.stop = false
@@ -99,7 +97,7 @@ try {
         /*var supportsFP32 = !!*/gl.getExtension("EXT_color_buffer_float")
 
         console.log("Calling main function")
-        safe(lib.engine_Engine_main_Ljava_lang_StringV(0))
+        safe(lib.EngineMain(0))
         console.log("Called main function")
 
         var lastTime = 0

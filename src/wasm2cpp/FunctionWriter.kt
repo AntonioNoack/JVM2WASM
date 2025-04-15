@@ -1,6 +1,8 @@
 package wasm2cpp
 
+import gIndex
 import hIndex
+import hierarchy.HierarchyIndex.getAlias
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertFail
 import me.anno.utils.assertions.assertTrue
@@ -79,6 +81,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
 
     private fun writeInstruction(instr: Instruction) {
         if (debugInstructions) writeDebugInfo(instr)
+        // writer.append("/* ").append(instr.javaClass).append(" */ ")
         when (instr) {
             is CppLoadInstr -> language.writeLoadInstr(instr, this)
             is CppStoreInstr -> language.writeStoreInstr(instr, this)
@@ -157,12 +160,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
                 writer.end()
             }
             else -> {
-                begin().append("return { ")
-                for (ri in results.indices) {
-                    if (ri > 0) writer.append(", ")
-                    language.appendExpr(results[ri].expr)
-                }
-                writer.append(" }").end()
+                begin()
+                language.writeReturnStruct(results.map { it.expr })
+                writer.end()
             }
         }
     }
@@ -174,6 +174,9 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
 
     private fun writeCallAssignmentBegin(instr: CallAssignment) {
         begin()
+
+        /*writer.append("/* ").append(instr.resultName ?: "null")
+            .append(", ").append(instr.resultType ?: "null").append(" */ ")*/
 
         if (instr.isReturn) {
             writer.append("return ")

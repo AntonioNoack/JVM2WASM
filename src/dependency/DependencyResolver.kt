@@ -417,7 +417,7 @@ class DependencyResolver {
     private fun handleFieldTypeConstructingInstances(field: FieldSig, sig: MethodSig) {
         // if field.type is constructing instances,
         //  mark that class as constructable (used for classes like Stack and Pool)
-        if (field.descriptor in constructingClasses) {
+        if (field.jvmType in constructingClasses) {
             val generics = hIndex.genericFieldSignatures[field]
             if (generics != null && generics.endsWith(";>;")) {
                 val idx = generics.indexOf("<L")

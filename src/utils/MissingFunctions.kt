@@ -34,6 +34,7 @@ object MissingFunctions {
     ) {
 
         usedButNotImplemented.retainAll(usedMethods)
+        usedButNotImplemented.removeIf { it in helperMethods }
 
         val usedBotNotImplementedMethods =
             usedButNotImplemented.mapNotNull { hIndex.methodByName[it] }
@@ -55,7 +56,7 @@ object MissingFunctions {
         }
     }
 
-    fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
+    private fun printMissingFunctions(usedButNotImplemented: Set<String>, resolved: Set<String>) {
         println("\nMissing functions:")
         val nameToMethod = hIndex.methodByName
         for (name in usedButNotImplemented) {

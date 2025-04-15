@@ -135,6 +135,23 @@ data class Call(val name: String) : Instruction {
         val dupI32 = Call("dupi32")
         val dupI64 = Call("dupi64")
 
+        val i32Neg = Call("i32neg")
+        val i64Neg = Call("i64neg")
+
+        val f32Rem = Call("f32rem")
+        val f64Rem = Call("f64rem")
+
+        val checkNonZero32 = Call("checkNonZero32")
+        val checkNonZero64 = Call("checkNonZero64")
+
+        val safeDiv32 = Call("safeDiv32")
+        val safeDiv64 = Call("safeDiv64")
+
+        val f2i = Call("f2i")
+        val f2l = Call("f2l")
+        val d2i = Call("d2i")
+        val d2l = Call("d2l")
+
         val resolveInterface = Call("resolveInterface")
     }
 }

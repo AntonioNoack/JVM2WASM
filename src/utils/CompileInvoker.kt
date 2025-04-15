@@ -33,7 +33,7 @@ fun compileToWASM(printer: StringBuilder2, clock: Clock) {
 
 fun collectAllMethods(clock: Clock): ArrayList<FunctionImpl> {
     val normalMethods = GeneratorIndex.translatedMethods.values
-    val helperMethods = helperFunctions.values
+    val helperMethods = helperMethods.values
     val getNthMethods = GeneratorIndex.nthGetterMethods.values
     val size = normalMethods.size + helperMethods.size + getNthMethods.size
     val functions = ArrayList<FunctionImpl>(size)

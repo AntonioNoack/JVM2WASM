@@ -7,6 +7,7 @@ import me.anno.utils.structures.arrays.ByteArrayList
 import me.anno.utils.structures.lists.Lists.none2
 import me.anno.utils.types.Booleans.hasFlag
 import me.anno.utils.types.Booleans.toInt
+import org.apache.logging.log4j.LogManager
 import utils.WASMType
 import wasm.instr.*
 import wasm.instr.Const.Companion.i32Const0
@@ -21,6 +22,8 @@ import wasm.parser.LocalVariable
 class BinaryWriter(val stream: ByteArrayList, val module: Module) {
 
     companion object {
+        private val LOGGER = LogManager.getLogger(BinaryWriter::class)
+
         const val K_INVALID_INDEX = -1
         private const val BINARY_MAGIC = 0x6d736100 // \0asm
         private const val BINARY_VERSION = 1
@@ -60,7 +63,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     }
 
     private fun writeSectionHeader(type: SectionType): Int {
-        println("starting section $type @${stream.size} (#${stream.size.toString(16)})")
+        LOGGER.info("starting section $type @${stream.size} (#${stream.size.toString(16)})")
         stream.write(type.ordinal)
         return writeU32Leb128Space()
     }
@@ -424,7 +427,7 @@ class BinaryWriter(val stream: ByteArrayList, val module: Module) {
     private fun writeTableSection() {
         val numTables = module.tables.size - numTableImports
         assertTrue(numTables >= 0)
-        println("num tables: $numTables, ${module.tables}")
+        LOGGER.info("num tables: $numTables, ${module.tables}")
         if (numTables == 0) return
         val ptr = beginSection(SectionType.TABLE, numTables)
         for (i in numTableImports until module.tables.size) {

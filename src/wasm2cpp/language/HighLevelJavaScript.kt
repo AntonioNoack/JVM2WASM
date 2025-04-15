@@ -6,6 +6,11 @@ import me.anno.utils.assertions.assertTrue
 import utils.NativeTypes
 import utils.StringBuilder2
 import wasm.instr.*
+import wasm.instr.Instructions.I32Add
+import wasm.instr.Instructions.I32Mul
+import wasm.instr.Instructions.I32Sub
+import wasm.instr.Instructions.I32_DIVS
+import wasm.instr.Instructions.I64ShrU
 import wasm.parser.FunctionImpl
 import wasm2cpp.FunctionWriter
 import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
@@ -30,7 +35,9 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
-        if (writer.isStatic) dst.append("static ")
+        if (writer.className.isNotEmpty()) {
+            if (writer.isStatic) dst.append("static ")
+        } else dst.append("function ")
         dst.append(function.funcName).append("(")
         // if not static, skip first parameter, and replace it with "this"
         val params = function.params
@@ -146,11 +153,10 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             Instructions.F32_CONVERT_I32U, Instructions.F64_CONVERT_I32U -> "" // needs >>> 0 to make it unsigned
             Instructions.F32_CONVERT_I64U -> "Number(" // needs & 0xFFFFFFFFn)
             Instructions.F64_CONVERT_I64U -> "Number(" // needs & 0xFFFFFFFFFFFFFFFFn)
-            // todo we need to implement the proper methods here...
-            Instructions.I32_REINTERPRET_F32 -> "bit_cast<i32>("
-            Instructions.F32_REINTERPRET_I32 -> "bit_cast<f32>("
-            Instructions.I64_REINTERPRET_F64 -> "bit_cast<i64>("
-            Instructions.F64_REINTERPRET_I64 -> "bit_cast<f64>("
+            Instructions.I32_REINTERPRET_F32 -> "getF32Bits("
+            Instructions.F32_REINTERPRET_I32 -> "fromF32Bits("
+            Instructions.I64_REINTERPRET_F64 -> "getF64Bits("
+            Instructions.F64_REINTERPRET_I64 -> "fromF64Bits("
             else -> throw NotImplementedError()
         }
     }
@@ -180,7 +186,11 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                     when (i.operator) {
                         BinaryOperator.SHIFT_LEFT -> " << "
                         BinaryOperator.SHIFT_RIGHT_SIGNED -> " >> "
-                        BinaryOperator.SHIFT_RIGHT_UNSIGNED -> " >>> "
+                        BinaryOperator.SHIFT_RIGHT_UNSIGNED -> {
+                            // length is unspecified -> unsigned right shift isn't defined
+                            if (i == I64ShrU) "& 0xffffffffffffffffn >> "
+                            else " >>> "
+                        }
                         else -> throw NotImplementedError()
                     }
                 )
@@ -211,11 +221,27 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                     if (castType != null) dst.append(castType)
                 }
             }
+            I32Mul -> {
+                dst.append("Math.imul(")
+                appendExpr(i0)
+                dst.append(',')
+                appendExpr(i1)
+                dst.append(')')
+            }
+            I32Add, I32Sub, I32_DIVS -> {
+                i as BinaryI32Instruction
+                dst.append("(")
+                appendExprSafely(i0)
+                dst.append(' ').append(i.operator.symbol).append(' ')
+                appendExprSafely(i1)
+                dst.append(")|0")
+            }
             is BinaryInstruction -> {
                 when (i.operator) {
                     BinaryOperator.ADD, BinaryOperator.SUB,
                     BinaryOperator.MULTIPLY, BinaryOperator.DIVIDE, BinaryOperator.REMAINDER,
                     BinaryOperator.AND, BinaryOperator.OR, BinaryOperator.XOR -> {
+                        // todo be careful with overflows in some of these operations
                         if (canAppendWithoutBrackets(i0, i.operator, true)) appendExpr(i0)
                         else appendExprSafely(i0)
                         dst.append(' ').append(i.operator.symbol).append(' ')
@@ -301,5 +327,15 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
     override fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter) {
         writer.begin().append("throw new Error('storeInstr not supported');\n")
+    }
+
+    override fun writeReturnStruct(results: List<Expr>) {
+        dst.append("return { ")
+        for (ri in results.indices) {
+            if (ri > 0) dst.append(", ")
+            dst.append("v").append(ri).append(": ")
+            appendExpr(results[ri])
+        }
+        dst.append(" }")
     }
 }

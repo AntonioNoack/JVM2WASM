@@ -408,11 +408,11 @@ fun calculateFieldOffsets() {
     }!!) {
         for (field in fieldsByClass[clazz]!!
             .sortedWith { a, b ->
-                storageSize(b.descriptor).compareTo(storageSize(a.descriptor))
+                storageSize(b.jvmType).compareTo(storageSize(a.jvmType))
                     .ifSame { (a.clazz in nativeClasses).toInt().compareTo((b.clazz in nativeClasses).toInt()) }
                     .ifSame { a.name.compareTo(b.name) }
             }) { // sort by size && is-ptr | later we even could respect alignment and fill gaps where possible :)
-            gIndex.getFieldOffset(field.clazz, field.name, field.descriptor, field.isStatic)
+            gIndex.getFieldOffset(field.clazz, field.name, field.jvmType, field.isStatic)
         }
     }
     gIndex.lockFields = true
@@ -433,20 +433,12 @@ fun printInterfaceIndex() {
 
 fun parseInlineWASM() {
     LOGGER.info("[assignNativeCode]")
-    for ((method, code, noinline) in hIndex.methodAnnotations.entries
+    for ((method, code) in hIndex.methodAnnotations.entries
         .mapNotNull { (method, annotations) ->
             val wasm = annotations.firstOrNull { it.clazz == Annotations.WASM }
-            if (wasm != null)
-                Triple(
-                    method, wasm.properties["code"] as String,
-                    annotations.any { it.clazz == Annotations.NO_INLINE })
-            else null
+            if (wasm != null) Pair(method, wasm.properties["code"] as String) else null
         }) {
-        if (noinline) {
-            hIndex.wasmNative[method] = parseInlineWASM(code)
-        } else {
-            hIndex.inlined[method] = parseInlineWASM(code)
-        }
+        hIndex.inlined[method] = parseInlineWASM(code)
     }
 }
 
@@ -799,7 +791,7 @@ fun createDynamicIndex(classesToLoad: List<String>, filterClass: (String) -> Boo
     return dynIndex
 }
 
-val helperFunctions = HashMap<String, FunctionImpl>()
+val helperMethods = HashMap<String, FunctionImpl>()
 
 fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<String>) {
     LOGGER.info("[printMethodImplementations]")
@@ -819,7 +811,7 @@ fun printMethodImplementations(bodyPrinter: StringBuilder2, usedMethods: Set<Str
     if (notActuallyUsed.isNotEmpty()) {
         LOGGER.warn("Not actually used, #${notActuallyUsed.size}: ${notActuallyUsed.joinToString(", ")}")
     }
-    for (impl in helperFunctions
+    for (impl in helperMethods
         .values.sortedBy { it.funcName }) {
         impl.toString(bodyPrinter)
     }

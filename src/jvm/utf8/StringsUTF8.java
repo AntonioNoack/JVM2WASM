@@ -2,6 +2,7 @@ package jvm.utf8;
 
 import annotations.Alias;
 import annotations.NoThrow;
+import annotations.PureJavaScript;
 import jvm.Pointer;
 
 import java.nio.charset.Charset;
@@ -100,14 +101,28 @@ public class StringsUTF8 {
     }
 
     @Alias(names = "java_lang_String_regionMatches_ZILjava_lang_StringIIZ")
-    public static boolean String_regionMatches(String str0, boolean ignoreCase, int offset0, String str1, int offset1, int charsToCompare) {
-        byte[] v0 = getValue(str0);
-        byte[] v1 = getValue(str1);
-        if (offset0 < 0 || offset0 + charsToCompare > v0.length) return false;
-        if (offset1 < 0 || offset1 + charsToCompare > v1.length) return false;
-        Pointer a0 = add(castToPtr(v0), (long) arrayOverhead + offset0);
-        Pointer a1 = add(castToPtr(v1), (long) arrayOverhead + offset1);
-        Pointer e0 = add(a0, charsToCompare);
+    public static boolean String_regionMatches(String strA, boolean ignoreCase, int offsetA, String strB, int offsetB, int numCharsToCompare) {
+        byte[] v0 = getValue(strA);
+        byte[] v1 = getValue(strB);
+        if (offsetA < 0 || offsetA + numCharsToCompare > v0.length) return false;
+        if (offsetB < 0 || offsetB + numCharsToCompare > v1.length) return false;
+        for (int i = 0; i < numCharsToCompare; i++) {
+            byte b0 = v0[offsetA + i];
+            byte b1 = v1[offsetB + i];
+            if (b0 != b1) return false;
+        }
+        return true;
+    }
+
+    // todo mark this as a native, fast variant???
+    public static boolean String_regionMatchesFast(String strA, boolean ignoreCase, int offsetA, String strB, int offsetB, int numCharsToCompare) {
+        byte[] v0 = getValue(strA);
+        byte[] v1 = getValue(strB);
+        if (offsetA < 0 || offsetA + numCharsToCompare > v0.length) return false;
+        if (offsetB < 0 || offsetB + numCharsToCompare > v1.length) return false;
+        Pointer a0 = add(castToPtr(v0), (long) arrayOverhead + offsetA);
+        Pointer a1 = add(castToPtr(v1), (long) arrayOverhead + offsetB);
+        Pointer e0 = add(a0, numCharsToCompare);
         while (true) {
             final Pointer diff0 = findDiscrepancy(a0, e0, a1);
             if (Pointer.unsignedGreaterThanEqual(diff0, e0)) return true;// they are the same :) -> match
@@ -124,35 +139,31 @@ public class StringsUTF8 {
 
     @Alias(names = "java_lang_String_indexOf_III")
     public static int String_indexOf(String self, int code, int idx) {
-        if (code < 128) {
-            byte[] chars = getValue(self);
-            for (int i = idx, l = chars.length; i < l; i++) {
-                if (chars[i] == code) {
-                    return i;
-                }
+        byte code1 = (byte) code;
+        byte[] chars = getValue(self);
+        for (int i = idx, l = chars.length; i < l; i++) {
+            if (chars[i] == code1) {
+                return i;
             }
         }
-        // else todo implement for special characters
         return -1;
     }
 
     @Alias(names = "java_lang_String_lastIndexOf_III")
     public static int String_lastIndexOf(String self, int code, int idx) {
-        if (code < 128) {
-            byte[] chars = getValue(self);
-            for (int i = Math.min(idx, chars.length - 1); i >= 0; --i) {
-                if (chars[i] == code) {
-                    return i;
-                }
+        byte code1 = (byte) code;
+        byte[] chars = getValue(self);
+        for (int i = Math.min(idx, chars.length - 1); i >= 0; --i) {
+            if (chars[i] == code1) {
+                return i;
             }
         }
-        // else todo implement for special characters
         return -1;
     }
 
     @Alias(names = "java_lang_String_indexOf_Ljava_lang_StringII")
     public static int String_indexOf(String self, String other, int idx) {
-        if (other.isEmpty()) return 0;
+        if (other.isEmpty()) return 0; // this case is needed for self=other=""
         for (int i = idx, l = self.length() - other.length(); i <= l; i++) {
             if (self.startsWith(other, i)) return i;
         }
@@ -196,7 +207,24 @@ public class StringsUTF8 {
 
     @SuppressWarnings("StringEquality")
     @Alias(names = "java_lang_String_compareTo_Ljava_lang_StringI")
-    public static int String_compareTo(String self, String other) {
+    public static int String_compareTo(String strA, String strB) {
+        if (strA == strB) return 0;
+        if (strB == null) throw new NullPointerException("String.compareTo");
+        byte[] charsA = getValue(strA);
+        byte[] charsB = getValue(strB);
+        int l0 = strA.length();
+        int l1 = strB.length();
+        int l = Math.min(l0, l1);
+        for (int i = 0; i < l; i++) {
+            byte bA = charsA[i];
+            byte bB = charsB[i];
+            if (bA != bB) return bA - bB;
+        }
+        return l0 - l1;
+    }
+
+    @SuppressWarnings("StringEquality")
+    public static int String_compareToFast(String self, String other) {
         if (self == other) return 0;
         if (other == null) throw new NullPointerException("String.compareTo");
         Pointer chars0 = castToPtr(getValue(self));
@@ -209,7 +237,7 @@ public class StringsUTF8 {
         a0 = add(a0, 4);
         b0 = add(b0, 4);
         int l = Math.min(l0, l1);
-        long i = diff(findDiscrepancy(a0, add(a0, l), b0) , a0);
+        long i = diff(findDiscrepancy(a0, add(a0, l), b0), a0);
         if (i < l) return read8(add(a0, i)) - read8(add(b0, i));
         return l0 - l1;
     }
@@ -220,7 +248,7 @@ public class StringsUTF8 {
         if (other instanceof String) {
             String otherS = (String) other;
             if (self.length() != otherS.length()) return false;
-            if (self.hashCode() != otherS.hashCode()) return false; // slower at first, but faster afterwards :)
+            if (self.hashCode() != otherS.hashCode()) return false; // slower at first, but faster afterward :)
             return String_compareTo(self, otherS) == 0;
         } else return false;
     }
@@ -244,7 +272,7 @@ public class StringsUTF8 {
     public static void String_getChars(String str, int start, int end, char[] dst, int dstStart) {
         byte[] src = getValue(str);
         int length = end - start;
-        // todo if search > 127 || replace > 127, this won't work properly
+        // todo if char > 127, this won't work properly
         for (int i = 0; i < length; i++) {
             dst[dstStart + i] = (char) src[start + i];
         }
@@ -253,33 +281,45 @@ public class StringsUTF8 {
     @Alias(names = "java_lang_String_toCharArray_AC")
     public static char[] String_toCharArray(String str) {
         byte[] src = getValue(str);
-        // todo if search > 127 || replace > 127, this won't work properly
         int length = src.length;
         char[] dst = new char[length];
-        str.getChars(0, length, dst, 0);
+        String_getChars(str, 0, length, dst, 0);
         return dst;
     }
 
     @NoThrow
+    @PureJavaScript(code = "return arg0.value;")
     private static byte[] getValue(String s) {
         return readPtrAtOffset(s, OFFSET_STRING_VALUE);
     }
 
     @NoThrow
+    @PureJavaScript(code = "arg0.value = arg1;")
     private static void setValue(String s, byte[] value) {
         writePtrAtOffset(s, OFFSET_STRING_VALUE, value);
     }
 
+    @NoThrow
+    @PureJavaScript(code = "return arg0.hash;")
+    private static int getHashCode(String str) {
+        return readI32AtOffset(str, OFFSET_STRING_HASH);
+    }
+
+    @NoThrow
+    @PureJavaScript(code = "arg0.hash = arg1;")
+    private static void setHashCode(String str, int hashCode) {
+        writeI32AtOffset(str, OFFSET_STRING_HASH, hashCode);
+    }
+
     // most critical, will break switch-case statements, if not ascii
     @Alias(names = "java_lang_String_hashCode_I")
-    public static int String_hashCode_I(String str) {
-        int hash = readI32AtOffset(str, OFFSET_STRING_HASH);
+    public static int String_hashCode_I(String self) {
+        int hash = getHashCode(self);
         if (hash == 0) {
-            byte[] chars = getValue(str);
-            for(byte charI : chars) {
-                hash = hash * 31 + (charI & 255);
+            for (int i = 0, l = self.length(); i < l; i++) {
+                hash = hash * 31 + self.charAt(i);
             }
-            writeI32AtOffset(str, OFFSET_STRING_HASH, hash);
+            setHashCode(self, hash);
         }
         return hash;
     }

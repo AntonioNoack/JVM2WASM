@@ -2,6 +2,7 @@ package jvm;
 
 import annotations.Alias;
 
+import static jvm.ArrayAccessUnchecked.*;
 import static jvm.JVMFlags.ptrSize;
 import static jvm.JVMShared.*;
 import static jvm.ThrowJS.throwJs;
@@ -10,93 +11,97 @@ import static utils.StaticClassIndices.*;
 public class ArrayAccessSafe {
 
     @Alias(names = "i32ArrayStore")
-    public static void arrayStore(Object instance, int index, int value) {
+    public static void arrayStore32(Object instance, int index, int value) {
         checkOutOfBounds(instance, index, ptrSize == 4 ? OBJECT_ARRAY : INT_ARRAY, INT_ARRAY);
-        writeI32AtOffset(instance, arrayOverhead + (index << 2), value);
+        arrayStoreU32(instance, index, value);
     }
 
     @Alias(names = "i64ArrayStore")
     public static void arrayStore(Object instance, int index, long value) {
         checkOutOfBounds(instance, index, ptrSize == 8 ? OBJECT_ARRAY : LONG_ARRAY, LONG_ARRAY);
-        writeI64AtOffset(instance, arrayOverhead + (index << 3), value);
+        arrayStoreU64(instance, index, value);
     }
 
     @Alias(names = "ptrArrayStore")
-    public static void arrayStore(Object[] instance, int index, Object value) {
+    public static void arrayStorePtr(Object[] instance, int index, Object value) {
         checkOutOfBounds(instance, index, OBJECT_ARRAY);
-        writePtrAtOffset(instance, arrayOverhead + index * ptrSize, value);
+        arrayStoreUPtr(instance, index, value);
     }
 
     @Alias(names = "f32ArrayStore")
-    public static void arrayStore(float[] instance, int index, float value) {
+    public static void arrayStore32(float[] instance, int index, float value) {
         checkOutOfBounds(instance, index, FLOAT_ARRAY);
-        writeF32AtOffset(instance, arrayOverhead + (index << 2), value);
+        arrayStoreU32(instance, index, value);
     }
 
     @Alias(names = "f64ArrayStore")
-    public static void arrayStore(double[] instance, int index, double value) {
+    public static void arrayStore64(double[] instance, int index, double value) {
         checkOutOfBounds(instance, index, DOUBLE_ARRAY);
-        writeF64AtOffset(instance, arrayOverhead + (index << 3), value);
+        arrayStoreU64(instance, index, value);
     }
 
     @Alias(names = "i16ArrayStore")
-    public static void arrayStore(Object instance, int index, short value) {
+    public static void arrayStore16(Object instance, int index, short value) {
         checkOutOfBounds(instance, index, SHORT_ARRAY, CHAR_ARRAY);
-        writeI16AtOffset(instance, arrayOverhead + (index << 1), value);
+        ArrayAccessUnchecked.arrayStoreU32(instance, index, value);
     }
 
     @Alias(names = "i8ArrayStore")
-    public static void arrayStore(Object instance, int index, byte value) {
+    public static void arrayStore8(Object instance, int index, byte value) {
         checkOutOfBounds(instance, index, BOOLEAN_ARRAY, BYTE_ARRAY);
-        writeI8AtOffset(instance, arrayOverhead + index, value);
+        arrayStore8U(instance, index, value);
     }
 
     @Alias(names = "i32ArrayLoad")
     public static int arrayLoad32(Object instance, int index) {
         checkOutOfBounds(instance, index, ptrSize == 4 ? OBJECT_ARRAY : INT_ARRAY, INT_ARRAY);
-        return readI32AtOffset(instance, arrayOverhead + (index << 2));
+        return arrayLoad32U(instance, index);
     }
 
     @Alias(names = "i64ArrayLoad")
     public static long arrayLoad64(Object instance, int index) {
         checkOutOfBounds(instance, index, ptrSize == 8 ? OBJECT_ARRAY : LONG_ARRAY, LONG_ARRAY);
-        return readI64AtOffset(instance, arrayOverhead + (index << 3));
+        return arrayLoad64U(instance, index);
     }
 
     @Alias(names = "f32ArrayLoad")
     public static float arrayLoad32f(float[] instance, int index) {
         checkOutOfBounds(instance, index, FLOAT_ARRAY);
-        return readF32AtOffset(instance, arrayOverhead + (index << 2));
+        return arrayLoad32fU(instance, index);
     }
 
     @Alias(names = "f64ArrayLoad")
     public static double arrayLoad64f(double[] instance, int index) {
         checkOutOfBounds(instance, index, DOUBLE_ARRAY);
-        return readF64AtOffset(instance, arrayOverhead + (index << 3));
+        return arrayLoad64fU(instance, index);
     }
 
     @Alias(names = "s8ArrayLoad")
     public static byte arrayLoad8(Object instance, int index) {
         checkOutOfBounds(instance, index, BOOLEAN_ARRAY, BYTE_ARRAY);
-        return readI8AtOffset(instance, arrayOverhead + index);
+        return arrayLoad8U(instance, index);
     }
 
     @Alias(names = "u16ArrayLoad")
     public static char arrayLoad16u(char[] instance, int index) {
         checkOutOfBounds(instance, index, CHAR_ARRAY);
-        return readU16AtOffset(instance, arrayOverhead + (index << 1));
+        return arrayLoad16uU(instance, index);
     }
 
     @Alias(names = "s16ArrayLoad")
     public static short arrayLoad16s(short[] instance, int index) {
         checkOutOfBounds(instance, index, SHORT_ARRAY);
-        return readS16AtOffset(instance, arrayOverhead + (index << 1));
+        return arrayLoad16sU(instance, index);
     }
 
     @Alias(names = "arrayLength")
     public static int arrayLength(Object instance) {
         if (instance == null) throw new NullPointerException("[].length");
-        return readI32AtOffset(instance, objectOverhead);
+        int classId = readClassId(instance);
+        if (classId < FIRST_ARRAY || classId > LAST_ARRAY) {
+            throw new ClassCastException("[].length for non-array");
+        }
+        return arrayLengthU(instance);
     }
 
     private static void checkOutOfBounds(Object instance, int index, int expectedClassId) {
@@ -110,7 +115,7 @@ public class ArrayAccessSafe {
         if (actualClassId != expectedClassId1 && actualClassId != expectedClassId2) {
             throwJs("Incorrect clazz!", castToPtr(instance), actualClassId, expectedClassId1);
         }
-        int length = readI32AtOffset(instance, objectOverhead);
+        int length = arrayLengthU(instance);
         if (ge_ub(index, length)) {
             throw new IndexOutOfBoundsException();
         }

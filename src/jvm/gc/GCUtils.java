@@ -3,7 +3,6 @@ package jvm.gc;
 import annotations.NoThrow;
 import jvm.Pointer;
 
-import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.JVMShared.*;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.add;
@@ -19,7 +18,7 @@ public class GCUtils {
     private static void mergeGaps() {
         for (byte[] gap : largestGapsTmp) {
             if (gap != null) {
-                int available = arrayLength(gap) + arrayOverhead;
+                int available = gap.length + arrayOverhead;
                 insertGapMaybe(gap, available, largestGaps);
             }
         }

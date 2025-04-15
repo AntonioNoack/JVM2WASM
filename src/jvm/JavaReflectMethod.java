@@ -1,6 +1,7 @@
 package jvm;
 
 import annotations.Alias;
+import annotations.PureJavaScript;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -41,17 +42,28 @@ public class JavaReflectMethod {
         return result;
     }
 
-    public static void Constructor_invoke(Constructor<?> self, Object called, Object[] args) {
-        if (called == null) throw new IllegalArgumentException("Called must not be null");
+    @PureJavaScript(code = "" +
+            // todo security checks??
+            "let constructor = arg0, newInstance = arg1, params = arg2.values;\n" +
+            "let jsClass = getJSClassByClass(constructor.clazz);\n" +
+            // convert parameters to native, where necessary
+            "let params1 = [...params];\n" +
+            "for(let i=0;i<params1.length;i++){\n" +
+            "   let paramType = constructor.parameterTypes[i].slot;\n" +
+            "   if(paramType >= 16 && paramType <= 23) params1[i] = params1[i].value;\n" +
+            "}\n" +
+            "jsClass.prototype[constructor.jsName].apply(newInstance, params1);\n")
+    public static void Constructor_invoke(Constructor<?> self, Object newInstance, Object[] params) {
+        if (newInstance == null) throw new IllegalArgumentException("Called must not be null");
         if (self == null) throw new IllegalArgumentException("Method must not be null");
 
         int methodId = getMethodId(self);
         // log("Creating", self.getDeclaringClass().getName(), methodId);
 
-        verifyArgumentTypes(self.getParameterTypes(), args, methodId);
+        verifyArgumentTypes(self.getParameterTypes(), params, methodId);
 
         // used to simplify branching
-        joinCallArguments(called, args);
+        joinCallArguments(newInstance, params);
         execute(methodId, void.class, getCallSignature(self));
     }
 
@@ -116,9 +128,9 @@ public class JavaReflectMethod {
     }
 
     private static Object execute(int methodId, Class<?> returnType, String callSignature) {
-        Object[] args = joinedCallArguments;
-        Object arg0 = args[0];
-        Object arg1 = args[1];
+        Object[] params = joinedCallArguments;
+        Object param0 = params[0];
+        Object param1 = params[1];
         switch (callSignature) {
             // static runnable
             case "V":
@@ -137,46 +149,46 @@ public class JavaReflectMethod {
                 return Double.valueOf(invokeD(methodId));
             // getters
             case "TT":
-                return invokeTT(arg0, methodId);
+                return invokeTT(param0, methodId);
             case "TI":
-                return castToIntObject(invokeTI(arg0, methodId), returnType);
+                return castToIntObject(invokeTI(param0, methodId), returnType);
             case "TJ":
-                return Long.valueOf(invokeTJ(arg0, methodId));
+                return Long.valueOf(invokeTJ(param0, methodId));
             case "TF":
-                return Float.valueOf(invokeTF(arg0, methodId));
+                return Float.valueOf(invokeTF(param0, methodId));
             case "TD":
-                return Double.valueOf(invokeTD(arg0, methodId));
+                return Double.valueOf(invokeTD(param0, methodId));
             // static setters
             case "TV":
-                invokeTV(arg0, methodId);
+                invokeTV(param0, methodId);
                 return null;
             case "IV":
-                invokeIV(castToIntLike(arg0), methodId);
+                invokeIV(castToIntLike(param0), methodId);
                 return null;
             case "JV":
-                invokeJV((long) arg0, methodId);
+                invokeJV((long) param0, methodId);
                 return null;
             case "FV":
-                invokeFV((float) arg0, methodId);
+                invokeFV((float) param0, methodId);
                 return null;
             case "DV":
-                invokeDV((double) arg0, methodId);
+                invokeDV((double) param0, methodId);
                 return null;
             // setters
             case "TTV":
-                invokeTTV(arg0, arg1, methodId);
+                invokeTTV(param0, param1, methodId);
                 return null;
             case "TIV":
-                invokeTIV(arg0, castToIntLike(arg1), methodId);
+                invokeTIV(param0, castToIntLike(param1), methodId);
                 return null;
             case "TJV":
-                invokeTJV(arg0, (long) arg1, methodId);
+                invokeTJV(param0, (long) param1, methodId);
                 return null;
             case "TFV":
-                invokeTFV(arg0, (float) arg1, methodId);
+                invokeTFV(param0, (float) param1, methodId);
                 return null;
             case "TDV":
-                invokeTDV(arg0, (double) arg1, methodId);
+                invokeTDV(param0, (double) param1, methodId);
                 return null;
             default:
                 throw new IllegalArgumentException("Unsupported method call");

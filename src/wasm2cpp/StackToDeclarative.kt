@@ -1,7 +1,9 @@
 package wasm2cpp
 
 import canThrowError
+import gIndex
 import hIndex
+import hierarchy.HierarchyIndex.getAlias
 import highlevel.*
 import me.anno.utils.Warning.unused
 import me.anno.utils.assertions.*
@@ -10,11 +12,8 @@ import me.anno.utils.structures.lists.Lists.pop
 import me.anno.utils.types.Booleans.toInt
 import org.apache.logging.log4j.LogManager
 import translator.JavaTypes.convertTypeToWASM
-import utils.FieldSig
-import utils.WASMType
+import utils.*
 import utils.WASMTypes.*
-import utils.methodName
-import utils.ptrType
 import wasm.instr.*
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.F32Load
@@ -673,15 +672,21 @@ class StackToDeclarative(
                 if (useHighLevelMemoryAccess) {
                     val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
                     val dependencies = self?.dependencies ?: emptyList()
-                    val isBoolean = i.fieldSig.descriptor == "boolean"
+                    val isBoolean = i.fieldSig.jvmType == "boolean"
                     stack.add(StackElement(FieldGetExpr(i.fieldSig, self?.expr, false), dependencies, isBoolean))
                 } else writeInstructions(i.toLowLevel())
             }
             is FieldSetInstr -> {
                 if (useHighLevelMemoryAccess) {
-                    val value = popElement(i.fieldSig.descriptor)
-                    val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
-                    append(FieldAssignment(i.fieldSig, self, value))
+                    if (i.reversed) {
+                        val self = popElement(i.fieldSig.clazz)
+                        val value = popElement(i.fieldSig.jvmType)
+                        append(FieldAssignment(i.fieldSig, self, value))
+                    } else {
+                        val value = popElement(i.fieldSig.jvmType)
+                        val self = if (!i.fieldSig.isStatic) popElement(i.fieldSig.clazz) else null
+                        append(FieldAssignment(i.fieldSig, self, value))
+                    }
                 } else writeInstructions(i.toLowLevel())
             }
             is InvokeMethodInstr -> {
@@ -694,6 +699,18 @@ class StackToDeclarative(
         }
     }
 
+    private fun mustWriteResolvedMethod(sig: MethodSig): Boolean {
+        var className = sig.className
+        if (className.startsWith("[") && className !in NativeTypes.nativeArrays) className = "[]"
+        if (getAlias(sig) != sig && className !in gIndex.classIndex) {
+            assertTrue(hIndex.isStatic(sig)) {
+                "${sig.className} is unknown, but also $sig is used and not static"
+            }
+            // traditional method resolving, kind of hacky...
+            return true
+        } else return false
+    }
+
     private fun appendHighLevelCall(i: InvokeMethodInstr) {
 
         // stackPush
@@ -704,7 +721,8 @@ class StackToDeclarative(
             append(ExprCall(Call.stackPush.name, listOf(constStack)))
         }
 
-        val sig = i.original
+        var sig = i.original
+        if (mustWriteResolvedMethod(sig)) sig = hIndex.getAlias(sig)
 
         // actual call
         val isStatic = hIndex.isStatic(sig)

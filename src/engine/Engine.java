@@ -103,8 +103,8 @@ public class Engine {
 
     @Export
     @NoThrow
-    @SuppressWarnings("ConfusingMainMethod")
-    public static void main(String clazzName) {
+    @Alias(names = "EngineMain")
+    public static void EngineMain(String clazzName) {
 
         if (!runsInBrowser()) {
             OS.isWeb = false;

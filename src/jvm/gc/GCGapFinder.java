@@ -7,7 +7,7 @@ import jvm.custom.WeakRef;
 
 import java.util.ArrayList;
 
-import static jvm.ArrayAccessUnchecked.arrayLength;
+import static jvm.ArrayAccessUnchecked.arrayLengthU;
 import static jvm.JVMShared.unsignedGreaterThanEqual;
 import static jvm.JVMShared.unsignedLessThan;
 import static jvm.JVMShared.*;
@@ -249,7 +249,7 @@ public class GCGapFinder {
     public static Pointer getInstanceSize(Pointer addr, int classId) {
         if (classId >= FIRST_ARRAY && classId <= LAST_ARRAY) {
             // handle arrays by size
-            int length = arrayLength(addr);
+            int length = arrayLengthU(addr);
             return getArraySizeInBytes(length, classId);
         } else {
             // handle class instance

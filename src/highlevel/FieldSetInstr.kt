@@ -4,6 +4,7 @@ import alwaysUseFieldCalls
 import interpreter.WASMEngine
 import jvm.JVMFlags.is32Bits
 import me.anno.utils.assertions.assertEquals
+import me.anno.utils.assertions.assertTrue
 import translator.GeneratorIndex
 import utils.FieldSig
 import utils.lookupStaticVariable
@@ -18,7 +19,8 @@ import wasm.instr.StoreInstr
 class FieldSetInstr(
     val fieldSig: FieldSig,
     val storeInstr: StoreInstr,
-    val storeCall: Call
+    val storeCall: Call,
+    val reversed: Boolean
 ) : HighLevelInstruction() {
 
     companion object {
@@ -34,12 +36,25 @@ class FieldSetInstr(
         }
     }
 
+    init {
+        // reversed is meaningless for static fields, so rather not set it at all
+        assertTrue(!reversed || !fieldSig.isStatic)
+    }
+
     override fun execute(engine: WASMEngine): String? {
-        val value = engine.pop()
-        val self = if (fieldSig.isStatic) null else engine.pop()
-        val addr = getFieldAddr(self, fieldSig)
-        storeInstr.store(engine, addr, value)
-        return null
+        if (reversed) {
+            val self = engine.pop()
+            val value = engine.pop()
+            val addr = getFieldAddr(self, fieldSig)
+            storeInstr.store(engine, addr, value)
+            return null
+        } else {
+            val value = engine.pop()
+            val self = if (fieldSig.isStatic) null else engine.pop()
+            val addr = getFieldAddr(self, fieldSig)
+            storeInstr.store(engine, addr, value)
+            return null
+        }
     }
 
     override fun toLowLevel(): List<Instruction> {
@@ -47,7 +62,10 @@ class FieldSetInstr(
         return when {
             alwaysUseFieldCalls -> listOf(i32Const(offset), storeCall)
             fieldSig.isStatic -> listOf(ptrConst(offset), storeInstr)
-            else -> listOf(ptrConst(offset), if (is32Bits) I32Add else I64Add, storeInstr)
+            else -> {
+                if (!reversed) throw NotImplementedError("Must swap arguments before and after adding offset")
+                listOf(ptrConst(offset), if (is32Bits) I32Add else I64Add, storeInstr)
+            }
         }
     }
 }

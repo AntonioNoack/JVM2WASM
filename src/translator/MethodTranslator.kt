@@ -86,7 +86,6 @@ import wasm.instr.Const.Companion.i32ConstM1
 import wasm.instr.Const.Companion.i64Const
 import wasm.instr.Const.Companion.i64Const0
 import wasm.instr.Const.Companion.i64Const1
-import wasm.instr.Const.Companion.ptrConst
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.F32Add
 import wasm.instr.Instructions.F32Div
@@ -232,16 +231,8 @@ class MethodTranslator(
         currentNode.inputStack = emptyList()
 
         if (access.hasFlag(ACC_NATIVE) || access.hasFlag(ACC_ABSTRACT)) {
-            // if it has @WASM annotation, use that code
-            val wasm = hIndex.wasmNative[sig]
-            if (wasm != null) {
-                checkNotMapped()
-                variables.defineParamVariables(clazz, descriptor, isStatic)
-                printer.append(wasm).append(Return)
-            } else {
-                // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
-                isAbstract = true
-            }
+            // println("skipped ${utils.methodName(clazz, name, descriptor)}, because native|abstract")
+            isAbstract = true
         } else {
             if (printOps) {
                 println("\n////////////////////////")
@@ -393,6 +384,12 @@ class MethodTranslator(
     override fun visitCode() {
     }
 
+    private fun Builder.append1(call: Call): Builder {
+        append(call)
+        ActuallyUsedIndex.add(sig, call)
+        return this
+    }
+
     private fun Builder.poppush(expectedType: String): Builder {
         // ensure we got the correct type
         if (printOps) println("// $stack = $expectedType")
@@ -456,35 +453,35 @@ class MethodTranslator(
             IALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(utils.ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.i32ArrayLoad else Call.i32ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.i32ArrayLoad else Call.i32ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             LALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(i64)
-                    .append(if (checkArrayAccess) Call.i64ArrayLoad else Call.i64ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.i64ArrayLoad else Call.i64ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             FALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(f32)
-                    .append(if (checkArrayAccess) Call.f32ArrayLoad else Call.f32ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.f32ArrayLoad else Call.f32ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             DALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(f64)
-                    .append(if (checkArrayAccess) Call.f64ArrayLoad else Call.f64ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.f64ArrayLoad else Call.f64ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             AALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(ptrType)
-                    .append(
+                    .append1(
                         if (checkArrayAccess) if (is32Bits) Call.i32ArrayLoad else Call.i64ArrayLoad
                         else if (is32Bits) Call.i32ArrayLoadU else Call.i64ArrayLoadU
                     )
@@ -494,21 +491,21 @@ class MethodTranslator(
             BALOAD -> { // used for bytes and booleans
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.s8ArrayLoad else Call.s8ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             CALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.u16ArrayLoad else Call.u16ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             SALOAD -> {
                 stackPush()
                 printer.pop(i32).pop(ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
+                    .append1(if (checkArrayAccess) Call.s16ArrayLoad else Call.s16ArrayLoadU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
@@ -516,35 +513,35 @@ class MethodTranslator(
             IASTORE -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.i32ArrayStore else Call.i32ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.i32ArrayStore else Call.i32ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             LASTORE -> {
                 stackPush()
                 printer.pop(i64).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.i64ArrayStore else Call.i64ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.i64ArrayStore else Call.i64ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             FASTORE -> {
                 stackPush()
                 printer.pop(f32).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.f32ArrayStore else Call.f32ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.f32ArrayStore else Call.f32ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             DASTORE -> {
                 stackPush()
                 printer.pop(f64).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.f64ArrayStore else Call.f64ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.f64ArrayStore else Call.f64ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             AASTORE -> {
                 stackPush()
                 printer.pop(ptrType).pop(i32).pop(ptrType)
-                    .append(
+                    .append1(
                         if (checkArrayAccess) if (is32Bits) Call.i32ArrayStore else Call.i64ArrayStore
                         else if (is32Bits) Call.i32ArrayStoreU else Call.i64ArrayStoreU
                     )
@@ -554,14 +551,14 @@ class MethodTranslator(
             BASTORE -> {
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.i8ArrayStore else Call.i8ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.i8ArrayStore else Call.i8ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
             CASTORE, SASTORE -> { // char/short-array store
                 stackPush()
                 printer.pop(i32).pop(i32).pop(ptrType)
-                    .append(if (checkArrayAccess) Call.i16ArrayStore else Call.i16ArrayStoreU)
+                    .append1(if (checkArrayAccess) Call.i16ArrayStore else Call.i16ArrayStoreU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
@@ -616,7 +613,7 @@ class MethodTranslator(
                 if (isDuplicable(lastInstr)) {
                     printer.append(lastInstr!!)
                 } else {
-                    printer.append(Call("dup${convertTypeToWASM(type1)}"))
+                    printer.append1(Call("dup${convertTypeToWASM(type1)}"))
                 }
             }
             DUP_X1 -> {
@@ -627,7 +624,7 @@ class MethodTranslator(
                 stack.add(v0)
                 val v0i = convertTypeToWASM(v0)
                 val v1i = convertTypeToWASM(v1)
-                printer.append(Call("dup_x1$v0i$v1i"))
+                printer.append1(Call("dup_x1$v0i$v1i"))
                 // value2, value1 →
                 // value1, value2, value1
             }
@@ -642,7 +639,7 @@ class MethodTranslator(
                 val v0i = convertTypeToWASM(v0)
                 val v1i = convertTypeToWASM(v1)
                 val v2i = convertTypeToWASM(v2)
-                printer.append(Call("dup_x2$v0i$v1i$v2i"))
+                printer.append1(Call("dup_x2$v0i$v1i$v2i"))
             }
             DUP2 -> {
                 val v1 = stack.last()
@@ -650,7 +647,7 @@ class MethodTranslator(
                     // dup
                     stack.add(v1)
                     val v1i = convertTypeToWASM(v1)
-                    printer.append(Call("dup$v1i"))
+                    printer.append1(Call("dup$v1i"))
                 } else {
                     // value2, value1 ->
                     // value2, value1, value2, value1
@@ -659,7 +656,7 @@ class MethodTranslator(
                     stack.add(v1)
                     val v0i = convertTypeToWASM(v0)
                     val v1i = convertTypeToWASM(v1)
-                    printer.append(Call("dup2$v0i$v1i"))
+                    printer.append1(Call("dup2$v0i$v1i"))
                 }
             }
             DUP2_X1 -> {
@@ -683,12 +680,12 @@ class MethodTranslator(
                     val v1i = convertTypeToWASM(v1)
                     val v2i = convertTypeToWASM(v2)
                     val v3i = convertTypeToWASM(v3)
-                    printer.append(Call("dup2_x1$v1i$v2i$v3i"))
+                    printer.append1(Call("dup2_x1$v1i$v2i$v3i"))
                 }
             }
             DUP2_X2 -> {
                 // didn't appear yet...
-                printer.append(Call("dup2_x2"))
+                printer.append1(Call("dup2_x2"))
                 throw NotImplementedError("Implement dup2_x2 instruction")
             }
             SWAP -> {
@@ -697,7 +694,7 @@ class MethodTranslator(
                 if (v0 != v1) printer.pop(v0).pop(v1).push(v0).push(v1)
                 val v0i = convertTypeToWASM(v0)
                 val v1i = convertTypeToWASM(v1)
-                printer.append(Call("swap$v0i$v1i"))
+                printer.append1(Call("swap$v0i$v1i"))
             }
             IADD -> printer.pop(i32).poppush(i32).append(I32Add)
             LADD -> printer.pop(i64).poppush(i64).append(I64Add)
@@ -715,7 +712,7 @@ class MethodTranslator(
             IDIV -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i32).append(Call("safeDiv32"))
+                    printer.poppush(i32).append1(Call.safeDiv32)
                     printer.pop(i32).poppush(i32)
                     stackPop()
                     if (useResultForThrowables) handleThrowable()
@@ -726,7 +723,7 @@ class MethodTranslator(
             LDIV -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i64).append(Call("safeDiv64"))
+                    printer.poppush(i64).append1(Call.safeDiv64)
                     printer.pop(i64).poppush(i64)
                     stackPop()
                     if (useResultForThrowables) handleThrowable()
@@ -739,7 +736,7 @@ class MethodTranslator(
             IREM -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i32).append(Call("checkNonZero32"))
+                    printer.poppush(i32).append1(Call.checkNonZero32)
                     stackPop()
                     if (useResultForThrowables) handleThrowable()
                 }
@@ -748,17 +745,17 @@ class MethodTranslator(
             LREM -> {
                 if (checkIntDivisions) {
                     stackPush()
-                    printer.poppush(i64).append(Call("checkNonZero64"))
+                    printer.poppush(i64).append1(Call.checkNonZero64)
                     stackPop()
                     if (useResultForThrowables) handleThrowable()
                 }
                 printer.pop(i64).poppush(i64)
                 printer.append(I64_REM_S)
             }
-            FREM -> printer.pop(f32).poppush(f32).append(Call("f32rem"))
-            DREM -> printer.pop(f64).poppush(f64).append(Call("f64rem"))
-            INEG -> printer.poppush(i32).append(Call("i32neg"))
-            LNEG -> printer.poppush(i64).append(Call("i64neg"))
+            FREM -> printer.pop(f32).poppush(f32).append1(Call.f32Rem)
+            DREM -> printer.pop(f64).poppush(f64).append1(Call.f64Rem)
+            INEG -> printer.poppush(i32).append1(Call.i32Neg)
+            LNEG -> printer.poppush(i64).append1(Call.i64Neg)
             FNEG -> printer.poppush(f32).append(F32_NEG)
             DNEG -> printer.poppush(f64).append(F64_NEG)
             ISHL -> printer.pop(i32).poppush(i32).append(I32Shl)
@@ -780,11 +777,11 @@ class MethodTranslator(
             L2I -> printer.pop(i64).push(i32).append(I32_WRAP_I64)
             L2F -> printer.pop(i64).push(f32).append(F32_CONVERT_I64S)
             L2D -> printer.pop(i64).push(f64).append(F64_CONVERT_I64S)
-            F2I -> printer.pop(f32).push(i32).append(Call("f2i"))
-            F2L -> printer.pop(f32).push(i64).append(Call("f2l"))
+            F2I -> printer.pop(f32).push(i32).append1(Call.f2i)
+            F2L -> printer.pop(f32).push(i64).append1(Call.f2l)
             F2D -> printer.pop(f32).push(f64).append(F64_PROMOTE_F32)
-            D2I -> printer.pop(f64).push(i32).append(Call("d2i"))
-            D2L -> printer.pop(f64).push(i64).append(Call("d2l"))
+            D2I -> printer.pop(f64).push(i32).append1(Call.d2i)
+            D2L -> printer.pop(f64).push(i64).append1(Call.d2l)
             D2F -> printer.pop(f64).push(f32).append(F32_DEMOTE_F64)
 
             I2B -> printer.poppush(i32)
@@ -796,17 +793,17 @@ class MethodTranslator(
                 .append(i32Const(16)).append(I32Shl)
                 .append(i32Const(16)).append(I32ShrS)
 
-            LCMP -> printer.pop(i64).pop(i64).push(i32).append(Call.lcmp)
-            FCMPL -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpl) // -1 if NaN
-            FCMPG -> printer.pop(f32).pop(f32).push(i32).append(Call.fcmpg) // +1 if NaN
-            DCMPL -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpl) // -1 if NaN
-            DCMPG -> printer.pop(f64).pop(f64).push(i32).append(Call.dcmpg) // +1 if NaN
+            LCMP -> printer.pop(i64).pop(i64).push(i32).append1(Call.lcmp)
+            FCMPL -> printer.pop(f32).pop(f32).push(i32).append1(Call.fcmpl) // -1 if NaN
+            FCMPG -> printer.pop(f32).pop(f32).push(i32).append1(Call.fcmpg) // +1 if NaN
+            DCMPL -> printer.pop(f64).pop(f64).push(i32).append1(Call.dcmpl) // -1 if NaN
+            DCMPG -> printer.pop(f64).pop(f64).push(i32).append1(Call.dcmpg) // +1 if NaN
 
             ARRAY_LENGTH_INSTR -> {
                 // array length
                 stackPush()
                 printer.pop(ptrType).push(i32)
-                    .append(if (checkArrayAccess) Call.arrayLength else Call.arrayLengthU)
+                    .append1(if (checkArrayAccess) Call.arrayLength else Call.arrayLengthU)
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
@@ -822,12 +819,13 @@ class MethodTranslator(
         }
     }
 
+    /**
+     * invoke a lambda
+     * */
     override fun visitInvokeDynamicInsn(
         name: String, descriptor: String, method: Handle,
         vararg args: Any //  Integer, Float, Long, Double, String, Type, Handle or ConstantDynamic
     ) {
-        // what is that? lambda and stuff
-        // until now we were able to implement everything at comptime;
         // implement this at comptime as well, as far as we get :) -> new pseudo-classes
         // java.lang.CharSequence.chars()
         // https://www.baeldung.com/java-invoke-dynamic
@@ -875,24 +873,17 @@ class MethodTranslator(
             for (i in fields.lastIndex downTo 0) {
                 val type = fields[i]
                 printer.append(createdInstance.getter) // instance
-                val offset = gIndex.getFieldOffset(synthClassName, "f$i", type, false)
+                val fieldName = "f$i"
+                val fieldSig = FieldSig(synthClassName, fieldName, type, false)
+                val offset = gIndex.getFieldOffset(fieldSig)
                 if (offset == null) {
                     printUsed(sig)
                     println("constructor-dependency? ${synthClassName in dIndex.constructorDependencies[sig]!!}")
-                    throw NullPointerException("Missing $synthClassName.f$i ($type), constructable? ${synthClassName in dIndex.constructableClasses}")
+                    throw NullPointerException("Missing $fieldSig, constructable? ${synthClassName in dIndex.constructableClasses}")
                 }
                 if (comments) printer.comment("set field #$i")
-                if (alwaysUseFieldCalls) {
-                    printer
-                        .append(i32Const(offset))
-                        .append(getVIOStoreCall(type))
-                } else {
-                    printer
-                        .append(ptrConst(offset))
-                        .append(if (is32Bits) I32Add else I64Add)
-                        .append(Call("swap${jvm2wasmTyped(type)}$ptrType")) // swap ptr and value
-                        .append(getStoreInstr(type))
-                }
+
+                printer.append(FieldSetInstr(fieldSig, getStoreInstr(type), getVIOStoreCall(type), true))
                 printer.pop(type)
             }
 
@@ -1172,14 +1163,14 @@ class MethodTranslator(
                         setter != null -> {
                             visitFieldInsn2(
                                 if (isStatic(setter)) PUTSTATIC else PUTFIELD,
-                                setter.clazz, setter.name, setter.descriptor, true
+                                setter.clazz, setter.name, setter.jvmType, true
                             )
                             calledCanThrow = false
                         }
                         getter != null -> {
                             visitFieldInsn2(
                                 if (isStatic(getter)) GETSTATIC else GETFIELD,
-                                getter.clazz, getter.name, getter.descriptor, true
+                                getter.clazz, getter.name, getter.jvmType, true
                             )
                             calledCanThrow = false
                         }
@@ -1873,7 +1864,7 @@ class MethodTranslator(
                     val storeCall = getStaticStoreCall(type)
                     if (useHighLevelInstructions) {
                         val storeInstr = getStoreInstr(type)
-                        printer.append(FieldSetInstr(sig, storeInstr, storeCall))
+                        printer.append(FieldSetInstr(sig, storeInstr, storeCall, false))
                     } else {
                         printer.append(i32Const(staticPtr))
                         printer.append(storeCall)
@@ -1937,7 +1928,7 @@ class MethodTranslator(
                     // we'd need to call a function twice, so call a generic functions for this
                     if (useHighLevelInstructions) {
                         val storeInstr = getStoreInstr(type)
-                        printer.append(FieldSetInstr(sig, storeInstr, storeCall))
+                        printer.append(FieldSetInstr(sig, storeInstr, storeCall, false))
                     } else {
                         printer
                             .append(i32Const(fieldOffset))

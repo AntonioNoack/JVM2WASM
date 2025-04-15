@@ -334,4 +334,13 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         appendExpr(instr.valueExpr.expr)
         dst.append(";\n")
     }
+
+    override fun writeReturnStruct(results: List<Expr>) {
+        dst.append("return { ")
+        for (ri in results.indices) {
+            if (ri > 0) dst.append(", ")
+            appendExpr(results[ri])
+        }
+        dst.append(" }")
+    }
 }

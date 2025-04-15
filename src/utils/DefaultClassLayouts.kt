@@ -96,8 +96,8 @@ object DefaultClassLayouts {
         // remove securityCheckCache and override, we don't need them
         eq(field, "slot", "int", 0, OFFSET_FIELD_SLOT)
         eq(field, "name", string, intSize, OFFSET_FIELD_NAME)
-        eq(field, "type", clazz, ptrSize + intSize, OFFSET_FIELD_TYPE)
-        eq(field, "clazz", clazz, 2 * ptrSize + intSize, OFFSET_FIELD_CLAZZ)
+        eq(field, "type", clazz, ptrSize + intSize, OFFSET_FIELD_TYPE) // class of stored values
+        eq(field, "clazz", clazz, 2 * ptrSize + intSize, OFFSET_FIELD_CLAZZ) // declaring class
         eq(field, "annotations", "[$annotation", 3 * ptrSize + intSize, OFFSET_FIELD_ANNOTATIONS)
         eq(field, "modifiers", "int", 4 * ptrSize + intSize, OFFSET_FIELD_MODIFIERS)
 

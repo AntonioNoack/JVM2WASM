@@ -59,8 +59,12 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
         }
     }
 
-    private fun incUsages(expr: StackElement) {
-        incUsages(expr.dependencies)
+    private fun incUsages(expr: StackElement?) {
+        incUsages(expr?.dependencies ?: return)
+    }
+
+    private fun incUsages1(expr: List<StackElement>) {
+        for (exprI in expr) incUsages(exprI.dependencies)
     }
 
     private fun getAssignCount(name: String): Int {
@@ -78,7 +82,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 incAssign(instr.name)
             }
             is FieldAssignment -> {
-                if (instr.instance != null) incUsages(instr.instance)
+                incUsages(instr.instance)
                 incUsages(instr.newValue)
             }
             is Declaration -> {
@@ -91,14 +95,23 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 incUsages(instr.valueExpr)
             }
             is ExprReturn -> {
-                for (expr in instr.results) incUsages(expr)
+                incUsages1(instr.results)
+            }
+            is UnresolvedCallAssignment -> {
+                incUsages(instr.self)
+                incUsages1(instr.params)
+                if (instr.resultName != null) incAssign(instr.resultName)
+            }
+            is UnresolvedExprCall -> {
+                incUsages(instr.self)
+                incUsages1(instr.params)
             }
             is CallAssignment -> {
-                for (expr in instr.params) incUsages(expr)
+                incUsages1(instr.params)
                 if (instr.resultName != null) incAssign(instr.resultName)
             }
             is ExprCall -> {
-                for (expr in instr.params) incUsages(expr)
+                incUsages1(instr.params)
             }
             is FunctionTypeDefinition -> {
                 incUsages(instr.indexExpr)
@@ -415,8 +428,12 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                     convertTypeToWASM(it).wasmName
                 }
             }
+        } else if (instr.resultName != null) {
+            val text = "usageCount=0: ${instr.resultName} ="
+            writer.add(Comment(text))
         }
 
+        // println("changing result type from ${instr.resultName}, ${instr.resultType} to $resultName, $resultType")
         writer.add(instr.withResult(resultName, resultType))
         return returnsImmediately || assignsImmediately
     }

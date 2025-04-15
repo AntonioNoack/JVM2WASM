@@ -1,9 +1,6 @@
 package jvm;
 
-import annotations.Alias;
-import annotations.JavaScript;
-import annotations.NoThrow;
-import annotations.WASM;
+import annotations.*;
 import jvm.custom.ThreadLocalRandom;
 import jvm.gc.GarbageCollector;
 import jvm.lang.Bean;
@@ -216,18 +213,22 @@ public class JavaLang {
         return false;
     }
 
-    private static boolean copyQuickly(int a, int b, int length) {
-        return (a >= b + length) || (b >= a + length);
+    private static void checkIndexOutOfBounds(int offset, int length, int availableLength) {
+        if (offset < 0 || offset + length > availableLength) throw new IndexOutOfBoundsException();
     }
 
-    private static boolean copyBackwards(int a, int b) {
-        return a < b;
-    }
-
-    public static void checkIndices(int a, int l, int al) {
-        if (a < 0 || a + l > al) throw new IndexOutOfBoundsException();
-    }
-
+    @PureJavaScript(code = "" +
+            "const src = arg0.values, srcIndex = arg1, dst = arg2.values, dstIndex = arg3, length = arg4;\n" +
+            "if ((src === dst && srcIndex == dstIndex) || length == 0) return;\n" +
+            "if (src !== dst || srcIndex > dstIndex) {\n" +
+            "   for(let i=0;i<length;i++){\n" +// copy forwards
+            "       dst[i+dstIndex] = src[i+srcIndex];\n" +
+            "   }\n" +
+            "} else {\n" +
+            "   for(let i=length-1;i>=0;i--){\n" +// copy backwards
+            "       dst[i+dstIndex] = src[i+srcIndex];\n" +
+            "   }\n" +
+            "}\n")
     @Alias(names = "java_lang_System_arraycopy_Ljava_lang_ObjectILjava_lang_ObjectIIV")
     public static void arraycopy(Object src, int srcIndex, Object dst, int dstIndex, int length) {
 
@@ -247,8 +248,8 @@ public class JavaLang {
         Pointer src2 = add(src1, delta + ((long) srcIndex << shift));
         Pointer dst2 = add(dst1, delta + ((long) dstIndex << shift));
 
-        checkIndices(srcIndex, length, arrayLength(src1));
-        checkIndices(dstIndex, length, arrayLength(dst1));
+        checkIndexOutOfBounds(srcIndex, length, arrayLength(src1));
+        checkIndexOutOfBounds(dstIndex, length, arrayLength(dst1));
 
         long numBytes = (long) length << shift;
         if (src != dst || srcIndex > dstIndex) copyForwards(src2, dst2, numBytes);
@@ -256,7 +257,7 @@ public class JavaLang {
     }
 
     @NoThrow
-    public static void copyForwards(Pointer src, Pointer dst, long length) {
+    private static void copyForwards(Pointer src, Pointer dst, long length) {
         Pointer endPtr = add(dst, length);
         Pointer end8 = sub(endPtr, 7);
         while (unsignedLessThan(dst, end8)) {
@@ -280,7 +281,7 @@ public class JavaLang {
     }
 
     @NoThrow
-    public static void copyBackwards(Pointer src, Pointer dst, long length) {
+    private static void copyBackwards(Pointer src, Pointer dst, long length) {
         Pointer endPtr = sub(dst, 1);
         // we start at the end
         src = add(src, length - 8);
@@ -550,6 +551,12 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_System_identityHashCode_Ljava_lang_ObjectI")
+    @PureJavaScript(code = "" + // lazy implementation
+            "let hash = arg0.__hash;\n" +
+            "if(hash === undefined) {\n" +
+            "   arg0.__hash = hash = (Math.random() * 2147483647)|0;\n" +
+            "}\n" +
+            "return hash;\n")
     public static int System_identityHashCode(Object obj) {
         // https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
         // return getAddr(obj); // good for debugging

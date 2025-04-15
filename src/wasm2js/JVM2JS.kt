@@ -1,12 +1,15 @@
 package wasm2js
 
 import dIndex
+import dependency.ActuallyUsedIndex
 import gIndex
 import globals
 import hIndex
+import hierarchy.Annota
 import jvm2wasm
 import me.anno.utils.Clock
 import me.anno.utils.OS.documents
+import me.anno.utils.types.Booleans.toInt
 import org.objectweb.asm.Opcodes.ACC_STATIC
 import utils.*
 import utils.DefaultClassLayouts.GC_FIELD_NAME
@@ -42,6 +45,14 @@ fun classNameToJS(jvmType: String): String {
     return jvmType.escapeChars()
 }
 
+data class Method(val jsName: String, val sig: MethodSig)
+data class Field(val sig: FieldSig, val annotations: List<Int>)
+
+data class ClassInfo(
+    val fields: List<Field>,
+    val methods: List<Method>
+)
+
 fun wasm2js(
     functions: ArrayList<FunctionImpl>, functionTable: List<String>,
     imports: List<Import>, globals: Map<String, GlobalVariable>
@@ -49,6 +60,11 @@ fun wasm2js(
 
     val functionByName = createFunctionByNameMap(functions, imports)
     functions.removeIf { it.funcName.startsWith("getNth_") || it.funcName.startsWith("tree_") }
+
+    val annotationInstances = HashMap<Annota, Int>()
+    fun getAnnotationId(annota: Annota): Int {
+        return annotationInstances.getOrPut(annota) { annotationInstances.size }
+    }
 
     writeHeader(functions, functionTable, imports, globals)
 
@@ -72,39 +88,48 @@ fun wasm2js(
         }
     }
 
-    fun appendField(name: String, type: String, modifiers: Int) {
-        val typeId = gIndex.classIndex[type] ?: 0
-        writer.append(name).append(',')
-            .append(typeId).append(',')
-            .append(modifiers).append(',')
-    }
-
+    val classInfos = ArrayList<ClassInfo>(gIndex.classNames.size)
     fun writeClassInstanceCreateCall(className: String) {
-        var className1 = className
-        val isSynthetic = className1 in hIndex.syntheticClasses
-        if (isSynthetic) className1 = ""
+        val classId = gIndex.getClassId(className)
+        val classInfo = classInfos[classId]
         val superClassName = hIndex.superClass[className] ?: "java/lang/Object"
-        writer.append("createClass(")
-            .append(gIndex.getClassId(className)).append(',')
-            .append(gIndex.getClassId(superClassName)).append(',')
-            .append("\"").append(className1).append("\",\"")
-        val staticFields = gIndex.getFieldOffsets(className, true)
-        val staticModifiers = ACC_STATIC
-        for ((name, field) in staticFields.fields) appendField(name, field.jvmType, staticModifiers)
-        val instanceFields = gIndex.getFieldOffsets(className, false)
-        val instanceModifiers = 0
-        for ((name, field) in instanceFields.fields) appendField(name, field.jvmType, instanceModifiers)
+        writer.append("init(")
+        writer.append(gIndex.getClassId(superClassName)).append(",\"")
+        for ((field, annotationIds) in classInfo.fields) {
+            if (!writer.endsWith("\"")) writer.append(';')
+            val typeId = gIndex.classIndex[field.jvmType] ?: 0
+            val modifiers = field.isStatic.toInt(ACC_STATIC)
+            writer.append(field.name).append(',')
+                .append(typeId).append(',')
+                .append(modifiers)
+            for (id in annotationIds) {
+                writer.append(',').append(id)
+            }
+        }
+        writer.append("\",\"")
+        for ((shortName, method) in classInfo.methods) {
+            if (!writer.endsWith("\"")) writer.append(';')
+            // short-name is for calling it
+            // we need the actual name for finding it...
+            writer.append(if (method.name == INSTANCE_INIT) "" else method.name).append(',')
+            writer.append(shortName).append(',')
+            val modifiers = hIndex.isStatic(method).toInt(ACC_STATIC)
+            writer.append(modifiers).append(',')
+            val returnType = method.descriptor.returnType
+            val returnTypeId = if (returnType != null) gIndex.getClassIdOrParents(returnType) else -1
+            writer.append(returnTypeId)
+            for (param in method.descriptor.params) {
+                writer.append(',').append(gIndex.getClassIdOrParents(param))
+            }
+        }
         writer.append("\");\n")
     }
 
     // todo group them by package...
     val classNames = gIndex.classNames
-    var canCreateClassInstances = false
     for (classId in classNames.indices) {
 
         val className = classNames[classId]
-        if (className in NativeTypes.nativeTypes) continue
-
         val jsClassName = classNameToJS(className)
         writer.append("class ").append(jsClassName)
         val superClass = hIndex.superClass[className]
@@ -118,12 +143,7 @@ fun wasm2js(
         val instanceFields = instanceFields0.fields
         val methods = hIndex.methodsByClass[className] ?: emptyList()
 
-        if (canCreateClassInstances) {
-            writer.append("  static CLASS_INSTANCE = ")
-            writeClassInstanceCreateCall(className)
-        } else {
-            writer.append("  static CLASS_INSTANCE = null;\n")
-        }
+        writer.append("  static CLASS_INSTANCE = null;\n")
 
         val isConstructable = className in dIndex.constructableClasses
         val isAbstract = hIndex.isAbstractClass(className)
@@ -140,21 +160,36 @@ fun wasm2js(
             writer.append("  static STATIC_INITED = false;\n")
         }
 
-        for ((name, data) in staticFields) {
-            val value = hIndex.finalFields[FieldSig(className, name, data.jvmType, true)]
-            writer.append("  static ").append(name).append(" = ")
-            appendValue(value, data.jvmType)
+        val fields1 = ArrayList<Field>(staticFields.size + instanceFields.size)
+        val methods1 = ArrayList<Method>(methods.size)
+
+        fun appendField(fieldSig: FieldSig) {
+            val name = fieldSig.name
+            val value = hIndex.finalFields[fieldSig]
+            writer.append("  ")
+            if (fieldSig.isStatic) writer.append("static ")
+            writer.append(name).append(" = ")
+            appendValue(value, fieldSig.jvmType)
             writer.append(";\n")
+            val annotations = hIndex.fieldAnnotations[fieldSig] ?: emptyList()
+            fields1.add(
+                Field(
+                    fieldSig, annotations
+                        .filter { it.properties.isEmpty() } // todo support annotations with properties, too
+                        .map { getAnnotationId(it) })
+            )
+        }
+
+        for ((name, data) in staticFields) {
+            appendField(FieldSig(className, name, data.jvmType, true))
         }
         writer.append("\n") // there is always static fields
 
         if (isConstructable && instanceFields.isNotEmpty()) {
             for ((name, data) in instanceFields) {
-                if (name == GC_FIELD_NAME) continue
-                val value = hIndex.finalFields[FieldSig(className, name, data.jvmType, false)]
-                writer.append("  ").append(name).append(" = ")
-                appendValue(value, data.jvmType)
-                writer.append(";\n")
+                if (name == GC_FIELD_NAME) continue // implicit field
+                if (name == "length" && className.startsWith("[")) continue // implicit field
+                appendField(FieldSig(className, name, data.jvmType, false))
             }
             writer.append("\n")
         }
@@ -166,20 +201,34 @@ fun wasm2js(
             val isStatic = hIndex.isStatic(method)
             if (!isStatic && !isConstructable) continue
             val resolved =
-                if (isStatic) method
+                if (isStatic) hIndex.getAlias(method)
                 else resolveMethod(method, false)
             // println("  $method -> $resolved")
             resolved ?: continue
+            val pureJS = hIndex.getAnnotation(resolved, Annotations.PURE_JAVASCRIPT)
+            val jsImplementation = pureJS ?: hIndex.getAnnotation(resolved, Annotations.JAVASCRIPT)
             val func = functionByName[methodName(resolved)]
+            if (jsImplementation != null) {
+                val shortName = shortName(method.name, method.descriptor.raw)
+                val numParams = method.descriptor.params.size + (!isStatic).toInt()
+                defineFunctionImplementationPureJS(
+                    numParams, shortName, isStatic,
+                    jsImplementation.properties["code"] as String
+                )
+                methods1.add(Method(shortName, method))
+                continue
+            }
             // println("  -> ${methodName(resolved)} -> ${func?.javaClass}")
-            func ?: continue
-            if (func is Import) continue // todo link to import/write imported implementation
+            if (func == null || func is Import) continue
             val shortName = shortName(method.name, method.descriptor.raw)
             // println("  -> '$shortName'")
             defineFunctionImplementation(
                 func, globals, functionByName, pureFunctions,
                 isStatic, className, shortName
             )
+            if (method.name != STATIC_INIT) {
+                methods1.add(Method(shortName, method))
+            }
         }
 
         // todo if a function is already defined in the parent class, skip it
@@ -189,53 +238,54 @@ fun wasm2js(
         // todo replace tree-calls with actual call
         // todo replace instanceof-function-call with proper instance-of check
 
-        writer.size-- // delete last \n
-        writer.append("}\n\n")
+        classInfos.add(ClassInfo(fields1, methods1))
 
-        if (className == "java/lang/reflect/Method") {
-
-            // what do we need? name, shortName, fields, methods
-            writer.append("// class instances\n")
-            writer.append("const CLASS_INSTANCES = [];\n") // only named classes
-            writer.append(
-                "" +
-                        "for(let i=0;i<${gIndex.classNames.size};i++){\n" +
-                        "   CLASS_INSTANCES.push(new java_lang_Class());\n" +
-                        "}\n" +
-                        "function createClass(classId,superId,name,fields) {\n" +
-                        "   const clazz = CLASS_INSTANCES[classId];\n" +
-                        "   clazz.name = wrapString(name);\n" +
-                        "   if(name.length) CLASS_INSTANCES.push(clazz);\n" +
-                        "   fields = fields.split(',');\n" +
-                        "   let fields1 = clazz.fields = new AW();\n" +
-                        "   let fields2 = fields1.values = superId < classId ? [...CLASS_INSTANCES[superId].fields.values] : [];\n" +
-                        "   for(let i=0;i+2<fields.length;i+=3){\n" +
-                        "       let field = new java_lang_reflect_Field();\n" +
-                        "       field.name = wrapString(fields[i]);\n" +
-                        "       field.clazz = CLASS_INSTANCES[fields[i+1]*1];\n" +
-                        "       field.modifiers = fields[i+2]*1;\n" +
-                        "       fields2.push(field);\n" +
-                        "   }\n" +
-                        "   return clazz;\n" +
-                        "}\n\n"
-            )
-
-            for (classIdI in 0..classId) {
-                val classNameI = classNames[classIdI]
-                if (classNameI !in NativeTypes.nativeTypes) {
-                    writer.append(classNameToJS(classNameI)).append(".CLASS_INSTANCE = ")
-                } // else just call the constructor
-                writeClassInstanceCreateCall(classNameI)
-            }
-            writer.append("\n")
-            canCreateClassInstances = true
-        }
+        writer.append("}\n")
     }
 
-    // todo instead of createArray, create the corresponding arrays
-    // todo replace array length with .length
-    // todo replace strings with JavaScript strings
-    // todo write class instances as pre-defined JavaScript objects, maybe a .json?
+    // what do we need? name, shortName, fields, methods
+    writer.append("// class instances\n")
+    writer.append("const global_numClasses = ").append(gIndex.classNames.size).append(";\n")
+    writer.append("const CLASS_INSTANCES = new Array(global_numClasses);\n") // only named classes
+    writer.append(
+        "" +
+                "for(let i=0;i<global_numClasses;i++){\n" +
+                "   CLASS_INSTANCES[i] = new java_lang_Class();\n" +
+                "}\n"
+    )
+    writer.append("\n")
+
+    for (classId in classNames.indices) {
+        val className = classNames[classId]
+        val jsClassName = classNameToJS(className)
+        writer.append("link(\"").append(className).append("\",").append(jsClassName).append(");\n")
+    }
+    writer.append("\n")
+
+    writer.append("// annotation instances\n")
+    writer.append("const ANNOTATION_INSTANCES = new Array(").append(annotationInstances.size).append(");\n")
+    for ((annota) in annotationInstances.entries.sortedBy { it.value }) {
+        writer.append("annota(").append(gIndex.getClassId(annota.implClass)).append(");\n")
+    }
+    writer.append("\n")
+
+    for (classIdI in classNames.indices) {
+        writeClassInstanceCreateCall(classNames[classIdI])
+    }
+    writer.append("\n")
+
+    // append all helper methods
+    writer.append("\n")
+    writer.append("// helper methods\n")
+    for (impl in helperMethods.values) {
+        if (impl.funcName !in ActuallyUsedIndex.usedBy) continue
+        defineFunctionImplementation(
+            impl, globals, functionByName,
+            pureFunctions, true, "", impl.funcName
+        )
+    }
+
+    // todo replace strings with JavaScript strings(?)
 
     // define all well-named alias functions as links to the actual methods
     writer.append("\n")
@@ -266,6 +316,24 @@ fun shortName(name: String, args: String): String {
     }.escapeChars()
 }
 
+fun defineFunctionImplementationPureJS(
+    numParamsInclSelf: Int, shortName: String,
+    isStatic: Boolean, pureJavaScript: String
+) {
+    if (isStatic) writer.append("static ")
+    writer.append(shortName).append("(")
+    for (i in 0 until numParamsInclSelf) {
+        if (i == 0 && !isStatic) continue
+        if (!writer.endsWith("(")) writer.append(", ")
+        writer.append("arg").append(i)
+    }
+    writer.append(") {")
+    if (!isStatic) writer.append("const arg0 = this;\n")
+    writer.append(pureJavaScript) // indent this code??
+    writer.append("\n}\n")
+}
+
+
 fun defineFunctionImplementation(
     function: FunctionImpl, globals: Map<String, GlobalVariable>,
     functionsByName: Map<String, FunctionImpl>, pureFunctions: Set<String>,
@@ -278,7 +346,7 @@ fun defineFunctionImplementation(
     )
     val optimizer = DeclarativeOptimizer(globals)
     val functionWriter = FunctionWriter(globals, HighLevelJavaScript(writer))
-    functionWriter.depth++ // inside a class -> one more
+    if (className.isNotEmpty()) functionWriter.depth++ // inside a class -> one more
     val pos0 = writer.size
     try {
         val declarative = stackToDeclarative.write(function)

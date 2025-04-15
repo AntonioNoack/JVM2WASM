@@ -1,13 +1,9 @@
 package jvm.gc;
 
-import annotations.Alias;
-import annotations.Export;
-import annotations.JavaScript;
-import annotations.NoThrow;
+import annotations.*;
 import jvm.Pointer;
 import jvm.custom.WeakRef;
 
-import static jvm.ArrayAccessUnchecked.arrayLength;
 import static jvm.JVMFlags.is32Bits;
 import static jvm.JVMShared.unsignedGreaterThanEqual;
 import static jvm.JVMShared.*;
@@ -39,6 +35,7 @@ public class GarbageCollector {
     @Export
     @NoThrow
     @Alias(names = "gc")
+    @PureJavaScript(code = "")
     public static void invokeGC() {
         // run gc:
         // - nothing is running -> we can safely ignore the stack
@@ -55,6 +52,7 @@ public class GarbageCollector {
     @Export
     @NoThrow
     @Alias(names = "concurrentGC0")
+    @PureJavaScript(code = "")
     public static void concurrentGC0() {
         nextGeneration();
         long t0 = System.nanoTime();
@@ -68,6 +66,7 @@ public class GarbageCollector {
     @Export
     @NoThrow
     @Alias(names = "concurrentGC1")
+    @PureJavaScript(code = "")
     public static boolean concurrentGC1() {
         boolean done = GCGapFinder.findLargestGapsStep(largestGaps, null);
         if (done) {
@@ -193,14 +192,15 @@ public class GarbageCollector {
     @NoThrow
     public static Pointer findGap(int size) {
         final int sizeWithoutHelper = size - arrayOverhead;
+        byte[][] largestGaps = GarbageCollector.largestGaps;
         for (int i = 0, l = largestGaps.length; i < l; i++) {
             byte[] array = largestGaps[i];
             if (array != null) {
-                int available = arrayLength(array);
                 // three cases:
                 //  a) we fit perfectly
                 //  b) we fit, and let stuff remain
                 //  c) we don't fit
+                int available = array.length;
                 if (available == sizeWithoutHelper) {
                     // if (printCtr++ < 0) log("GC replacing", size);
                     largestGaps[i] = null; // nothing is remaining -> set entry to null

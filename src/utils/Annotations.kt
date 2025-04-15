@@ -1,5 +1,6 @@
 package utils
 
+import annotations.*
 import gIndex
 import hIndex
 import hierarchy.Annota
@@ -14,19 +15,24 @@ import wasm.instr.Const.Companion.i32Const
 import wasm.instr.Instructions.Return
 import wasm.instr.ParamGet
 import wasm.parser.FunctionImpl
+import kotlin.reflect.KClass
 
 object Annotations {
 
     private val LOGGER = LogManager.getLogger(Annotations::class)
 
-    const val EXPORT_CLASS = "annotations/Export"
-    const val JAVASCRIPT = "annotations/JavaScript"
-    const val NO_INLINE = "annotations/NoInline"
-    const val WASM = "annotations/WASM"
-    const val USED_IF_DEFINED = "annotations/UsedIfIndexed"
-    const val NO_THROW = "annotations/NoThrow"
-    const val ALIAS = "annotations/Alias"
-    const val REV_ALIAS = "annotations/RevAlias"
+    val EXPORT_CLASS: String = getClassName(Export::class)
+    val JAVASCRIPT: String = getClassName(JavaScript::class)
+    val PURE_JAVASCRIPT: String = getClassName(PureJavaScript::class)
+    val WASM: String = getClassName(annotations.WASM::class)
+    val USED_IF_INDEXED: String = getClassName(UsedIfIndexed::class)
+    val NO_THROW: String = getClassName(NoThrow::class)
+    val ALIAS: String = getClassName(Alias::class)
+    val REV_ALIAS: String = getClassName(RevAlias::class)
+
+    private fun <V: Annotation> getClassName(clazz: KClass<V>): String {
+        return clazz.java.name.replace('.', '/')
+    }
 
     private val annotationCache = HashMap<Annota, Int>()
     private val annotationListCache = HashMap<List<Annota>, Int>()

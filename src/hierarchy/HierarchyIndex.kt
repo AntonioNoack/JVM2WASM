@@ -110,7 +110,6 @@ object HierarchyIndex {
     }
 
     val inlined = HashMap<MethodSig, List<Instruction>>(cap2)
-    val wasmNative = HashMap<MethodSig, List<Instruction>>(cap2)
 
     /**
      * used by lambda-helpers and annotations

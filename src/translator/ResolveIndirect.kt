@@ -216,7 +216,7 @@ object ResolveIndirect {
         canThrowError: Boolean
     ): Call {
         val helperName = "tree_${sig0.toString().escapeChars()}"
-        helperFunctions.getOrPut(helperName) {
+        helperMethods.getOrPut(helperName) {
             val results = ArrayList<String>(2)
             if (ret != null) results.add(ret)
             if (canThrowError) results.add(ptrType)

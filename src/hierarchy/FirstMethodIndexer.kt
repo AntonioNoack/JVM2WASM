@@ -268,7 +268,7 @@ class FirstMethodIndexer(val sig: MethodSig, val clazz: FirstClassIndexer, val i
     override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor {
         val annotationClass = Descriptor.parseType(descriptor)
         val annota = hIndex.addAnnotation(sig, Annota(annotationClass))
-        if (annotationClass == Annotations.USED_IF_DEFINED) dIndex.usedMethods.add(sig)
+        if (annotationClass == Annotations.USED_IF_INDEXED) dIndex.usedMethods.add(sig)
         clazz.dep(annotationClass)
         return AnnotaVisitor(api, annota.properties)
     }

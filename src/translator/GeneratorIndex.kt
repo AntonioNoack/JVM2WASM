@@ -406,7 +406,7 @@ object GeneratorIndex {
     }
 
     fun getFieldOffset(fieldSig: FieldSig): Int? {
-        return getFieldOffset(fieldSig.clazz, fieldSig.name, fieldSig.descriptor, fieldSig.isStatic)
+        return getFieldOffset(fieldSig.clazz, fieldSig.name, fieldSig.jvmType, fieldSig.isStatic)
     }
 
     fun getFieldOffset(clazz: String, name: String, descriptor: String, static: Boolean): Int? {

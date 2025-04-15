@@ -56,7 +56,7 @@ object NativeHelperFunctions {
 
     private val types = listOf(i32, i64, f32, f64)
     fun register(func: FunctionImpl) {
-        val old = helperFunctions.put(func.funcName, func)
+        val old = helperMethods.put(func.funcName, func)
         assertTrue(old == null) {
             "Found duplicate implementation for ${func.funcName}"
         }

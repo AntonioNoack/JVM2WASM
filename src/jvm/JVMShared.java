@@ -35,11 +35,34 @@ public class JVMShared {
     // todo mark some static fields as not needing <clinit>
     // private static int riLastClass, riLastMethod, riLastImpl;
 
+    /*
+    public static final int OBJECT_ARRAY = 1;
+    public static final int INT_ARRAY = 2;
+    public static final int FLOAT_ARRAY = 3;
+    public static final int BOOLEAN_ARRAY = 4;
+    public static final int BYTE_ARRAY = 5;
+    public static final int CHAR_ARRAY = 6;
+    public static final int SHORT_ARRAY = 7;
+    public static final int LONG_ARRAY = 8;
+    public static final int DOUBLE_ARRAY = 9;
+    * */
     @Alias(names = "createNativeArray1")
+    @PureJavaScript(code = "" +
+            "let instance = createInstance(arg1);\n" +
+            "instance.values = \n" +
+            "   arg1 == 1 ? new Array(arg0) :\n" +
+            "   arg1 == 2 ? new Int32Array(arg0) :\n" +
+            "   arg1 == 3 ? new Float32Array(arg0) :\n" +
+            "   arg1 == 4 || arg1 == 5 ? new Int8Array(arg0) :\n" +
+            "   arg1 == 6 ? new Uint16Array(arg0) :\n" +
+            "   arg1 == 7 ? new Int16Array(arg0) :\n" +
+            "   arg1 == 8 ? new BigInt64Array(arg0) :\n" +
+            "   arg1 == 9 ? new Float64Array(arg0) : null;\n" +
+            "if(!instance.values) throw new Error('Unknown array classId ' + arg1);\n" +
+            "return instance;\n")
     public static Object createNativeArray1(int length, int classId) {
         if (length < 0) throw new IllegalArgumentException();
         if (trackAllocations) trackCalloc(classId, length);
-        int typeShift = getTypeShiftUnsafe(classId);
         Pointer instanceSize = getArraySizeInBytes(length, classId);
         Object newInstance = calloc(instanceSize);
         writeClass(newInstance, classId); // [] has index 1
@@ -244,13 +267,14 @@ public class JVMShared {
      */
     @NoThrow
     @WASM(code = "i32.load i32.const 16777215 i32.and")
-    public static native int readClassIdImpl(Object addr);
+    private static native int readClassIdImpl(Object addr);
 
     /**
      * returns the class index for the given instance
      */
     @NoThrow
     @Alias(names = "readClass")
+    @PureJavaScript(code = "return arg0.constructor.CLASS_INSTANCE.index;")
     public static int readClassId(Object instance) {
         return readClassIdImpl(instance);
     }
@@ -486,17 +510,20 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "getStackDepth")
+    @PureJavaScript(code = "return 0;") // idk if we need the actual stack trace
     public static int getStackDepth() {
         return getStackDepth(getStackPtr());
     }
 
     @NoThrow
+    @PureJavaScript(code = "return 0;") // idk if we need the actual stack trace
     public static int getStackDepth(Pointer stackPointer) {
         return (int) (diff(getStackStart(), stackPointer) >> 2);
     }
 
     @NoThrow
     @WASM(code = "global.get $stackPointer")
+    @PureJavaScript(code = "return 0;") // idk if we ever need that
     public static native Pointer getStackPtr();
 
     @NoThrow
@@ -775,9 +802,9 @@ public class JVMShared {
     }
 
     @NoThrow
-    public static void validateClassId(int childClassIdx) {
-        if (ge_ub(childClassIdx, numClasses())) {
-            log("class index out of bounds", childClassIdx, numClasses());
+    public static void validateClassId(int questionableClassId) {
+        if (ge_ub(questionableClassId, numClasses())) {
+            log("class index out of bounds", questionableClassId, numClasses());
             throwJs();
         }
     }
@@ -877,6 +904,7 @@ public class JVMShared {
     @Export
     @NoThrow
     @Alias(names = "instanceOf")
+    @PureJavaScript(code = "return arg0 instanceof getJSClassById(arg1)") // todo also check interfaces
     public static boolean instanceOf(Object instance, int classId) {
         // log("instanceOf", instance, clazz);
         if (instance == null) return false;
@@ -889,6 +917,7 @@ public class JVMShared {
     @Export
     @NoThrow
     @Alias(names = "instanceOfNonInterface")
+    @PureJavaScript(code = "return arg0 instanceof getJSClassById(arg1)")
     public static boolean instanceOfNonInterface(Object instance, int clazz) {
         // log("instanceOf", instance, clazz);
         if (instance == null) return false;
@@ -900,8 +929,9 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "instanceOfExact")
-    public static boolean instanceOfExact(Object instance, int clazz) {
-        return (instance != null) & (readClassId(instance) == clazz);
+    @PureJavaScript(code = "return arg0 && arg0.constructor == getJSClassById(arg1)")
+    public static boolean instanceOfExact(Object instance, int classId) {
+        return (instance != null) & (readClassId(instance) == classId);
     }
 
     @NoThrow
@@ -984,7 +1014,7 @@ public class JVMShared {
     public static Object[] createNativeArray2(int l0, int l1, int clazz) {
         Object[] array = createObjectArray(l0);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray1(l1, clazz));
+            ArrayAccessSafe.arrayStorePtr(array, i, createNativeArray1(l1, clazz));
         }
         return array;
     }
@@ -993,7 +1023,7 @@ public class JVMShared {
     public static Object[] createNativeArray3(int l0, int l1, int l2, int clazz) {
         Object[] array = createObjectArray(l0);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray2(l1, l2, clazz));
+            ArrayAccessSafe.arrayStorePtr(array, i, createNativeArray2(l1, l2, clazz));
         }
         return array;
     }
@@ -1002,7 +1032,7 @@ public class JVMShared {
     public static Object[] createNativeArray4(int l0, int l1, int l2, int l3, int clazz) {
         Object[] array = createObjectArray(l0);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray3(l1, l2, l3, clazz));
+            ArrayAccessSafe.arrayStorePtr(array, i, createNativeArray3(l1, l2, l3, clazz));
         }
         return array;
     }
@@ -1011,7 +1041,7 @@ public class JVMShared {
     public static Object[] createNativeArray5(int l0, int l1, int l2, int l3, int l4, int clazz) {
         Object[] array = createObjectArray(l0);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray4(l1, l2, l3, l4, clazz));
+            ArrayAccessSafe.arrayStorePtr(array, i, createNativeArray4(l1, l2, l3, l4, clazz));
         }
         return array;
     }
@@ -1020,7 +1050,7 @@ public class JVMShared {
     public static Object[] createNativeArray6(int l0, int l1, int l2, int l3, int l4, int l5, int clazz) {
         Object[] array = createObjectArray(l0);
         for (int i = 0; i < l0; i++) {
-            arrayStore(array, i, createNativeArray5(l1, l2, l3, l4, l5, clazz));
+            ArrayAccessSafe.arrayStorePtr(array, i, createNativeArray5(l1, l2, l3, l4, l5, clazz));
         }
         return array;
     }
@@ -1047,11 +1077,15 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "findClass")
+    @PureJavaScript(code = "return CLASS_INSTANCES[arg0];")
     public static Class<Object> classIdToInstance(int classId) {
         return unsafeCast(add(getClassInstanceTable(), classId * getClassSize()));
     }
 
     @Alias(names = "createInstance")
+    @PureJavaScript(code = "" +
+            "let foundClass = getJSClassById(arg0);\n" +
+            "return new foundClass();")
     public static Object createInstance(int classId) {
         validateClassId(classId);
 

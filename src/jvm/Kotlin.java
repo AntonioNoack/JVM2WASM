@@ -41,12 +41,11 @@ public class Kotlin {
 	public static native void Intrinsics_checkNotNullExpressionValue(Object o, String s);*/
 
     @Alias(names = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toFloatOrNull_Ljava_lang_StringLjava_lang_Float")
-    public static Float Float_toFloatOrNull(String s) {
-        try {
-            return Float.parseFloat(s);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+    public static Float Float_toFloatOrNull(String str) {
+        if ("NaN".equals(str)) return Float.valueOf(Float.NaN);
+        if ("+Infinity".equals(str) || "Infinity".equals(str)) return Float.valueOf(Float.POSITIVE_INFINITY);
+        if ("-Infinity".equals(str)) return Float.valueOf(Float.NEGATIVE_INFINITY);
+        return isValidDouble(str) ? Float.valueOf(Float.parseFloat(str)) : null;
     }
 
     @Alias(names = "kotlin_text_StringsKt__StringBuilderJVMKt_clear_Ljava_lang_StringBuilderLjava_lang_StringBuilder")
@@ -72,10 +71,10 @@ public class Kotlin {
 
     @Alias(names = "kotlin_text_StringsKt__StringNumberConversionsJVMKt_toDoubleOrNull_Ljava_lang_StringLjava_lang_Double")
     public static Double toDoubleOrNull(String str) {
-        if ("NaN".equals(str)) return Double.NaN;
-        if ("+Infinity".equals(str) || "Infinity".equals(str)) return Double.POSITIVE_INFINITY;
-        if ("-Infinity".equals(str)) return Double.NEGATIVE_INFINITY;
-        return isValidDouble(str) ? Double.parseDouble(str) : null;
+        if ("NaN".equals(str)) return Double.valueOf(Double.NaN);
+        if ("+Infinity".equals(str) || "Infinity".equals(str)) return Double.valueOf(Double.POSITIVE_INFINITY);
+        if ("-Infinity".equals(str)) return Double.valueOf(Double.NEGATIVE_INFINITY);
+        return isValidDouble(str) ? Double.valueOf(Double.parseDouble(str)) : null;
     }
 
     private static boolean isValidDouble(String str) {

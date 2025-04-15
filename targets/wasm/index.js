@@ -170,7 +170,7 @@ try {
         /*var supportsFP32 = !!*/gl.getExtension("EXT_color_buffer_float")
 
         console.log("Calling main function")
-        safe(lib.engine_Engine_main_Ljava_lang_StringV(0))
+        safe(lib.EngineMain(0))
         console.log("Called main function")
 
         var fi = 0

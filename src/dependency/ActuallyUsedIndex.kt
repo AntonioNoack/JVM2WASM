@@ -6,6 +6,7 @@ import listEntryPoints
 import utils.DynIndex.dynIndexSig
 import utils.MethodSig
 import utils.methodName
+import wasm.instr.Call
 
 object ActuallyUsedIndex {
 
@@ -14,8 +15,15 @@ object ActuallyUsedIndex {
     val usedBy = HashMap<String, HashSet<String>>()
 
     fun add(caller: MethodSig, called: MethodSig) {
+        add(caller, methodName(called))
+    }
+
+    fun add(caller: MethodSig, called: Call) {
+        add(caller, called.name)
+    }
+
+    fun add(caller: MethodSig, calledName: String) {
         val callerName = methodName(caller)
-        val calledName = methodName(called)
         val changed0 = usedBy.getOrPut(calledName) { HashSet() }.add(callerName)
         val changed1 = uses.getOrPut(callerName) { HashSet() }.add(calledName)
         if ((changed0 || changed1) && isLocked) {

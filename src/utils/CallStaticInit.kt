@@ -104,7 +104,7 @@ object CallStaticInit {
         engine.registerMemorySections(dataSections)
         assertTrue(translatedMethods.isNotEmpty()) // should not be empty
         engine.registerFunctions(translatedMethods.values)
-        engine.registerFunctions(helperFunctions.values)
+        engine.registerFunctions(helperMethods.values)
         engine.registerFunctions(nthGetterMethods.values)
         engine.resolveCalls()
         assertTrue(functionTable.isNotEmpty()) // usually should not be empty

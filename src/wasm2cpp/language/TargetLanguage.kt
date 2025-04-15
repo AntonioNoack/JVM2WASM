@@ -24,5 +24,6 @@ interface TargetLanguage {
 
     fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter)
     fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter)
+    fun writeReturnStruct(results: List<Expr>)
 
 }

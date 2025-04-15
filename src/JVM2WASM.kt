@@ -179,9 +179,6 @@ val classReplacements = hashMapOf(
     "java/util/zip/Inflater" to "jvm/custom/Inflater",
     "java/util/zip/Deflater" to "jvm/custom/Deflater",
 ).apply {
-    if (!checkArrayAccess) {
-        put("jvm/ArrayAccessSafe", "jvm/ArrayAccessUnchecked")
-    }
     if (!is32Bits) {
         put("jvm/Pointer", "jvm/Pointer64")
     }

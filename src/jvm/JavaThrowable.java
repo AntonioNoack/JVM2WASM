@@ -3,6 +3,7 @@ package jvm;
 import annotations.Alias;
 import annotations.JavaScript;
 import annotations.NoThrow;
+import annotations.PureJavaScript;
 
 import static jvm.JVMShared.*;
 import static jvm.JavaLang.getStackTraceTablePtr;
@@ -53,15 +54,18 @@ public class JavaThrowable {
 
     private static boolean insideFIST = false;
 
+    @PureJavaScript(code = "return arg0.stackTrace;")
     private static StackTraceElement[] getStackTrace(Throwable th) {
         return readPtrAtOffset(th, OFFSET_THROWABLE_STACKTRACE);
     }
 
+    @PureJavaScript(code = "arg0.stackTrace = arg1;")
     private static void setStackTrace(Throwable th, StackTraceElement[] value) {
         writePtrAtOffset(th, OFFSET_THROWABLE_STACKTRACE, value);
     }
 
     @NoThrow
+    @PureJavaScript(code = "return arg0;")
     public static Throwable Throwable_fillInStackTraceI(Throwable th) throws NoSuchFieldException, IllegalAccessException {
 
         // todo this is supposed to store the state, but not yet create the stack elements

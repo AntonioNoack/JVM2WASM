@@ -8,14 +8,14 @@ import me.anno.utils.assertions.assertFail
 import translator.GeneratorIndex
 import useWASMExceptions
 import utils.MethodSig
-import utils.helperFunctions
+import utils.helperMethods
 import wasm.parser.FunctionImpl
 
 object StackCallUtils {
     fun findCallByName(name: String): Any? {
         return methodAliases[name]
             ?: implementedMethods[name]
-            ?: helperFunctions[name]
+            ?: helperMethods[name]
             ?: GeneratorIndex.nthGetterMethods.values.firstOrNull { it.funcName == name }
     }
 
