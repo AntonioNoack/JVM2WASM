@@ -62,7 +62,6 @@ import useWASMExceptions
 import utils.*
 import utils.Builder.Companion.isDuplicable
 import utils.CommonInstructions.ARRAY_LENGTH_INSTR
-import utils.CommonInstructions.ATHROW_INSTR
 import utils.CommonInstructions.MONITOR_ENTER
 import utils.CommonInstructions.MONITOR_EXIT
 import utils.CommonInstructions.NEW_ARRAY_INSTR
@@ -807,9 +806,10 @@ class MethodTranslator(
                 stackPop()
                 if (checkArrayAccess && useResultForThrowables) handleThrowable()
             }
-            ATHROW_INSTR -> {// athrow, easy :3
+            ATHROW -> {// athrow, easy :3
                 printer.poppush(ptrType)
                 handleThrowable(true)
+                stack.clear() // after must-throw, stack will be empty
             }
             // MONITOR_ENTER -> printer.pop(ptrType).append(Call.monitorEnter) // monitor enter
             // MONITOR_EXIT -> printer.pop(ptrType).append(Call.monitorExit) // monitor exit

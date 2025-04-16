@@ -98,6 +98,34 @@ window.init = function(superId,interfaces,fields,methods){
     createClass(classId,superId,interfaces,fields,methods);
 }
 
+window.toFloat32Array = function(buffer) {
+    let result = buffer instanceof Float32Array ?
+        buffer : new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength >> 2);
+    if(result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    return result;
+}
+
+window.toUint32Array = function(buffer) {
+    let result = buffer instanceof Uint32Array ?
+        buffer : new Uint32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength >> 2);
+    if(result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    return result;
+}
+
+window.toUint16Array = function(buffer) {
+    let result = buffer instanceof Uint16Array ?
+        buffer : new Uint16Array(buffer.buffer, buffer.byteOffset, buffer.byteLength >> 1);
+    if(result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    return result;
+}
+
+window.toUint8Array = function(buffer) {
+    let result = buffer instanceof Uint8Array ?
+        buffer : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    if(result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    return result;
+}
+
 function createClass(classId,superId,interfaces,fields,methods) {
     const clazz = CLASS_INSTANCES[classId];
     clazz.superClass = superId != classId ? CLASS_INSTANCES[superId] : null;

@@ -182,11 +182,8 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             if (expr is VariableExpr &&
                 (expr.name == function.params[0].name || sig.name != INSTANCE_INIT) &&
                 (sig.className != className)
-            ) appendSuper = true
-            else {
-                if (function.funcName == "hashCode_I") {
-                    println("called in hashCode without super: $self.$sig")
-                }
+            ) {
+                appendSuper = true
             }
         }
         if (appendSuper) {

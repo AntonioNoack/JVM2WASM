@@ -1,9 +1,6 @@
 package jvm;
 
-import annotations.Alias;
-import annotations.JavaScript;
-import annotations.NoThrow;
-import annotations.WASM;
+import annotations.*;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.system.Callback;
@@ -428,35 +425,40 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
+    // null is needed for method resolution
     @JavaScript(code = "/*console.log('glTexImage2D', arguments);*/gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
-    // null is needed why-ever...
     private static native void texImage2DNullptr(int target, int level, int format, int w, int h, int border, int dataFormat, int dataType);
 
     @NoThrow
+    // null is needed for method resolution
     @JavaScript(code = "/*console.log('glTexImage3D', arguments);*/gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
-    // null is needed why-ever...
     private static native void texImage3DNullptr(int target, int level, int format, int w, int h, int d, int border, int dataFormat, int dataType);
 
     @NoThrow
     @Alias(names = "texImage2DAny")
     @JavaScript(code = "" +
-            "/*console.log('glTexImage2D', arguments);*/\n" +
-            "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
-            "   arg7 == gl.UNSIGNED_INT ?" +
-            "   new Uint32Array(memory.buffer, arg8, arg9>>2):" +
-            "   arg7 == gl.FLOAT ?" +
-            "   new Float32Array(memory.buffer, arg8, arg9>>2):" +
-            "   arg7 == 0x140B ?" + // half float -> short
-            "   new Uint16Array(memory.buffer, arg8, arg9>>1):" +
+            // "console.log('glTexImage2D', arguments);\n" +
+            "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,\n" +
+            "   arg7 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg8, arg9>>2) :\n" +
+            "   arg7 == gl.FLOAT ? new Float32Array(memory.buffer, arg8, arg9>>2) :\n" +
+            "   arg7 == 0x140B ? new Uint16Array(memory.buffer, arg8, arg9>>1) :\n" + // half float -> short
             "   new Uint8Array(memory.buffer, arg8, arg9))")
+    @PureJavaScript(code = "" +
+            // "console.log('glTexImage2D', arguments);\n" +
+            "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,\n" +
+            "   arg7 == gl.UNSIGNED_INT ? toUint32Array(arg8) :\n" +
+            "   arg7 == gl.FLOAT ? toFloat32Array(arg8) :\n" +
+            "   arg7 == 0x140B ? toUint16Array(arg8) :\n" + // half float -> short
+            "   new Uint8Array(arg8))")
     private static native void texImage2DAny(int target, int level, int format, int w, int h, int border, int dataFormat, int dataType, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIIAFV")
+    @PureJavaScript(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
     private static void glTexImage2D_IIIIIIIIAFV(
-            int target, int level, int format, int w,
-            int h, int border, int dataFormat, int dataType, float[] data) {
-        texImage2DAny(target, level, format, w, h, border, dataFormat, dataType, add(castToPtr(data), arrayOverhead), data.length << 2);
+            int target, int level, int format, int width, int height,
+            int border, int dataFormat, int dataType, float[] data) {
+        texImage2DAny(target, level, format, width, height, border, dataFormat, dataType, add(castToPtr(data), arrayOverhead), data.length << 2);
     }
 
     @NoThrow
@@ -469,36 +471,41 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIASV")
+    @PureJavaScript(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
     private static void glTexImage2D_IIIIIIIIASV(
-            int a, int b, int c, int d, int e, int f, int g, int h, short[] data) {
-        texImage2DAny(a, b, c, d, e, f, g, h, add(castToPtr(data), arrayOverhead), data.length);
+            int target, int level, int format, int width, int height,
+            int border, int dataFormat, int dataType, short[] data) {
+        texImage2DAny(target, level, format, width, height, border, dataFormat, dataType, add(castToPtr(data), arrayOverhead), data.length);
     }
 
     @NoThrow
     @Alias(names = "texImage3DAny")
     @JavaScript(code = "" +
-            "console.log('glTexImage3D', arguments);\n" +
             "gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
-            "   arg8 == gl.UNSIGNED_INT ?" +
-            "   new Uint32Array(memory.buffer, arg9, arg10>>2):" +
-            "   arg8 == gl.FLOAT ?" +
-            "   new Float32Array(memory.buffer, arg9, arg10>>2):" +
+            "   arg8 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg9, arg10>>2) :" +
+            "   arg8 == gl.FLOAT ? new Float32Array(memory.buffer, arg9, arg10>>2) :" +
             "   new Uint8Array(memory.buffer, arg9, arg10))")
+    @PureJavaScript(code = "" +
+            "gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
+            "   arg8 == gl.UNSIGNED_INT ? toUint32Array(arg9) :" +
+            "   arg8 == gl.FLOAT ? toFloat32Array(arg9) :" +
+            "   toUint8Array(arg9))")
     private static native void texImage3DAny(int target, int level, int format, int w, int h, int d, int border, int dataFormat, int dataType, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "texSubImage2D")
     @JavaScript(code = "" +
-            // fps panel is ignored for now
-            "/*if(arg4 != 250 || arg5 != 1) console.log('glTexSubImage2D', arguments);*/\n" +
             "gl.texSubImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
-            "   arg7 == gl.UNSIGNED_INT ?" +
-            "   new Uint32Array(memory.buffer, arg8, arg9>>2):" +
-            "   arg7 == gl.FLOAT ?" +
-            "   new Float32Array(memory.buffer, arg8, arg9>>2):" +
-            "   arg7 == 0x140B ?" + // half float -> short
-            "   new Uint16Array(memory.buffer, arg8, arg9>>1):" +
+            "   arg7 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg8, arg9>>2):" +
+            "   arg7 == gl.FLOAT ? new Float32Array(memory.buffer, arg8, arg9>>2):" +
+            "   arg7 == 0x140B ? new Uint16Array(memory.buffer, arg8, arg9>>1):" +  // half float -> short
             "   new Uint8Array(memory.buffer, arg8, arg9))")
+    @PureJavaScript(code = "" +
+            "gl.texSubImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
+            "   arg7 == gl.UNSIGNED_INT ? toUint32Array(arg8):" +
+            "   arg7 == gl.FLOAT ? toFloat32Array(arg8):" +
+            "   arg7 == 0x140B ? toUint16Array(arg8):" +  // half float -> short
+            "   new toUint8Array(arg8))")
     private static native void texSubImage2D(int target, int level, int x, int y, int w, int h, int dataFormat, int dataType, Pointer data, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexSubImage2D_IIIIIIIIAIV")
@@ -530,9 +537,11 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "readPixelsU8")
     @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
+    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6))")
     public static native void readPixelsU8(int x, int y, int w, int h, int format, int type, Pointer data, int length);
 
     @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV"})
+    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6.values))")
     public static void glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int[] data) {
         readPixelsU8(x, y, w, h, format, type, add(castToPtr(data), arrayOverhead), data.length << 2);
     }
@@ -540,9 +549,11 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "readPixelsF32")
     @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
+    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toFloat32Array(arg6))")
     public static native void readPixelsF32(int x, int y, int w, int h, int format, int type, Pointer data, int length);
 
     @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAFV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV"})
+    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,arg6.values)")
     public static void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, float[] data) {
         readPixelsF32(x, y, w, h, format, type, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -610,6 +621,18 @@ public class LWJGLxOpenGL {
         }
     }
 
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV")
+    public static void glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV(
+            int a, int b, int c, int d, int e, int f, int g, int h, DoubleBuffer data
+    ) throws NoSuchFieldException, IllegalAccessException {
+        if (data == null) {
+            texImage2DNullptr(a, b, c, d, e, f, g, h);
+        } else {
+            texImage2DAny(a, b, c, d, e, f, g, h, getBufferAddr(data), data.remaining() << 3);
+        }
+    }
+
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexSubImage2D_IIIIIIIILjava_nio_ByteBufferV")
     public static void glTexSubImage2D_IIIIIIIILjava_nio_ByteBufferV(
             int target, int level, int format, int w, int h, int border,
@@ -669,6 +692,14 @@ public class LWJGLxOpenGL {
         else log("Warning(glTexParameteriv)! Unknown mode", mode);
     }
 
+    @PureJavaScript(code = "" +
+            "let position = arg0.position;\n" +
+            "let limit = arg0.limit;\n" +
+            "let buffer = arg0.hb || arg0.bb.hb;\n" +
+            "let data = buffer.values.subarray(position,limit);\n" +
+            "if(!data) throw new Error('Invalid data?');\n" +
+            "if(data instanceof Int8Array) data = new Uint8Array(data.buffer);\n" +
+            "return data;\n")
     private static Pointer getBufferAddr(Buffer data, int shift) throws NoSuchFieldException, IllegalAccessException {
         Class<?> clazz = data.getClass();
         // ByteBuffer.allocate(10).asFloatBuffer();
@@ -704,23 +735,6 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @Alias(names = "uniform1fv")
-    @JavaScript(code = "gl.uniform1fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    public static native void glUniform1fv(int location, Pointer addr, int length);
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1fv_ILjava_nio_FloatBufferV")
-    public static void glUniform1fv_ILjava_nio_FloatBufferV(int location, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
-        glUniform1fv(location, getBufferAddr(data), data.remaining());
-    }
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1fv_IAFV")
-    public static void glUniform1fv_IAFV(int location, float[] data) {
-        glUniform1fv(location, add(castToPtr(data), arrayOverhead), data.length);
-    }
-
-    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV")
     @JavaScript(code = "throw 'glGetIntegeri_v_IIAIV'")
     public static native void glGetIntegeri_v_IIAIV(int query, int index, int[] dst);
@@ -732,18 +746,81 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
+    @Alias(names = "uniform1fv")
+    @JavaScript(code = "gl.uniform1fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),toFloat32Array(arg1));\n")
+    public static native void glUniform1fv(int location, Pointer addr, int length);
+
+    @NoThrow
+    @Alias(names = "uniform2fv")
+    @JavaScript(code = "gl.uniform2fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),toFloat32Array(arg1));\n")
+    public static native void glUniform2fv(int location, Pointer addr, int length);
+
+    @NoThrow
+    @Alias(names = "uniform3fv")
+    @JavaScript(code = "gl.uniform3fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),toFloat32Array(arg1));\n")
+    public static native void glUniform3fv(int location, Pointer addr, int length);
+
+    @NoThrow
     @Alias(names = "uniform4fv")
     @JavaScript(code = "gl.uniform4fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),toFloat32Array(arg1));\n")
     public static native void glUniform4fv(int location, Pointer addr, int length);
 
     @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1fv_ILjava_nio_FloatBufferV")
+    public static void glUniform1fv_ILjava_nio_FloatBufferV(int location, FloatBuffer data)
+            throws NoSuchFieldException, IllegalAccessException {
+        glUniform1fv(location, getBufferAddr(data), data.remaining());
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1fv_IAFV")
+    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),arg1.values);\n")
+    public static void glUniform1fv_IAFV(int location, float[] data) {
+        glUniform1fv(location, add(castToPtr(data), arrayOverhead), data.length);
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform2fv_ILjava_nio_FloatBufferV")
+    public static void glUniform2fv_ILjava_nio_FloatBufferV(int location, FloatBuffer data)
+            throws NoSuchFieldException, IllegalAccessException {
+        glUniform2fv(location, getBufferAddr(data), data.remaining());
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform2fv_IAFV")
+    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),arg1.values);\n")
+    public static void glUniform2fv_IAFV(int location, float[] data) {
+        glUniform2fv(location, add(castToPtr(data), arrayOverhead), data.length);
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform3fv_ILjava_nio_FloatBufferV")
+    public static void glUniform3fv_ILjava_nio_FloatBufferV(int location, FloatBuffer data)
+            throws NoSuchFieldException, IllegalAccessException {
+        glUniform3fv(location, getBufferAddr(data), data.remaining());
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniform3fv_IAFV")
+    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),arg1.values);\n")
+    public static void glUniform3fv_IAFV(int location, float[] data) {
+        glUniform3fv(location, add(castToPtr(data), arrayOverhead), data.length);
+    }
+
+    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4fv_ILjava_nio_FloatBufferV")
-    public static void glUniform4fv(int location, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
+    public static void glUniform4fv(int location, FloatBuffer data)
+            throws NoSuchFieldException, IllegalAccessException {
         glUniform4fv(location, getBufferAddr(data), data.remaining());
     }
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4fv_IAFV")
+    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),arg1.values);\n")
     public static void glUniform4fv(int location, float[] data) {
         glUniform4fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -751,34 +828,26 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "uniformMatrix4x3fv")
     @JavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @PureJavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
     public static native void uniformMatrix4x3fv(int location, boolean transpose, Pointer addr, int length);
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4x3fv_IZLjava_nio_FloatBufferV")
-    public static void glUniformMatrix4x3fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
-        uniformMatrix4x3fv(location, transpose, getBufferAddr(data), data.remaining());
-    }
-
-    @NoThrow
-    @Alias(names = "uniformMatrix4fv")
-    @JavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    public static native void uniformMatrix4fv(int location, boolean transpose, Pointer addr, int length);
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4fv_IZLjava_nio_FloatBufferV")
-    public static void glUniformMatrix4fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
-        uniformMatrix4fv(location, transpose, getBufferAddr(data), data.remaining());
-    }
 
     @NoThrow
     @Alias(names = "uniformMatrix2fv")
     @JavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @PureJavaScript(code = "gl.uniformMatrix2fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
     private static native void uniformMatrix2fv(int u, boolean t, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix3fv")
     @JavaScript(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @PureJavaScript(code = "gl.uniformMatrix3fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
     private static native void uniformMatrix3fv(int u, boolean t, Pointer data, int length);
+
+    @NoThrow
+    @Alias(names = "uniformMatrix4fv")
+    @JavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @PureJavaScript(code = "gl.uniformMatrix4fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
+    public static native void uniformMatrix4fv(int location, boolean transpose, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL20C_glUniformMatrix2fv_IZLjava_nio_FloatBufferV")
@@ -792,6 +861,18 @@ public class LWJGLxOpenGL {
     public static void glUniformMatrix3fv_IZLjava_nio_FloatBufferV(int u, boolean t, FloatBuffer data)
             throws NoSuchFieldException, IllegalAccessException {
         uniformMatrix3fv(u, t, getBufferAddr(data), data.remaining());
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4x3fv_IZLjava_nio_FloatBufferV")
+    public static void glUniformMatrix4x3fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
+        uniformMatrix4x3fv(location, transpose, getBufferAddr(data), data.remaining());
+    }
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glUniformMatrix4fv_IZLjava_nio_FloatBufferV")
+    public static void glUniformMatrix4fv(int location, boolean transpose, FloatBuffer data) throws NoSuchFieldException, IllegalAccessException {
+        uniformMatrix4fv(location, transpose, getBufferAddr(data), data.remaining());
     }
 
     @NoThrow
@@ -818,28 +899,9 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV")
-    public static void glTexImage2D_IIIIIIIILjava_nio_DoubleBufferV(
-            int a, int b, int c, int d, int e, int f, int g, int h, DoubleBuffer data
-    ) throws NoSuchFieldException, IllegalAccessException {
-        if (data == null) {
-            texImage2DNullptr(a, b, c, d, e, f, g, h);
-        } else {
-            texImage2DAny(a, b, c, d, e, f, g, h, getBufferAddr(data), data.remaining() << 3);
-        }
-    }
-
-    @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glDebugMessageCallback_Lorg_lwjgl_opengl_GLDebugMessageCallbackIJV")
     public static void glDebugMessageCallback_Lorg_lwjgl_opengl_GLDebugMessageCallbackIJV(Object callback, long j) {
         log("Setting debugCallback isn't supported");
-    }
-
-    @NoThrow
-    @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ShortBufferV")
-    public static void glBufferSubData_IJLjava_nio_ShortBufferV(int i, long offset, ShortBuffer data)
-            throws NoSuchFieldException, IllegalAccessException {
-        bufferSubData16(i, offset, getBufferAddr(data), data.remaining());
     }
 
     @NoThrow
@@ -895,11 +957,13 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "bufferData8")
     @JavaScript(code = "gl.bufferData(arg0,new Uint8Array(memory.buffer,arg1,arg2),arg3)")
+    @PureJavaScript(code = "gl.bufferData(arg0,toUint8Array(arg1),arg3)")
     private static native void bufferData8(int target, Pointer addr, int length, int usage);
 
     @NoThrow
     @Alias(names = "bufferData16")
     @JavaScript(code = "gl.bufferData(arg0,new Uint16Array(memory.buffer,arg1,arg2),arg3)")
+    @PureJavaScript(code = "gl.bufferData(arg0,toUint16Array(arg1),arg3)")
     private static native void bufferData16(int target, Pointer addr, int length, int usage);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ByteBufferIV")
@@ -922,22 +986,30 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "bufferSubData8")
     @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint8Array(memory.buffer,arg2,arg3))")
+    @PureJavaScript(code = "gl.bufferSubData(arg0,Number(arg1),toUint8Array(arg2))")
     private static native void bufferSubData8(int target, long offset, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "bufferSubData16")
     @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint16Array(memory.buffer,arg2,arg3))")
+    @PureJavaScript(code = "gl.bufferSubData(arg0,Number(arg1),toUint16Array(arg2))")
     private static native void bufferSubData16(int target, long offset, Pointer addr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ByteBufferV")
     public static void glBufferSubData_IJLjava_nio_ByteBufferV(int target, long offset, ByteBuffer data)
             throws NoSuchFieldException, IllegalAccessException {
-        if (offset < 0 || offset > Integer.MAX_VALUE)
-            throw new IllegalArgumentException("Offset is out of bounds for WebGL!");
         bufferSubData8(target, offset, getBufferAddr(data), data.remaining());
     }
 
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ShortBufferV")
+    public static void glBufferSubData_IJLjava_nio_ShortBufferV(int i, long offset, ShortBuffer data)
+            throws NoSuchFieldException, IllegalAccessException {
+        bufferSubData16(i, offset, getBufferAddr(data), data.remaining());
+    }
+
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJAIV")
+    @PureJavaScript(code = "gl.bufferSubData(arg0,arg1,toUint8Array(arg2.values))")
     public static void glBufferSubData_IJAIV(int target, long offset, int[] data) {
         if (offset < 0 || offset > Integer.MAX_VALUE)
             throw new IllegalArgumentException("Offset is out of bounds for WebGL!");
@@ -971,12 +1043,12 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteTextures_IV")
     @JavaScript(code = "gl.deleteTexture(unmap(arg0)); delete glMap[arg0];")
-    public static native void GLXXC_glDeleteTextures(int id);
+    public static native void deleteTexture(int id);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteTextures_AIV")
     public static void glDeleteTextures_AIV(int[] ids) {
         for (int id : ids) {
-            GLXXC_glDeleteTextures(id);
+            deleteTexture(id);
         }
     }
 

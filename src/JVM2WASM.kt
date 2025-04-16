@@ -281,6 +281,7 @@ fun listLibrary(clazz: (String) -> Unit) {
     clazz("jvm/JavaReflectMethod")
     clazz("jvm/JavaThrowable")
     clazz("jvm/Chars")
+    clazz("java/lang/JavaLang2")
 
     if (replaceStringInternals) {
         clazz("jvm/utf8/StringsUTF8")

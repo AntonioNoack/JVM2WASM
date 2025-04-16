@@ -1,6 +1,7 @@
 package engine;
 
 import annotations.*;
+import engine.test.SciMark;
 import jvm.FillBuffer;
 import jvm.JavaLang;
 import jvm.Pointer;
@@ -116,7 +117,7 @@ public class Engine {
         // Build.setShipped(true);
 
         // LuaTest.test();
-        // SciMark.test();
+        SciMark.test();
 
         if (runsInBrowser()) {
             initBrowserFonts();

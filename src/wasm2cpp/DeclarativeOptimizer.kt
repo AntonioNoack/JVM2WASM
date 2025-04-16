@@ -428,7 +428,7 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                     convertTypeToWASM(it).wasmName
                 }
             }
-        } else if (instr.resultName != null) {
+        } else if (instr.resultName != null && debugInstructions) {
             val text = "usageCount=0: ${instr.resultName} ="
             writer.add(Comment(text))
         }

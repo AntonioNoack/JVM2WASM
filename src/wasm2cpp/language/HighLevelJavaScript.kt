@@ -143,7 +143,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
         return when (i) {
             Instructions.I32_TRUNC_F32S, Instructions.I32_TRUNC_F64S -> "Math.trunc("
-            Instructions.I64_TRUNC_F32S, Instructions.I64_TRUNC_F64S -> "BigInt("
+            Instructions.I64_TRUNC_F32S, Instructions.I64_TRUNC_F64S -> "BigInt(Math.trunc("
             Instructions.F64_PROMOTE_F32, Instructions.F32_DEMOTE_F64 -> "" // done automatically
             Instructions.F32_CONVERT_I32S, Instructions.F64_CONVERT_I32S -> "" // done automatically
             Instructions.I64_EXTEND_I32S -> "BigInt("
@@ -167,6 +167,12 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             Instructions.I32_WRAP_I64 -> dst.append(" & 0xFFFFFFFFn) | 0")
             Instructions.F32_CONVERT_I32U, Instructions.F64_CONVERT_I32U -> dst.append(" >>> 0")
             Instructions.F32_CONVERT_I64U, Instructions.F64_CONVERT_I64U -> dst.append(" & 0xFFFFFFFFFFFFFFFFn)")
+            Instructions.I32_TRUNC_F32S, Instructions.I32_TRUNC_F64S -> dst.append(")|0")
+            Instructions.I64_TRUNC_F32S, Instructions.I64_TRUNC_F64S -> {
+                // ||0 is to avoid NaN crashing the function
+                // todo clamp to valid range
+                dst.append(")||0)")
+            }
             else -> {
                 val remainingBrackets = prefix.count { it == '(' } - prefix.count { it == ')' }
                 for (i in 0 until remainingBrackets) {
@@ -290,8 +296,6 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             val classId = (expr.params[0] as ConstExpr).value as Int
             dst.append(classNameToJS(gIndex.classNames[classId])).append(".CLASS_INSTANCE")
         } else {
-            // todo if is not static, use first argument as caller
-            // todo shorten name
             dst.append(expr.funcName).append('(')
             val popped = expr.params
             for (i in popped.indices) {

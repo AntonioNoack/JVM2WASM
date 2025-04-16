@@ -29,10 +29,13 @@ public class JavaReflectMethod {
             // todo security checks??
             "let method = arg0, newInstance = arg1, params = arg2.values;\n" +
             "let jsClass = getJSClassByClass(method.clazz);\n" +
+            "if(params.length != method.parameterTypes.values.length) {\n" +
+            "   throw new Error('Invalid call');\n" +
+            "}\n" +
             // convert parameters to native, where necessary
             "let params1 = [...params];\n" +
             "for(let i=0;i<params1.length;i++){\n" +
-            "   params1[i] = applyUnboxing(params1[i], method.parameterTypes[i]);\n" +
+            "   params1[i] = applyUnboxing(params1[i], method.parameterTypes.values[i]);\n" +
             "}\n" +
             "let response = jsClass.prototype[method.jsName].apply(newInstance, params1);\n" +
             "return applyBoxing(response, method.returnType);\n")
@@ -57,10 +60,14 @@ public class JavaReflectMethod {
             // todo security checks??
             "let constructor = arg0, newInstance = arg1, params = arg2.values;\n" +
             "let jsClass = getJSClassByClass(constructor.clazz);\n" +
+            "if(params.length != constructor.parameterTypes.values.length) {\n" +
+            "   console.log(params, constructor);\n" +
+            "   throw new Error('Invalid call');\n" +
+            "}\n" +
             // convert parameters to native, where necessary
             "let params1 = [...params];\n" +
             "for(let i=0;i<params1.length;i++){\n" +
-            "   params1[i] = applyUnboxing(params1[i], constructor.parameterTypes[i]);\n" +
+            "   params1[i] = applyUnboxing(params1[i], constructor.parameterTypes.values[i]);\n" +
             "}\n" +
             "jsClass.prototype[constructor.jsName].apply(newInstance, params1);\n")
     public static void Constructor_invoke(Constructor<?> self, Object newInstance, Object[] params) {

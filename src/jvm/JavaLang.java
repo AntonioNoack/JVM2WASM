@@ -526,20 +526,7 @@ public class JavaLang {
 
     @Alias(names = "java_lang_StringBuilder_append_FLjava_lang_StringBuilder")
     public static StringBuilder java_lang_StringBuilder_append_FLjava_lang_StringBuilder(StringBuilder builder, float v) {
-        return java_lang_StringBuilder_append_DLjava_lang_StringBuilder(builder, v);
-    }
-
-    @Alias(names = "java_lang_AbstractStringBuilder_append_DLjava_lang_AbstractStringBuilder")
-    public static StringBuilder java_lang_AbstractStringBuilder_append_DLjava_lang_AbstractStringBuilder(StringBuilder builder, double v) {
-        return java_lang_StringBuilder_append_DLjava_lang_StringBuilder(builder, v);
-    }
-
-    @Alias(names = "java_lang_StringBuilder_append_DLjava_lang_StringBuilder")
-    public static StringBuilder java_lang_StringBuilder_append_DLjava_lang_StringBuilder(StringBuilder builder, double v) {
-        char[] content = FillBuffer.getBuffer();
-        int length = fillD2S(content, v);
-        builder.append(content, 0, length);
-        return builder;
+        return builder.append((double) v);
     }
 
     @Alias(names = "java_lang_Float_toString_FLjava_lang_String")

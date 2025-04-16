@@ -1,6 +1,6 @@
 # JVM2WASM / JVM2CPP
 
-This is a compiler from Java, Kotlin and any other JVM-language to WebAssembly (WASM) and C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s web port.
+This is a compiler from Java, Kotlin and any other JVM-language to WebAssembly (WASM), JavaScript or C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s ports onto the Web and as a true native application.
 It has a [garbage collector](src/jvm/GarbageCollector.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
 The target JVM language version is Java 8 (lambdas).
 
@@ -96,14 +96,14 @@ It only crashed after 236,000 iterations (why ever). This is the best choice for
 
 ## Performance Comparison using SciMark 2.0a
 
-| Performance Test                 | Amazon JDK    | WASM in Chrome      | C++ (Debug)          | C++ (Release)          |
-|----------------------------------|---------------|---------------------|----------------------|------------------------|
-| **Composite Score**              | 4646.12       | 85.86 (54x slower)  | 169.53 (27x slower)  | 3265.81 (1.4x slower)  |
-| FFT (1024)                       | 2895.01       | 66.82 (43x slower)  | 75.23 (38x slower)   | 3037.42 (1.05x faster) |
-| SOR (100x100)                    | 2306.35       | 159.25 (14x slower) | 407.73 (5.6x slower) | 2611.93 (1.13x faster) |
-| Monte Carlo                      | 1431.18       | 29.31 (48x slower)  | 63.91 (22x slower)   | 1126.99 (1.27x slower) |
-| Sparse MatMult (N=1000, nz=5000) | 4086.42       | 86.39 (47x slower)  | 206.22 (20x slower)  | 4050.12 (tie)          |
-| LU (100x100)                     | 12511.65      | 87.54 (142x slower) | 94.55 (132x slower)  | 5502.60 (2.27x slower) |
+| Performance Test                 | Amazon JDK    | WASM (Chrome)       | JavaScript (Chrome)    | C++ (Debug)          | C++ (Release)          |
+|----------------------------------|---------------|---------------------|------------------------|----------------------|------------------------|
+| **Composite Score**              | 4646.12       | 85.86 (54x slower)  | 1168.34 (3.98x slower) | 169.53 (27x slower)  | 3265.81 (1.4x slower)  |
+| FFT (1024)                       | 2895.01       | 66.82 (43x slower)  | 1543.57 (1.87x slower) | 75.23 (38x slower)   | 3037.42 (1.05x faster) |
+| SOR (100x100)                    | 2306.35       | 159.25 (14x slower) | 1476.02 (1.56x slower) | 407.73 (5.6x slower) | 2611.93 (1.13x faster) |
+| Monte Carlo                      | 1431.18       | 29.31 (48x slower)  | 120.37 (11.89x slower) | 63.91 (22x slower)   | 1126.99 (1.27x slower) |
+| Sparse MatMult (N=1000, nz=5000) | 4086.42       | 86.39 (47x slower)  | 597.95 (6.83x slower)  | 206.22 (20x slower)  | 4050.12 (tie)          |
+| LU (100x100)                     | 12511.65      | 87.54 (142x slower) | 2103.75 (5.95x slower) | 94.55 (132x slower)  | 5502.60 (2.27x slower) |
 
 ### System Information
 
