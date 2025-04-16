@@ -1,5 +1,6 @@
 package wasm2cpp.language
 
+import checkArrayAccess
 import gIndex
 import me.anno.utils.Color.hex16
 import me.anno.utils.assertions.assertTrue
@@ -26,6 +27,23 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         private val allowedCodepoints = " .,_-#+%!?:;§$&/()[]{}=*^".codePoints().toList()
 
         val jsKeywords = "function,var,let,const".split(',').toHashSet()
+        val unsafeArrayLoadInstructions = listOf(
+            Call.s8ArrayLoadU,
+            Call.s16ArrayLoadU,
+            Call.u16ArrayLoadU,
+            Call.i32ArrayLoadU,
+            Call.i64ArrayLoadU,
+            Call.f32ArrayLoadU,
+            Call.f64ArrayLoadU,
+        ).map { it.name }
+        val unsafeArrayStoreInstructions = listOf(
+            Call.i8ArrayStoreU,
+            Call.i16ArrayStoreU,
+            Call.i32ArrayStoreU,
+            Call.i64ArrayStoreU,
+            Call.f32ArrayStoreU,
+            Call.f64ArrayStoreU,
+        ).map { it.name }
     }
 
     private var thisVariable: String? = null
@@ -286,21 +304,34 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun appendCallExpr(expr: CallExpr) {
-        if (expr.funcName == "createInstance" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
-            val classId = (expr.params[0] as ConstExpr).value as Int
+        val params = expr.params
+        if (expr.funcName == "createInstance" && params.size == 1 && params[0] is ConstExpr) {
+            val classId = (params[0] as ConstExpr).value as Int
             dst.append("new ").append(classNameToJS(gIndex.classNames[classId])).append("()")
-        } else if (expr.funcName == "getClassIdPtr" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
-            val classId = (expr.params[0] as ConstExpr).value as Int
+        } else if (expr.funcName == "getClassIdPtr" && params.size == 1 && params[0] is ConstExpr) {
+            val classId = (params[0] as ConstExpr).value as Int
             dst.append(classNameToJS(gIndex.classNames[classId])).append(".LAMBDA_INSTANCE")
-        } else if (expr.funcName == "findClass" && expr.params.size == 1 && expr.params[0] is ConstExpr) {
-            val classId = (expr.params[0] as ConstExpr).value as Int
+        } else if (expr.funcName == "findClass" && params.size == 1 && params[0] is ConstExpr) {
+            val classId = (params[0] as ConstExpr).value as Int
             dst.append(classNameToJS(gIndex.classNames[classId])).append(".CLASS_INSTANCE")
+        } else if (!checkArrayAccess && expr.funcName in unsafeArrayLoadInstructions && params.size == 2) {
+            // array.values[index]
+            appendExprSafely(params[0])
+            dst.append(".values[")
+            appendExpr(params[1])
+            dst.append(']')
+        } else if (!checkArrayAccess && expr.funcName in unsafeArrayStoreInstructions && params.size == 3) {
+            // array.values[index] = value
+            appendExprSafely(params[0])
+            dst.append(".values[")
+            appendExpr(params[1])
+            dst.append("] = ")
+            appendExpr(params[2])
         } else {
             dst.append(expr.funcName).append('(')
-            val popped = expr.params
-            for (i in popped.indices) {
+            for (i in params.indices) {
                 if (i > 0) dst.append(", ")
-                appendExpr(popped[i])
+                appendExpr(params[i])
             }
             dst.append(')')
         }
