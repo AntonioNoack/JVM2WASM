@@ -1,7 +1,17 @@
-<html>
-<head></head>
-<body style="margin: 0;">
-	<canvas style="width: 100%; height: 100%"></canvas>
-	<script src="texturedCube.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>JVM2WebGPU</title>
+    <link rel="stylesheet" href="../wasm/index.css">
+</head>
+<body>
+<p id="pleaseWait">Please wait...</p>
+<div class="center0"><img src="../../assets/icon2.png" class="center" alt="icon"></div>
+<canvas id="canvas" width="1" height="1" class="cvs"></canvas>
+<canvas id="txtCanvas" width="1" height="1"></canvas>
+<script>window.useWebGPU = true;</script>
+<script type="module" src="../wasm/events.js"></script>
+<script type="module" src="../wasm/index.js"></script>
 </body>
 </html>

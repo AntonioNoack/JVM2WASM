@@ -264,11 +264,11 @@ async function renderTexturedCube() {
 	/*** Swap Chain Setup ***/
 	function frameUpdate() {
 		const secondsBuffer = new Float32Array(4);
-		const d = new Date();
-		const seconds = d.getMilliseconds() / 1000.0 + d.getSeconds();
-		secondsBuffer.set([seconds*10 * (6.28318530718 / 60.0),
-						  seconds*5 * (6.28318530718 / 60.0),
-						  seconds*1 * (6.28318530718 / 60.0),
+		const seconds = (new Date().getTime() * 0.001) % 60.0;
+		const TAU = Math.PI * 2.0;
+		secondsBuffer.set([seconds*10 * (TAU / 60.0),
+						  seconds*5 * (TAU / 60.0),
+						  seconds*1 * (TAU / 60.0),
 						  innerHeight/innerWidth]);
 		device.queue.writeBuffer(uniformBuffer, 0, secondsBuffer);
 

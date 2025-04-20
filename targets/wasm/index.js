@@ -1,6 +1,6 @@
 
 // not really well supported yet
-let useWebGPU = false
+let useWebGPU = !!window.useWebGPU
 
 let module = null
 let instance = null
@@ -223,7 +223,7 @@ try {
 
     window.hasCrashed = 0
     window.lib = 0
-    var fetched = fetch("./jvm2wasm.wasm")
+    var fetched = fetch("../wasm/jvm2wasm.wasm")
 	fetched
         .then(response => response.arrayBuffer())
         .then(buffer => WebAssembly.instantiate(buffer, imports))
