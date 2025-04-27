@@ -48,7 +48,7 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
         colorTextureI: Int, depthTextureI: Int
     ): Framebuffer = framebuffer
 
-    override var isActive: Boolean = false
+    override val isActive: Boolean get() = getNumViews() > 0
     override val leftView: Vector4f = Vector4f(0.5f, 1f, -0.25f, 0f)
     override val rightView: Vector4f = Vector4f(0.5f, 1f, 0.25f, 0f)
     override val leftTexture: ITexture2D? get() = if (getNumViews() > 0) framebuffer.getTexture0() else null
@@ -57,7 +57,6 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
 
     override fun startSession(window: OSWindow, rv: RenderView): Boolean {
         this.rv = rv
-        isActive = true
         return true
     }
 
