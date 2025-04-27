@@ -592,11 +592,13 @@ public class JavaLang {
     @NoThrow
     @Alias(names = "java_lang_Runtime_gc_V")
     @JavaScript(code = "gcCtr=1e9")
+    @PureJavaScript(code = "")
     public static native void Runtime_gc_V(Runtime rt);
 
     @NoThrow
     @Alias(names = "java_lang_System_gc_V")
     @JavaScript(code = "gcCtr=1e9")
+    @PureJavaScript(code = "")
     public static native void System_gc_V();
 
     private static byte sleepCtr = 0;

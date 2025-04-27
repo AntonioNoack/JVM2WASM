@@ -2,9 +2,11 @@
     window.mouseX = 0
     window.mouseY = 0
     document.onmousemove = function(e){
-        window.mouseX = e.clientX
-        window.mouseY = e.clientY
-        if(inited) lib.EngineMouseMove(mouseX,mouseY)
+        if (inited) {
+            window.mouseX = e.clientX
+            window.mouseY = e.clientY
+            lib.EngineMouseMove(mouseX,mouseY)
+        }
     }
 
     function mapMouseButton(i){

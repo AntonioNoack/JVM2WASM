@@ -21,6 +21,7 @@ import me.anno.engine.WindowRenderFlags;
 import me.anno.engine.ui.control.DraggingControlSettings;
 import me.anno.engine.ui.render.SceneView;
 import me.anno.engine.ui.render.SuperMaterial;
+import me.anno.engine.ui.vr.VRRenderingRoutine;
 import me.anno.fonts.Font;
 import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
@@ -110,6 +111,9 @@ public class Engine {
             OS.isWeb = false;
             OS.isLinux = true;
         }
+
+        // register VR routine
+        VRRenderingRoutine.Companion.setVrRoutine(new VRRoutineImpl());
 
         initImageReader();
 

@@ -3,14 +3,16 @@
 <head>
     <meta charset="utf-8"/>
     <title>JVM2JavaScript</title>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="../wasm/index.css">
 </head>
 <body>
 <p id="pleaseWait">Please wait...</p>
 <div class="center0"><img src="../../assets/icon2.png" class="center" alt="icon"></div>
 <canvas id="canvas" width="1" height="1" class="cvs"></canvas>
+<button id="enter-vr">Enter VR</button>
 <canvas id="txtCanvas" width="1" height="1"></canvas>
 <script src="base.js"></script>
+<script src="webxr.js"></script>
 <script src="jvm2js.js"></script>
 <script src="../wasm/events.js"></script>
 <script src="index.js"></script>

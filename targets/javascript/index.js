@@ -79,7 +79,6 @@ try {
     }
 
     window.stop = false
-    let t0 = new Date().getTime()
     function startEngine() {
 
         if(window.inited) return
@@ -98,23 +97,22 @@ try {
         console.log("Called main function")
 
         var lastTime = 0
-        var fakeFpsMultiplier = 1 // not really working, the engine is rendering only necessary frames 😅
         window.inited = true
         function render(time) {
-            // console.log("Rendering frame", time)
             if(window.hasCrashed > 20) window.stop = true
             if(canvas.width != innerWidth || canvas.height != innerHeight) {
                 console.log("Resolution changed")
                 canvas.width = innerWidth
                 canvas.height = innerHeight
             }
-            var dt = (time-lastTime)*1e-3/fakeFpsMultiplier
-            for(var i=0;i<fakeFpsMultiplier;i++) {
-                // console.log("Calling Engine.update")
-                safe(lib.EngineUpdate(innerWidth, innerHeight, dt))
-            }
+            var dt = (time-lastTime) * 1e-3;
+            
+            if (!webXR.hasXRSession) {
+                safe(lib.EngineUpdate(innerWidth, innerHeight, dt));
+            } else console.log('Skipping EngineUpdate, because XR is active')
+            
             lastTime = time
-            if(!window.stop) requestAnimationFrame(render)
+            if (!window.stop) requestAnimationFrame(render)
         }
         requestAnimationFrame(render)
     }
