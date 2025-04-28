@@ -173,9 +173,7 @@ try {
         safe(lib.EngineMain(0))
         console.log("Called main function")
 
-        var fi = 0
-        var lastTime = 0
-        var fakeFpsMultiplier = 1 // not really working, the engine is rendering only necessary frames 😅
+        window.lastTime = 0
         window.inited = true
         function render(time) {
             // console.log("Rendering frame", time)
@@ -185,12 +183,9 @@ try {
                 canvas.width = innerWidth
                 canvas.height = innerHeight
             }
-            var dt = (time-lastTime)*1e-3/fakeFpsMultiplier
-            for(var i=0;i<fakeFpsMultiplier;i++) {
-                // console.log("Calling Engine.update")
-                safe(lib.EngineUpdate(innerWidth, innerHeight, dt))
-            }
-            lastTime = time
+            const dt = (time-window.lastTime)*1e-3
+            safe(lib.EngineUpdate(innerWidth, innerHeight, dt))
+            window.lastTime = time
             if (window.gcCtr++ >= 2000) {
                 if (window.gcStage == 0) {
                     lib.concurrentGC0();
@@ -295,7 +290,15 @@ try {
         }
     }
 
-    var refs = window.jsRefs = {}
+    window.unpackFloatArray = function(ptr,length) {
+        return new Float32Array(memory.buffer, ptr + arrayOverhead, length);
+    }
+
+    window.unpackIntArray = function(ptr,length) {
+        return new Int32Array(memory.buffer, ptr + arrayOverhead, length);
+    }
+
+    window.jsRefs = {}
     window.gcLock = function(ref){
     	jsRefs[ref] = (jsRefs[ref]||0)+1;
     }

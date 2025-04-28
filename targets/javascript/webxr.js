@@ -11,8 +11,6 @@ let xrRefSpace = null;
 
 function onXRFrame(time, frame) {
 
-    // todo use time to set engine time
-
 	const session = frame.session;
 	session.requestAnimationFrame(onXRFrame);
 
@@ -30,12 +28,6 @@ function onXRFrame(time, frame) {
 
     const numViews = pose.views.length;
 
-	/*for (const view of pose.views) {
-		const viewport = glLayer.getViewport(view);
-		gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-		drawScene(view.projectionMatrix, view.transform.inverse.matrix);
-	}*/
-
     // prepare vr data
     webXR.views.length = numViews;
     webXR.viewports.length = numViews;
@@ -45,9 +37,10 @@ function onXRFrame(time, frame) {
         webXR.viewports[i] = glLayer.getViewport(view);
     }
 
-    // todo call engine loop in here
-
-    // todo we need to draw our framebuffer onto glLayer.framebuffer somehow...
+	// normal engine step; will call all necessary rendering steps
+	const dt = (time - window.lastTime) / 1e3;
+	safe(lib.EngineUpdate(window.innerWidth, window.innerHeight, dt));
+	window.lastTime = time;
 }
 
 function onSessionStarted(session) {
@@ -63,6 +56,73 @@ function onSessionStarted(session) {
 	});
 }
 
+function startPseudoWebVR() {
+	// run a pseudo webVR implementation for testing
+
+	const n = 0.01, f = 1000;
+	const projectionMatrix = [
+		0.1, 0, 0, 0,
+		0, 0.1, 0, 0,
+		0, 0, -(f+n)/(f-n), -2*f*n/(f-n),
+		0, 0, -1, 0
+	];
+	webXR.views = [
+		{
+			projectionMatrix,
+			transform: {
+				inverse: {
+					matrix: [
+						1, 0, 0, 0,
+						0, 1, 0, 0,
+						0, 0, 1, 0,
+						0, 0, 0, 1,
+					]
+				}
+			}
+		}, {
+			projectionMatrix,
+			transform: {
+				inverse: {
+					matrix: [
+						1, 0, 0, 0,
+						0, 1, 0, 0,
+						0, 0, 1, 0,
+						0, 0, 0, 1,
+					]
+				}
+			}
+		}
+	];
+	webXR.viewports = [
+		{ x: 0,   y: 0, width: 100, height: 100 },
+		{ x: 100, y: 0, width: 100, height: 100 }
+	];
+	webXR.hasXRSession = true;
+
+	const fb = gl.createFramebuffer();
+	const tex = gl.createTexture();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+	gl.bindTexture(gl.TEXTURE_2D, tex);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 200, 100, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+	webXR.targetFramebuffer = fb;
+
+	function render(time) {
+		const dt = (time - window.lastTime) / 1e3;
+		safe(lib.EngineUpdate(window.innerWidth, window.innerHeight, dt));
+		window.lastTime = time;
+
+		// blit result onto canvas
+		gl.bindFramebuffer(gl.READ_FRAMEBUFFER,fb);
+		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null); // null = canvas
+		const my = window.innerHeight;
+		gl.blitFramebuffer(0,0,200,100,0,my-100,200,my,gl.COLOR_BUFFER_BIT,gl.NEAREST);
+
+		requestAnimationFrame(render);
+	}
+	requestAnimationFrame(render);
+}
+
 document.getElementById('enter-vr').addEventListener('click', () => {
 	if (navigator.xr) {
 		navigator.xr.requestSession('immersive-vr')
@@ -72,7 +132,8 @@ document.getElementById('enter-vr').addEventListener('click', () => {
 				webXR.views.length = 0;
                 webXR.viewports.length = 0;
                 webXR.hasXRSession = false;
-				// todo restart fallback loop somehow...
+				// todo check that normal rendering loop is running, again
+				startPseudoWebVR()
 			});
 	} else confirm('WebXR not supported')
 });

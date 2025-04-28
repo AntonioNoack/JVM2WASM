@@ -5,9 +5,9 @@ import me.anno.engine.EngineBase
 import me.anno.engine.ui.render.RenderView
 import me.anno.engine.ui.vr.VRRendering
 import me.anno.engine.ui.vr.VRRenderingRoutine
-import me.anno.gpu.GFXState.useFrame
 import me.anno.gpu.OSWindow
 import me.anno.gpu.RenderStep.callOnGameLoop
+import me.anno.gpu.framebuffer.Frame
 import me.anno.gpu.framebuffer.Framebuffer
 import me.anno.gpu.framebuffer.TargetType
 import me.anno.gpu.texture.ITexture2D
@@ -22,7 +22,7 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
     lateinit var rv: RenderView
 
     private val matrixTmp = FloatArray(16)
-    private val viewport = IntArray(4)
+    private val viewport = IntArray(2)
 
     private val modelMatrix = Matrix4f()
     private val projectionMatrix = Matrix4f()
@@ -69,8 +69,8 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
 
         for (viewIndex in 0 until numViews) {
             fillViewport(viewIndex, viewport)
-            maxWidth = max(maxWidth, viewport[0] + viewport[2])
-            maxHeight = max(maxHeight, viewport[1] + viewport[3])
+            maxWidth = max(maxWidth, viewport[0])
+            maxHeight = max(maxHeight, viewport[1])
         }
 
         if (maxWidth > 0 && maxHeight > 0) {
@@ -92,9 +92,12 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
 
         renderFrame(
             rv, viewIndex,
-            viewport[0], viewport[1], viewport[2], viewport[3],
+            0, 0, viewport[0], viewport[1],
             0, 0, tmpPos, tmpRot, projectionMatrix
         )
+
+        drawToTargetFramebuffer(framebuffer.pointer, viewIndex)
+        Frame.invalidate()
     }
 
     override fun drawFrame(window: OSWindow): Boolean {
@@ -103,17 +106,9 @@ class VRRoutineImpl : VRRendering(), VRRenderingRoutine {
         beginRenderViews(rv, framebuffer.width, framebuffer.height)
 
         val numViews = getNumViews()
-        if (numViews > 0) {
-
-            ensureFBSize(numViews)
-
-            for (viewIndex in 0 until numViews) {
-                renderView(viewIndex)
-            }
-
-            useFrame(framebuffer) {
-                drawToTargetFramebuffer(framebuffer.pointer, framebuffer.width, framebuffer.height)
-            }
+        ensureFBSize(numViews)
+        for (viewIndex in 0 until numViews) {
+            renderView(viewIndex)
         }
 
         callOnGameLoop(EngineBase.instance!!, window)

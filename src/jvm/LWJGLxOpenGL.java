@@ -748,25 +748,25 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "uniform1fv")
     @JavaScript(code = "gl.uniform1fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),toFloat32Array(arg1));\n")
+    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform1fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform2fv")
     @JavaScript(code = "gl.uniform2fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),toFloat32Array(arg1));\n")
+    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform2fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform3fv")
     @JavaScript(code = "gl.uniform3fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),toFloat32Array(arg1));\n")
+    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform3fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform4fv")
     @JavaScript(code = "gl.uniform4fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),toFloat32Array(arg1));\n")
+    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform4fv(int location, Pointer addr, int length);
 
     @NoThrow
@@ -820,7 +820,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4fv_IAFV")
-    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),arg1.values);\n")
+    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0), arg1.values);\n")
     public static void glUniform4fv(int location, float[] data) {
         glUniform4fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -828,25 +828,25 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "uniformMatrix4x3fv")
     @JavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
+    @PureJavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     public static native void uniformMatrix4x3fv(int location, boolean transpose, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix2fv")
     @JavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix2fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
+    @PureJavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     private static native void uniformMatrix2fv(int u, boolean t, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix3fv")
     @JavaScript(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix3fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
+    @PureJavaScript(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     private static native void uniformMatrix3fv(int u, boolean t, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix4fv")
     @JavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix4fv(unmap(arg0),arg1,toFloat32Array(arg2));\n")
+    @PureJavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     public static native void uniformMatrix4fv(int location, boolean transpose, Pointer addr, int length);
 
     @NoThrow
@@ -1116,7 +1116,7 @@ public class LWJGLxOpenGL {
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV")
     @JavaScript(code = "gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
-    public static native void glFramebufferTexture2D_IIIIIV(int a, int b, int c, int d, int e);
+    public static native void glFramebufferTexture2D_IIIIIV(int fbTarget, int attachment, int texTarget, int texture, int level);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV")

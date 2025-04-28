@@ -98,10 +98,25 @@ window.init = function(superId,interfaces,fields,methods){
     createClass(classId,superId,interfaces,fields,methods);
 }
 
-window.toFloat32Array = function(buffer) {
+window.unpackFloatArray = function(buffer,length) {
+    if(!(buffer.values instanceof Float32Array) || buffer.values.length < length)
+        throw new Error('Size/type mismatch');
+    return buffer.values;
+}
+
+window.unpackIntArray = function(buffer,length) {
+    if(!(buffer.values instanceof Int32Array) || buffer.values.length < length)
+        throw new Error('Size/type mismatch');
+    return buffer.values;
+}
+
+window.toFloat32Array = function(buffer, newLength) {
     let result = buffer instanceof Float32Array ?
         buffer : new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength >> 2);
-    if(result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    if (result.byteLength != buffer.byteLength) throw new Error("Size mismatch!");
+    if (newLength !== undefined && newLength < (result.byteLength >> 2)) {
+        result = new Float32Array(buffer.buffer, buffer.byteOffset, newLength);
+    }
     return result;
 }
 

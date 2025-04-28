@@ -96,7 +96,7 @@ try {
         safe(lib.EngineMain(0))
         console.log("Called main function")
 
-        var lastTime = 0
+        window.lastTime = 0
         window.inited = true
         function render(time) {
             if(window.hasCrashed > 20) window.stop = true
@@ -109,9 +109,9 @@ try {
             
             if (!webXR.hasXRSession) {
                 safe(lib.EngineUpdate(innerWidth, innerHeight, dt));
-            } else console.log('Skipping EngineUpdate, because XR is active')
+            }// else console.log('Skipping EngineUpdate, because XR is active')
             
-            lastTime = time
+            window.lastTime = time
             if (!window.stop) requestAnimationFrame(render)
         }
         requestAnimationFrame(render)
