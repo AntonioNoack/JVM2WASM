@@ -2,7 +2,7 @@
     window.mouseX = 0
     window.mouseY = 0
     document.onmousemove = function(e){
-        if (inited) {
+        if (window.inited) {
             window.mouseX = e.clientX
             window.mouseY = e.clientY
             lib.EngineMouseMove(mouseX,mouseY)
@@ -14,7 +14,7 @@
     }
 
     document.onmousedown = function(e){
-        if (inited) {
+        if (window.inited) {
             lib.EngineKeyModState(calcMods(e))
             lib.EngineMouseDown(mapMouseButton(e.button))
             e.preventDefault()
@@ -22,7 +22,7 @@
     }
 
     document.onmouseup = function(e) {
-        if (inited) {
+        if (window.inited) {
             lib.EngineKeyModState(calcMods(e))
             lib.EngineMouseUp(mapMouseButton(e.button))
             e.preventDefault()
@@ -34,9 +34,9 @@
         return false
     }
 
-    // todo copy paste events
+    // todo implement copy-paste events
 
-    var keyMap = {
+    const keyMap = {
         // arrows
         37:263,
         39:262,
@@ -87,7 +87,7 @@
     }
 
     document.onkeypress = function(e) {
-        if(inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
+        if (window.inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
             lib.EngineKeyModState(calcMods(e))
             lib.EngineKeyTyped(keyMap[e.keyCode] || e.keyCode)
             e.preventDefault()
@@ -97,20 +97,20 @@
         return (e.ctrlKey ? 2 : 0) + (e.shiftKey ? 1 : 0) + (e.altKey ? 4 : 0) + (e.metaKey ? 8 : 0)
     }
     document.onkeydown = function(e) {
-        if(inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
+        if (window.inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
             lib.EngineKeyModState(calcMods(e))
             lib.EngineKeyDown(keyMap[e.keyCode] || e.keyCode)
-            if(e.key.length == 1 && !e.ctrlKey) lib.EngineCharTyped(e.key.charCodeAt(0), calcMods(e))
+            if (e.key.length == 1 && !e.ctrlKey) lib.EngineCharTyped(e.key.charCodeAt(0), calcMods(e))
             e.preventDefault()
         }
     }
     document.onkeyup = function(e) {
-        if(inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
+        if (window.inited && e.keyCode != 116 && !(e.keyCode == 73 && e.shiftKey && e.ctrlKey)) {
             lib.EngineKeyModState(calcMods(e))
             lib.EngineKeyUp(keyMap[e.keyCode] || e.keyCode)
             e.preventDefault()
         }
     }
     document.onwheel = function(e) {
-        if(inited) lib.EngineMouseWheel((e.deltaX||0)*0.01,(-e.deltaY||0)*0.01)
+        if (window.inited) lib.EngineMouseWheel((e.deltaX||0)*0.01,(-e.deltaY||0)*0.01)
     }

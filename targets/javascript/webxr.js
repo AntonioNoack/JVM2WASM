@@ -70,26 +70,22 @@ function startPseudoWebVR() {
 		{
 			projectionMatrix,
 			transform: {
-				inverse: {
-					matrix: [
-						1, 0, 0, 0,
-						0, 1, 0, 0,
-						0, 0, 1, 0,
-						0, 0, 0, 1,
-					]
-				}
+				matrix: [
+					1, 0, 0, 0,
+					0, 1, 0, 0,
+					0, 0, 1, 0,
+					0, 0, 0, 1,
+				]
 			}
 		}, {
 			projectionMatrix,
 			transform: {
-				inverse: {
-					matrix: [
-						1, 0, 0, 0,
-						0, 1, 0, 0,
-						0, 0, 1, 0,
-						0, 0, 0, 1,
-					]
-				}
+				matrix: [
+					1, 0, 0, 0,
+					0, 1, 0, 0,
+					0, 0, 1, 0,
+					0, 0, 0, 1,
+				]
 			}
 		}
 	];

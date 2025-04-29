@@ -4,7 +4,7 @@ import annotations.JavaScript;
 
 public class VRRoutineJS {
     @JavaScript(code = "const viewIndex = arg0, dst = unpackFloatArray(arg1,16);\n" +
-            "const src = webXR.views[viewIndex].transform.inverse.matrix;\n" +
+            "const src = webXR.views[viewIndex].transform.matrix;\n" +
             "for(let i=0;i<16;i++){\n" +
             "   dst[i] = src[i];\n" +
             "}\n")

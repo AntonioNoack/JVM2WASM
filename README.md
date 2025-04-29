@@ -134,8 +134,8 @@ Other JVMs might implement different backends for classes like java.nio.?Buffer,
 The following TODOs are also sorted by priority, so I'll likely implement the first ones first.
 Anyone is welcome to contribute to these topics.
 
-- Port the engine to my Meta Quest 3
-- Create nice-looking JavaScript/TypeScript
+- Port the engine to my Meta Quest 3 (C++, via JS already works)
+- WebXR controls
 - Create nice-looking C++ with structs as classes
 - Implement proper file IO for C++ to load assets
 - Integrate this into Rem's Engine's export feature, so you can create WASM-builds from within editor
