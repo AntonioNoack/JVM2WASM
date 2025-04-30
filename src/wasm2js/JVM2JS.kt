@@ -360,7 +360,7 @@ fun shortName(key: Triple<String, String, String>, debugExtra: String): String {
 }
 
 private val availableChars0 = ('A'..'Z') + ('a'..'z') + '_'
-private val availableChars1 = availableChars0 + ('0'..'9')
+private val availableChars1 = availableChars0 + ('0'..'9') + '$'
 
 private fun indexToName(idx: Int): String {
     var i = idx + 1
