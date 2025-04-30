@@ -217,16 +217,14 @@ window.unreachable = function(funcName) {
 
 // todo fill this buffer with everything necessary
 const resourcesAsBuffers = new Map();
-window.getResourceAsStream = function(jvmName) {
+window.getResourceAsByteArray = function(jvmName) {
     const jsName = unwrapString(jvmName);
-    const result = new java_io_ByteArrayInputStream();
     let bytes = resourcesAsBuffers.get(jsName);
     if(!bytes) return null;
     const byteArray = new AB();
     byteArray.values = new Uint8Array(bytes);
-    result.new_java_io_ByteArrayInputStream_ABV(byteArray);
-    // console.log('Returned', result, 'as stream for', jsName);
-    return result;
+    // console.log('Returned', bytes, 'as stream for', jsName);
+    return byteArray;
 }
 
 window.loadResources = function(callback) {

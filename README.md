@@ -1,7 +1,7 @@
 # JVM2WASM / JVM2CPP
 
 This is a compiler from Java, Kotlin and any other JVM-language to WebAssembly (WASM), JavaScript or C++ for [Rem's Engine](https://github.com/AntonioNoack/RemsEngine)'s ports onto the Web and as a true native application.
-It has a [garbage collector](src/jvm/GarbageCollector.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
+It has a [garbage collector](src/jvm/gc/GarbageCollector.java), and [JavaScript bindings for OpenGL via OpenGL ES](src/jvm/LWJGLxOpenGL.java).
 The target JVM language version is Java 8 (lambdas).
 
 With optional exception handling, a manual stack is created, where the stack-trace is tracked.

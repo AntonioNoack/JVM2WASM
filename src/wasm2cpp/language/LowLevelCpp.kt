@@ -40,8 +40,16 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
 
     }
 
+    override fun end() {
+        dst.append(";\n")
+    }
+
     override fun appendName(name: String) {
         dst.append(name)
+    }
+
+    override fun writeUnreachable(function: FunctionWriter) {
+        dst.append("unreachable(\"").append(function.originalName).append("\")\n")
     }
 
     override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
@@ -59,7 +67,8 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             val param = params[i]
             if (i > 0) dst.append(", ")
             dst.append(param.wasmType)
-            dst.append(' ').append(param.name)
+            dst.append(' ')
+            appendName(param.name)
         }
         dst.append(") {\n")
     }
@@ -301,6 +310,11 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                 !jvmType.startsWith("[") && jvmType != "null"
         val wasmType = if (isCustomType) jvmType else jvm2wasmTyped(jvmType).wasmName
         dst.append(wasmType).append(' ')
+        appendName(name)
+        dst.append(" = ")
+    }
+
+    override fun beginAssignment(name: String) {
         appendName(name)
         dst.append(" = ")
     }

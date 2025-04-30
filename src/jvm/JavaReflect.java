@@ -535,20 +535,24 @@ public class JavaReflect {
     @WASM(code = "global.get $resourceTable")
     static native Pointer getResourcePtr();
 
-    @PureJavaScript(code = "return getResourceAsStream(arg1);")
     @Alias(names = "java_lang_ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream")
     public static InputStream ClassLoader_getResourceAsStream_Ljava_lang_StringLjava_io_InputStream(ClassLoader cl, String name) {
+        byte[] bytes = ClassLoader_getResourceAsByteArray(name);
+        return bytes != null ? new ByteArrayInputStream(bytes) : null;
+    }
+
+    @PureJavaScript(code = "return getResourceAsByteArray(arg0);")
+    public static byte[] ClassLoader_getResourceAsByteArray(String name) {
         if (name == null) return null;
         Pointer ptr = getResourcePtr();
-        int length = read32(ptr);
+        int numResources = read32(ptr);
         // todo if we have more than 16 resources, use a HashMap
         ptr = add(ptr, 4);
-        Pointer endPtr = add(ptr, length << 3);
+        Pointer endPtr = add(ptr, numResources << 3);
         while (Pointer.unsignedLessThan(ptr, endPtr)) {
             String key = readPtrAtOffset(ptr, 0);
             if (name.equals(key)) {
-                byte[] bytes = readPtrAtOffset(ptr, 4);
-                return new ByteArrayInputStream(bytes);
+                return readPtrAtOffset(ptr, 4);
             }
             ptr = add(ptr, 8);
         }

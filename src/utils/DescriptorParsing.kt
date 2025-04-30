@@ -122,7 +122,7 @@ fun methodName2(clazz: String, name: String, args: String): String {
     val clazz2 = if (NativeTypes.isObjectArray(clazz)) "[]" else clazz
     return methodName2Cache.getOrPut(Triple(clazz2, name, args)) {
         when (name) {
-            STATIC_INIT -> "static|$clazz2|$args"
+            STATIC_INIT -> "static|$clazz2|()V"
             INSTANCE_INIT -> "new|$clazz2|$args"
             else -> "$clazz2|$name|$args"
         }.escapeChars()

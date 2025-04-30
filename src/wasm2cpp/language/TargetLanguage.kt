@@ -14,6 +14,8 @@ interface TargetLanguage {
 
     fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter)
     fun beginDeclaration(name: String, jvmType: String)
+    fun beginAssignment(name: String)
+
     fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter)
 
     fun writeStaticInitCheck(writer: FunctionWriter)
@@ -25,5 +27,8 @@ interface TargetLanguage {
     fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter)
     fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter)
     fun writeReturnStruct(results: List<Expr>)
+
+    fun writeUnreachable(function: FunctionWriter)
+    fun end()
 
 }

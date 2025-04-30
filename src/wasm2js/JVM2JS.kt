@@ -20,8 +20,21 @@ import wasm.parser.GlobalVariable
 import wasm.parser.Import
 import wasm2cpp.*
 import wasm2cpp.language.HighLevelJavaScript
+import wasm2cpp.language.HighLevelJavaScript.Companion.fieldName
+import wasm2cpp.language.HighLevelJavaScript.Companion.jsKeywords
 
 val jsFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/javascript")
+
+// todo minify JavaScript
+//  - inline local variables, where possible
+//  - rename fields to a-z (except when serialized)
+
+// done minimizing JavaScript
+//  - done local variables to a-z
+//  - done classes to unique, short names -> which symbols are allowed at the start, which after?
+//  - remove all comments
+
+var minifyJavaScript = true
 
 fun main() {
     val clock = Clock("JVM2JS")
@@ -35,15 +48,9 @@ fun main() {
 }
 
 fun wasm2jsFromMemory() {
-    // todo implement high-level JavaScript generation
     val functions = collectAllMethods(clock)
     wasm2js(functions, functionTable, imports, globals)
     clock.stop("WASM2JS")
-}
-
-fun classNameToJS(jvmType: String): String {
-    if (jvmType == "void") return "_void"
-    return jvmType.escapeChars()
 }
 
 data class Method(val jsName: String, val sig: MethodSig)
@@ -132,11 +139,11 @@ fun wasm2js(
         val methods1 = ArrayList<Method>(methods.size)
 
         fun appendField(fieldSig: FieldSig) {
-            val name = fieldSig.name
             val value = hIndex.finalFields[fieldSig]
-            writer.append("  ")
+            if (!minifyJavaScript) writer.append("  ")
             if (fieldSig.isStatic) writer.append("static ")
-            writer.append(name).append(" = ")
+            writer.append(fieldName(fieldSig))
+            writer.append(if (minifyJavaScript) "=" else " = ")
             appendValue(value, fieldSig.jvmType)
             writer.append(";\n")
             val annotations = hIndex.fieldAnnotations[fieldSig] ?: emptyList()
@@ -221,17 +228,20 @@ fun wasm2js(
         writer.append("}\n")
     }
 
+    if (minifyJavaScript) {
+        writer.append("const $ = window.wrapString;\n")
+    }
+
     // what do we need? name, shortName, fields, methods
     writer.append("// class instances\n")
-    writer.append("const global_numClasses = ").append(gIndex.classNames.size).append(";\n")
-    writer.append("const CLASS_INSTANCES = new Array(global_numClasses);\n") // only named classes
-    writer.append(
-        "" +
-                "for(let i=0;i<global_numClasses;i++){\n" +
-                "   CLASS_INSTANCES[i] = new java_lang_Class();\n" +
-                "}\n"
-    )
-    writer.append("\n")
+    val globalNumClasses = if (minifyJavaScript) {
+        shortName(Triple("local", "", "global_numClasses"))
+    } else "global_numClasses"
+    writer.append("const ").append(globalNumClasses).append(" = ").append(gIndex.classNames.size).append(";\n")
+    writer.append("const CLASS_INSTANCES = new Array(").append(globalNumClasses).append(");\n") // only named classes
+    writer.append("for(let i=0;i<").append(globalNumClasses).append(";i++){\n")
+    writer.append("   CLASS_INSTANCES[i] = new java_lang_Class();\n")
+    writer.append("}\n\n")
 
     for (classId in classNames.indices) {
         val className = classNames[classId]
@@ -325,9 +335,80 @@ fun shortName(sig: MethodSig): String {
     return shortName(sig.className, sig.name, sig.descriptor.raw)
 }
 
+fun shortName(key: Triple<String, String, String>): String {
+    return shortNames.getOrPut(key) {
+        indexToName(shortNames.size)
+    }
+}
+
+fun shortName(key: Triple<String, String, String>, debugExtra: String): String {
+    return shortNames.getOrPut(key) {
+        debugExtra + "_" + indexToName(shortNames.size)
+    }
+}
+
+private val availableChars0 = ('A'..'Z') + ('a'..'z') + '_'
+private val availableChars1 = availableChars0 + ('0'..'9')
+
+private fun indexToName(idx: Int): String {
+    var i = idx + 1
+    val name = StringBuilder()
+    while (i > 0) {
+        val chars = if (name.isEmpty()) availableChars0 else availableChars1
+        val char = chars[i % chars.size]
+        name.append(char)
+        i /= chars.size
+    }
+    var result = name.toString()
+    if (result in jsKeywords) result = "_$result"
+    return result
+}
+
+// todo instead of not renaming these classes, create aliases at the end of the file for them
+val usedFromOutsideClasses = listOf(
+    "java/lang/Class",
+    "java/lang/reflect/Method",
+    "java/lang/reflect/Constructor",
+    "java/lang/reflect/Field",
+    "java/lang/String",
+    "[]"
+) + NativeTypes.nativeArrays + NativeTypes.nativeTypeWrappers.values
+
+fun classNameToJS(jvmType: String): String {
+    return if (minifyJavaScript && jvmType !in usedFromOutsideClasses) {
+        shortName(Triple("class", "", jvmType))
+    } else classNameToJS0(jvmType)
+}
+
+private fun classNameToJS0(jvmType: String): String {
+    if (jvmType == "void") return "_void"
+    return jvmType.escapeChars()
+}
+
+private val shortNames = HashMap<Triple<String, String, String>, String>(4096)
 fun shortName(className: String, name: String, args: String): String {
+    return if (minifyJavaScript) {
+
+        val isUsedFromOutside =
+            className in NativeTypes.nativeTypeWrappers.values && name == "valueOf"
+
+        if (isUsedFromOutside) {
+            return shortName0(className, name, args)
+        }
+
+        val key = when (name) {
+            STATIC_INIT -> Triple("static", "", "")
+            INSTANCE_INIT -> Triple("new", className, args) // must include class-name to avoid inheritance
+            else -> Triple("call", name, args)
+        }
+
+        shortName(key)
+    } else shortName0(className, name, args)
+}
+
+fun shortName0(className: String, name: String, args: String): String {
     return when (name) {
-        STATIC_INIT -> "static|$args"
+        STATIC_INIT -> "static|()V"
         INSTANCE_INIT -> "new|$className|$args" // must include class-name to avoid inheritance
         else -> "$name|$args"
     }.escapeChars()
@@ -350,7 +431,6 @@ fun defineFunctionImplementationPureJS(
     writer.append("\n}\n")
 }
 
-
 fun defineFunctionImplementation(
     function: FunctionImpl, globals: Map<String, GlobalVariable>,
     functionsByName: Map<String, FunctionImpl>, pureFunctions: Set<String>,
@@ -372,7 +452,7 @@ fun defineFunctionImplementation(
             shortName, function.params, function.results,
             function.locals, optimized, function.isExported
         )
-        functionWriter.write(renamed, className, isStatic)
+        functionWriter.write(renamed, className, function.funcName, isStatic)
     } catch (e: Throwable) {
         println(writer.toString(pos0, writer.size))
         throw RuntimeException("Failed writing ${function.funcName}", e)

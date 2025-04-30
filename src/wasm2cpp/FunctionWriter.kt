@@ -16,7 +16,9 @@ import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import wasm2cpp.expr.CallExpr
 import wasm2cpp.expr.VariableExpr
 import wasm2cpp.instr.*
+import wasm2cpp.language.HighLevelJavaScript
 import wasm2cpp.language.TargetLanguage
+import wasm2js.minifyJavaScript
 
 class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: TargetLanguage) {
 
@@ -28,34 +30,35 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     lateinit var function: FunctionImpl
     var isStatic = false
     var className: String = ""
+    var originalName: String = ""
 
-    fun write(function: FunctionImpl, className: String, isStatic: Boolean) {
+    fun write(function: FunctionImpl, className: String, originalName: String, isStatic: Boolean) {
 
         this.function = function
         this.isStatic = isStatic
         this.className = className
+        this.originalName = originalName
 
         begin()
         language.writeFunctionStart(function, this)
         depth++
 
-        if (function.funcName.startsWith("static_")) {
+        if (originalName.startsWith("static_")) {
             language.writeStaticInitCheck(this)
         }
 
         writeInstructions(function.body)
 
         depth--
-        begin().append("}\n")
+        val suffix = if (language is HighLevelJavaScript && minifyJavaScript) "}" else "}\n"
+        begin().append(suffix)
     }
 
     fun begin(): StringBuilder2 {
-        for (i in 0 until depth) writer.append("  ")
+        if (!(language is HighLevelJavaScript && minifyJavaScript)) {
+            for (i in 0 until depth) writer.append("  ")
+        }
         return writer
-    }
-
-    private fun StringBuilder2.end() {
-        append(";\n")
     }
 
     private fun writeInstructions(instructions: List<Instruction>) {
@@ -91,6 +94,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     }
 
     private fun writeComment(instr: Comment) {
+        if (language is HighLevelJavaScript && minifyJavaScript) return
         assertTrue('\n' !in instr.text)
         begin().append("// ").append(instr.text).append('\n')
     }
@@ -98,11 +102,12 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     private fun writeGoto(instr: GotoInstr) {
         begin()
         language.writeGoto(instr)
-        writer.end()
+        language.end()
     }
 
     private fun writeBreakThisLoop() {
-        begin().append("break").end()
+        begin().append("break")
+        language.end()
     }
 
     private fun writeDebugInfo(instr: Instruction) {
@@ -114,20 +119,22 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     private fun writeNullDeclaration(instr: NullDeclaration) {
         begin()
         language.beginDeclaration(instr.name, instr.jvmType)
-        writer.append("0").end()
+        writer.append("0")
+        language.end()
     }
 
     private fun writeDeclaration(instr: Declaration) {
         begin()
         language.beginDeclaration(instr.name, instr.jvmType)
         language.appendExpr(instr.initialValue.expr)
-        writer.end()
+        language.end()
     }
 
     private fun writeAssignment(assignment: Assignment) {
-        begin().append(assignment.name).append(" = ")
+        begin()
+        language.beginAssignment(assignment.name)
         language.appendExpr(assignment.newValue.expr)
-        writer.end()
+        language.end()
     }
 
     private fun writeFieldAssignment(assignment: FieldAssignment) {
@@ -138,23 +145,22 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         val results = instr.results
         assertEquals(function.results.size, results.size)
         when (results.size) {
-            0 -> begin().append("return").end()
+            0 -> begin().append("return")
             1 -> {
                 begin().append("return ")
                 language.appendExpr(results.first().expr)
-                writer.end()
             }
             else -> {
                 begin()
                 language.writeReturnStruct(results.map { it.expr })
-                writer.end()
             }
         }
+        language.end()
     }
 
     private fun writeUnreachable() {
-        begin().append("unreachable(\"")
-            .append(function.funcName).append("\")").end()
+        begin()
+        language.writeUnreachable(this)
     }
 
     private fun writeCallAssignmentBegin(instr: CallAssignment) {
@@ -169,7 +175,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             if (instr.resultType != null) {
                 language.beginDeclaration(instr.resultName, instr.resultType)
             } else {
-                writer.append(instr.resultName).append(" = ")
+                language.beginAssignment(instr.resultName)
             }
         }
     }
@@ -198,7 +204,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     private fun writeCallAssignment(instr: CallAssignment) {
         writeCallAssignmentBegin(instr)
         language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, instr.resultType ?: "?"))
-        writer.end()
+        language.end()
     }
 
     private fun writeUnresolvedCallAssignment(instr: UnresolvedCallAssignment) {
@@ -206,13 +212,13 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         writeCalled(instr.self, instr.isSpecial, instr.sig)
         writer.append('.')
         language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, instr.resultType ?: "?"))
-        writer.end()
+        language.end()
     }
 
     private fun writeExprCall(instr: ExprCall) {
         begin()
         language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, "?"))
-        writer.end()
+        language.end()
     }
 
     private fun writeUnresolvedExprCall(instr: UnresolvedExprCall) {
@@ -220,12 +226,15 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         writeCalled(instr.self, instr.isSpecial, instr.sig)
         writer.append('.')
         language.appendExpr(CallExpr(instr.funcName, instr.params.map { it.expr }, "?"))
-        writer.end()
+        language.end()
     }
 
     private fun writeLoopInstr(instr: LoopInstr) {
         begin()
-        if (instr.label.isNotEmpty()) writer.append(instr.label).append(": ")
+        if (instr.label.isNotEmpty()) {
+            language.appendName(instr.label)
+            writer.append(": ")
+        }
         writer.append("while (true) {\n")
         depth++
         writeInstructions(instr.body)

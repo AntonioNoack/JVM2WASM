@@ -50,7 +50,7 @@ fun defineFunctionImplementations(
         try {
             val declarative = stackToDeclarative.write(function)
             val optimized = optimizer.write(function.withBody(declarative))
-            functionWriter.write(function.withBody(optimized), "?", true)
+            functionWriter.write(function.withBody(optimized), "?", function.funcName, true)
         } catch (e: Throwable) {
             println(writer.toString(pos0, writer.size))
             throw RuntimeException("Failed writing ${function.funcName}", e)

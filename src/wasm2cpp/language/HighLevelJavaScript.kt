@@ -4,8 +4,10 @@ import checkArrayAccess
 import gIndex
 import me.anno.utils.Color.hex16
 import me.anno.utils.assertions.assertTrue
+import utils.FieldSig
 import utils.NativeTypes
 import utils.StringBuilder2
+import utils.jvm2wasmTyped
 import wasm.instr.*
 import wasm.instr.Instructions.I32Add
 import wasm.instr.Instructions.I32Mul
@@ -19,6 +21,9 @@ import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
 import wasm2cpp.instr.*
 import wasm2js.classNameToJS
+import wasm2js.minifyJavaScript
+import wasm2js.shortName
+import wasm2js.usedFromOutsideClasses
 import kotlin.streams.toList
 
 class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
@@ -26,7 +31,12 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     companion object {
         private val allowedCodepoints = " .,_-#+%!?:;§$&/()[]{}=*^".codePoints().toList()
 
-        val jsKeywords = "function,var,let,const".split(',').toHashSet()
+        val jsKeywords = ("" +
+                "function,var,let,const,in,if,while,do,else,class,super," +
+                "gl," +
+                "AB,AZ,AS,AC,AI,AL,AF,AD,AW")
+            .split(',').toHashSet()
+
         val unsafeArrayLoadInstructions = listOf(
             Call.s8ArrayLoadU,
             Call.s16ArrayLoadU,
@@ -44,12 +54,28 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             Call.f32ArrayStoreU,
             Call.f64ArrayStoreU,
         ).map { it.name }
+
+        fun fieldName(sig: FieldSig): String {
+            return if (minifyJavaScript && sig.clazz !in usedFromOutsideClasses && false) {
+                // todo this is causing crashes :( and only saving 3% space
+                shortName(Triple("field", sig.clazz, sig.name))
+            } else sig.name
+        }
     }
 
     private var thisVariable: String? = null
 
+    override fun end() {
+        dst.append(";\n")
+    }
+
     override fun appendName(name: String) {
-        dst.append(if (name == thisVariable) "this" else name)
+        val newName = when {
+            name == thisVariable -> "this"
+            minifyJavaScript -> shortName(Triple("local", "", name))
+            else -> name
+        }
+        dst.append(newName)
     }
 
     override fun writeFunctionStart(function: FunctionImpl, writer: FunctionWriter) {
@@ -66,8 +92,10 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             if (i == 0 && !writer.isStatic) continue
             val param = params[i]
             if (!dst.endsWith("(")) dst.append(", ")
-            dst.append(param.name)
-            dst.append(" /* ").append(param.jvmType).append(" */")
+            appendName(param.name)
+            if (!minifyJavaScript) {
+                dst.append(" /* ").append(param.jvmType).append(" */")
+            }
         }
         dst.append(") {\n")
         thisVariable = if (!writer.isStatic) params[0].name else null
@@ -75,12 +103,22 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
     override fun writeStaticInitCheck(writer: FunctionWriter) {
         val className = classNameToJS(writer.className)
-        writer.begin().append("").append(className).append(".static_V = DO_NOTHING;\n")
+        writer.begin().append(className)
+            .append('.').append(writer.function.funcName)
+            .append(if (minifyJavaScript) "=" else " = ")
+            .append("DO_NOTHING;\n")
+    }
+
+    override fun writeUnreachable(function: FunctionWriter) {
+        if (minifyJavaScript) {
+            dst.append("unreachable()\n")
+        } else super.writeUnreachable(function)
     }
 
     override fun writeGoto(instr: GotoInstr) {
-        // todo make sure that instr.owner is a Loop
-        dst.append("continue ").append(instr.label)
+        // to do make sure that instr.owner is a Loop
+        dst.append("continue ")
+        appendName(instr.label)
     }
 
     override fun appendConstExpr(expr: ConstExpr) {
@@ -100,16 +138,14 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                     dst.append("null")
                 } else {
                     val stringValue = expr.value as String
-                    // todo escape string as necessary
-                    dst.append("wrapString(\"")
+                    // escape string as necessary
+                    dst.append(if (minifyJavaScript) "$(\"" else "wrapString(\"")
                     for (codepoint in stringValue.codePoints()) {
                         when (codepoint) {
                             in '0'.code..'9'.code,
                             in 'A'.code..'Z'.code,
                             in 'a'.code..'z'.code,
-                            in allowedCodepoints -> {
-                                dst.append(codepoint.toChar())
-                            }
+                            in allowedCodepoints -> dst.append(codepoint.toChar())
                             else -> dst.append("\\u").append(hex16(codepoint))
                         }
                     }
@@ -256,6 +292,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                 i as BinaryI32Instruction
                 dst.append("(")
                 appendExprSafely(i0)
+                // todo we can remove these spaces, when we remove cases of (127--128)
                 dst.append(' ').append(i.operator.symbol).append(' ')
                 appendExprSafely(i1)
                 dst.append(")|0")
@@ -280,7 +317,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                         } else {
                             appendExpr(i0)
                         }
-                        dst.append(", ")
+                        dst.append(if (minifyJavaScript) "," else ", ")
                         appendExpr(i1)
                         dst.append(')')
                     }
@@ -293,7 +330,14 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     override fun beginDeclaration(name: String, jvmType: String) {
         dst.append("let ")
         appendName(name)
-        dst.append(" /* ").append(jvmType).append(" */ = ")
+        if (!minifyJavaScript) {
+            dst.append(" /* ").append(jvmType).append(" */ = ")
+        } else dst.append('=')
+    }
+
+    override fun beginAssignment(name: String) {
+        appendName(name)
+        dst.append(if (minifyJavaScript) "=" else " = ")
     }
 
     override fun writeFunctionTypeDefinition(instr: FunctionTypeDefinition, writer: FunctionWriter) {
@@ -325,16 +369,20 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             appendExprSafely(params[0])
             dst.append(".values[")
             appendExpr(params[1])
-            dst.append("] = ")
+            dst.append(if (minifyJavaScript) "]=" else "] = ")
             appendExpr(params[2])
         } else {
             dst.append(expr.funcName).append('(')
             for (i in params.indices) {
-                if (i > 0) dst.append(", ")
+                if (i > 0) dst.append(if (minifyJavaScript) "," else ", ")
                 appendExpr(params[i])
             }
             dst.append(')')
         }
+    }
+
+    override fun writeStaticInstance(className: String) {
+        dst.append(classNameToJS(className))
     }
 
     override fun appendFieldGetExpr(expr: FieldGetExpr) {
@@ -344,16 +392,17 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             writeStaticInstance(expr.field.clazz)
         }
         dst.append('.')
-        dst.append(expr.field.name)
+        dst.append(fieldName(expr.field))
     }
 
     override fun writeFieldAssignment(assignment: FieldAssignment, writer: FunctionWriter) {
         writer.begin()
         if (assignment.instance != null) appendExpr(assignment.instance.expr)
         else writeStaticInstance(assignment.field.clazz)
-        dst.append('.').append(assignment.field.name).append(" = ")
+        dst.append('.').append(fieldName(assignment.field))
+        dst.append(if (minifyJavaScript) "=" else " = ")
         appendExpr(assignment.newValue.expr)
-        dst.append(";\n")
+        end()
     }
 
     override fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter) {
@@ -365,10 +414,12 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun writeReturnStruct(results: List<Expr>) {
+        val totalType = results.joinToString("") { jvm2wasmTyped(it.jvmType).wasmName }
         dst.append("return { ")
         for (ri in results.indices) {
             if (ri > 0) dst.append(", ")
-            dst.append("v").append(ri).append(": ")
+            val sig = FieldSig(totalType, "v$ri", results[ri].jvmType, false)
+            dst.append(fieldName(sig)).append(": ")
             appendExpr(results[ri])
         }
         dst.append(" }")
