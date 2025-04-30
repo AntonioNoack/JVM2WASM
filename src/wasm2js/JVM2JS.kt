@@ -36,6 +36,10 @@ val jsFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/javascript")
 
 var minifyJavaScript = true
 
+val CLASS_INSTANCE_NAME = if (minifyJavaScript) "\$C" else "CLASS_INSTANCE"
+val LAMBDA_INSTANCE_NAME = if (minifyJavaScript) "\$L" else "LAMBDA_INSTANCE"
+val DO_NOTHING_NAME = if (minifyJavaScript) "$0" else "DO_NOTHING"
+
 fun main() {
     val clock = Clock("JVM2JS")
     jvm2wasm()
@@ -81,7 +85,8 @@ fun wasm2js(
     val pureFunctions = PureFunctions(imports, functions, functionByName).findPureFunctions()
     clock.stop("Finding Pure Functions")
     writer.append("\"use strict\";\n\n")
-    writer.append("const DO_NOTHING = () => {};\n")
+    writer.append("const ").append(DO_NOTHING_NAME).append(" = () => {};\n")
+    writer.append("window.minimizeJS = ").append(minifyJavaScript).append(";\n")
 
     fun appendValue(value: Any?, type: String) {
         when (value) {
@@ -109,7 +114,7 @@ fun wasm2js(
         writer.append("class ").append(jsClassName)
         val superClass = hIndex.superClass[className]
         if (superClass != null) writer.append(" extends ").append(classNameToJS(superClass))
-        writer.append(" {\n")
+        writer.append(if (minifyJavaScript) "{" else " {\n")
 
         // todo declare static fields, so we can use them
         val staticFields0 = gIndex.getFieldOffsets(className, true)
@@ -118,7 +123,9 @@ fun wasm2js(
         val instanceFields = instanceFields0.fields
         val methods = hIndex.methodsByClass[className] ?: emptyList()
 
-        writer.append("  static CLASS_INSTANCE = null;\n")
+        if (!minifyJavaScript) {
+            writer.append("  static CLASS_INSTANCE = null;\n")
+        } // else doesn't need to be declared
 
         val isConstructable = className in dIndex.constructableClasses
         val isAbstract = hIndex.isAbstractClass(className)
@@ -128,11 +135,12 @@ fun wasm2js(
             className in hIndex.syntheticClasses
         ) {
             // used to replace getClassIdPtr
-            writer.append("  static LAMBDA_INSTANCE = new ").append(jsClassName).append(";\n")
-        }
-
-        if (methods.any { it.name == STATIC_INIT }) {
-            writer.append("  static STATIC_INITED = false;\n")
+            if (minifyJavaScript) {
+                writer.append("static ").append(LAMBDA_INSTANCE_NAME).append("=new ").append(jsClassName).append(";")
+            } else {
+                writer.append("  static ").append(LAMBDA_INSTANCE_NAME).append(" = new ").append(jsClassName)
+                    .append(";\n")
+            }
         }
 
         val fields1 = ArrayList<Field>(staticFields.size + instanceFields.size)
@@ -145,7 +153,7 @@ fun wasm2js(
             writer.append(fieldName(fieldSig))
             writer.append(if (minifyJavaScript) "=" else " = ")
             appendValue(value, fieldSig.jvmType)
-            writer.append(";\n")
+            writer.append(if (minifyJavaScript) ";" else ";\n")
             val annotations = hIndex.fieldAnnotations[fieldSig] ?: emptyList()
             fields1.add(
                 Field(
@@ -158,7 +166,7 @@ fun wasm2js(
         for ((name, data) in staticFields) {
             appendField(FieldSig(className, name, data.jvmType, true))
         }
-        writer.append("\n") // there is always static fields
+        if (!minifyJavaScript) writer.append("\n") // there is always static fields
 
         if (isConstructable && instanceFields.isNotEmpty()) {
             for ((name, data) in instanceFields) {
@@ -166,7 +174,7 @@ fun wasm2js(
                 if (name == "length" && className.startsWith("[")) continue // implicit field
                 appendField(FieldSig(className, name, data.jvmType, false))
             }
-            writer.append("\n")
+            if (!minifyJavaScript) writer.append("\n")
         }
 
         // println(className)
@@ -225,7 +233,7 @@ fun wasm2js(
 
         classInfos.add(ClassInfo(interfaces, fields1, methods1))
 
-        writer.append("}\n")
+        writer.append(if (minifyJavaScript) "}" else "}\n")
     }
 
     if (minifyJavaScript) {
@@ -233,7 +241,7 @@ fun wasm2js(
     }
 
     // what do we need? name, shortName, fields, methods
-    writer.append("// class instances\n")
+    if (!minifyJavaScript) writer.append("// class instances\n")
     val globalNumClasses = if (minifyJavaScript) {
         shortName(Triple("local", "", "global_numClasses"))
     } else "global_numClasses"
@@ -241,22 +249,25 @@ fun wasm2js(
     writer.append("const CLASS_INSTANCES = new Array(").append(globalNumClasses).append(");\n") // only named classes
     writer.append("for(let i=0;i<").append(globalNumClasses).append(";i++){\n")
     writer.append("   CLASS_INSTANCES[i] = new java_lang_Class();\n")
-    writer.append("}\n\n")
+    writer.append(if (minifyJavaScript) "}" else "}\n\n")
 
     for (classId in classNames.indices) {
         val className = classNames[classId]
         val jsClassName = classNameToJS(className)
         val jvmClassName = className.replace('/', '.')
-        writer.append("link(\"").append(jvmClassName).append("\",").append(jsClassName).append(");\n")
+        writer.append("link(\"").append(jvmClassName).append("\",").append(jsClassName).append(")")
+            .append(if (minifyJavaScript) ";" else ";\n")
     }
-    writer.append("\n")
 
-    writer.append("// annotation instances\n")
+    if (!minifyJavaScript) {
+        writer.append("\n// annotation instances\n")
+    }
     writer.append("const ANNOTATION_INSTANCES = new Array(").append(annotationInstances.size).append(");\n")
     for ((annota) in annotationInstances.entries.sortedBy { it.value }) {
-        writer.append("annota(").append(gIndex.getClassId(annota.implClass)).append(");\n")
+        writer.append("annota(").append(gIndex.getClassId(annota.implClass))
+            .append(if (minifyJavaScript) ");" else ");\n")
     }
-    writer.append("\n")
+    if (!minifyJavaScript) writer.append("\n")
 
     for (classId in classNames.indices) {
         val className = classNames[classId]
@@ -297,13 +308,14 @@ fun wasm2js(
                 writer.append(',').append(gIndex.getClassIdOrParents(param))
             }
         }
-        writer.append("\");\n")
+        writer.append("\")").append(if (minifyJavaScript) ";" else ";\n")
     }
-    writer.append("\n")
 
     // append all helper methods
-    writer.append("\n")
-    writer.append("// helper methods\n")
+    if (!minifyJavaScript) {
+        writer.append("\n\n")
+        writer.append("// helper methods\n")
+    }
     for (impl in helperMethods.values) {
         if (impl.funcName !in ActuallyUsedIndex.usedBy) continue
         defineFunctionImplementation(
@@ -315,13 +327,13 @@ fun wasm2js(
     // todo replace strings with JavaScript strings(?)
 
     // define all well-named alias functions as links to the actual methods
-    writer.append("\n")
-    writer.append("// aliases\n")
+    if (!minifyJavaScript) writer.append("\n// aliases\n")
+    else writer.append("let _=window;\n")
     for ((name, method) in hIndex.methodAliases) {
         if ('_' !in name && hIndex.isStatic(method)) {
-            writer.append("window.").append(name).append(" = ")
+            writer.append(if (minifyJavaScript) "_." else "window.").append(name).append(" = ")
                 .append(classNameToJS(method.className)).append('.').append(shortName(method))
-                .append(";\n")
+                .append(if (minifyJavaScript) ";" else ";\n")
         }
     }
     writer.append("\n")
@@ -426,9 +438,16 @@ fun defineFunctionImplementationPureJS(
         writer.append("arg").append(i)
     }
     writer.append(") {")
-    if (!isStatic) writer.append("const arg0 = this;\n")
-    writer.append(pureJavaScript) // indent this code??
-    writer.append("\n}\n")
+    if (!isStatic) {
+        writer.append("const arg0 = this;")
+        if (!minifyJavaScript) writer.append("\n")
+    }
+    var code = pureJavaScript
+    if (minifyJavaScript && ".CLASS_INSTANCE" in code) {
+        code = code.replace(".CLASS_INSTANCE", ".$CLASS_INSTANCE_NAME")
+    }
+    writer.append(code) // to do indent this code??
+    writer.append(if (minifyJavaScript) "}" else "\n}\n")
 }
 
 fun defineFunctionImplementation(
@@ -457,5 +476,5 @@ fun defineFunctionImplementation(
         println(writer.toString(pos0, writer.size))
         throw RuntimeException("Failed writing ${function.funcName}", e)
     }
-    writer.append('\n')
+    if (!minifyJavaScript) writer.append('\n')
 }

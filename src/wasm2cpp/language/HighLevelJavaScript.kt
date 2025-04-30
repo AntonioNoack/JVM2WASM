@@ -20,10 +20,7 @@ import wasm2cpp.StackToDeclarative.Companion.canAppendWithoutBrackets
 import wasm2cpp.StackToDeclarative.Companion.isNumber
 import wasm2cpp.expr.*
 import wasm2cpp.instr.*
-import wasm2js.classNameToJS
-import wasm2js.minifyJavaScript
-import wasm2js.shortName
-import wasm2js.usedFromOutsideClasses
+import wasm2js.*
 import kotlin.streams.toList
 
 class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
@@ -66,7 +63,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     private var thisVariable: String? = null
 
     override fun end() {
-        dst.append(";\n")
+        dst.append(if (minifyJavaScript) ";" else ";\n")
     }
 
     override fun appendName(name: String) {
@@ -91,13 +88,15 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         for (i in params.indices) {
             if (i == 0 && !writer.isStatic) continue
             val param = params[i]
-            if (!dst.endsWith("(")) dst.append(", ")
+            if (!dst.endsWith("(")) {
+                dst.append(if (minifyJavaScript) "," else ", ")
+            }
             appendName(param.name)
             if (!minifyJavaScript) {
                 dst.append(" /* ").append(param.jvmType).append(" */")
             }
         }
-        dst.append(") {\n")
+        dst.append(") {").ln()
         thisVariable = if (!writer.isStatic) params[0].name else null
     }
 
@@ -106,12 +105,13 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         writer.begin().append(className)
             .append('.').append(writer.function.funcName)
             .append(if (minifyJavaScript) "=" else " = ")
-            .append("DO_NOTHING;\n")
+            .append(DO_NOTHING_NAME)
+        end()
     }
 
     override fun writeUnreachable(function: FunctionWriter) {
         if (minifyJavaScript) {
-            dst.append("unreachable()\n")
+            dst.append("unreachable();")
         } else super.writeUnreachable(function)
     }
 
@@ -327,6 +327,25 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         }
     }
 
+    override fun writeDeclarations(writer: FunctionWriter, list: List<Declaration>) {
+        if (list.isEmpty()) return
+        writer.begin()
+        dst.append("let ")
+        var lastType: String? = null
+        for (i in list.indices) {
+            if (i > 0) dst.append(if (minifyJavaScript) "," else ", ")
+            val instr = list[i]
+            appendName(instr.name)
+            if (!minifyJavaScript && instr.jvmType != lastType) {
+                dst.append(" /* ").append(instr.jvmType).append(" */")
+                lastType = instr.jvmType
+            }
+            dst.append(if (minifyJavaScript) "=" else " = ")
+            appendExpr(instr.initialValue.expr)
+        }
+        end()
+    }
+
     override fun beginDeclaration(name: String, jvmType: String) {
         dst.append("let ")
         appendName(name)
@@ -344,7 +363,8 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         writer.begin()
             .append("const ").append(instr.instanceName).append(" = indirectFunctions[")
         appendExpr(instr.indexExpr.expr)
-        dst.append("];\n")
+        dst.append("]")
+        end()
     }
 
     override fun appendCallExpr(expr: CallExpr) {
@@ -354,10 +374,10 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             dst.append("new ").append(classNameToJS(gIndex.classNames[classId])).append("()")
         } else if (expr.funcName == "getClassIdPtr" && params.size == 1 && params[0] is ConstExpr) {
             val classId = (params[0] as ConstExpr).value as Int
-            dst.append(classNameToJS(gIndex.classNames[classId])).append(".LAMBDA_INSTANCE")
+            dst.append(classNameToJS(gIndex.classNames[classId])).append('.').append(LAMBDA_INSTANCE_NAME)
         } else if (expr.funcName == "findClass" && params.size == 1 && params[0] is ConstExpr) {
             val classId = (params[0] as ConstExpr).value as Int
-            dst.append(classNameToJS(gIndex.classNames[classId])).append(".CLASS_INSTANCE")
+            dst.append(classNameToJS(gIndex.classNames[classId])).append('.').append(CLASS_INSTANCE_NAME)
         } else if (!checkArrayAccess && expr.funcName in unsafeArrayLoadInstructions && params.size == 2) {
             // array.values[index]
             appendExprSafely(params[0])
@@ -406,11 +426,11 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     }
 
     override fun writeLoadInstr(instr: CppLoadInstr, writer: FunctionWriter) {
-        writer.begin().append("throw new Error('loadInstr not supported');\n")
+        writer.begin().append("throw new Error('loadInstr not supported');").ln()
     }
 
     override fun writeStoreInstr(instr: CppStoreInstr, writer: FunctionWriter) {
-        writer.begin().append("throw new Error('storeInstr not supported');\n")
+        writer.begin().append("throw new Error('storeInstr not supported');").ln()
     }
 
     override fun writeReturnStruct(results: List<Expr>) {
@@ -423,5 +443,14 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             appendExpr(results[ri])
         }
         dst.append(" }")
+    }
+
+    @Suppress("UnusedReceiverParameter")
+    private fun StringBuilder2.ln() {
+        if (!minifyJavaScript) dst.append('\n')
+    }
+
+    override fun ln() {
+        if (!minifyJavaScript) super.ln()
     }
 }

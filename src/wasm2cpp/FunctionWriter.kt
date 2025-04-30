@@ -47,11 +47,16 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             language.writeStaticInitCheck(this)
         }
 
-        writeInstructions(function.body)
+        val body = function.body
+        var i = 0
+        while (i < body.size && body[i] is Declaration) i++
+        @Suppress("UNCHECKED_CAST")
+        if (i > 0) language.writeDeclarations(this, body.subList(0, i) as List<Declaration>)
+        writeInstructions(body, i, body.size)
 
         depth--
-        val suffix = if (language is HighLevelJavaScript && minifyJavaScript) "}" else "}\n"
-        begin().append(suffix)
+        begin().append("}")
+        language.ln()
     }
 
     fun begin(): StringBuilder2 {
@@ -62,7 +67,11 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     }
 
     private fun writeInstructions(instructions: List<Instruction>) {
-        for (i in instructions.indices) {
+        writeInstructions(instructions, 0, instructions.size)
+    }
+
+    private fun writeInstructions(instructions: List<Instruction>, i0: Int, i1: Int) {
+        for (i in i0 until i1) {
             writeInstruction(instructions[i])
         }
     }
@@ -73,7 +82,6 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         when (instr) {
             is CppLoadInstr -> language.writeLoadInstr(instr, this)
             is CppStoreInstr -> language.writeStoreInstr(instr, this)
-            is NullDeclaration -> writeNullDeclaration(instr)
             is Declaration -> writeDeclaration(instr)
             is Assignment -> writeAssignment(instr)
             is FieldAssignment -> writeFieldAssignment(instr)
@@ -113,14 +121,8 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     private fun writeDebugInfo(instr: Instruction) {
         begin().append("/* ").append(instr.javaClass.simpleName)
         if (instr is Declaration) writer.append(", ").append(instr.initialValue.dependencies)
-        writer.append(" */\n")
-    }
-
-    private fun writeNullDeclaration(instr: NullDeclaration) {
-        begin()
-        language.beginDeclaration(instr.name, instr.jvmType)
-        writer.append("0")
-        language.end()
+        writer.append(" */")
+        language.ln()
     }
 
     private fun writeDeclaration(instr: Declaration) {
@@ -230,27 +232,35 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
     }
 
     private fun writeLoopInstr(instr: LoopInstr) {
+        val compact = language is HighLevelJavaScript && minifyJavaScript
         begin()
         if (instr.label.isNotEmpty()) {
             language.appendName(instr.label)
-            writer.append(": ")
+            writer.append(if (compact) ":" else ": ")
         }
-        writer.append("while (true) {\n")
+        writer.append(if (compact) "for(;;){" else "while (true) {")
+        language.ln()
         depth++
         writeInstructions(instr.body)
         depth--
-        begin().append("}\n")
+        begin().append("}")
+        language.ln()
     }
 
     private fun writeIfBranch(instr: ExprIfBranch, extraComments: List<Instruction>) {
-        if (!writer.endsWith("else if (")) begin().append("if (")
-        language.appendExpr(instr.expr.expr)
-        writer.append(") {")
-        for (i in extraComments.indices) {
-            val comment = extraComments[i] as Comment
-            writer.append(if (i == 0) " // " else ", ").append(comment.text)
+        val compact = language is HighLevelJavaScript && minifyJavaScript
+        if (!writer.endsWith(if (compact) "else if(" else "else if (")) {
+            begin().append(if (compact) "if(" else "if (")
         }
-        writer.append('\n')
+        language.appendExpr(instr.expr.expr)
+        writer.append(if (compact) "){" else ") {")
+        if (!(language is HighLevelJavaScript && minifyJavaScript)) {
+            for (i in extraComments.indices) {
+                val comment = extraComments[i] as Comment
+                writer.append(if (i == 0) " // " else ", ").append(comment.text)
+            }
+            language.ln()
+        }
         depth++
         writeInstructions(instr.ifTrue)
         depth--
@@ -260,18 +270,23 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
             val ni = nextInstr(ifFalse, i)
             val instrI = ifFalse.getOrNull(i)
             if (ni == -1 && instrI is ExprIfBranch) {
-                begin().append("} else if (")
+                begin().append(if (compact) "}else if(" else "} else if (")
                 // continue if-else-cascade
                 writeIfBranch(instrI, ifFalse.subList(0, i))
                 // append any additional comments
-                writeInstructions(ifFalse.subList(i + 1, ifFalse.size))
+                writeInstructions(ifFalse, i + 1, ifFalse.size)
             } else {
-                begin().append("} else {\n")
+                begin().append(if (compact) "}else{" else "} else {")
+                language.ln()
                 depth++
                 writeInstructions(ifFalse)
                 depth--
-                begin().append("}\n")
+                begin().append("}")
+                language.ln()
             }
-        } else begin().append("}\n")
+        } else {
+            begin().append("}")
+            language.ln()
+        }
     }
 }

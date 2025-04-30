@@ -30,5 +30,8 @@ interface TargetLanguage {
 
     fun writeUnreachable(function: FunctionWriter)
     fun end()
+    fun ln()
+
+    fun writeDeclarations(writer: FunctionWriter, list: List<Declaration>)
 
 }

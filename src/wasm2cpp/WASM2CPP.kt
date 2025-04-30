@@ -17,8 +17,6 @@ import utils.*
 import utils.WASMTypes.*
 import wasm.parser.*
 import wasm2cpp.Clustering.Companion.splitFunctionsIntoClusters
-import wasm2cpp.language.HighLevelJavaScript.Companion.jsKeywords
-import wasm2cpp.language.LowLevelCpp.Companion.cppKeywords
 
 private val LOGGER = LogManager.getLogger("WASM2CPP")
 
@@ -226,7 +224,7 @@ fun writeStructs() {
 }
 
 fun FileReference.write() {
-    writeBytes(writer.values, 0, writer.size)
+    writeBytes(writer)
     writer.clear()
 }
 

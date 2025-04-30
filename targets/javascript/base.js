@@ -83,7 +83,7 @@ let initCtr = 0;
 window.link = function(jvmName, jsClass){
     let classId = linkCtr++;
     let jvmClass = CLASS_INSTANCES[classId];
-    jsClass.CLASS_INSTANCE = jvmClass;
+    jsClass[window.minimizeJS ? '$C' : 'CLASS_INSTANCE'] = jvmClass;
     jvmClass.jsClass = jsClass;
     jvmClass.index = classId;
     

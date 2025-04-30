@@ -44,6 +44,10 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         dst.append(";\n")
     }
 
+    override fun ln() {
+        dst.append('\n')
+    }
+
     override fun appendName(name: String) {
         dst.append(name)
     }
@@ -80,6 +84,28 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             else "if(wasCalled) return 0;\n"
         )
         writer.begin().append("wasCalled = true;\n")
+    }
+
+    override fun writeDeclarations(writer: FunctionWriter, list: List<Declaration>) {
+        val byType = list.groupBy { jvm2cppTyped(it.jvmType) }
+        for ((type, declarations) in byType.entries.sortedBy { it.key }) {
+            var lastType: String? = null
+            for (i in declarations.indices) {
+                val instr = declarations[i]
+                if (i == 0) {
+                    writer.begin().append(type).append(' ')
+                } else {
+                    dst.append(", ")
+                }
+                if (instr.jvmType != lastType) {
+                    dst.append("/* ").append(instr.jvmType).append(" */ ")
+                    lastType = instr.jvmType
+                }
+                beginAssignment(instr.name)
+                appendExpr(instr.initialValue.expr)
+            }
+            end()
+        }
     }
 
     override fun writeStaticInstance(className: String) {
@@ -303,13 +329,16 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         }
     }
 
-    override fun beginDeclaration(name: String, jvmType: String) {
+    private fun jvm2cppTyped(jvmType: String): String {
         // todo this should be passed along explicitly
         val isCustomType = jvmType !in hIndex.classFlags &&
                 jvmType !in NativeTypes.nativeTypes &&
                 !jvmType.startsWith("[") && jvmType != "null"
-        val wasmType = if (isCustomType) jvmType else jvm2wasmTyped(jvmType).wasmName
-        dst.append(wasmType).append(' ')
+        return if (isCustomType) jvmType else jvm2wasmTyped(jvmType).wasmName
+    }
+
+    override fun beginDeclaration(name: String, jvmType: String) {
+        dst.append(jvm2cppTyped(jvmType)).append(' ')
         appendName(name)
         dst.append(" = ")
     }
