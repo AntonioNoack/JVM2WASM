@@ -1011,6 +1011,8 @@ class StructuralAnalysis(
     /**
      * crossing infinite circle
      * A -> B | C; B -> C; C -> B
+     *
+     * functionality not tested
      * */
     private fun findCrossCircle(): Boolean {
         var changed = false
@@ -1047,15 +1049,14 @@ class StructuralAnalysis(
             nodeB.printer.append(i32Const0).append(condition.setter)
             nodeC.printer.append(i32Const1).append(condition.setter)
 
-            val loop = ArrayList<Instruction>(2)
-            val jump = Jump(BreakableInstruction.tmp)
+            val loop = ArrayList<Instruction>(3)
             val loopInstr = LoopInstr(label, loop, io, io)
+            loop.add(condition.getter)
             loop.add(IfBranch(nodeB.printer.instrs, nodeC.printer.instrs, io, io))
-            loop.add(jump)
+            loop.add(Jump(loopInstr))
 
             nodeA.printer.append(condition.setter)
             nodeA.printer.append(loopInstr)
-            jump.owner = loopInstr
 
             val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
 
@@ -1072,6 +1073,8 @@ class StructuralAnalysis(
     /**
      * extreme infinite circle
      * A -> B | C; B -> A | C; C -> A | B
+     *
+     * functionality not tested
      * */
     private fun findClique(): Boolean {
         var changed = false
@@ -1128,14 +1131,13 @@ class StructuralAnalysis(
             appendLabels(nodeC.printer, 0, 1, nodeC.ifTrue === nodeA)
 
             val loop = ArrayList<Instruction>(5)
-            val jump = Jump(BreakableInstruction.tmp)
             val loopInstr = LoopInstr(label, loop, io, io)
             loop.add(condition.getter)
             loop.add(i32Const(2))
             loop.add(I32EQ)
             val loop2 = ArrayList<Instruction>(4)
             loop.add(IfBranch(nodeC.printer.instrs, loop2, io, io))
-            loop.add(jump) // infinite loop
+            loop.add(Jump(loopInstr)) // infinite loop
 
             // else case
             loop2.add(condition.getter)
@@ -1144,7 +1146,6 @@ class StructuralAnalysis(
             val joined = Builder(3)
             joined.append(i32Const0).append(condition.setter)
             joined.append(loopInstr)
-            jump.owner = loopInstr
 
             nodeA.inputs.remove(nodeB)
             nodeA.inputs.remove(nodeC)
@@ -1152,6 +1153,145 @@ class StructuralAnalysis(
             val newNodeA = replaceNode(nodeA, ReturnNode(joined), i)
             assertTrue(nodes.remove(nodeB))
             assertTrue(nodes.remove(nodeC))
+
+            if (printOps) {
+                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
+            }
+        }
+        return changed
+    }
+
+    /**
+     * A -> B|C; B <-> D; C -> D
+     *
+     * functionality not tested
+     * */
+    fun findCase1504(): Boolean {
+        var changed = false
+        for (i in nodes.indices) {
+
+            val nodeA = nodes.getOrNull(i) ?: break
+            if (nodeA !is BranchNode) continue
+
+            val nodeT = nodeA.ifTrue as? SequenceNode ?: continue
+            val nodeF = nodeA.ifFalse as? SequenceNode ?: continue
+            if (nodeF === nodeT) continue
+            val nodeD = nodeF.next as? SequenceNode ?: continue
+            if (nodeD !== nodeT.next) continue
+            if (nodeD === nodeF || nodeD === nodeT) continue
+            if (nodeD.inputs.size != 2) continue
+
+            val firstNode = nodes.first()
+            if (nodeF === firstNode || nodeT === firstNode || nodeD === firstNode) continue
+
+            fun isValid(nodeB: SequenceNode, nodeC: SequenceNode): Boolean {
+                return nodeC.inputs.size == 1 && nodeD.inputs.size == 2 && nodeD.next == nodeB
+            }
+
+            val nodeB: SequenceNode
+            val nodeC: SequenceNode
+            val negate: Boolean
+            if (isValid(nodeF, nodeT)) {
+                nodeB = nodeF
+                nodeC = nodeT
+                negate = false
+            } else if (isValid(nodeT, nodeF)) {
+                nodeB = nodeT
+                nodeC = nodeF
+                negate = true
+            } else continue
+
+            val io = nodeB.inputStack
+            assertEquals(io, nodeC.inputStack)
+            assertEquals(io, nodeB.outputStack)
+            assertEquals(io, nodeC.outputStack)
+
+            changed = true
+
+            val label = "case1504_${methodTranslator.nextLoopIndex++}"
+
+            // todo we could support either B or C being branches, and continuing their code from there
+
+            val skipB = methodTranslator.variables
+                .addPrefixedLocalVariable("case1504_", WASMType.I32, "boolean")
+
+            if (negate) nodeA.printer.append(I32EQZ)
+            nodeA.printer
+                .append(skipB.setter).append(skipB.getter)
+                .append(IfBranch(nodeC.printer.instrs))
+
+            val loop = ArrayList<Instruction>(3 + nodeD.printer.instrs.size)
+            val loopInstr = LoopInstr(label, loop, nodeB.inputStack, nodeB.inputStack)
+
+            nodeB.printer.append(i32Const0).append(skipB.setter) // at max skip B once
+
+            loop.add(skipB.getter)
+            loop.add(IfBranch(nodeB.printer.instrs))
+            loop.addAll(nodeD.printer.instrs)
+            loop.add(Jump(loopInstr))
+
+            val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
+
+            assertTrue(nodes.remove(nodeB))
+            assertTrue(nodes.remove(nodeC))
+            assertTrue(nodes.remove(nodeD))
+
+            if (printOps) {
+                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
+            }
+        }
+        return changed
+    }
+
+    /**
+     * A -> B|C; B -> D, C -> D; D -> B|C
+     *
+     * functionality not tested
+     * */
+    fun findCase3552(): Boolean {
+        var changed = false
+        for (i in nodes.indices) {
+
+            val nodeA = nodes.getOrNull(i) ?: break
+            if (nodeA !is BranchNode) continue
+
+            val nodeB = nodeA.ifTrue as? SequenceNode ?: continue
+            val nodeC = nodeA.ifFalse as? SequenceNode ?: continue
+            if (nodeC === nodeB) continue
+            val nodeD = nodeC.next as? BranchNode ?: continue
+            if (nodeD !== nodeB.next) continue
+            if (nodeB.inputs.size != 2 || nodeC.inputs.size != 2 || nodeD.inputs.size != 2) continue
+            if (nodeD.ifTrue !== nodeB && nodeD.ifFalse !== nodeB) continue
+            if (nodeD.ifTrue !== nodeC && nodeD.ifFalse !== nodeC) continue
+
+            val firstNode = nodes.first()
+            if (nodeC === firstNode || nodeB === firstNode || nodeD === firstNode) continue
+
+            changed = true
+
+            val label = "case3552_${methodTranslator.nextLoopIndex++}"
+
+            // todo we could support either B or C being branches, and continuing their code from there
+
+            val chooseB = methodTranslator.variables
+                .addPrefixedLocalVariable("case1504_", WASMType.I32, "boolean")
+
+            val loop = ArrayList<Instruction>(5 + nodeD.printer.instrs.size)
+            val loopInstr = LoopInstr(label, loop, nodeB.inputStack, nodeB.inputStack)
+            nodeA.printer.append(chooseB.setter).append(loopInstr)
+
+            loop.add(chooseB.getter)
+            loop.add(IfBranch(nodeB.printer.instrs, nodeC.printer.instrs))
+            loop.addAll(nodeD.printer.instrs)
+            if (nodeD.ifFalse == nodeB) loop.add(I32EQZ)
+            loop.add(chooseB.setter)
+            loop.add(Jump(loopInstr))
+
+            val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
+
+            assertTrue(nodes.remove(nodeB))
+            assertTrue(nodes.remove(nodeC))
+            assertTrue(nodes.remove(nodeD))
 
             if (printOps) {
                 printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
@@ -1204,7 +1344,7 @@ class StructuralAnalysis(
 
         while (true) {
             var hadAnyChange = false
-            for (step in 0 until 17) {
+            for (step in 0..18) {
                 while (true) {
                     val hadStepChange = when (step) {
                         0 -> removeEmptyIfStatements()
@@ -1224,6 +1364,8 @@ class StructuralAnalysis(
                         14 -> removeNodesWithoutInputs()
                         15 -> findCrossCircle()
                         16 -> findClique()
+                        17 -> findCase1504()
+                        18 -> findCase3552()
                         else -> false
                     }
                     if (hadStepChange) {

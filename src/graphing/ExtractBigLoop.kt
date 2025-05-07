@@ -11,6 +11,7 @@ import me.anno.utils.algorithms.Recursion
 import me.anno.utils.assertions.*
 import me.anno.utils.structures.lists.Lists.partition1
 import me.anno.utils.structures.lists.Lists.swap
+import me.anno.utils.types.Booleans.toInt
 import translator.MethodTranslator
 import utils.Builder
 import wasm.instr.Instruction.Companion.emptyArrayList
@@ -22,7 +23,6 @@ import kotlin.math.min
 /**
  * ideal: half/half-split
  * must-haves:
- * - at least one node before the graph
  * - more than one node in the graph
  * - all startNodes terminate in loopStart
  * - no other connections between loopNodes and startNodes
@@ -62,7 +62,10 @@ object ExtractBigLoop {
     private fun findBigLoopFrom(loopStart: GraphingNode, sa: StructuralAnalysis): BigLoop? {
 
         if (loopStart is ReturnNode) return null
-        if (loopStart.inputs.size < 2) return null // not a splitting node
+
+        val effectiveInputs = loopStart.inputs.size + (loopStart == sa.nodes.first()).toInt()
+        if (effectiveInputs < 2) return null // not a splitting node
+
         // we don't want to extract a single node with this much effort
         if (loopStart is SequenceNode && loopStart.next == loopStart) return null
 
