@@ -16,11 +16,7 @@ import org.apache.logging.log4j.LogManager
 import translator.MethodTranslator
 import translator.MethodTranslator.Companion.comments
 import utils.Builder
-import utils.WASMType
 import wasm.instr.*
-import wasm.instr.Const.Companion.i32Const
-import wasm.instr.Const.Companion.i32Const0
-import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.Instruction.Companion.emptyArrayList
 import wasm.instr.Instructions.I32EQ
 import wasm.instr.Instructions.I32EQZ
@@ -1009,298 +1005,6 @@ class StructuralAnalysis(
     }
 
     /**
-     * crossing infinite circle
-     * A -> B | C; B -> C; C -> B
-     *
-     * functionality not tested
-     * */
-    private fun findCrossCircle(): Boolean {
-        var changed = false
-        for (i in nodes.indices) {
-
-            val nodeA = nodes.getOrNull(i) ?: break
-            if (nodeA !is BranchNode) continue
-
-            val nodeB = nodeA.ifTrue as? SequenceNode ?: continue
-            val nodeC = nodeA.ifFalse as? SequenceNode ?: continue
-            if (nodeB === nodeC) continue // not though over
-
-            val firstNode = nodes.first()
-            if (nodeB === firstNode || nodeC === firstNode) continue
-
-            if (nodeB.next !== nodeC || nodeC.next !== nodeB) continue
-            if (nodeB.inputs.size != 2 || nodeC.inputs.size != 2) continue
-
-            assertTrue(nodeB in nodeC.inputs)
-            assertTrue(nodeC in nodeB.inputs)
-
-            val io = nodeB.inputStack
-            assertEquals(io, nodeC.inputStack)
-            assertEquals(io, nodeB.outputStack)
-            assertEquals(io, nodeC.outputStack)
-
-            changed = true
-
-            val label = "crossCircle${methodTranslator.nextLoopIndex++}"
-
-            val condition = methodTranslator.variables
-                .addPrefixedLocalVariable("crossCircle", WASMType.I32, "boolean")
-
-            nodeB.printer.append(i32Const0).append(condition.setter)
-            nodeC.printer.append(i32Const1).append(condition.setter)
-
-            val loop = ArrayList<Instruction>(3)
-            val loopInstr = LoopInstr(label, loop, io, io)
-            loop.add(condition.getter)
-            loop.add(IfBranch(nodeB.printer.instrs, nodeC.printer.instrs, io, io))
-            loop.add(Jump(loopInstr))
-
-            nodeA.printer.append(condition.setter)
-            nodeA.printer.append(loopInstr)
-
-            val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
-
-            assertTrue(nodes.remove(nodeB))
-            assertTrue(nodes.remove(nodeC))
-
-            if (printOps) {
-                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-            }
-        }
-        return changed
-    }
-
-    /**
-     * extreme infinite circle
-     * A -> B | C; B -> A | C; C -> A | B
-     *
-     * functionality not tested
-     * */
-    private fun findClique(): Boolean {
-        var changed = false
-        for (i in nodes.indices) {
-
-            val nodeA = nodes.getOrNull(i) ?: break
-            if (nodeA !is BranchNode) continue
-
-            val nodeB = nodeA.ifTrue as? BranchNode ?: continue
-            val nodeC = nodeA.ifFalse as? BranchNode ?: continue
-            if (nodeB === nodeC) continue // not though over
-            if (nodeB === nodeA) continue
-            if (nodeC === nodeA) continue
-
-            val firstNode = nodes.first()
-            if (nodeB === firstNode || nodeC === firstNode) continue
-
-            fun isValid(n0: BranchNode, n1: BranchNode): Boolean {
-                return ((n0.ifTrue === n1 && n0.ifFalse === nodeA) ||
-                        (n0.ifFalse === n1 && n0.ifTrue === nodeA)) &&
-                        n0.inputs.size == 2
-            }
-
-            if (!isValid(nodeB, nodeC)) continue
-            if (!isValid(nodeC, nodeB)) continue
-
-            val io = nodeA.inputStack
-            assertEquals(io, nodeA.outputStack)
-            assertEquals(io, nodeB.inputStack)
-            assertEquals(io, nodeB.outputStack)
-            assertEquals(io, nodeC.inputStack)
-            assertEquals(io, nodeC.outputStack)
-
-            changed = true
-
-            val label = "clique${methodTranslator.nextLoopIndex++}"
-
-            val condition = methodTranslator.variables
-                .addPrefixedLocalVariable("clique", WASMType.I32, "int")
-
-            fun appendLabels(printer: Builder, ifTrue: Int, ifFalse: Int, notFlipped: Boolean) {
-                printer.append(
-                    IfBranch(
-                        arrayListOf(i32Const(if (notFlipped) ifTrue else ifFalse)),
-                        arrayListOf(i32Const(if (notFlipped) ifFalse else ifTrue)),
-                        emptyList(), listOf("int")
-                    )
-                )
-                printer.append(condition.setter)
-            }
-
-            appendLabels(nodeA.printer, 0, 1, true)
-            appendLabels(nodeB.printer, 0, 2, nodeB.ifTrue === nodeA)
-            appendLabels(nodeC.printer, 0, 1, nodeC.ifTrue === nodeA)
-
-            val loop = ArrayList<Instruction>(5)
-            val loopInstr = LoopInstr(label, loop, io, io)
-            loop.add(condition.getter)
-            loop.add(i32Const(2))
-            loop.add(I32EQ)
-            val loop2 = ArrayList<Instruction>(4)
-            loop.add(IfBranch(nodeC.printer.instrs, loop2, io, io))
-            loop.add(Jump(loopInstr)) // infinite loop
-
-            // else case
-            loop2.add(condition.getter)
-            loop2.add(IfBranch(nodeB.printer.instrs, nodeA.printer.instrs, io, io))
-
-            val joined = Builder(3)
-            joined.append(i32Const0).append(condition.setter)
-            joined.append(loopInstr)
-
-            nodeA.inputs.remove(nodeB)
-            nodeA.inputs.remove(nodeC)
-
-            val newNodeA = replaceNode(nodeA, ReturnNode(joined), i)
-            assertTrue(nodes.remove(nodeB))
-            assertTrue(nodes.remove(nodeC))
-
-            if (printOps) {
-                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-            }
-        }
-        return changed
-    }
-
-    /**
-     * A -> B|C; B <-> D; C -> D
-     *
-     * functionality not tested
-     * */
-    fun findCase1504(): Boolean {
-        var changed = false
-        for (i in nodes.indices) {
-
-            val nodeA = nodes.getOrNull(i) ?: break
-            if (nodeA !is BranchNode) continue
-
-            val nodeT = nodeA.ifTrue as? SequenceNode ?: continue
-            val nodeF = nodeA.ifFalse as? SequenceNode ?: continue
-            if (nodeF === nodeT) continue
-            val nodeD = nodeF.next as? SequenceNode ?: continue
-            if (nodeD !== nodeT.next) continue
-            if (nodeD === nodeF || nodeD === nodeT) continue
-            if (nodeD.inputs.size != 2) continue
-
-            val firstNode = nodes.first()
-            if (nodeF === firstNode || nodeT === firstNode || nodeD === firstNode) continue
-
-            fun isValid(nodeB: SequenceNode, nodeC: SequenceNode): Boolean {
-                return nodeC.inputs.size == 1 && nodeD.inputs.size == 2 && nodeD.next == nodeB
-            }
-
-            val nodeB: SequenceNode
-            val nodeC: SequenceNode
-            val negate: Boolean
-            if (isValid(nodeF, nodeT)) {
-                nodeB = nodeF
-                nodeC = nodeT
-                negate = false
-            } else if (isValid(nodeT, nodeF)) {
-                nodeB = nodeT
-                nodeC = nodeF
-                negate = true
-            } else continue
-
-            val io = nodeB.inputStack
-            assertEquals(io, nodeC.inputStack)
-            assertEquals(io, nodeB.outputStack)
-            assertEquals(io, nodeC.outputStack)
-
-            changed = true
-
-            val label = "case1504_${methodTranslator.nextLoopIndex++}"
-
-            // todo we could support either B or C being branches, and continuing their code from there
-
-            val skipB = methodTranslator.variables
-                .addPrefixedLocalVariable("case1504_", WASMType.I32, "boolean")
-
-            if (negate) nodeA.printer.append(I32EQZ)
-            nodeA.printer
-                .append(skipB.setter).append(skipB.getter)
-                .append(IfBranch(nodeC.printer.instrs))
-
-            val loop = ArrayList<Instruction>(3 + nodeD.printer.instrs.size)
-            val loopInstr = LoopInstr(label, loop, nodeB.inputStack, nodeB.inputStack)
-
-            nodeB.printer.append(i32Const0).append(skipB.setter) // at max skip B once
-
-            loop.add(skipB.getter)
-            loop.add(IfBranch(nodeB.printer.instrs))
-            loop.addAll(nodeD.printer.instrs)
-            loop.add(Jump(loopInstr))
-
-            val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
-
-            assertTrue(nodes.remove(nodeB))
-            assertTrue(nodes.remove(nodeC))
-            assertTrue(nodes.remove(nodeD))
-
-            if (printOps) {
-                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-            }
-        }
-        return changed
-    }
-
-    /**
-     * A -> B|C; B -> D, C -> D; D -> B|C
-     *
-     * functionality not tested
-     * */
-    fun findCase3552(): Boolean {
-        var changed = false
-        for (i in nodes.indices) {
-
-            val nodeA = nodes.getOrNull(i) ?: break
-            if (nodeA !is BranchNode) continue
-
-            val nodeB = nodeA.ifTrue as? SequenceNode ?: continue
-            val nodeC = nodeA.ifFalse as? SequenceNode ?: continue
-            if (nodeC === nodeB) continue
-            val nodeD = nodeC.next as? BranchNode ?: continue
-            if (nodeD !== nodeB.next) continue
-            if (nodeB.inputs.size != 2 || nodeC.inputs.size != 2 || nodeD.inputs.size != 2) continue
-            if (nodeD.ifTrue !== nodeB && nodeD.ifFalse !== nodeB) continue
-            if (nodeD.ifTrue !== nodeC && nodeD.ifFalse !== nodeC) continue
-
-            val firstNode = nodes.first()
-            if (nodeC === firstNode || nodeB === firstNode || nodeD === firstNode) continue
-
-            changed = true
-
-            val label = "case3552_${methodTranslator.nextLoopIndex++}"
-
-            // todo we could support either B or C being branches, and continuing their code from there
-
-            val chooseB = methodTranslator.variables
-                .addPrefixedLocalVariable("case1504_", WASMType.I32, "boolean")
-
-            val loop = ArrayList<Instruction>(5 + nodeD.printer.instrs.size)
-            val loopInstr = LoopInstr(label, loop, nodeB.inputStack, nodeB.inputStack)
-            nodeA.printer.append(chooseB.setter).append(loopInstr)
-
-            loop.add(chooseB.getter)
-            loop.add(IfBranch(nodeB.printer.instrs, nodeC.printer.instrs))
-            loop.addAll(nodeD.printer.instrs)
-            if (nodeD.ifFalse == nodeB) loop.add(I32EQZ)
-            loop.add(chooseB.setter)
-            loop.add(Jump(loopInstr))
-
-            val newNodeA = replaceNode(nodeA, ReturnNode(nodeA.printer), i)
-
-            assertTrue(nodes.remove(nodeB))
-            assertTrue(nodes.remove(nodeC))
-            assertTrue(nodes.remove(nodeD))
-
-            if (printOps) {
-                printState(nodes, "$label, [${newNodeA.index}, ${nodeB.index}, ${nodeC.index}]")
-            }
-        }
-        return changed
-    }
-
-    /**
      * transform all nodes into some nice if-else-tree
      * */
     fun joinNodes(): Builder {
@@ -1344,7 +1048,7 @@ class StructuralAnalysis(
 
         while (true) {
             var hadAnyChange = false
-            for (step in 0..18) {
+            for (step in 0..14) {
                 while (true) {
                     val hadStepChange = when (step) {
                         0 -> removeEmptyIfStatements()
@@ -1362,10 +1066,6 @@ class StructuralAnalysis(
                         12 -> findSmallCircleA()
                         13 -> findSmallCircleB()
                         14 -> removeNodesWithoutInputs()
-                        15 -> findCrossCircle()
-                        16 -> findClique()
-                        17 -> findCase1504()
-                        18 -> findCase3552()
                         else -> false
                     }
                     if (hadStepChange) {
@@ -1411,8 +1111,11 @@ class StructuralAnalysis(
             }
 
             if (!hadAnyChange) {
-                printState(nodes, "Everything should be transformable!")
-                throw IllegalStateException()
+                // not tested
+                if (printOps) printState(nodes, "Everything should be transformable!")
+                InefficientNodeStack.createNodeStack(nodes, methodTranslator)
+                checkState()
+                return firstNodeForReturn()
             }
         }
 

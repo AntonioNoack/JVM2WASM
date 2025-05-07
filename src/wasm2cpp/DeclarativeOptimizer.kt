@@ -409,8 +409,12 @@ class DeclarativeOptimizer(val globals: Map<String, GlobalVariable>) {
                 val declaration = nextInstr is Declaration || canInlineDeclaration(variableName)
                 if (unused) {
                     val text = if (declaration) {
-                        nextInstr as Declaration
-                        "unused: ${nextInstr.jvmType} $variableName ="
+                        if (nextInstr is Declaration) {
+                            "unused: ${nextInstr.jvmType} $variableName ="
+                        } else {
+                            nextInstr as Assignment
+                            "unused: ${nextInstr.jvmType} $variableName ="
+                        }
                     } else {
                         "unused: $variableName ="
                     }

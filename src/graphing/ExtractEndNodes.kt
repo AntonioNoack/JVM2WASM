@@ -15,7 +15,6 @@ import translator.LocalVariableOrParam
 import translator.MethodTranslator
 import utils.Builder
 import utils.WASMType
-import utils.WASMTypes.i32
 import wasm.instr.Const.Companion.i32Const0
 import wasm.instr.Const.Companion.i32Const1
 import wasm.instr.IfBranch
@@ -41,8 +40,6 @@ object ExtractEndNodes {
             return true
         } else return false
     }
-
-    data class EndNodes(val endNodes: Set<GraphingNode>, val commonInputStack: List<String>)
 
     private fun findEndNodes(sa: StructuralAnalysis): Set<GraphingNode> {
         // check all nodes, whose following nodes are not recursive

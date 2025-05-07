@@ -40,10 +40,7 @@ class StructuralAnalysisTest {
         val varGetter = translator.variables.addLocalVariable("tmp", WASMType.I32, "boolean")
 
         graphs@ for (connectionBits in 0 until (1L shl maxNumConnections)) {
-            translator.isLookingAtSpecial = connectionBits >= 5600
-            if (translator.isLookingAtSpecial) {
-                println("Bits: ${connectionBits.toString(2)} ($connectionBits)")
-            }
+            if (connectionBits % 10_000L == 0L) println("Bits: ${connectionBits.toString(2)} ($connectionBits)")
 
             val nodes0 = createList(numNodes) {
                 TranslatorNode(it).apply {
