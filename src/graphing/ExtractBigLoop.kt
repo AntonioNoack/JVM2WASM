@@ -100,7 +100,7 @@ object ExtractBigLoop {
                 loopStart -> {
                     assertTrue(loopStart in loopNodes)
                     // assertTrue(loopStart.inputs.any { it in loopNodes }) // weird if that is missing...
-                    assertTrue(loopStart.inputs.any { it !in loopNodes })
+                    assertTrue(loopStart.inputs.any { it !in loopNodes } || loopStart == sa.nodes.first())
                 }
                 in loopNodes -> {
                     assertTrue(node.inputs.all { it in loopNodes })

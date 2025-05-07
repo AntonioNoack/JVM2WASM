@@ -565,7 +565,7 @@ class MethodTranslator(
             // returnx is important: it shows to cancel the flow = jump to end
             in 0xac..0xb1 -> {
 
-                if (currentNode.ifTrue != null) {
+                if (currentNode.ifTrue != -1) {
                     // throw IllegalStateException("Branch cannot have return afterwards")
                     // we expected a label, but didn't get any -> create out own
                     visitLabel(createLabel())

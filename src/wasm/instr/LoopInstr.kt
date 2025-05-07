@@ -35,7 +35,7 @@ data class LoopInstr(
 
     override fun toString(depth: Int, builder: StringBuilder2) {
         for (i in 0 until depth) builder.append("  ")
-        builder.append("(loop \$").append(label)
+        builder.append("(loop $").append(label)
         appendParams(params, builder) // todo do we ever need/use them?
         appendResults(results, builder)
         builder.append("\n")

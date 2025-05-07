@@ -13,14 +13,14 @@ import wasm.instr.Comment
 
 class TranslatorNode(val label: Int) {
 
-    var ifTrue: Int? = null
+    var ifTrue: Int = -1
     var ifFalse: TranslatorNode? = null
 
     var isAlwaysTrue = false
     var isReturn = false
 
-    val next get() = if (isAlwaysTrue) ifTrue else ifFalse?.label
-    val isBranch get() = ifTrue != null && ifFalse != null && !isAlwaysTrue
+    val next get() = if (isAlwaysTrue) ifTrue else (ifFalse?.label ?: -1)
+    val isBranch get() = ifTrue != -1 && ifFalse != null && !isAlwaysTrue
 
     var inputStack: List<String> = emptyList()
     var outputStack: List<String> = emptyList()
@@ -33,8 +33,8 @@ class TranslatorNode(val label: Int) {
             "[$name -> ${mapper(ifTrue)}]"
         } else if (isReturn) {
             "[$name -> exit]"
-        } else if (ifTrue != null) {
-            "[$name ? ${mapper(ifTrue!!)} : ${mapper(ifFalse!!.label)}]"
+        } else if (ifTrue != -1) {
+            "[$name ? ${mapper(ifTrue)} : ${mapper(ifFalse!!.label)}]"
         } else if (ifFalse == null) {
             "[$name -?> void]"
         } else {
@@ -57,8 +57,17 @@ class TranslatorNode(val label: Int) {
                 val node = nodes[i]
                 when {
                     node.isReturn -> ReturnNode(node.printer)
-                    node.isBranch -> BranchNode(node.printer)
-                    node.next != null -> SequenceNode(node.printer)
+                    node.isBranch -> {
+                        if (node.ifTrue == node.ifFalse?.label) {
+                            node.printer.drop()
+                            node.isAlwaysTrue = true
+                            node.ifFalse = null
+                            SequenceNode(node.printer)
+                        } else {
+                            BranchNode(node.printer)
+                        }
+                    }
+                    node.next != -1 -> SequenceNode(node.printer)
                     else -> {
                         assertTrue(node.printer.instrs.all2 { it is Comment })
                         VoidNode
@@ -85,10 +94,10 @@ class TranslatorNode(val label: Int) {
                 val node = nodes[i]
                 when (val newNode = newNodes[i]) {
                     is SequenceNode -> {
-                        newNode.next = labelToNode[node.next!!]!!
+                        newNode.next = labelToNode[node.next]!!
                     }
                     is BranchNode -> {
-                        newNode.ifTrue = labelToNode[node.ifTrue!!]!!
+                        newNode.ifTrue = labelToNode[node.ifTrue]!!
                         newNode.ifFalse = labelToNode[node.ifFalse!!.label]!!
                     }
                 }
