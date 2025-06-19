@@ -287,7 +287,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
                 }
             }
             is CompareInstr -> {
-                // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
+                // prevent Yoda-speech: if the first is a number, but the second isn't, swap them around
                 if (isNumber(i0) && !isNumber(i1)) {
                     // flipped
                     if (i.castType != null) dst.append('(').append(i.castType).append(") ")

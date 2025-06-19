@@ -246,6 +246,9 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         val i1 = expr.compB
         when (val i = expr.instr) {
             is ShiftInstr -> {
+                if (i.operator == BinaryOperator.SHIFT_RIGHT_UNSIGNED && i == I64ShrU) {
+                    dst.append('(') // we need brackets, because >> is stronger than &
+                }
                 appendExprSafely(i0)
                 dst.append(
                     when (i.operator) {
@@ -253,7 +256,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                         BinaryOperator.SHIFT_RIGHT_SIGNED -> " >> "
                         BinaryOperator.SHIFT_RIGHT_UNSIGNED -> {
                             // length is unspecified -> unsigned right shift isn't defined
-                            if (i == I64ShrU) "& 0xffffffffffffffffn >> "
+                            if (i == I64ShrU) "& 0xffffffffffffffffn) >> "
                             else " >>> "
                         }
                         else -> throw NotImplementedError()
@@ -268,7 +271,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
                     null -> null
                     else -> throw NotImplementedError()
                 }
-                // prevent Yoda-speach: if the first is a number, but the second isn't, swap them around
+                // prevent Yoda-speech: if the first is a number, but the second isn't, swap them around
                 if (isNumber(i0) && !isNumber(i1)) {
                     // flipped
                     appendExprSafely(i1)

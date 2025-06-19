@@ -12,9 +12,12 @@ import kotlin.jvm.functions.Function2;
 import me.anno.Time;
 import me.anno.cache.AsyncCacheData;
 import me.anno.ecs.Entity;
+import me.anno.ecs.components.mesh.IMesh;
 import me.anno.ecs.components.mesh.Mesh;
+import me.anno.ecs.components.mesh.MeshCache;
 import me.anno.ecs.components.mesh.MeshComponent;
 import me.anno.ecs.components.mesh.shapes.IcosahedronModel;
+import me.anno.engine.DefaultAssets;
 import me.anno.engine.EngineBase;
 import me.anno.engine.Events;
 import me.anno.engine.WindowRenderFlags;
@@ -30,6 +33,7 @@ import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.gpu.texture.TextureCache;
 import me.anno.graph.visual.render.RenderGraph;
+import me.anno.graph.visual.scalar.FloatMathBinary;
 import me.anno.image.Image;
 import me.anno.image.ImageCache;
 import me.anno.image.raw.GPUImage;
@@ -40,6 +44,7 @@ import me.anno.input.Key;
 import me.anno.io.files.BundledRef;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
+import me.anno.io.files.LinkFileReference;
 import me.anno.io.files.inner.temporary.InnerTmpImageFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
@@ -102,15 +107,22 @@ public class Engine {
         settings.setSuperMaterial(SuperMaterial.Companion.getNONE());
     }
 
-    @Export
-    @NoThrow
-    @Alias(names = "EngineMain")
-    public static void EngineMain(String clazzName) {
+    private static void runMeshTest() {
+        Mesh original = DefaultAssets.INSTANCE.getFlatCube();
+        System.out.println("MeshTestOriginal: " + original);
+        FileReference file = original.getRef();
+        System.out.println("MeshTestFile: " + file);
+        IMesh resolved = MeshCache.INSTANCE.get(file, true);
+        System.out.println("MeshTestResolved: " + resolved + ", identical? " + (resolved == original));
+    }
 
-        if (!runsInBrowser()) {
-            OS.isWeb = false;
-            OS.isLinux = true;
-        } else {
+    private static void setupFeatures() {
+
+        boolean inBrowser = runsInBrowser();
+        OS.isWeb = inBrowser;
+        OS.isLinux = !inBrowser;
+
+        if (inBrowser) {
             OSFeatures features = OSFeatures.INSTANCE;
             features.setCanSleep(false);
             features.setCanHostServers(false);
@@ -128,11 +140,30 @@ public class Engine {
             gfxFeatures.setCanOpenNewWindows(false);
             gfxFeatures.setSupportsTextureGather(false);
         }
+    }
+
+    private static void markUnreachedProperties() {
+        FloatMathBinary binary = null;
+        binary.getGlsl();
+        binary.getId();
+    }
+
+    @Export
+    @NoThrow
+    @Alias(names = "EngineMain")
+    public static void EngineMain(String clazzName) {
+
+        setupFeatures();
 
         // register VR routine
         VRRenderingRoutine.Companion.setVrRoutine(new VRRoutineImpl());
 
         initImageReader();
+
+        //noinspection ConstantValue
+        if (false) { // must stay!
+            markUnreachedProperties();
+        }
 
         // Build.setShipped(true);
 
@@ -142,6 +173,8 @@ public class Engine {
         if (runsInBrowser()) {
             initBrowserFonts();
         }
+
+        runMeshTest();
 
         EngineBase instance;
         //instance = (StudioBase) JavaLang.Class_forName(clazzName).newInstance();
@@ -450,6 +483,7 @@ public class Engine {
 
     @Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_ITexture2D")
     public static ITexture2D TextureCache_get(Object self, FileReference file, long timeout, boolean async) {
+        file = file.resolved(); // resolve file
         if (file == InvalidRef.INSTANCE) return null;
         if (file instanceof InnerTmpImageFile) {
             InnerTmpImageFile file1 = (InnerTmpImageFile) file;
@@ -459,20 +493,21 @@ public class Engine {
             }
         }
         if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
+        FileReference file1 = file;
         AsyncCacheData<ITexture2D> tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, true, (callback) -> {
-            log("Reading image", file.getAbsolutePath());
-            if (file instanceof WebRef2 || file instanceof BundledRef) {
+            log("Reading image", file1.getAbsolutePath());
+            if (file1 instanceof WebRef2 || file1 instanceof BundledRef) {
                 // call JS to generate a texture for us :)
-                String path = file.getAbsolutePath();
+                String path = file1.getAbsolutePath();
                 String prefix = BundledRef.PREFIX;
                 if (path.startsWith(prefix)) {
                     path = getBaseURL() + path.substring(prefix.length());
                 }
-                Texture2D newTexture = new Texture2D(file.getName(), 1, 1, 1);
+                Texture2D newTexture = new Texture2D(file1.getName(), 1, 1, 1);
                 loadTextureAsync(path, newTexture, callback);
             } else {
                 System.err.println("Reading other images hasn't been implemented yet, '" +
-                        file.getAbsolutePath() + "', '" + Object_toString(file) + "'");
+                        file1.getAbsolutePath() + "', '" + Object_toString(file1) + "'");
                 callback.err(new IOException("Reading other images hasn't been implemented yet"));
             }
             return Unit.INSTANCE;
@@ -803,7 +838,6 @@ public class Engine {
 
     // todo why is Cold-LUT RenderMode still hanging???
     //  in the worst case, we'll have to replace TextureCache.getLUT
-    // todo bug: forward-rendering is broken, because MathNode.getId() and getGlsl() or so are missing.
 
     /*@Alias(names = "me_anno_cache_AsyncCacheData_waitFor_Ljava_lang_Object")
     public static Object waitFor(AsyncCacheData<?> self) {

@@ -216,6 +216,10 @@ try {
         return glMap[id]
     }
 
+    window.delmap = function(id){
+        glMap[id] = ""
+    }
+
     window.hasCrashed = 0
     window.lib = 0
     var fetched = fetch("../wasm/jvm2wasm.wasm")

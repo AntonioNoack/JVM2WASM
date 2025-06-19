@@ -885,7 +885,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteBuffers_IV")
-    @JavaScript(code = "throw 'glDeleteBuffers_IV'")
+    @JavaScript(code = "gl.deleteBuffer(unmap(arg0)); delmap(arg0);")
     public static native void glDeleteBuffers_IV(int buffer);
 
     @NoThrow

@@ -133,6 +133,10 @@ try {
         return glMap[id]
     }
 
+    window.delmap = function(id){
+        glMap[id] = ""
+    }
+
     window.hasCrashed = 0
 
     window.measureText = function(font,size,text){
