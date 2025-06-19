@@ -40,15 +40,15 @@ import me.anno.input.Key;
 import me.anno.io.files.BundledRef;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
-import me.anno.io.files.Reference;
-import me.anno.io.files.inner.temporary.InnerTmpFile;
 import me.anno.io.files.inner.temporary.InnerTmpImageFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
 import me.anno.ui.debug.TestEngine;
 import me.anno.utils.Clock;
+import me.anno.utils.GFXFeatures;
 import me.anno.utils.OS;
+import me.anno.utils.OSFeatures;
 import me.anno.utils.async.Callback;
 import org.apache.logging.log4j.LoggerImpl;
 import org.lwjgl.opengl.GL11C;
@@ -110,6 +110,23 @@ public class Engine {
         if (!runsInBrowser()) {
             OS.isWeb = false;
             OS.isLinux = true;
+        } else {
+            OSFeatures features = OSFeatures.INSTANCE;
+            features.setCanSleep(false);
+            features.setCanHostServers(false);
+            features.setSupportsContinuousLogFiles(false);
+            features.setSupportsFFMPEG(false);
+            features.setSupportsNetworkUDP(false);
+            features.setFilesAreCaseSensitive(true);
+            features.setHasMultiThreading(false);
+            features.setMayLoadRenderDocExplicitly(false);
+
+            GFXFeatures gfxFeatures = GFXFeatures.INSTANCE;
+            gfxFeatures.setCanToggleVSync(false);
+            gfxFeatures.setHasWeakGPU(true);
+            gfxFeatures.setOpenGLES(true);
+            gfxFeatures.setCanOpenNewWindows(false);
+            gfxFeatures.setSupportsTextureGather(false);
         }
 
         // register VR routine
@@ -304,41 +321,14 @@ public class Engine {
         // todo make this work???
     }
 
-    @Alias(names = "me_anno_io_files_Reference_createReference_Ljava_lang_StringLme_anno_io_files_FileReference")
-    public static FileReference Reference_createReference(String uri) {
-        uri = uri.indexOf('\\') >= 0 ? uri.replace('\\', '/') : uri;
-        while (uri.endsWith("/")) uri = uri.substring(0, uri.length() - 1);
-
-        if (uri.startsWith("https://") || uri.startsWith("http://")) {
-            return new WebRef2(uri);
-        }
-
-        String bundledRefPrefix = BundledRef.PREFIX;
-        if (uri.startsWith(bundledRefPrefix)) {
-            String url = getBaseURL() + uri.substring(bundledRefPrefix.length());
-            return new WebRef2(url);
-        }
-
-        if (uri.startsWith("tmp://")) {
-            FileReference tmpRef = InnerTmpFile.find(uri);
-            if (tmpRef == null) {
-                log("Missing temporary file {}, probably GCed", uri);
-                return InvalidRef.INSTANCE;
-            }
-            return tmpRef;
-        }
-
-        FileReference staticReference = Reference.queryStatic(uri);
-        if (staticReference != null) {
-            return staticReference;
-        }
-
-        return new VirtualFileRef(uri);
+    @Alias(names = "me_anno_io_files_Reference_createReferenceOnLastExistingFile_Ljava_lang_StringLme_anno_io_files_FileReference")
+    public static FileReference Reference_createReferenceOnLastExistingFile(String absolutePath) {
+        return new VirtualFileRef(absolutePath);
     }
 
-    @Alias(names = "me_anno_io_files_Reference_getReference_Ljava_lang_StringLme_anno_io_files_FileReference")
-    public static FileReference Reference_getReference(String str) {
-        return Reference_createReference(str);
+    @Alias(names = "me_anno_io_files_Reference_createFileFileRef_Ljava_lang_StringLme_anno_io_files_FileReference")
+    public static FileReference Reference_createFileFileRef(String absolutePath) {
+        return new VirtualFileRef(absolutePath);
     }
 
     @NoThrow
@@ -813,6 +803,8 @@ public class Engine {
 
     // todo why is Cold-LUT RenderMode still hanging???
     //  in the worst case, we'll have to replace TextureCache.getLUT
+    // todo bug: forward-rendering is broken, because MathNode.getId() and getGlsl() or so are missing.
+
     /*@Alias(names = "me_anno_cache_AsyncCacheData_waitFor_Ljava_lang_Object")
     public static Object waitFor(AsyncCacheData<?> self) {
         if (self.getHasValue()) return self.getValue();

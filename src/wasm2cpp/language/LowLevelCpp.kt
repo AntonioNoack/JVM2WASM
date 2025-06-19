@@ -48,7 +48,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
         dst.append('\n')
     }
 
-    override fun appendName(name: String) {
+    override fun appendName(name: String, type: AppendNameType) {
         dst.append(name)
     }
 
@@ -72,7 +72,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             if (i > 0) dst.append(", ")
             dst.append(param.wasmType)
             dst.append(' ')
-            appendName(param.name)
+            appendName(param.name, AppendNameType.SRC_VARIABLE)
         }
         dst.append(") {\n")
     }
@@ -122,7 +122,7 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
             is CallExpr -> appendCallExpr(expr)
             is UnaryExpr -> appendUnaryExpr(expr)
             is BinaryExpr -> appendBinaryExpr(expr)
-            is VariableExpr -> appendName(expr.name)
+            is VariableExpr -> appendName(expr.name, AppendNameType.SRC_VARIABLE)
             is FieldGetExpr -> appendFieldGetExpr(expr)
             else -> throw NotImplementedError(expr.javaClass.toString())
         }
@@ -339,12 +339,12 @@ open class LowLevelCpp(val dst: StringBuilder2) : TargetLanguage {
 
     override fun beginDeclaration(name: String, jvmType: String) {
         dst.append(jvm2cppTyped(jvmType)).append(' ')
-        appendName(name)
+        appendName(name, AppendNameType.DST_VARIABLE)
         dst.append(" = ")
     }
 
     override fun beginAssignment(name: String) {
-        appendName(name)
+        appendName(name, AppendNameType.DST_VARIABLE)
         dst.append(" = ")
     }
 

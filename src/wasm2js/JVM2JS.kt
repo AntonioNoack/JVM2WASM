@@ -34,7 +34,8 @@ val jsFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/javascript")
 //  - done classes to unique, short names -> which symbols are allowed at the start, which after?
 //  - remove all comments
 
-var minifyJavaScript = true
+// todo bug: minify is broken :/, producing different results than usual
+var minifyJavaScript = false
 
 val CLASS_INSTANCE_NAME = if (minifyJavaScript) "\$C" else "CLASS_INSTANCE"
 val LAMBDA_INSTANCE_NAME = if (minifyJavaScript) "\$L" else "LAMBDA_INSTANCE"

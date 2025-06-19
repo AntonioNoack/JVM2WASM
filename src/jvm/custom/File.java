@@ -111,7 +111,7 @@ public class File {
         throw new RuntimeException("Not implemented");
     }
 
-    public WatchKey register(WatchService service, WatchEvent.Kind[] kinds) {
+    public WatchKey register(WatchService service, WatchEvent.Kind<?>[] kinds) {
         // idk, maybe later we support this :)
         return null;
     }

@@ -3,13 +3,11 @@ package jvm;
 import annotations.*;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GLCapabilities;
-import org.lwjgl.system.Callback;
 import org.lwjgl.system.FunctionProvider;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.SharedLibrary;
 import sun.misc.Unsafe;
 
-import java.io.PrintStream;
 import java.nio.*;
 import java.util.function.Consumer;
 
@@ -393,8 +391,8 @@ public class LWJGLxOpenGL {
         return null;
     }
 
-    @Alias(names = "org_lwjgl_opengl_GLUtil_setupDebugMessageCallback_Ljava_io_PrintStreamLorg_lwjgl_system_Callback")
-    public static Callback setupDebugMessageCallback(PrintStream stream) {
+    @Alias(names = "org_lwjgl_debug_LWJGLDebugCallback_setupDebugMessageCallback_Lorg_lwjgl_system_Callback")
+    public static Object setupDebugMessageCallback(Object self) {
         return null;
     }
 
@@ -1263,6 +1261,11 @@ public class LWJGLxOpenGL {
     @Alias(names = "org_lwjgl_opengl_GL46C_glDepthMask_ZV")
     @JavaScript(code = "gl.depthMask(!!arg0)")
     public static native void glDepthMask_ZV(boolean mask);
+
+    @NoThrow
+    @Alias(names = "org_lwjgl_opengl_GL46C_glColorMask_ZZZZV")
+    @JavaScript(code = "gl.colorMask(!!arg0,!!arg1,!!arg2,!!arg3)")
+    public static native void glColorMask_ZZZZV(boolean r, boolean g, boolean b, boolean a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCullFace_IV")

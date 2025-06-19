@@ -66,9 +66,14 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         dst.append(if (minifyJavaScript) ";" else ";\n")
     }
 
-    override fun appendName(name: String) {
+    override fun appendName(name: String, type: AppendNameType) {
         val newName = when {
-            name == thisVariable -> "this"
+            name == thisVariable -> {
+                if (type == AppendNameType.DST_VARIABLE) {
+                    IllegalStateException("Writing to 'this'").printStackTrace()
+                    "// this"
+                } else "this"
+            }
             minifyJavaScript -> shortName(Triple("local", "", name))
             else -> name
         }
@@ -91,7 +96,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
             if (!dst.endsWith("(")) {
                 dst.append(if (minifyJavaScript) "," else ", ")
             }
-            appendName(param.name)
+            appendName(param.name, AppendNameType.SRC_VARIABLE)
             if (!minifyJavaScript) {
                 dst.append(" /* ").append(param.jvmType).append(" */")
             }
@@ -118,7 +123,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
     override fun writeGoto(instr: GotoInstr) {
         // to do make sure that instr.owner is a Loop
         dst.append("continue ")
-        appendName(instr.label)
+        appendName(instr.label, AppendNameType.GOTO_LABEL)
     }
 
     override fun appendConstExpr(expr: ConstExpr) {
@@ -335,7 +340,7 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
         for (i in list.indices) {
             if (i > 0) dst.append(if (minifyJavaScript) "," else ", ")
             val instr = list[i]
-            appendName(instr.name)
+            appendName(instr.name, AppendNameType.DST_VARIABLE)
             if (!minifyJavaScript && instr.jvmType != lastType) {
                 dst.append(" /* ").append(instr.jvmType).append(" */")
                 lastType = instr.jvmType
@@ -348,14 +353,14 @@ class HighLevelJavaScript(dst: StringBuilder2) : LowLevelCpp(dst) {
 
     override fun beginDeclaration(name: String, jvmType: String) {
         dst.append("let ")
-        appendName(name)
+        appendName(name, AppendNameType.DST_VARIABLE)
         if (!minifyJavaScript) {
             dst.append(" /* ").append(jvmType).append(" */ = ")
         } else dst.append('=')
     }
 
     override fun beginAssignment(name: String) {
-        appendName(name)
+        appendName(name, AppendNameType.DST_VARIABLE)
         dst.append(if (minifyJavaScript) "=" else " = ")
     }
 

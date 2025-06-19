@@ -41,11 +41,6 @@ public class JavaIO {
 
 	public static final HashMap<String, FileInfo> files = new HashMap<>();
 
-	@Alias(names = "me_anno_io_files_FileFileRef_writeText_Ljava_lang_StringV")
-	public static void FileFileRef_writeText_Ljava_lang_StringV(FileFileRef ref, String content) {
-		FileReference_writeText_Ljava_lang_StringV(ref, content);
-	}
-
 	@Alias(names = "me_anno_io_files_FileReference_writeText_Ljava_lang_StringV")
 	public static void FileReference_writeText_Ljava_lang_StringV(FileReference ref, String content) {
 		FileInfo fi = new FileInfo(false);

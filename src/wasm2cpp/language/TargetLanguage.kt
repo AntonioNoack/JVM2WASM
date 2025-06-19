@@ -7,7 +7,7 @@ import wasm2cpp.instr.*
 
 interface TargetLanguage {
 
-    fun appendName(name: String)
+    fun appendName(name: String, type: AppendNameType)
 
     fun appendExpr(expr: Expr)
     fun appendExprSafely(expr: Expr)

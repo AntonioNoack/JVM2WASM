@@ -16,6 +16,7 @@ import wasm2cpp.StackToDeclarative.Companion.nextInstr
 import wasm2cpp.expr.CallExpr
 import wasm2cpp.expr.VariableExpr
 import wasm2cpp.instr.*
+import wasm2cpp.language.AppendNameType
 import wasm2cpp.language.HighLevelJavaScript
 import wasm2cpp.language.TargetLanguage
 import wasm2js.minifyJavaScript
@@ -235,7 +236,7 @@ class FunctionWriter(val globals: Map<String, GlobalVariable>, val language: Tar
         val compact = language is HighLevelJavaScript && minifyJavaScript
         begin()
         if (instr.label.isNotEmpty()) {
-            language.appendName(instr.label)
+            language.appendName(instr.label, AppendNameType.DEFINE_LABEL)
             writer.append(if (compact) ":" else ": ")
         }
         writer.append(if (compact) "for(;;){" else "while (true) {")
