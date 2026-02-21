@@ -598,7 +598,10 @@ public class JavaReflect {
     public static <V> Object Class_newInstance_Ljava_lang_Object(Class<V> clazz) throws NoSuchMethodException {
         Constructor<?> constructor = clazz.getConstructor((Class<?>[]) empty);
         //noinspection ConstantValue
-        if (constructor == null) throw new IllegalStateException("Class doesn't have constructor without args");
+        if (constructor == null) {
+            NativeLog.log("Class without constructor:", clazz.getName(), clazz.getSimpleName());
+            throw new IllegalStateException("Class doesn't have constructor without args");
+        }
         return Constructor_newInstance_AWLjava_lang_Object(constructor, empty);
     }
 

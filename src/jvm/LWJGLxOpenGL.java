@@ -1098,7 +1098,8 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexParameteri_IIIV")
-    @JavaScriptWASM(code = "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2);") // GL_GENERATE_MIPMAP is not supported :/
+    @JavaScriptWASM(code = "if(arg2==33069)arg2=gl.CLAMP_TO_EDGE;\n" + // clamp to border -> clamp to edge
+            "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2);") // GL_GENERATE_MIPMAP is not supported :/
     public static native void glTexParameteri_IIIV(int a, int b, int c);
 
     @NoThrow

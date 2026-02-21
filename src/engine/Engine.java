@@ -26,6 +26,8 @@ import me.anno.engine.ui.render.SuperMaterial;
 import me.anno.engine.ui.vr.VRRenderingRoutine;
 import me.anno.fonts.FontStats;
 import me.anno.gpu.*;
+import me.anno.gpu.pipeline.InstancedAnimStack;
+import me.anno.gpu.pipeline.InstancedStack;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.graph.visual.render.RenderGraph;
@@ -102,6 +104,8 @@ public class Engine {
         new SSAOSettings();
         new SSRSettings();
         new BloomSettings();
+        new InstancedStack();
+        new InstancedAnimStack();
     }
 
     private static void runMeshTest() {

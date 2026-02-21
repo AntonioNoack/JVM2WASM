@@ -59,8 +59,8 @@ public class TextGen {
     }*/
 
     static final String commonCode = "" +
-            "let font=arg0,w=arg3,h=arg4,color0Int=arg6,color1Int=arg5;\n" +
-            "let dstArray=arg7, dstOffset=arg8, dstStride=arg9;\n" +
+            "let font=arg0,w=arg3,h=arg4,dw=arg5,dh=arg6,color0Int=arg8,color1Int=arg7;\n" +
+            "let dstArray=arg9, dstOffset=arg10, dstStride=arg11;\n" +
             "txtCanvas.width=w;txtCanvas.height=h;\n" +
             "let color0 = '#'+color0Int.toString(16).padStart(6,'0');\n" +
             "let color1 = '#'+color1Int.toString(16).padStart(6,'0');\n" +
@@ -78,18 +78,19 @@ public class TextGen {
     @NoThrow
     @JavaScriptWASM(code = "" +
             commonCode +
-            "for(let y=0;y<h;y++){\n" +
-            "   let dstPtr = (dstArray+dstOffset+dstStride*y)<<2;\n" +
-            "   for(let x=0,len=w*4;x<len;x++){\n" +
+            "for(let y=0;y<Math.min(h,dh);y++){\n" +
+            "   let dstPtr = dstArray + arrayOverhead + ((dstOffset+dstStride*y)<<2);\n" +
+            "   for(let x=0,len=Math.min(w,dw)*4;x<len;x++){\n" +
             // todo test this function with WASM target
-            "       lib.w8(dstPtr++, buffer[readPtr++]);\n" +
+            // todo optimized, direct copy
+            "       window.lib.w8(dstPtr++, buffer[readPtr++]);\n" +
             "   }\n" +
             "}\n")
     @JavaScriptNative(code = "" +
             commonCode +
-            "for(let y=0;y<h;y++){\n" +
+            "for(let y=0;y<Math.min(h,dh);y++){\n" +
             "   let dstPtr = dstOffset+dstStride*y;\n" +
-            "   for(let x=0,len=w;x<len;x++){\n" +
+            "   for(let x=0,len=Math.min(w,dw);x<len;x++){\n" +
             "       dstArray.values[dstPtr++] = " +
             "(buffer[readPtr++] << 24) | " +
             "(buffer[readPtr++] << 16) | " +
@@ -100,6 +101,8 @@ public class TextGen {
     public static native void genASCIITexture(
             String font, float fontSize, int text0,
             int width, int height,
+            int imgWidth, int imgHeight,
             int textColor, int backgroundColor,
-            int[] dstPointer, int dstOffset, int stride);
+            int[] dstPointer, int dstOffset, int stride,
+            int arraySize);
 }

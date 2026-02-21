@@ -214,7 +214,10 @@ public class JavaLang {
     }
 
     private static void checkIndexOutOfBounds(int offset, int length, int availableLength) {
-        if (offset < 0 || offset + length > availableLength) throw new IndexOutOfBoundsException();
+        if (offset < 0 || offset + length > availableLength) {
+            NativeLog.log("Index access violation [offset, elementLength, availableLength]:", offset, length, availableLength);
+            throw new IndexOutOfBoundsException();
+        }
     }
 
     @JavaScriptNative(code = "" +
