@@ -1,8 +1,8 @@
 package utils
 
 import me.anno.utils.Clock
-import me.anno.utils.OS.documents
 import org.apache.logging.log4j.LogManager
+import targetsFolder
 import translator.GeneratorIndex
 import wasm.parser.FunctionImpl
 import wasm.parser.WATParser
@@ -10,7 +10,7 @@ import wasm.writer.WASMWriter.writeWASM
 
 private val LOGGER = LogManager.getLogger("CompileInvoker")
 
-val wasmFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/wasm")
+val wasmFolder = targetsFolder.getChild("wasm")
 val wasmTextFile = wasmFolder.getChild("jvm2wasm.wat")
 val wasmOutputFile = wasmFolder.getChild("jvm2wasm.wasm")
 val debugFolder = wasmFolder.getSibling("debug").apply {

@@ -9,9 +9,9 @@ import hierarchy.Annota
 import jvm2wasm
 import listInterfaces
 import me.anno.utils.Clock
-import me.anno.utils.OS.documents
 import me.anno.utils.types.Booleans.toInt
 import org.objectweb.asm.Opcodes.ACC_STATIC
+import targetsFolder
 import utils.*
 import utils.DefaultClassLayouts.GC_FIELD_NAME
 import utils.MethodResolver.resolveMethod
@@ -23,7 +23,7 @@ import wasm2cpp.language.HighLevelJavaScript
 import wasm2cpp.language.HighLevelJavaScript.Companion.fieldName
 import wasm2cpp.language.HighLevelJavaScript.Companion.jsKeywords
 
-val jsFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/javascript")
+val jsFolder = targetsFolder.getChild("javascript")
 
 // todo minify JavaScript
 //  - inline local variables, where possible

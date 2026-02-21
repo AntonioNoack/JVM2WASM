@@ -8,9 +8,9 @@ import hIndex
 import jvm.JVMFlags.is32Bits
 import me.anno.io.files.FileReference
 import me.anno.utils.Clock
-import me.anno.utils.OS.documents
 import me.anno.utils.assertions.assertEquals
 import org.apache.logging.log4j.LogManager
+import targetsFolder
 import translator.GeneratorIndex
 import translator.LocalVariables.Companion.isKeyword
 import utils.*
@@ -32,7 +32,7 @@ val numTargetClusters = 20
 var disableClustersForInspection = true
 
 val writer = StringBuilder2(1 shl 16)
-val cppFolder = documents.getChild("IdeaProjects/JVM2WASM/targets/cpp")
+val cppFolder = targetsFolder.getChild("cpp")
 
 val clock = Clock(LOGGER)
 
