@@ -6,7 +6,6 @@ import interpreter.WASMEngine
 import interpreter.functions.TrackCallocInstr
 import interpreter.memory.MemoryOptimizer
 import interpreter.memory.StaticInitRemover
-import me.anno.maths.Maths.min
 import me.anno.utils.Clock
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
@@ -17,6 +16,7 @@ import translator.GeneratorIndex.translatedMethods
 import utils.StaticClassIndices.FIRST_ARRAY
 import utils.StaticClassIndices.LAST_ARRAY
 import kotlin.math.ceil
+import kotlin.math.min
 
 object CallStaticInit {
 

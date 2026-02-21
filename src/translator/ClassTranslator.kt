@@ -14,6 +14,7 @@ class ClassTranslator(val clazz: String) : ClassVisitor(FirstClassIndexer.API_LE
         if (replaceClass(clazz) != clazz) throw IllegalStateException("Forgot to resolve $clazz")
     }
 
+    // Java 1.6
     private val minVersion = 50
 
     private var writer: ClassWriter? = null

@@ -4,7 +4,6 @@ import graphing.GraphingNode
 import graphing.StructuralAnalysis.Companion.renumberForReading
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.structures.lists.Lists.any2
-import me.anno.utils.structures.lists.Lists.createList
 import wasm.instr.Call
 import wasm.instr.Const
 
@@ -18,7 +17,7 @@ object StaticInitOptimizer {
         renumberForReading(nodes)
         // go through each node and collect which static-init was called already
         // on branches, go both paths and 'AND' their result
-        val calledInit = createList(nodes.size) { HashSet<String>() }
+        val calledInit = List(nodes.size) { HashSet<String>() }
         for (node in nodes) {
             optimizeStaticInit(node, calledInit)
         }

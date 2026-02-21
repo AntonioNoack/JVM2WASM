@@ -1,6 +1,5 @@
 package utils
 
-import me.anno.utils.structures.lists.Lists.createList
 import translator.JavaTypes.convertTypeToWASM
 import utils.WASMTypes.isWASMType
 
@@ -11,7 +10,7 @@ class Param(val name: String, val jvmType: String, val wasmType: WASMType) {
     }
 
     companion object {
-        val names = createList(100) { "p$it" }
+        val names = List(100) { "p$it" }
 
         fun getSampleJVMType(type: WASMType): String {
             return when (type) {

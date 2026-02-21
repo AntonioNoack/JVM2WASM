@@ -2,7 +2,6 @@ package wasm.instr
 
 import interpreter.WASMEngine
 import me.anno.utils.assertions.assertFalse
-import me.anno.utils.structures.lists.Lists.createList
 
 data class Call(val name: String) : Instruction {
 
@@ -110,7 +109,7 @@ data class Call(val name: String) : Instruction {
         val instanceOfExact = Call("instanceOfExact")
 
         val createObjectArray = Call("createObjectArray")
-        val createNativeArray = createList(7) { Call("createNativeArray$it") }
+        val createNativeArray = List(7) { Call("createNativeArray$it") }
 
         val createInstance = Call("createInstance")
 

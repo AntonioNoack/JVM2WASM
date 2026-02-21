@@ -7,12 +7,11 @@ import interpreter.WASMEngine
 import jvm.JVMFlags.is32Bits
 import jvm.JVMFlags.ptrSize
 import jvm.JVMShared.*
-import me.anno.utils.algorithms.Recursion.processRecursive2
+import me.anno.utils.algorithms.Recursion.processRecursiveSet
 import me.anno.utils.assertions.assertEquals
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
 import me.anno.utils.files.Files.formatFileSize
-import me.anno.utils.structures.lists.Lists.createList
 import org.apache.logging.log4j.LogManager
 import utils.*
 import utils.StaticClassIndices.*
@@ -71,7 +70,7 @@ object MemoryOptimizer {
         assertNotEquals(0, addr)
         assertEquals(OBJECT_ARRAY, readClassId(memory, addr))
         val size = readArrayLength(memory, addr)
-        return createList(size) {
+        return List(size) {
             val addrI = readPointer(memory, addr + arrayOverhead + it * ptrSize)
             if (addrI != 0) readIntArray(memory, addrI) else null
         }
@@ -175,7 +174,7 @@ object MemoryOptimizer {
 
 
         var usedMemorySize = 0
-        processRecursive2(staticValues) { addr, remaining ->
+        processRecursiveSet(staticValues) { addr, remaining ->
             assertTrue(isDynamicInstance(addr, allocationPtr))
             if (readGCIteration(memory, addr) != thisIteration) {
                 writeGCIteration(memory, addr, thisIteration)

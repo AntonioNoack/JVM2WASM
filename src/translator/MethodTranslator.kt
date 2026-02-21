@@ -1499,10 +1499,8 @@ class MethodTranslator(
                     if (printOps) println("--- handler: ${currentNode.label}")
 
                     val currentNode = currentNode
-                    if (stack.isNotEmpty()) {
-                        for (j in stack.indices) { // don't drop exception
-                            printer.drop()
-                        }
+                    repeat(stack.size) { // don't drop exception
+                        printer.drop()
                     }
 
                     visitLabel(createLabel(), true)

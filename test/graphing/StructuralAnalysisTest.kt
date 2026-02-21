@@ -4,7 +4,6 @@ import graphing.StackValidator.validateInputOutputStacks
 import graphing.StackValidator.validateStack
 import me.anno.utils.assertions.assertNotEquals
 import me.anno.utils.assertions.assertTrue
-import me.anno.utils.structures.lists.Lists.createList
 import org.junit.jupiter.api.Test
 import translator.MethodTranslator
 import translator.TranslatorNode
@@ -42,7 +41,7 @@ class StructuralAnalysisTest {
         graphs@ for (connectionBits in 0 until (1L shl maxNumConnections)) {
             if (connectionBits % 10_000L == 0L) println("Bits: ${connectionBits.toString(2)} ($connectionBits)")
 
-            val nodes0 = createList(numNodes) {
+            val nodes0 = List(numNodes) {
                 TranslatorNode(it).apply {
                     printer.append(i32Const0)
                     printer.append(Call.panic)

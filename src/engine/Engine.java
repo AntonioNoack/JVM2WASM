@@ -10,7 +10,6 @@ import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.Time;
-import me.anno.cache.AsyncCacheData;
 import me.anno.ecs.Entity;
 import me.anno.ecs.components.mesh.IMesh;
 import me.anno.ecs.components.mesh.Mesh;
@@ -70,6 +69,7 @@ import java.util.Objects;
 import static jvm.JVMShared.arrayOverhead;
 import static jvm.JVMShared.castToPtr;
 import static jvm.JavaLang.Object_toString;
+import static jvm.JavaLang.java_lang_System_nanoTime_J;
 import static jvm.LWJGLxGLFW.disableCursor;
 import static jvm.NativeLog.log;
 import static jvm.Pointer.add;
@@ -85,13 +85,9 @@ public class Engine {
     private static void initBrowserFonts() {
         // todo setup everything that JVMPlugin would do...
         FontStats.INSTANCE.setQueryInstalledFontsImpl(Collections::emptyList);
-        FontStats.INSTANCE.setGetTextGeneratorImpl(font -> new TextGeneratorImpl(new Font(
-                font.getName(),
-                FontManager.INSTANCE.getAvgFontSize(font.getSizeIndex()),
-                font.getBold(),
-                font.getItalic())));
-        FontStats.INSTANCE.setGetTextLengthImpl((font, text) ->
-                Double.valueOf(TextGen.measureText1(font.getName(), font.getSize(), text)));
+        FontStats.INSTANCE.setGetTextGeneratorImpl(() -> TextGeneratorImpl.INSTANCE);
+        // FontStats.INSTANCE.setGetTextLengthImpl((font, text) ->
+        //        Double.valueOf(TextGen.measureText1(font.getName(), font.getSize(), text)));
     }
 
     @NoThrow
@@ -112,7 +108,7 @@ public class Engine {
         System.out.println("MeshTestOriginal: " + original);
         FileReference file = original.getRef();
         System.out.println("MeshTestFile: " + file);
-        IMesh resolved = MeshCache.INSTANCE.get(file, true);
+        IMesh resolved = MeshCache.INSTANCE.getEntry(file).waitFor("runMeshTest");
         System.out.println("MeshTestResolved: " + resolved + ", identical? " + (resolved == original));
     }
 
@@ -190,7 +186,7 @@ public class Engine {
 
         Entity scene = new Entity("Scene");
         scene.add(new MeshComponent(icoSphere));
-        panel = SceneView.Companion.testScene(scene, null);
+        panel = SceneView.Companion.testScene2(scene, null);
 
         panel.setWeight(1f);
         instance = new TestEngine("Engine", () -> Collections.singletonList(panel));
@@ -258,14 +254,14 @@ public class Engine {
     public static void keyDown(int key) {
         if (window == null) return;
         long time = System.nanoTime();
-        addEvent(() -> Input.INSTANCE.onKeyPressed(window, Key.Companion.byId(key), time));
+        addEvent(() -> Input.INSTANCE.onKeyDown(window, Key.Companion.byId(key), time));
     }
 
     @Export
     @Alias(names = "EngineKeyUp")
     public static void keyUp(int key) {
         if (window == null) return;
-        addEvent(() -> Input.INSTANCE.onKeyReleased(window, Key.Companion.byId(key)));
+        addEvent(() -> Input.INSTANCE.onKeyUp(window, Key.Companion.byId(key)));
     }
 
     @Export
@@ -279,21 +275,21 @@ public class Engine {
     @Alias(names = "EngineCharTyped")
     public static void charTyped(int key, int mods) {
         if (window == null) return;
-        addEvent(() -> Input.INSTANCE.onCharTyped(window, key, mods));
+        addEvent(() -> Input.INSTANCE.onCharTyped(window, key));
     }
 
     @Export
     @Alias(names = "EngineMouseDown")
     public static void mouseDown(int key) {
         if (window == null) return;
-        addEvent(() -> Input.INSTANCE.onMousePress(window, Key.Companion.byId(key)));
+        addEvent(() -> Input.INSTANCE.onMouseDown(window, Key.Companion.byId(key), java_lang_System_nanoTime_J()));
     }
 
     @Export
     @Alias(names = "EngineMouseUp")
     public static void mouseUp(int key) {
         if (window == null) return;
-        addEvent(() -> Input.INSTANCE.onMouseRelease(window, Key.Companion.byId(key)));
+        addEvent(() -> Input.INSTANCE.onMouseUp(window, Key.Companion.byId(key), java_lang_System_nanoTime_J()));
     }
 
     @Export
@@ -306,8 +302,7 @@ public class Engine {
     @Export
     @Alias(names = "EngineKeyModState")
     public static void keyModState(int state) {
-        // shift: 1, control: 2, alt: 4, super: 8, capslock: 16
-        addEvent(() -> Input.INSTANCE.setKeyModState(state));
+        // no longer used
     }
 
     @Export
@@ -481,7 +476,7 @@ public class Engine {
         }
     }
 
-    @Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_ITexture2D")
+    /*@Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_ITexture2D")
     public static ITexture2D TextureCache_get(Object self, FileReference file, long timeout, boolean async) {
         file = file.resolved(); // resolve file
         if (file == InvalidRef.INSTANCE) return null;
@@ -513,7 +508,7 @@ public class Engine {
             return Unit.INSTANCE;
         });
         return tex != null ? tex.getValue() : null;
-    }
+    }*/
 
     @Alias(names = "me_anno_io_files_thumbs_Thumbs_generateSystemIcon_Lme_anno_io_files_FileReferenceLme_anno_io_files_FileReferenceILkotlin_jvm_functions_Function2V")
     public static void Thumbs_generateSystemIcon(FileReference src, FileReference dst, int size, Function2<ITexture2D, Exception, Unit> callback) {

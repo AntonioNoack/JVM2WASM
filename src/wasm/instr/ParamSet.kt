@@ -1,7 +1,6 @@
 package wasm.instr
 
 import interpreter.WASMEngine
-import me.anno.utils.structures.lists.Lists.createList
 import utils.Param.Companion.names
 
 class ParamSet(val index: Int, override var name: String) : ValueSet {
@@ -22,7 +21,7 @@ class ParamSet(val index: Int, override var name: String) : ValueSet {
     }
 
     companion object {
-        private val values = createList(100) { ParamSet(it, names[it]) }
+        private val values = List(100) { ParamSet(it, names[it]) }
         operator fun get(idx: Int) = values[idx]
     }
 }

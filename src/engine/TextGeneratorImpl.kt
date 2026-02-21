@@ -1,22 +1,12 @@
 package engine
 
 import me.anno.fonts.Font
-import me.anno.fonts.TextGenerator
-import me.anno.fonts.mesh.CharacterOffsetCache.Companion.getOffsetCache
-import me.anno.gpu.GFX.maxTextureSize
-import me.anno.gpu.debug.DebugGPUStorage
-import me.anno.gpu.drawing.DrawTexts.simpleChars
-import me.anno.gpu.texture.ITexture2D
-import me.anno.gpu.texture.Texture2D.Companion.bindTexture
-import me.anno.gpu.texture.Texture2DArray
-import me.anno.utils.async.Callback
-import org.lwjgl.opengl.GL11C
-import kotlin.math.min
-import kotlin.math.roundToInt
+import me.anno.fonts.FontImpl
+import me.anno.image.raw.IntImage
 
-class TextGeneratorImpl(private val font: Font) : TextGenerator {
+object TextGeneratorImpl : FontImpl<Font>() {
 
-    override fun calculateSize(text: CharSequence, widthLimit: Int, heightLimit: Int): Int {
+    /*override fun calculateSize(text: CharSequence, widthLimit: Int, heightLimit: Int): Int {
         return TextGen.getSize(font.name, text, font.size, widthLimit, heightLimit)
     }
 
@@ -37,8 +27,8 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         val widthLimit: Int = maxTextureSize
         val heightLimit: Int = maxTextureSize
 
-        val offsetCache = getOffsetCache(font)
-        val size = offsetCache.getOffset('w'.code, 'w'.code)
+        // val offsetCache = getOffsetCache(font)
+        val size = 0f//offsetCache.getOffset('w'.code, 'w'.code)
         val width = min(widthLimit, size.roundToInt() + 1)
         // leading + ascent + descent
         val height = min(heightLimit, font.sampleHeight)
@@ -72,5 +62,51 @@ class TextGeneratorImpl(private val font: Font) : TextGenerator {
         backgroundColor: Int
     ) {
         callback.ok(TextGen.generateTexture(font.name, text, font.size, widthLimit))
+    }*/
+
+    override fun getTextLength(font: Font, codepoint: Int): Int {
+        TODO("Not yet implemented")
+    }
+
+    override fun getTextLength(font: Font, codepointA: Int, codepointB: Int): Int {
+        TODO("Not yet implemented")
+    }
+
+    override fun drawGlyph(
+        image: IntImage,
+        x0: Int,
+        x1: Int,
+        y0: Int,
+        y1: Int,
+        strictBounds: Boolean,
+        font: Font,
+        fallbackFonts: Font,
+        fontIndex: Int,
+        codepoint: Int,
+        textColor: Int,
+        backgroundColor: Int,
+        portableImages: Boolean
+    ) {
+        TODO("Not yet implemented")
+    }
+
+    override fun getBaselineY(font: Font): Float {
+        TODO("Not yet implemented")
+    }
+
+    override fun getLineHeight(font: Font): Float {
+        TODO("Not yet implemented")
+    }
+
+    override fun getFallbackFonts(font: Font): Font {
+        TODO("Not yet implemented")
+    }
+
+    override fun getSupportLevel(
+        fonts: Font,
+        codepoint: Int,
+        lastSupportLevel: Int
+    ): Int {
+        TODO("Not yet implemented")
     }
 }
