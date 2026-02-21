@@ -1,24 +1,24 @@
 package engine;
 
-import annotations.Alias;
-import annotations.JavaScript;
+import annotations.JavaScriptWASM;
 import annotations.NoThrow;
-import me.anno.gpu.GFX;
-import me.anno.gpu.drawing.GFXx2D;
-import me.anno.gpu.texture.ITexture2D;
-import me.anno.gpu.texture.Texture2D;
-
-import static engine.Engine.finishTexture;
-import static engine.Engine.prepareTexture;
-import static jvm.JVMShared.b2i;
+import annotations.JavaScriptNative;
 
 public class TextGen {
 
     @NoThrow
-    @JavaScript(code = "measureText(arg0,arg1,str(arg2));return Math.ceil(tmp.width)")
-    public static native int measureText1(String fontName, float fontSize, String text);
+    @JavaScriptWASM(code = "measureText(arg0,arg1,str(arg2));return Math.ceil(tmp.width)")
+    public static native int measureTextFull(String fontName, float fontSize, String text);
 
     @NoThrow
+    @JavaScriptWASM(code = "measureText(arg0,arg1,String.fromCodePoint(arg2));return Math.ceil(tmp.width)")
+    public static native int measureTextSingle(String fontName, float fontSize, int c1);
+
+    @NoThrow
+    @JavaScriptWASM(code = "measureText(arg0,arg1,String.fromCodePoint(arg2)+String.fromCodePoint(arg3));return Math.ceil(tmp.width)")
+    public static native int measureTextPair(String fontName, float fontSize, int c1, int c2);
+
+    /*@NoThrow
     private static int spaceBetweenLines(float fontSize) {
         return (int) (0.5f * fontSize + 0.5f);
     }
@@ -34,9 +34,9 @@ public class TextGen {
             lineCount += b2i(text.charAt(i) == '\n');
         }
         return lineCount;
-    }
+    }*/
 
-    @Alias(names = "me_anno_fonts_FontManager_getSize_Lme_anno_fonts_keys_TextCacheKeyI")
+    /*@Alias(names = "me_anno_fonts_FontManager_getSize_Lme_anno_fonts_keys_TextCacheKeyI")
     public static int getSize(String fontName, CharSequence text, float fontSize, int widthLimit, int heightLimit) {
         // calculate actual size
         // https://www.w3schools.com/tags/canvas_measuretext.asp
@@ -44,7 +44,7 @@ public class TextGen {
         if (text.length() == 0) {
             return GFXx2D.INSTANCE.getSize(0, (int) fontSize);
         } else {
-            int width = measureText1(fontName, fontSize, text.toString());
+            int width = measureTextFull(fontName, fontSize, text.toString());
             int lineCount = countLines(text);
             int spaceBetweenLines = spaceBetweenLines(fontSize);
             int fontHeight = (int) fontSize;
@@ -56,75 +56,49 @@ public class TextGen {
             height = Math.min(heightLimit, Math.min(height, mts));
             return GFXx2D.INSTANCE.getSize(width, height);
         }
-    }
+    }*/
 
-    @NoThrow
-    @JavaScript(code = "" +
-            "let text=str(arg2), fontNamePtr = arg0, fontSize = arg1;\n" +
-            "measureText(fontNamePtr,fontSize,text);\n" + // defines tmp
-            "let w=Math.max(1,Math.min(arg3,Math.ceil(tmp.width))),h=arg4;\n" +
+    static final String commonCode = "" +
+            "let font=arg0,w=arg3,h=arg4,color0Int=arg6,color1Int=arg5;\n" +
+            "let dstArray=arg7, dstOffset=arg8, dstStride=arg9;\n" +
             "txtCanvas.width=w;txtCanvas.height=h;\n" +
-            "ctx.fillStyle='#000'\n" +
-            "ctx.fillRect(0,0,w,h)\n" +
-            "ctx.fillStyle='#fff'\n" +
-            "ctx.textAlign='left'\n" +
-            "ctx.font=(fontSize|0)+'px '+str(fontNamePtr);\n" +
-            "let lines = text.split('\\n');\n" + // ctx.fillText ignores linebreaks
-            "let spacing = h/lines.length;\n" +
-            "for(let i=0;i<lines.length;i++){\n" +
-            "   ctx.fillText(lines[i],0,(i+0.8)*spacing);\n" +
-            "}\n" +
-            "let buffer = ctx.getImageData(0,0,w,h).data;\n" +
-            "flipImageVertically(w,h,buffer);\n" +
-            "gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n" +
-            "return w;")
-    public static native int genTexTexture(String font, float fontSize, String text, int wl, int h);
-
-    public static ITexture2D generateTexture(String fontName, CharSequence text, float fontSize, int wl) {
-
-        // todo should return the same size as the texture will be...
-
-        if (text.length() == 0) return null;
-
-        // val font2 = getFont(key)
-        int mts = GFX.maxTextureSize;
-
-        wl = wl < 0 ? mts : Math.min(wl, mts);
-
-        String text2 = text.toString();
-        Texture2D tex = new Texture2D(text2, 0, 0, 1);
-        prepareTexture(tex);
-
-        int fontHeight = (int) fontSize;
-        int lineCount = countLines(text);
-        int spaceBetweenLines = spaceBetweenLines(fontSize);
-        int h = calcTextHeight(fontHeight, lineCount, spaceBetweenLines);
-
-        // generate and upload texture in JavaScript
-        int w = genTexTexture(fontName, fontSize, text2, wl, h);
-        finishTexture(tex, w, h, null);
-
-        return tex;
-    }
-
-    @NoThrow
-    @JavaScript(code = "" +
-            "let font=arg0,w=arg3,h=arg4,d=arg5,color0Int=arg7,color1Int=arg6;\n" +
-            "txtCanvas.width=w;txtCanvas.height=h*d;\n" +
             "let color0 = '#'+color0Int.toString(16).padStart(6,'0');\n" +
             "let color1 = '#'+color1Int.toString(16).padStart(6,'0');\n" +
             "ctx.textAlign='center'\n" +
             "ctx.font=(arg1|0)+'px '+str(font);\n" +
-            "for(let i=0;i<d;i++) {\n" +
+
             "   ctx.fillStyle=color0;\n" + // clear space, just in case
-            "   ctx.fillRect(0,i*h,w,h);\n" +
+            "   ctx.fillRect(0,0,w,h);\n" +
             "   ctx.fillStyle=color1;\n" +
-            "   ctx.fillText(String.fromCharCode(arg2+(d-1-i)),w/2,arg8+h*i);\n" +
-            "}\n" +
-            "let buffer = ctx.getImageData(0,0,w,h*d).data;\n" +
-            "flipImageVertically(w,h*d,buffer);\n" +
-            "gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,w,h,d,0,gl.RGBA,gl.UNSIGNED_BYTE,buffer);\n")
+            "   ctx.fillText(String.fromCharCode(arg2),w/2,arg1);\n" +
+
+            // todo copy data into dst buffer,
+            //  use more efficient way
+            "let buffer = ctx.getImageData(0,0,w,h).data;\n" +
+            "let readPtr = 0;\n";
+
+    @NoThrow
+    @JavaScriptWASM(code = "" +
+            commonCode +
+            "for(let y=0;y<h;y++){\n" +
+            "   let dstPtr = (dstArray+dstOffset+dstStride*y)<<2;\n" +
+            "   for(let x=0,len=w*4;x<len;x++){\n" +
+            // todo test this function with WASM target
+            "       lib.w8(dstPtr++, buffer[readPtr++]);\n" +
+            "   }\n" +
+            "}\n")
+    @JavaScriptNative(code = "" +
+            commonCode +
+            "for(let y=0;y<h;y++){\n" +
+            "   let dstPtr = dstOffset+dstStride*y;\n" +
+            "   for(let x=0,len=w;x<len;x++){\n" +
+            // todo read int somehow???
+            "       dstArray.values[dstPtr++] = buffer[readPtr++];\n" +
+            "   }\n" +
+            "}\n")
     public static native void genASCIITexture(
-            String font, float fontSize, int text0, int width, int height, int depth,
-            int textColor, int backgroundColor, float y0);
+            String font, float fontSize, int text0,
+            int width, int height,
+            int textColor, int backgroundColor,
+            int[] dstPointer, int dstOffset, int stride);
 }

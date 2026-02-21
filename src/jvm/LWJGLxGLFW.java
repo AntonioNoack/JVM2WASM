@@ -1,7 +1,7 @@
 package jvm;
 
 import annotations.Alias;
-import annotations.JavaScript;
+import annotations.JavaScriptWASM;
 import annotations.NoThrow;
 import org.lwjgl.glfw.*;
 
@@ -34,7 +34,7 @@ public class LWJGLxGLFW {
 
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;\n" +
             "canvas.requestPointerLock()")
     public static native void disableCursor();
@@ -72,7 +72,7 @@ public class LWJGLxGLFW {
 
     // not supported
     @NoThrow
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwSetCursor_JJV")
     public static native void org_lwjgl_glfw_GLFW_glfwSetCursor_JJV(long window, long cursor);
 
@@ -105,7 +105,7 @@ public class LWJGLxGLFW {
     }
 
     @NoThrow
-    @JavaScript(code = "document.title=str(arg0)")
+    @JavaScriptWASM(code = "document.title=str(arg0)")
     public static native void setTitle(String title);
 
     @NoThrow
@@ -121,7 +121,7 @@ public class LWJGLxGLFW {
     }
 
     @NoThrow
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwSwapInterval_IV")
     public static native void GLFW_glfwSwapInterval(int interval);
 
@@ -193,11 +193,11 @@ public class LWJGLxGLFW {
 
 
     @NoThrow
-    @JavaScript(code = "return canvas.width")
+    @JavaScriptWASM(code = "return canvas.width")
     public static native int getWindowWidth();
 
     @NoThrow
-    @JavaScript(code = "return canvas.height")
+    @JavaScriptWASM(code = "return canvas.height")
     public static native int getWindowHeight();
 
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwGetFramebufferSize_JAIAIV")
@@ -212,11 +212,11 @@ public class LWJGLxGLFW {
     }
 
     @NoThrow
-    @JavaScript(code = "return mouseX")
+    @JavaScriptWASM(code = "return mouseX")
     private static native double getMouseX();
 
     @NoThrow
-    @JavaScript(code = "return mouseY")
+    @JavaScriptWASM(code = "return mouseY")
     private static native double getMouseY();
 
     @NoThrow
@@ -368,17 +368,17 @@ public class LWJGLxGLFW {
 
     @NoThrow
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwDestroyWindow_JV")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void org_lwjgl_glfw_GLFW_glfwDestroyWindow_JV(long window);
 
     @NoThrow
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwHideWindow_JV")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void org_lwjgl_glfw_GLFW_glfwHideWindow_JV(long window);
 
     @NoThrow
     @Alias(names = "org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void org_lwjgl_glfw_GLFW_glfwRequestWindowAttention_JV(long window);
 
     @NoThrow

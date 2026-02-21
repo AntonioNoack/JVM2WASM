@@ -1,7 +1,7 @@
 package jvm;
 
 import annotations.Alias;
-import annotations.JavaScript;
+import annotations.JavaScriptWASM;
 import annotations.NoThrow;
 
 import java.lang.reflect.Field;
@@ -76,7 +76,7 @@ public class Debug {
     }
 
     @NoThrow
-    @JavaScript(code = "let lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
+    @JavaScriptWASM(code = "let lib=window.lib,len=Math.min(lib.r32(arg0+objectOverhead),100),arr=[];\n" +
             "for(let i=0;i<len;i++) arr.push(lib.r32(arg0+arrayOverhead+(i<<2)));\n" +
             "console.log(arr)")
     private static native void debugArray(Object instance);

@@ -29,13 +29,13 @@ public class GarbageCollector {
     static byte[][] largestGapsTmp = new byte[16][];
 
     @NoThrow
-    @JavaScript(code = "markJSReferences()")
+    @JavaScriptWASM(code = "markJSReferences()")
     private static native void markJSReferences();
 
     @Export
     @NoThrow
     @Alias(names = "gc")
-    @PureJavaScript(code = "")
+    @JavaScriptNative(code = "")
     public static void invokeGC() {
         // run gc:
         // - nothing is running -> we can safely ignore the stack
@@ -52,7 +52,7 @@ public class GarbageCollector {
     @Export
     @NoThrow
     @Alias(names = "concurrentGC0")
-    @PureJavaScript(code = "")
+    @JavaScriptNative(code = "")
     public static void concurrentGC0() {
         nextGeneration();
         long t0 = System.nanoTime();
@@ -66,7 +66,7 @@ public class GarbageCollector {
     @Export
     @NoThrow
     @Alias(names = "concurrentGC1")
-    @PureJavaScript(code = "")
+    @JavaScriptNative(code = "")
     public static boolean concurrentGC1() {
         boolean done = GCGapFinder.findLargestGapsStep(largestGaps, null);
         if (done) {
@@ -227,7 +227,7 @@ public class GarbageCollector {
 
     @NoThrow
     @Alias(names = "isParallelGC")
-    @JavaScript(code = "return false;")
+    @JavaScriptWASM(code = "return false;")
     static native boolean isParallelGC();
 
     @NoThrow
@@ -263,12 +263,12 @@ public class GarbageCollector {
 
     @NoThrow
     @Alias(names = "lockMallocMutex")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void lockMallocMutex();
 
     @NoThrow
     @Alias(names = "unlockMallocMutex")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void unlockMallocMutex();
 
 }

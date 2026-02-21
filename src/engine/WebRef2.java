@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 
 public class WebRef2 extends FileReference {
 
@@ -70,7 +69,7 @@ public class WebRef2 extends FileReference {
     }
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "let x = new XMLHttpRequest();\n" +
             // todo implement args properly
             "let url = str(arg0);\n" +
@@ -103,7 +102,7 @@ public class WebRef2 extends FileReference {
     private static native void readText(String url, Object callback);
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "let x = new XMLHttpRequest();\n" +
             // todo implement args properly
             "let url = str(arg0);\n" +
@@ -134,7 +133,7 @@ public class WebRef2 extends FileReference {
     private static native void readBytes(String url, Object callback);
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "let x = new XMLHttpRequest();\n" +
             // todo implement args properly
             "let url = str(arg0);\n" +

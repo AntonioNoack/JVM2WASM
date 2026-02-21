@@ -4,20 +4,9 @@ import me.anno.fonts.Font
 import me.anno.fonts.FontImpl
 import me.anno.image.raw.IntImage
 
-object TextGeneratorImpl : FontImpl<Font>() {
+object TextGeneratorImpl : FontImpl<List<Font>>() {
 
-    /*override fun calculateSize(text: CharSequence, widthLimit: Int, heightLimit: Int): Int {
-        return TextGen.getSize(font.name, text, font.size, widthLimit, heightLimit)
-    }
-
-    override fun getBaselineY(): Float {
-        return font.size * 0.8f // good like that?
-    }
-
-    override fun getLineHeight(): Float {
-        return font.size
-    }
-
+    /*
     override fun generateASCIITexture(
         portableImages: Boolean,
         callback: Callback<Texture2DArray>,
@@ -50,63 +39,47 @@ object TextGeneratorImpl : FontImpl<Font>() {
         tex.afterUpload(GL11C.GL_RGBA8, 4, false)
         DebugGPUStorage.tex2da.add(tex)
         callback.ok(tex)
-    }
-
-    override fun generateTexture(
-        text: CharSequence,
-        widthLimit: Int,
-        heightLimit: Int,
-        portableImages: Boolean,
-        callback: Callback<ITexture2D>,
-        textColor: Int,
-        backgroundColor: Int
-    ) {
-        callback.ok(TextGen.generateTexture(font.name, text, font.size, widthLimit))
     }*/
 
     override fun getTextLength(font: Font, codepoint: Int): Int {
-        TODO("Not yet implemented")
+        return TextGen.measureTextSingle(font.name, font.size, codepoint)
     }
 
     override fun getTextLength(font: Font, codepointA: Int, codepointB: Int): Int {
-        TODO("Not yet implemented")
+        return TextGen.measureTextPair(font.name, font.size, codepointA, codepointB)
     }
 
     override fun drawGlyph(
         image: IntImage,
-        x0: Int,
-        x1: Int,
-        y0: Int,
-        y1: Int,
+        x0: Int, x1: Int,
+        y0: Int, y1: Int,
         strictBounds: Boolean,
         font: Font,
-        fallbackFonts: Font,
+        fallbackFonts: List<Font>,
         fontIndex: Int,
         codepoint: Int,
         textColor: Int,
         backgroundColor: Int,
         portableImages: Boolean
     ) {
-        TODO("Not yet implemented")
+        val dstOffset = image.getIndex(x0,y0)
+        TextGen.genASCIITexture(
+            font.name, font.size,
+            codepoint, x1 - x0, y1 - y0,
+            textColor, backgroundColor,
+            image.data, dstOffset, image.height,
+        )
     }
 
-    override fun getBaselineY(font: Font): Float {
-        TODO("Not yet implemented")
-    }
+    override fun getBaselineY(font: Font): Float = 0f
 
-    override fun getLineHeight(font: Font): Float {
-        TODO("Not yet implemented")
-    }
+    override fun getLineHeight(font: Font): Float = font.size
 
-    override fun getFallbackFonts(font: Font): Font {
-        TODO("Not yet implemented")
-    }
+    override fun getFallbackFonts(font: Font): List<Font> = emptyList()
 
     override fun getSupportLevel(
-        fonts: Font,
+        fonts: List<Font>,
         codepoint: Int,
         lastSupportLevel: Int
-    ): Int {
-        TODO("Not yet implemented")
-    }
+    ): Int = 0
 }

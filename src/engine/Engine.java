@@ -24,18 +24,14 @@ import me.anno.engine.ui.control.DraggingControlSettings;
 import me.anno.engine.ui.render.SceneView;
 import me.anno.engine.ui.render.SuperMaterial;
 import me.anno.engine.ui.vr.VRRenderingRoutine;
-import me.anno.fonts.Font;
-import me.anno.fonts.FontManager;
 import me.anno.fonts.FontStats;
 import me.anno.gpu.*;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
-import me.anno.gpu.texture.TextureCache;
 import me.anno.graph.visual.render.RenderGraph;
 import me.anno.graph.visual.scalar.FloatMathBinary;
 import me.anno.image.Image;
 import me.anno.image.ImageCache;
-import me.anno.image.raw.GPUImage;
 import me.anno.image.raw.IntImage;
 import me.anno.input.Clipboard;
 import me.anno.input.Input;
@@ -43,8 +39,6 @@ import me.anno.input.Key;
 import me.anno.io.files.BundledRef;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
-import me.anno.io.files.LinkFileReference;
-import me.anno.io.files.inner.temporary.InnerTmpImageFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
@@ -91,7 +85,7 @@ public class Engine {
     }
 
     @NoThrow
-    @JavaScript(code = "return 1;")
+    @JavaScriptWASM(code = "return 1;")
     public static native boolean runsInBrowser();
 
     private static void markFieldsAsUsed() {
@@ -323,7 +317,7 @@ public class Engine {
     public static native void me_anno_gpu_GFX_check_V();
 
     @NoThrow
-    @JavaScript(code = "let loc = window.location.href;\n" +
+    @JavaScriptWASM(code = "let loc = window.location.href;\n" +
             "let dir = loc.substring(0, loc.lastIndexOf('/'));" +
             "return fill(arg0,dir+'/../../assets/')")
     private static native int fillBaseURL(char[] chars);
@@ -369,7 +363,7 @@ public class Engine {
     }
 
     @Alias(names = "loadTextureAsync")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "let img = new Image();\n" +
             "gcLock(arg1);\n" +
             "gcLock(arg2);\n" +
@@ -400,7 +394,7 @@ public class Engine {
     private static native void loadTextureAsync(String path, Texture2D texture, Callback<?> textureCallback);
 
     @Alias(names = "loadImageAsync")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "console.log('Loading image from bytes...');\n" +
             "let bytes = arg0, numBytes = arg1, callback = arg2;\n" +
             "let img = new Image();\n" +
@@ -658,7 +652,7 @@ public class Engine {
     }
 
     @NoThrow
-    @JavaScript(code = "try { return BigInt(window.performance.memory.usedJSHeapSize); } catch(e){ return 0n; }")
+    @JavaScriptWASM(code = "try { return BigInt(window.performance.memory.usedJSHeapSize); } catch(e){ return 0n; }")
     @Alias(names = "me_anno_ui_debug_JSMemory_jsUsedMemory_J")
     public static native long JSMemory_jsUsedMemory_J();
 
@@ -733,7 +727,7 @@ public class Engine {
 
     @NoThrow
     @Alias(names = "me_anno_input_Input_setClipboardContent_Ljava_lang_StringV")
-    @JavaScript(code = "if(arg1) navigator.clipboard.writeText(str(arg1))")
+    @JavaScriptWASM(code = "if(arg1) navigator.clipboard.writeText(str(arg1))")
     public static native void Input_setClipboardContent_Ljava_lang_StringV(Object self, String txt);
 
     @NoThrow
@@ -761,7 +755,7 @@ public class Engine {
     }
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "// console.log('running thread', str(arg1));\n" +
             "safe(window.lib.runRunnable(arg0));\n")
     private static native void runAsyncImpl(Function0<Object> runnable, String name);
@@ -804,7 +798,7 @@ public class Engine {
     }
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "for(let key in gl) { if(typeof(gl[key]) == 'number') {\n" +
             "   window.lib.GLNames_pushName(arg0, arg1, fill(arg0,key), gl[key]); }}")
     public static native void discoverGLNamesImpl(char[] buffer, HashMap<Integer, String> dst);

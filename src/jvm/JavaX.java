@@ -1,14 +1,14 @@
 package jvm;
 
 import annotations.Alias;
-import annotations.JavaScript;
+import annotations.JavaScriptWASM;
 import annotations.NoThrow;
 import org.apache.logging.log4j.LoggerImpl;
 
 public class JavaX {
 
 	@NoThrow
-	@JavaScript(code = "let d = new Date(), h=d.getHours(),m=d.getMinutes(),s=d.getSeconds();return fill(arg0, (h<10?'0'+h:h)+':'+(m<10?'0'+m:m)+':'+(s<10?'0'+s:s))")
+	@JavaScriptWASM(code = "let d = new Date(), h=d.getHours(),m=d.getMinutes(),s=d.getSeconds();return fill(arg0, (h<10?'0'+h:h)+':'+(m<10?'0'+m:m)+':'+(s<10?'0'+s:s))")
 	public static native int fillDate(char[] chr);
 
 	@Alias(names = {"org_apache_logging_log4j_LoggerImplXCompanion_getTimeStamp_Ljava_lang_CharSequence"})

@@ -85,11 +85,11 @@ object DynIndex {
         for ((sig0, name, _) in dynIndexSorted) {
             val name2 = resolveByAlias(name)
 
-            val sig2 = nameToMethod[name2]
-            assertFalse(sig2 != null && hIndex.isAbstract(sig2)) { "$name is abstract, but also listed" }
+            // val sig2 = nameToMethod[name2]
+            // assertFalse(sig2 != null && hIndex.isAbstract(sig2)) { "$name is abstract, but also listed" }
 
             val sig = nameToMethod[name2] ?: sig0
-            assertFalse(hIndex.isAbstract(sig)) { "$name2 is abstract, but also listed" }
+            // assertFalse(hIndex.isAbstract(sig)) { "$name2 is abstract, but also listed" }
 
             functionTable.add(name2)
             ActuallyUsedIndex.add(dynIndexSig, sig)

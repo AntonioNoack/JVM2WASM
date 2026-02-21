@@ -1,6 +1,6 @@
 package jvm.custom;
 
-import annotations.PureJavaScript;
+import annotations.JavaScriptNative;
 import annotations.UnsafePointerField;
 
 import java.lang.ref.ReferenceQueue;
@@ -20,7 +20,7 @@ public class WeakRef<V> {
 
     public WeakRef next; // linked-list of references to that instance
 
-    @PureJavaScript(code = "arg0.value = new WeakRef(arg1);")
+    @JavaScriptNative(code = "arg0.value = new WeakRef(arg1);")
     public WeakRef(V instance) {
         address = instance;
         if (isAfterAllocationStart()) {
@@ -40,7 +40,7 @@ public class WeakRef<V> {
         // idk what to do about this ref queue...
     }
 
-    @PureJavaScript(code = "return arg0.value.deref();")
+    @JavaScriptNative(code = "return arg0.value.deref();")
     public V get() {
         return address;
     }

@@ -27,7 +27,7 @@ public class JavaReflect {
     @NoThrow
     @NotNull
     @Alias(names = {"java_lang_Class_getFields_AW", "java_lang_Class_getDeclaredFields_AW"})
-    @PureJavaScript(code = "return arg0.fields;")
+    @JavaScriptNative(code = "return arg0.fields;")
     public static Field[] getFields(Class<?> clazz) {
         return readPtrAtOffset(clazz, OFFSET_CLASS_FIELDS);
     }
@@ -87,7 +87,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getMethods_AW")
-    @PureJavaScript(code = "return arg0.methods;")
+    @JavaScriptNative(code = "return arg0.methods;")
     public static <V> Method[] Class_getMethods(Class<V> clazz) {
         return readPtrAtOffset(clazz, OFFSET_CLASS_METHODS);
     }
@@ -150,7 +150,7 @@ public class JavaReflect {
         return offset;
     }
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "let field = arg0, instance = arg1;\n" +
             "const jsClass = field.type.jsClass;\n" +
             "if(!instance) instance = jsClass;\n" +
@@ -184,7 +184,7 @@ public class JavaReflect {
         }
     }
 
-    @PureJavaScript(code = "return arg0.name;")
+    @JavaScriptNative(code = "return arg0.name;")
     private static int getFieldOffsetSafely(Field field, Object instance) {
         int offset = getFieldOffset(field);
         if (Modifier.isStatic(field.getModifiers())) {
@@ -208,7 +208,7 @@ public class JavaReflect {
         Field_setImpl(field, getClassId(field.getType()), instance, value);
     }
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "let field = arg0;\n" +
             "let typeId = arg1;\n" +
             "let instance = arg2;\n" +
@@ -463,7 +463,7 @@ public class JavaReflect {
 
     @NoThrow
     @Alias(names = "java_lang_Object_getClass_Ljava_lang_Class")
-    @PureJavaScript(code = "return arg0.constructor.CLASS_INSTANCE;")
+    @JavaScriptNative(code = "return arg0.constructor.CLASS_INSTANCE;")
     public static Object Object_getClass(Object instance) {
         return classIdToInstance(readClassId(instance));
     }
@@ -509,7 +509,7 @@ public class JavaReflect {
     }
 
     @NoThrow
-    @PureJavaScript(code = "return arg0 ? arg0.index : -1;")
+    @JavaScriptNative(code = "return arg0 ? arg0.index : -1;")
     public static <V> int getClassId(Class<V> self) {
         if (self == null) return -1;
         return readI32AtOffset(self, OFFSET_CLASS_INDEX);
@@ -523,7 +523,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getSuperclass_Ljava_lang_Class")
-    @PureJavaScript(code = "return arg0.superClass;\n")
+    @JavaScriptNative(code = "return arg0.superClass;\n")
     public static Class<Object> Class_getSuperclass_Ljava_lang_Class(Class<?> clazz) {
         int classId = getClassId(clazz);
         if (classId <= 0 || classId >= numClasses()) return null;
@@ -541,7 +541,7 @@ public class JavaReflect {
         return bytes != null ? new ByteArrayInputStream(bytes) : null;
     }
 
-    @PureJavaScript(code = "return getResourceAsByteArray(arg0);")
+    @JavaScriptNative(code = "return getResourceAsByteArray(arg0);")
     public static byte[] ClassLoader_getResourceAsByteArray(String name) {
         if (name == null) return null;
         Pointer ptr = getResourcePtr();
@@ -562,7 +562,7 @@ public class JavaReflect {
     private static final Object[] empty = new Object[0];
 
     @Alias(names = "java_lang_reflect_Field_getAnnotations_AW")
-    @PureJavaScript(code = "return arg0.annotations;")
+    @JavaScriptNative(code = "return arg0.annotations;")
     public static Object[] Field_getAnnotations(Field field) {
         return readPtrAtOffset(field, OFFSET_FIELD_ANNOTATIONS);
     }
@@ -584,7 +584,7 @@ public class JavaReflect {
 
     @NoThrow
     @Alias(names = "java_lang_Class_getSimpleName_Ljava_lang_String")
-    @PureJavaScript(code = "return arg0.simpleName;")
+    @JavaScriptNative(code = "return arg0.simpleName;")
     public static <V> String Class_getSimpleName(Class<V> c) {
         return readPtrAtOffset(c, OFFSET_CLASS_SIMPLE_NAME);
     }
@@ -609,7 +609,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getName_Ljava_lang_String")
-    @PureJavaScript(code = "return arg0.name;")
+    @JavaScriptNative(code = "return arg0.name;")
     public static String Class_getName_Ljava_lang_String(Class<?> self) {
         return readPtrAtOffset(self, OFFSET_CLASS_NAME);
     }
@@ -621,7 +621,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_isInstance_Ljava_lang_ObjectZ")
-    @PureJavaScript(code = "return arg1 && arg1 instanceof getJSClassByClass(arg0);")
+    @JavaScriptNative(code = "return arg1 && arg1 instanceof getJSClassByClass(arg0);")
 // todo we need to handle interfaces, too
     public static boolean Class_isInstance_Ljava_lang_ObjectZ(Class<?> clazz, Object instance) {
         if (instance == null) return false;
@@ -663,7 +663,7 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_Class_getConstructors_AW")
-    @PureJavaScript(code = "return arg0.constructors;")
+    @JavaScriptNative(code = "return arg0.constructors;")
     public static <V> Constructor<V>[] Class_getConstructors_AW(Class<V> self) {
         return readPtrAtOffset(self, OFFSET_CLASS_CONSTRUCTORS);
     }
@@ -696,14 +696,14 @@ public class JavaReflect {
     }
 
     @Alias(names = "java_lang_reflect_Method_getParameterTypes_AW")
-    @PureJavaScript(code = "return arg0.parameterTypes;")
+    @JavaScriptNative(code = "return arg0.parameterTypes;")
     public static Class<?>[] Method_getParameterTypes_AW(Method self) {
         // avoid cloning, when we never modify these values anyway
         return readPtrAtOffset(self, OFFSET_METHOD_PARAMETER_TYPES);
     }
 
     @Alias(names = "java_lang_reflect_Constructor_getParameterTypes_AW")
-    @PureJavaScript(code = "return arg0.parameterTypes;")
+    @JavaScriptNative(code = "return arg0.parameterTypes;")
     public static Class<?>[] Constructor_getParameterTypes_AW(Constructor<?> self) {
         // avoid cloning, when we never modify these values anyway
         return readPtrAtOffset(self, OFFSET_CONSTRUCTOR_PARAMETER_TYPES);

@@ -1,7 +1,7 @@
 package jvm;
 
 import annotations.Alias;
-import annotations.PureJavaScript;
+import annotations.JavaScriptNative;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -25,7 +25,7 @@ public class JavaReflectMethod {
     // must be long enough for the longest supported combination, including 'self'
     private static final Object[] joinedCallArguments = new Object[4];
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             // todo security checks??
             "let method = arg0, newInstance = arg1, params = arg2.values;\n" +
             "let jsClass = getJSClassByClass(method.clazz);\n" +
@@ -56,7 +56,7 @@ public class JavaReflectMethod {
         return result;
     }
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             // todo security checks??
             "let constructor = arg0, newInstance = arg1, params = arg2.values;\n" +
             "let jsClass = getJSClassByClass(constructor.clazz);\n" +

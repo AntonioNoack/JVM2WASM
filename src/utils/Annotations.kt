@@ -22,8 +22,8 @@ object Annotations {
     private val LOGGER = LogManager.getLogger(Annotations::class)
 
     val EXPORT_CLASS: String = getClassName(Export::class)
-    val JAVASCRIPT: String = getClassName(JavaScript::class)
-    val PURE_JAVASCRIPT: String = getClassName(PureJavaScript::class)
+    val JAVASCRIPT: String = getClassName(JavaScriptWASM::class)
+    val PURE_JAVASCRIPT: String = getClassName(JavaScriptNative::class)
     val WASM: String = getClassName(annotations.WASM::class)
     val USED_IF_INDEXED: String = getClassName(UsedIfIndexed::class)
     val NO_THROW: String = getClassName(NoThrow::class)

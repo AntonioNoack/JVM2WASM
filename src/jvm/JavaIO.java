@@ -2,7 +2,7 @@ package jvm;
 
 import annotations.Alias;
 import annotations.NoThrow;
-import annotations.PureJavaScript;
+import annotations.JavaScriptNative;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -54,13 +54,13 @@ public class JavaIO {
     }
 
     @NoThrow
-    @PureJavaScript(code = "return arg0.lock;")
+    @JavaScriptNative(code = "return arg0.lock;")
     private static InputStream getInputStream(InputStreamReader reader) {
         return readPtrAtOffset(reader, OFFSET_READER_LOCK);
     }
 
     @NoThrow
-    @PureJavaScript(code = "arg0.lock = arg1;")
+    @JavaScriptNative(code = "arg0.lock = arg1;")
     private static void setInputStream(InputStreamReader reader, InputStream value) {
         writePtrAtOffset(reader, OFFSET_READER_LOCK, value);
     }

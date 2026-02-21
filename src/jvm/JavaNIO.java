@@ -39,6 +39,11 @@ public class JavaNIO {
         return ByteBuffer.allocate(size);
     }
 
+    @Alias(names = "java_nio_HeapByteBuffer_isDirect_Z")
+    public static boolean ByteBuffer_isDirect_Z(ByteBuffer self) {
+        return true;
+    }
+
     @NoThrow
     @Alias(names = "java_nio_charset_Charset_atBugLevel_Ljava_lang_StringZ")
     public static boolean Charset_atBugLevel(String version) {

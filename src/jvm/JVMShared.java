@@ -9,7 +9,6 @@ import sun.misc.SharedSecrets;
 
 import java.io.PrintStream;
 
-import static jvm.ArrayAccessSafe.arrayStore;
 import static jvm.JVMFlags.is32Bits;
 import static jvm.JVMFlags.ptrSizeBits;
 import static jvm.JVMValues.emptyArray;
@@ -47,7 +46,7 @@ public class JVMShared {
     public static final int DOUBLE_ARRAY = 9;
     * */
     @Alias(names = "createNativeArray1")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "let instance = createInstance(arg1);\n" +
             "instance.values = \n" +
             "   arg1 == 1 ? new Array(arg0) :\n" +
@@ -102,7 +101,7 @@ public class JVMShared {
     // @WASM(code = "memory.size i32.const 16 i32.shl")
     @NoThrow
     @Alias(names = "getAllocatedSize")
-    @JavaScript(code = "return memory.buffer.byteLength;")
+    @JavaScriptWASM(code = "return memory.buffer.byteLength;")
     public static native Pointer getAllocatedSize();
 
     @NoThrow
@@ -274,7 +273,7 @@ public class JVMShared {
      */
     @NoThrow
     @Alias(names = "readClass")
-    @PureJavaScript(code = "return arg0.constructor.CLASS_INSTANCE.index;")
+    @JavaScriptNative(code = "return arg0.constructor.CLASS_INSTANCE.index;")
     public static int readClassId(Object instance) {
         return readClassIdImpl(instance);
     }
@@ -396,11 +395,11 @@ public class JVMShared {
     }
 
     @NoThrow
-    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
+    @JavaScriptWASM(code = "calloc[arg0] = (calloc[arg0]||0)+1")
     public static native void trackCalloc(int classId);
 
     @NoThrow
-    @JavaScript(code = "calloc[arg0] = (calloc[arg0]||0)+1")
+    @JavaScriptWASM(code = "calloc[arg0] = (calloc[arg0]||0)+1")
     public static native void trackCalloc(int classId, int arrayLength);
 
     @NoThrow
@@ -510,20 +509,20 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "getStackDepth")
-    @PureJavaScript(code = "return 0;") // idk if we need the actual stack trace
+    @JavaScriptNative(code = "return 0;") // idk if we need the actual stack trace
     public static int getStackDepth() {
         return getStackDepth(getStackPtr());
     }
 
     @NoThrow
-    @PureJavaScript(code = "return 0;") // idk if we need the actual stack trace
+    @JavaScriptNative(code = "return 0;") // idk if we need the actual stack trace
     public static int getStackDepth(Pointer stackPointer) {
         return (int) (diff(getStackStart(), stackPointer) >> 2);
     }
 
     @NoThrow
     @WASM(code = "global.get $stackPointer")
-    @PureJavaScript(code = "return 0;") // idk if we ever need that
+    @JavaScriptNative(code = "return 0;") // idk if we ever need that
     public static native Pointer getStackPtr();
 
     @NoThrow
@@ -904,7 +903,7 @@ public class JVMShared {
     @Export
     @NoThrow
     @Alias(names = "instanceOf")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "if(!arg0) return false;\n" +
             "const classId = arg1;\n" +
             "const jsClass = getJSClassById(classId);\n" +
@@ -922,7 +921,7 @@ public class JVMShared {
     @Export
     @NoThrow
     @Alias(names = "instanceOfNonInterface")
-    @PureJavaScript(code = "return arg0 instanceof getJSClassById(arg1)")
+    @JavaScriptNative(code = "return arg0 instanceof getJSClassById(arg1)")
     public static boolean instanceOfNonInterface(Object instance, int clazz) {
         // log("instanceOf", instance, clazz);
         if (instance == null) return false;
@@ -934,7 +933,7 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "instanceOfExact")
-    @PureJavaScript(code = "return arg0 && arg0.constructor == getJSClassById(arg1)")
+    @JavaScriptNative(code = "return arg0 && arg0.constructor == getJSClassById(arg1)")
     public static boolean instanceOfExact(Object instance, int classId) {
         return (instance != null) & (readClassId(instance) == classId);
     }
@@ -990,7 +989,7 @@ public class JVMShared {
     }
 
     @NoThrow
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "console.log('Growing by ' + (arg0<<6) + ' kiB, total: '+(memory.buffer.byteLength>>20)+' MiB');\n" +
             "try { memory.grow(arg0); return true; }\n" +
             "catch(e) { console.error(e.stack); return false; }")
@@ -1072,7 +1071,7 @@ public class JVMShared {
     }
 
     @NoThrow
-    @JavaScript(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
+    @JavaScriptWASM(code = "console.log('  '.repeat(arg0) + str(arg1) + '.' + str(arg2) + ':' + arg3)")
     private static native void printStackTraceLine(int depth, String className, String methodName, int lineNumber);
 
     @Alias(names = "resolveIndirectFail")
@@ -1082,13 +1081,13 @@ public class JVMShared {
 
     @NoThrow
     @Alias(names = "findClass")
-    @PureJavaScript(code = "return CLASS_INSTANCES[arg0];")
+    @JavaScriptNative(code = "return CLASS_INSTANCES[arg0];")
     public static Class<Object> classIdToInstance(int classId) {
         return unsafeCast(add(getClassInstanceTable(), classId * getClassSize()));
     }
 
     @Alias(names = "createInstance")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "let foundClass = getJSClassById(arg0);\n" +
             "return new foundClass();")
     public static Object createInstance(int classId) {

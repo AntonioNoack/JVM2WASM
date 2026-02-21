@@ -37,96 +37,96 @@ public class LWJGLxOpenGL {
             "org_lwjgl_opengl_GL46C_glGetError_I",
             "org_lwjgl_opengl_GL46C_glGetError_I"
     }) // the browser is extremely bad with gl.getError(), each call costing 0.5-1.1ms
-    @JavaScript(code = "return 0; /* gl.getError() */")
+    @JavaScriptWASM(code = "return 0; /* gl.getError() */")
     public static native int glGetError_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCreateProgram_I")
-    @JavaScript(code = "return map(gl.createProgram())")
+    @JavaScriptWASM(code = "return map(gl.createProgram())")
     public static native int glCreateProgram_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCreateShader_II")
-    @JavaScript(code = "return map(gl.createShader(arg0))")
+    @JavaScriptWASM(code = "return map(gl.createShader(arg0))")
     public static native int glCreateShader_II(int type);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCompileShader_IV")
-    @JavaScript(code = "gl.compileShader(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.compileShader(unmap(arg0))")
     public static native void glCompileShader_IV(int shader);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glLinkProgram_IV")
-    @JavaScript(code = "gl.linkProgram(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.linkProgram(unmap(arg0))")
     public static native void glLinkProgram_IV(int program);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glAttachShader_IIV")
-    @JavaScript(code = "gl.attachShader(unmap(arg0), unmap(arg1))")
+    @JavaScriptWASM(code = "gl.attachShader(unmap(arg0), unmap(arg1))")
     public static native void glAttachShader_IIV(int program, int shader);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUseProgram_IV")
-    @JavaScript(code = "gl.useProgram(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.useProgram(unmap(arg0))")
     public static native void glUseProgram_IV(int program);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glValidateProgram_IV")
-    @JavaScript(code = "gl.validateProgram(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.validateProgram(unmap(arg0))")
     public static native void glValidateProgram_IV(int program);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform1f(unmap(arg0),arg1)")
+    @JavaScriptWASM(code = "gl.uniform1f(unmap(arg0),arg1)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1f_IFV")
     public static native void glUniform1f(int location, float x);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform1i(unmap(arg0),arg1)")
+    @JavaScriptWASM(code = "gl.uniform1i(unmap(arg0),arg1)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1i_IIV")
     public static native void glUniform1i(int location, int x);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform2f(unmap(arg0),arg1,arg2)")
+    @JavaScriptWASM(code = "gl.uniform2f(unmap(arg0),arg1,arg2)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform2f_IFFV")
     public static native void glUniform2f(int location, float x, float y);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform2i(unmap(arg0),arg1,arg2)")
+    @JavaScriptWASM(code = "gl.uniform2i(unmap(arg0),arg1,arg2)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform2i_IIIV")
     public static native void glUniform2i(int location, int x, int y);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform3f(unmap(arg0),arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.uniform3f(unmap(arg0),arg1,arg2,arg3)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform3f_IFFFV")
     public static native void glUniform3f(int location, float x, float y, float z);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform3i(unmap(arg0),arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.uniform3i(unmap(arg0),arg1,arg2,arg3)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform3i_IIIIV")
     public static native void glUniform3i(int location, int x, int y, int z);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform4f(unmap(arg0),arg1,arg2,arg3,arg4)")
+    @JavaScriptWASM(code = "gl.uniform4f(unmap(arg0),arg1,arg2,arg3,arg4)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4f_IFFFFV")
     public static native void glUniform4f(int location, float x, float y, float z, float w);
 
     @NoThrow
-    @JavaScript(code = "gl.uniform4i(unmap(arg0),arg1,arg2,arg3,arg4)")
+    @JavaScriptWASM(code = "gl.uniform4i(unmap(arg0),arg1,arg2,arg3,arg4)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4i_IIIIIV")
     public static native void glUniform4i(int location, int x, int y, int z, int w);
 
     @NoThrow // 34895 = GL_TEXTURE_CUBE_MAP_SEAMLESS, 2848 = GL_LINE_SMOOTH, 32925 = GL_MULTISAMPLE, not supported
-    @JavaScript(code = "if(arg0 != 34895 && arg0 != 2848 && arg0 != 32925) gl.enable(arg0)")
+    @JavaScriptWASM(code = "if(arg0 != 34895 && arg0 != 2848 && arg0 != 32925) gl.enable(arg0)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glEnable_IV")
     public static native void glEnable(int mode);
 
     @NoThrow
-    @JavaScript(code = "if(arg0 != 34895 && arg0 != 2848 && arg0 != 32925) gl.disable(arg0)")
+    @JavaScriptWASM(code = "if(arg0 != 34895 && arg0 != 2848 && arg0 != 32925) gl.disable(arg0)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glDisable_IV")
     public static native void glDisable(int mode);
 
     @NoThrow
-    @JavaScript(code = "return map(gl.getUniformLocation(unmap(arg0), str(arg1)))")
+    @JavaScriptWASM(code = "return map(gl.getUniformLocation(unmap(arg0), str(arg1)))")
     public static native int glGetUniformLocationString(int program, String name);
 
     @NoThrow
@@ -137,47 +137,47 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGenFramebuffers_I")
-    @JavaScript(code = "return map(gl.createFramebuffer())")
+    @JavaScriptWASM(code = "return map(gl.createFramebuffer())")
     public static native int glGenFramebuffers_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGenRenderbuffers_I")
-    @JavaScript(code = "return map(gl.createRenderbuffer())")
+    @JavaScriptWASM(code = "return map(gl.createRenderbuffer())")
     public static native int glGenRenderbuffers_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBindFramebuffer_IIV")
-    @JavaScript(code = "gl.bindFramebuffer(arg0,unmap(arg1))")
+    @JavaScriptWASM(code = "gl.bindFramebuffer(arg0,unmap(arg1))")
     public static native void glBindFramebuffer_IIV(int target, int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBindRenderbuffer_IIV")
-    @JavaScript(code = "gl.bindRenderbuffer(arg0,unmap(arg1))")
+    @JavaScriptWASM(code = "gl.bindRenderbuffer(arg0,unmap(arg1))")
     public static native void glBindRenderbuffer_IIV(int target, int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBlitFramebuffer_IIIIIIIIIIV")
-    @JavaScript(code = "gl.blitFramebuffer(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9)")
+    @JavaScriptWASM(code = "gl.blitFramebuffer(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9)")
     public static native void glBlitFramebuffer_10xI_V(int a, int b, int c, int d, int e,
                                                        int f, int g, int h, int i, int j);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glViewport_IIIIV")
-    @JavaScript(code = "gl.viewport(arg0,arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.viewport(arg0,arg1,arg2,arg3)")
     public static native void glViewport_IIIIV(int x, int y, int w, int h);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBlendEquationSeparate_IIV")
-    @JavaScript(code = "gl.blendEquationSeparate(arg0,arg1)")
+    @JavaScriptWASM(code = "gl.blendEquationSeparate(arg0,arg1)")
     public static native void glBlendEquationSeparate_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBlendFuncSeparate_IIIIV")
-    @JavaScript(code = "gl.blendFuncSeparate(arg0,arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.blendFuncSeparate(arg0,arg1,arg2,arg3)")
     public static native void glBlendFuncSeparate_IIIIV(int a, int b, int c, int d);
 
     @NoThrow
-    @JavaScript(code = "return map(gl.createTexture())")
+    @JavaScriptWASM(code = "return map(gl.createTexture())")
     public static native int glGenTexture();
 
     @NoThrow
@@ -190,34 +190,34 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClearColor_FFFFV")
-    @JavaScript(code = "gl.clearColor(arg0,arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.clearColor(arg0,arg1,arg2,arg3)")
     public static native void glClearColor_FFFFV(float r, float g, float b, float a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClearDepth_DV")
-    @JavaScript(code = "gl.clearDepth(arg0)")
+    @JavaScriptWASM(code = "gl.clearDepth(arg0)")
     public static native void glClearDepth_DV(double depth);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glClear_IV")
-    @JavaScript(code = "gl.clear(arg0)")
+    @JavaScriptWASM(code = "gl.clear(arg0)")
     public static native void glClear_IV(int mask);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteProgram_IV")
-    @JavaScript(code = "gl.deleteProgram(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.deleteProgram(unmap(arg0))")
     public static native void glDeleteProgram_IV(int program);
 
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBindTexture_IIV")
     // if statement for WebGL, because it doesn't have GL_TEXTURE_2D_MULTISAMPLE
-    @JavaScript(code = "if(arg0 == 37120) arg0 = 3553; gl.bindTexture(arg0,unmap(arg1))")
+    @JavaScriptWASM(code = "if(arg0 == 37120) arg0 = 3553; gl.bindTexture(arg0,unmap(arg1))")
     public static native void glBindTexture_IIV(int target, int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glActiveTexture_IV")
-    @JavaScript(code = "gl.activeTexture(arg0)")
+    @JavaScriptWASM(code = "gl.activeTexture(arg0)")
     public static native void glActiveTexture_IV(int id);
 
     // todo implement multisampling like https://stackoverflow.com/questions/47934444/webgl-framebuffer-multisampling
@@ -306,18 +306,18 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glShaderSource_ILjava_lang_CharSequenceV")
-    @JavaScript(code = "gl.shaderSource(unmap(arg0),str(arg1)" +
+    @JavaScriptWASM(code = "gl.shaderSource(unmap(arg0),str(arg1)" +
             ".split('#extension').join('// #ext')" +
             ".split('gl_SampleID').join('0')" + // todo why is this not supported???
             ")")
     public static native void glShaderSource_ILjava_lang_CharSequenceV(int shader, CharSequence source);
 
     @NoThrow
-    @JavaScript(code = "return fill(arg0, gl.getShaderInfoLog(unmap(arg1)))")
+    @JavaScriptWASM(code = "return fill(arg0, gl.getShaderInfoLog(unmap(arg1)))")
     public static native int fillShaderInfoLog(char[] data, int shader);
 
     @NoThrow
-    @JavaScript(code = "return fill(arg0, gl.getProgramInfoLog(unmap(arg1)))")
+    @JavaScriptWASM(code = "return fill(arg0, gl.getProgramInfoLog(unmap(arg1)))")
     public static native int fillProgramInfoLog(char[] data, int program);
 
 
@@ -382,7 +382,7 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @JavaScript(code = "return gl.getProgramParameter(unmap(arg0),arg1)")
+    @JavaScriptWASM(code = "return gl.getProgramParameter(unmap(arg0),arg1)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetProgrami_III")
     public static native int glGetProgrami_III(int program, int type);
 
@@ -398,12 +398,12 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGenerateMipmap_IV")
-    @JavaScript(code = "gl.generateMipmap(arg0)")
+    @JavaScriptWASM(code = "gl.generateMipmap(arg0)")
     public static native void glGenerateMipmap_IV(int target);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetInteger_II")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "if(arg0 == 0x8D57) return 1;\n" + // multisampled texture aren't supported, multisampled renderbuffers would be
             "if(arg0 == 0x826E) return 1024;\n" + // max uniform locations; not defined in WebGL
             "if(arg0 == 0x821B || arg0 == 0x821C) return 0;\n" + // 0x821B, 0x821C = major, minor version
@@ -424,24 +424,24 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     // null is needed for method resolution
-    @JavaScript(code = "/*console.log('glTexImage2D', arguments);*/gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
+    @JavaScriptWASM(code = "/*console.log('glTexImage2D', arguments);*/gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,null)")
     private static native void texImage2DNullptr(int target, int level, int format, int w, int h, int border, int dataFormat, int dataType);
 
     @NoThrow
     // null is needed for method resolution
-    @JavaScript(code = "/*console.log('glTexImage3D', arguments);*/gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
+    @JavaScriptWASM(code = "/*console.log('glTexImage3D', arguments);*/gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,null)")
     private static native void texImage3DNullptr(int target, int level, int format, int w, int h, int d, int border, int dataFormat, int dataType);
 
     @NoThrow
     @Alias(names = "texImage2DAny")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             // "console.log('glTexImage2D', arguments);\n" +
             "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,\n" +
             "   arg7 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg8, arg9>>2) :\n" +
             "   arg7 == gl.FLOAT ? new Float32Array(memory.buffer, arg8, arg9>>2) :\n" +
             "   arg7 == 0x140B ? new Uint16Array(memory.buffer, arg8, arg9>>1) :\n" + // half float -> short
             "   new Uint8Array(memory.buffer, arg8, arg9))")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             // "console.log('glTexImage2D', arguments);\n" +
             "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,\n" +
             "   arg7 == gl.UNSIGNED_INT ? toUint32Array(arg8) :\n" +
@@ -452,7 +452,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexImage2D_IIIIIIIIAFV")
-    @PureJavaScript(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
+    @JavaScriptNative(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
     private static void glTexImage2D_IIIIIIIIAFV(
             int target, int level, int format, int width, int height,
             int border, int dataFormat, int dataType, float[] data) {
@@ -469,7 +469,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexImage2D_IIIIIIIIASV")
-    @PureJavaScript(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
+    @JavaScriptNative(code = "gl.texImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8.values);")
     private static void glTexImage2D_IIIIIIIIASV(
             int target, int level, int format, int width, int height,
             int border, int dataFormat, int dataType, short[] data) {
@@ -478,12 +478,12 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "texImage3DAny")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
             "   arg8 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg9, arg10>>2) :" +
             "   arg8 == gl.FLOAT ? new Float32Array(memory.buffer, arg9, arg10>>2) :" +
             "   new Uint8Array(memory.buffer, arg9, arg10))")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "gl.texImage3D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8," +
             "   arg8 == gl.UNSIGNED_INT ? toUint32Array(arg9) :" +
             "   arg8 == gl.FLOAT ? toFloat32Array(arg9) :" +
@@ -492,13 +492,13 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "texSubImage2D")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "gl.texSubImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
             "   arg7 == gl.UNSIGNED_INT ? new Uint32Array(memory.buffer, arg8, arg9>>2):" +
             "   arg7 == gl.FLOAT ? new Float32Array(memory.buffer, arg8, arg9>>2):" +
             "   arg7 == 0x140B ? new Uint16Array(memory.buffer, arg8, arg9>>1):" +  // half float -> short
             "   new Uint8Array(memory.buffer, arg8, arg9))")
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "gl.texSubImage2D(arg0,arg1,arg2,arg3,arg4,arg5,arg6,arg7," +
             "   arg7 == gl.UNSIGNED_INT ? toUint32Array(arg8):" +
             "   arg7 == gl.FLOAT ? toFloat32Array(arg8):" +
@@ -518,40 +518,40 @@ public class LWJGLxOpenGL {
     }
 
     @NoThrow
-    @JavaScript(code = "gl.scissor(arg0,arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.scissor(arg0,arg1,arg2,arg3)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glScissor_IIIIV")
     private static native void glScissor_IIIIV(int x, int y, int w, int h);
 
     @NoThrow
-    @JavaScript(code = "gl.flush()")
+    @JavaScriptWASM(code = "gl.flush()")
     @Alias(names = "org_lwjgl_opengl_GL46C_glFlush_V")
     private static native void glFlush_V();
 
     @NoThrow
-    @JavaScript(code = "gl.finish()")
+    @JavaScriptWASM(code = "gl.finish()")
     @Alias(names = "org_lwjgl_opengl_GL46C_glFinish_V")
     private static native void glFinish_V();
 
     @NoThrow
     @Alias(names = "readPixelsU8")
-    @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
-    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6))")
+    @JavaScriptWASM(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Uint8Array(memory.buffer,arg6,arg7))")
+    @JavaScriptNative(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6))")
     public static native void readPixelsU8(int x, int y, int w, int h, int format, int type, Pointer data, int length);
 
     @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAIV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAIV"})
-    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6.values))")
+    @JavaScriptNative(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toUint8Array(arg6.values))")
     public static void glReadPixels_IIIIIIAIV(int x, int y, int w, int h, int format, int type, int[] data) {
         readPixelsU8(x, y, w, h, format, type, add(castToPtr(data), arrayOverhead), data.length << 2);
     }
 
     @NoThrow
     @Alias(names = "readPixelsF32")
-    @JavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
-    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toFloat32Array(arg6))")
+    @JavaScriptWASM(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,new Float32Array(memory.buffer,arg6,arg7))")
+    @JavaScriptNative(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,toFloat32Array(arg6))")
     public static native void readPixelsF32(int x, int y, int w, int h, int format, int type, Pointer data, int length);
 
     @Alias(names = {"org_lwjgl_opengl_GL11C_glReadPixels_IIIIIIAFV", "org_lwjgl_opengl_GL46C_glReadPixels_IIIIIIAFV"})
-    @PureJavaScript(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,arg6.values)")
+    @JavaScriptNative(code = "gl.readPixels(arg0,arg1,arg2,arg3,arg4,arg5,arg6.values)")
     public static void glReadPixels_IIIIIIAFV(int x, int y, int w, int h, int format, int type, float[] data) {
         readPixelsF32(x, y, w, h, format, type, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -690,7 +690,7 @@ public class LWJGLxOpenGL {
         else log("Warning(glTexParameteriv)! Unknown mode", mode);
     }
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "let position = arg0.position;\n" +
             "let limit = arg0.limit;\n" +
             "let buffer = arg0.hb || arg0.bb.hb;\n" +
@@ -734,7 +734,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glGetIntegeri_v_IIAIV")
-    @JavaScript(code = "throw 'glGetIntegeri_v_IIAIV'")
+    @JavaScriptWASM(code = "throw 'glGetIntegeri_v_IIAIV'")
     public static native void glGetIntegeri_v_IIAIV(int query, int index, int[] dst);
 
     @NoThrow
@@ -745,26 +745,26 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "uniform1fv")
-    @JavaScript(code = "gl.uniform1fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
+    @JavaScriptWASM(code = "gl.uniform1fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @JavaScriptNative(code = "gl.uniform1fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform1fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform2fv")
-    @JavaScript(code = "gl.uniform2fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
+    @JavaScriptWASM(code = "gl.uniform2fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @JavaScriptNative(code = "gl.uniform2fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform2fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform3fv")
-    @JavaScript(code = "gl.uniform3fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
+    @JavaScriptWASM(code = "gl.uniform3fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @JavaScriptNative(code = "gl.uniform3fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform3fv(int location, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniform4fv")
-    @JavaScript(code = "gl.uniform4fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
-    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
+    @JavaScriptWASM(code = "gl.uniform4fv(unmap(arg0), new Float32Array(memory.buffer, arg1, arg2))")
+    @JavaScriptNative(code = "gl.uniform4fv(unmap(arg0),toFloat32Array(arg1,arg2));\n")
     public static native void glUniform4fv(int location, Pointer addr, int length);
 
     @NoThrow
@@ -776,7 +776,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform1fv_IAFV")
-    @PureJavaScript(code = "gl.uniform1fv(unmap(arg0),arg1.values);\n")
+    @JavaScriptNative(code = "gl.uniform1fv(unmap(arg0),arg1.values);\n")
     public static void glUniform1fv_IAFV(int location, float[] data) {
         glUniform1fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -790,7 +790,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform2fv_IAFV")
-    @PureJavaScript(code = "gl.uniform2fv(unmap(arg0),arg1.values);\n")
+    @JavaScriptNative(code = "gl.uniform2fv(unmap(arg0),arg1.values);\n")
     public static void glUniform2fv_IAFV(int location, float[] data) {
         glUniform2fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -804,7 +804,7 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform3fv_IAFV")
-    @PureJavaScript(code = "gl.uniform3fv(unmap(arg0),arg1.values);\n")
+    @JavaScriptNative(code = "gl.uniform3fv(unmap(arg0),arg1.values);\n")
     public static void glUniform3fv_IAFV(int location, float[] data) {
         glUniform3fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
@@ -818,33 +818,33 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glUniform4fv_IAFV")
-    @PureJavaScript(code = "gl.uniform4fv(unmap(arg0), arg1.values);\n")
+    @JavaScriptNative(code = "gl.uniform4fv(unmap(arg0), arg1.values);\n")
     public static void glUniform4fv(int location, float[] data) {
         glUniform4fv(location, add(castToPtr(data), arrayOverhead), data.length);
     }
 
     @NoThrow
     @Alias(names = "uniformMatrix4x3fv")
-    @JavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
+    @JavaScriptWASM(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @JavaScriptNative(code = "gl.uniformMatrix4x3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     public static native void uniformMatrix4x3fv(int location, boolean transpose, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix2fv")
-    @JavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
+    @JavaScriptWASM(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @JavaScriptNative(code = "gl.uniformMatrix2fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     private static native void uniformMatrix2fv(int u, boolean t, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix3fv")
-    @JavaScript(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
+    @JavaScriptWASM(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @JavaScriptNative(code = "gl.uniformMatrix3fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     private static native void uniformMatrix3fv(int u, boolean t, Pointer data, int length);
 
     @NoThrow
     @Alias(names = "uniformMatrix4fv")
-    @JavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
-    @PureJavaScript(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
+    @JavaScriptWASM(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, new Float32Array(memory.buffer, arg2, arg3))")
+    @JavaScriptNative(code = "gl.uniformMatrix4fv(unmap(arg0), arg1, toFloat32Array(arg2,arg3));\n")
     public static native void uniformMatrix4fv(int location, boolean transpose, Pointer addr, int length);
 
     @NoThrow
@@ -875,17 +875,17 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenBuffers_I")
-    @JavaScript(code = "return map(gl.createBuffer())")
+    @JavaScriptWASM(code = "return map(gl.createBuffer())")
     public static native int glGenBuffers_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBindBuffer_IIV")
-    @JavaScript(code = "gl.bindBuffer(arg0,unmap(arg1))")
+    @JavaScriptWASM(code = "gl.bindBuffer(arg0,unmap(arg1))")
     public static native void glBindBuffer_IIV(int target, int buffer);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteBuffers_IV")
-    @JavaScript(code = "gl.deleteBuffer(unmap(arg0)); delmap(arg0);")
+    @JavaScriptWASM(code = "gl.deleteBuffer(unmap(arg0)); delmap(arg0);")
     public static native void glDeleteBuffers_IV(int buffer);
 
     @NoThrow
@@ -919,49 +919,49 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetFloat_IF")
-    @JavaScript(code = "throw 'glGetFloat_IF'")
+    @JavaScriptWASM(code = "throw 'glGetFloat_IF'")
     public static native float glGetFloat_IF(int type);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribIPointer_IIIIJV")
-    @JavaScript(code = "throw 'glVertexAttribIPointer_IIIIJV'")
+    @JavaScriptWASM(code = "throw 'glVertexAttribIPointer_IIIIJV'")
     public static native void glVertexAttribIPointer_IIIIJV(int a, int b, int c, int d, long e);
 
     @NoThrow
-    @JavaScript(code = "gl.drawArrays(arg0,arg1,arg2)")
+    @JavaScriptWASM(code = "gl.drawArrays(arg0,arg1,arg2)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawArrays_IIIV")
     public static native void glDrawArrays_IIIV(int mode, int first, int count);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawElements_IIIJV")
-    @JavaScript(code = "gl.drawElements(arg0,arg1,arg2,Number(arg3))")
+    @JavaScriptWASM(code = "gl.drawElements(arg0,arg1,arg2,Number(arg3))")
     public static native void glDrawElements_IIIJV(int mode, int count, int type, long nullPtr);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glDrawArraysIndirect_IJV")
-    @JavaScript(code = "/* not supported */")
+    @JavaScriptWASM(code = "/* not supported */")
     public static native void glDrawArraysIndirect_IJV(int mode, long offset);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glDrawElementsIndirect_IIJV")
-    @JavaScript(code = "/* not supported */")
+    @JavaScriptWASM(code = "/* not supported */")
     public static native void glDrawElementsIndirect_IIJV(int mode, int indexType, long offset);
 
     @NoThrow
-    @JavaScript(code = "gl.drawArraysInstanced(arg0,arg1,arg2,arg3)")
+    @JavaScriptWASM(code = "gl.drawArraysInstanced(arg0,arg1,arg2,arg3)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawArraysInstanced_IIIIV")
     public static native void glDrawArraysInstanced_IIIIV(int mode, int first, int count, int primCount);
 
     @NoThrow
     @Alias(names = "bufferData8")
-    @JavaScript(code = "gl.bufferData(arg0,new Uint8Array(memory.buffer,arg1,arg2),arg3)")
-    @PureJavaScript(code = "gl.bufferData(arg0,toUint8Array(arg1),arg3)")
+    @JavaScriptWASM(code = "gl.bufferData(arg0,new Uint8Array(memory.buffer,arg1,arg2),arg3)")
+    @JavaScriptNative(code = "gl.bufferData(arg0,toUint8Array(arg1),arg3)")
     private static native void bufferData8(int target, Pointer addr, int length, int usage);
 
     @NoThrow
     @Alias(names = "bufferData16")
-    @JavaScript(code = "gl.bufferData(arg0,new Uint16Array(memory.buffer,arg1,arg2),arg3)")
-    @PureJavaScript(code = "gl.bufferData(arg0,toUint16Array(arg1),arg3)")
+    @JavaScriptWASM(code = "gl.bufferData(arg0,new Uint16Array(memory.buffer,arg1,arg2),arg3)")
+    @JavaScriptNative(code = "gl.bufferData(arg0,toUint16Array(arg1),arg3)")
     private static native void bufferData16(int target, Pointer addr, int length, int usage);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferData_ILjava_nio_ByteBufferIV")
@@ -983,14 +983,14 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "bufferSubData8")
-    @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint8Array(memory.buffer,arg2,arg3))")
-    @PureJavaScript(code = "gl.bufferSubData(arg0,Number(arg1),toUint8Array(arg2))")
+    @JavaScriptWASM(code = "gl.bufferSubData(arg0,Number(arg1),new Uint8Array(memory.buffer,arg2,arg3))")
+    @JavaScriptNative(code = "gl.bufferSubData(arg0,Number(arg1),toUint8Array(arg2))")
     private static native void bufferSubData8(int target, long offset, Pointer addr, int length);
 
     @NoThrow
     @Alias(names = "bufferSubData16")
-    @JavaScript(code = "gl.bufferSubData(arg0,Number(arg1),new Uint16Array(memory.buffer,arg2,arg3))")
-    @PureJavaScript(code = "gl.bufferSubData(arg0,Number(arg1),toUint16Array(arg2))")
+    @JavaScriptWASM(code = "gl.bufferSubData(arg0,Number(arg1),new Uint16Array(memory.buffer,arg2,arg3))")
+    @JavaScriptNative(code = "gl.bufferSubData(arg0,Number(arg1),toUint16Array(arg2))")
     private static native void bufferSubData16(int target, long offset, Pointer addr, int length);
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJLjava_nio_ByteBufferV")
@@ -1007,7 +1007,7 @@ public class LWJGLxOpenGL {
     }
 
     @Alias(names = "org_lwjgl_opengl_GL15C_glBufferSubData_IJAIV")
-    @PureJavaScript(code = "gl.bufferSubData(arg0,arg1,toUint8Array(arg2.values))")
+    @JavaScriptNative(code = "gl.bufferSubData(arg0,arg1,toUint8Array(arg2.values))")
     public static void glBufferSubData_IJAIV(int target, long offset, int[] data) {
         if (offset < 0 || offset > Integer.MAX_VALUE)
             throw new IllegalArgumentException("Offset is out of bounds for WebGL!");
@@ -1016,31 +1016,31 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glBindVertexArray_IV")
-    @JavaScript(code = "gl.bindVertexArray(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.bindVertexArray(unmap(arg0))")
     public static native void glBindVertexArray_IV(int buffer);
 
     @NoThrow
-    @JavaScript(code = "gl.getAttribLocation(unmap(arg0),str(arg1))")
+    @JavaScriptWASM(code = "gl.getAttribLocation(unmap(arg0),str(arg1))")
     public static native int glGetAttribLocation(int program, String name);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteFramebuffers_IV")
-    @JavaScript(code = "gl.deleteFramebuffer(unmap(arg0)); delete glMap[arg0];")
+    @JavaScriptWASM(code = "gl.deleteFramebuffer(unmap(arg0)); delete glMap[arg0];")
     public static native void glDeleteFramebuffers_IV(int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteRenderbuffers_IV")
-    @JavaScript(code = "gl.deleteRenderbuffer(unmap(arg0)); delete glMap[arg0];")
+    @JavaScriptWASM(code = "gl.deleteRenderbuffer(unmap(arg0)); delete glMap[arg0];")
     public static native void glDeleteRenderbuffers_IV(int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteRenderbuffers_AIV")
-    @JavaScript(code = "gl.deleteRenderbuffer(arg0);")
+    @JavaScriptWASM(code = "gl.deleteRenderbuffer(arg0);")
     public static native void glDeleteRenderbuffers_AIV(int id);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteTextures_IV")
-    @JavaScript(code = "gl.deleteTexture(unmap(arg0)); delete glMap[arg0];")
+    @JavaScriptWASM(code = "gl.deleteTexture(unmap(arg0)); delete glMap[arg0];")
     public static native void deleteTexture(int id);
 
     @Alias(names = "org_lwjgl_opengl_GL46C_glDeleteTextures_AIV")
@@ -1058,31 +1058,31 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glVertexAttribPointer_IIIZIJV")
-    @JavaScript(code = "gl.vertexAttribPointer(arg0,arg1,arg2,!!arg3,arg4,Number(arg5))")
+    @JavaScriptWASM(code = "gl.vertexAttribPointer(arg0,arg1,arg2,!!arg3,arg4,Number(arg5))")
     public static native void glVertexAttribPointer_IIIZIJV(int index, int size, int type, boolean normalized, int stride, long ptr);
 
     @NoThrow
-    @JavaScript(code = "gl.vertexAttrib1f(arg0,arg1)")
+    @JavaScriptWASM(code = "gl.vertexAttrib1f(arg0,arg1)")
     @Alias(names = "org_lwjgl_opengl_GL46C_glVertexAttrib1f_IFV")
     public static native void glVertexAttrib1f_IFV(int index, float value);
 
     @NoThrow
-    @JavaScript(code = "gl.vertexAttrib1f(arg0,arg1)") // int variant is not supported :/
+    @JavaScriptWASM(code = "gl.vertexAttrib1f(arg0,arg1)") // int variant is not supported :/
     @Alias(names = "org_lwjgl_opengl_GL46C_glVertexAttrib1i_IIV")
     public static native void glVertexAttrib1i_IIV(int index, int value);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glVertexAttribDivisor_IIV")
-    @JavaScript(code = "gl.vertexAttribDivisor(arg0,arg1)")
+    @JavaScriptWASM(code = "gl.vertexAttribDivisor(arg0,arg1)")
     public static native void glVertexAttribDivisor_IIV(int index, int divisor);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glEnableVertexAttribArray_IV")
-    @JavaScript(code = "gl.enableVertexAttribArray(arg0)")
+    @JavaScriptWASM(code = "gl.enableVertexAttribArray(arg0)")
     public static native void glEnableVertexAttribArray_IV(int index);
 
     @NoThrow
-    @JavaScript(code = "gl.bindAttribLocation(unmap(arg0),arg1,str(arg2))")
+    @JavaScriptWASM(code = "gl.bindAttribLocation(unmap(arg0),arg1,str(arg2))")
     public static native void glBindAttribLocation2(int program, int index, String name);
 
     @NoThrow
@@ -1093,90 +1093,90 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDisableVertexAttribArray_IV")
-    @JavaScript(code = "gl.disableVertexAttribArray(arg0)")
+    @JavaScriptWASM(code = "gl.disableVertexAttribArray(arg0)")
     public static native void glDisableVertexAttribArray_IV(int index);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexParameteri_IIIV")
-    @JavaScript(code = "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2);") // GL_GENERATE_MIPMAP is not supported :/
+    @JavaScriptWASM(code = "if(arg1!=33169) gl.texParameteri(arg0,arg1,arg2);") // GL_GENERATE_MIPMAP is not supported :/
     public static native void glTexParameteri_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glTexParameterf_IIFV")
-    @JavaScript(code = "gl.texParameterf(arg0,arg1,arg2)")
+    @JavaScriptWASM(code = "gl.texParameterf(arg0,arg1,arg2)")
     public static native void glTexParameterf_IIFV(int a, int b, float c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glTexParameterfv_IIAFV")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void glTexParameterfv_IIAFV(int a, int b, float[] c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferTexture2D_IIIIIV")
-    @JavaScript(code = "gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
+    @JavaScriptWASM(code = "gl.framebufferTexture2D(arg0,arg1,arg2,unmap(arg3),arg4)")
     public static native void glFramebufferTexture2D_IIIIIV(int fbTarget, int attachment, int texTarget, int texture, int level);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glFramebufferTextureLayer_IIIIIV")
-    @JavaScript(code = "throw 'glFramebufferTextureLayer_IIIIIV'")
+    @JavaScriptWASM(code = "throw 'glFramebufferTextureLayer_IIIIIV'")
     public static native void glFramebufferTextureLayer_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glRenderbufferStorage_IIIIV")
-    @JavaScript(code = "" +
+    @JavaScriptWASM(code = "" +
             "if(arg1 == 33191 || arg1 == 6402) arg1 = 33190;\n" + // DEPTH_COMPONENT32 and DEPTH_COMPONENT isn't supported, but DEPTH_COMPONENT24 is
             "gl.renderbufferStorage(arg0,arg1,arg2,arg3)")
     public static native void glRenderbufferStorage(int target, int format, int width, int height);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glBlendEquationSeparatei_IIIV")
-    @JavaScript(code = "throw 'glBlendEquationSeparatei_IIIV'")
+    @JavaScriptWASM(code = "throw 'glBlendEquationSeparatei_IIIV'")
     public static native void glBlendEquationSeparatei_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glRenderbufferStorageMultisample_IIIIIV")
-    @JavaScript(code = "throw 'glRenderbufferStorageMultisample_IIIIIV'")
+    @JavaScriptWASM(code = "throw 'glRenderbufferStorageMultisample_IIIIIV'")
     public static native void glRenderbufferStorageMultisample_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glBeginQuery_IIV")
-    @JavaScript(code = "if(arg0 != 35007) { gl.beginQuery(arg0,unmap(arg1)); } else { glTimeQueries[arg1] = 1; glTimeQuery = arg1; glTimer = performance.now(); }")
+    @JavaScriptWASM(code = "if(arg0 != 35007) { gl.beginQuery(arg0,unmap(arg1)); } else { glTimeQueries[arg1] = 1; glTimeQuery = arg1; glTimer = performance.now(); }")
     // GL_TIME_ELAPSED isn't supported
     public static native void glBeginQuery_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glEndQuery_IV")
-    @JavaScript(code = "if(arg0 != 35007) { gl.endQuery(arg0); } else { glTimeQueries[glTimeQuery] = (1e6 * (performance.now() - glTimer)) | 0; }")
+    @JavaScriptWASM(code = "if(arg0 != 35007) { gl.endQuery(arg0); } else { glTimeQueries[glTimeQuery] = (1e6 * (performance.now() - glTimer)) | 0; }")
     public static native void glEndQuery_IV(int a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGetQueryObjecti_III")
-    @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
+    @JavaScriptWASM(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
     public static native int glGetQueryObjecti_III(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL33C_glGetQueryObjecti64_IIJ")
-    @JavaScript(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
+    @JavaScriptWASM(code = "return arg0 in glTimeQueries ? (arg1 == 0x8867 ? 1 : glTimeQueries[arg0]) : gl.getQueryParameter(unmap(arg0), arg1)")
     public static native long glGetQueryObjecti64_IIJ(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glMemoryBarrier_IV")
-    @JavaScript(code = "throw 'glMemoryBarrier_IV'")
+    @JavaScriptWASM(code = "throw 'glMemoryBarrier_IV'")
     public static native void glMemoryBarrier_IV(int a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV")
-    @JavaScript(code = "throw 'org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV'")
+    @JavaScriptWASM(code = "throw 'org_lwjgl_opengl_GL32C_glTexImage2DMultisample_IIIIIZV'")
     public static native void glTexImage2DMultisample_IIIIIZV(int a, int b, int c, int d, int e, boolean f);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL42C_glBindImageTexture_IIIZIIIV")
-    @JavaScript(code = "throw 'glBindImageTexture_IIIZIIIV'")
+    @JavaScriptWASM(code = "throw 'glBindImageTexture_IIIZIIIV'")
     public static native void glBindImageTexture_IIIZIIIV(int a, int b, int c, boolean d, int e, int f, int g);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL11C_glGetTexImage_IIIIAIV")
-    @JavaScript(code = "throw 'glGetTexImage_IIIIAIV'")
+    @JavaScriptWASM(code = "throw 'glGetTexImage_IIIIAIV'")
     public static native void glGetTexImage_IIIIAIV(int a, int b, int c, int d, int[] e);
 
     @NoThrow
@@ -1209,84 +1209,84 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glVertexAttribI1i_IIV")
-    @JavaScript(code = "throw 'glVertexAttribI1i_IIV'")
+    @JavaScriptWASM(code = "throw 'glVertexAttribI1i_IIV'")
     public static native void glVertexAttribI1i_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL45C_glClipControl_IIV")
-    @JavaScript(code = "throw 'glClipControl_IIV'")
+    @JavaScriptWASM(code = "throw 'glClipControl_IIV'")
     public static native void glClipControl_IIV(int a, int b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL30C_glBindBufferBase_IIIV")
-    @JavaScript(code = "throw 'glBindBufferBase_IIIV'")
+    @JavaScriptWASM(code = "throw 'glBindBufferBase_IIIV'")
     public static native void glBindBufferBase_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL43C_glDispatchCompute_IIIV")
-    @JavaScript(code = "throw 'glDispatchCompute_IIIV'")
+    @JavaScriptWASM(code = "throw 'glDispatchCompute_IIIV'")
     public static native void glDispatchCompute_IIIV(int a, int b, int c);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL40C_glBlendFuncSeparatei_IIIIIV")
-    @JavaScript(code = "throw 'glBlendFuncSeparatei_IIIIIV'")
+    @JavaScriptWASM(code = "throw 'glBlendFuncSeparatei_IIIIIV'")
     public static native void glBlendFuncSeparatei_IIIIIV(int a, int b, int c, int d, int e);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glFramebufferRenderbuffer_IIIIV")
-    @JavaScript(code = "/*console.log('glFramebufferRenderbuffer', arguments);*/gl.framebufferRenderbuffer(arg0,arg1,arg2,unmap(arg3))")
+    @JavaScriptWASM(code = "/*console.log('glFramebufferRenderbuffer', arguments);*/gl.framebufferRenderbuffer(arg0,arg1,arg2,unmap(arg3))")
     public static native void glFramebufferRenderbuffer(int target, int attachment, int target1, int renderbufferId);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawBuffer_IV")
-    @JavaScript(code = "/*console.log('glDrawBuffer',arguments);*/gl.drawBuffers([arg0])")
+    @JavaScriptWASM(code = "/*console.log('glDrawBuffer',arguments);*/gl.drawBuffers([arg0])")
     public static native void glDrawBuffer_IV(int mode);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL45C_glCreateVertexArrays_I")
-    @JavaScript(code = "return map(gl.createVertexArray())")
+    @JavaScriptWASM(code = "return map(gl.createVertexArray())")
     public static native int glCreateVertexArrays_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDepthFunc_IV")
-    @JavaScript(code = "gl.depthFunc(arg0)")
+    @JavaScriptWASM(code = "gl.depthFunc(arg0)")
     public static native void glDepthFunc_IV(int func);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDepthRange_DDV")
-    @JavaScript(code = "gl.depthRange(arg0,arg1)")
+    @JavaScriptWASM(code = "gl.depthRange(arg0,arg1)")
     public static native void glDepthRange_DDV(double a, double b);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDepthMask_ZV")
-    @JavaScript(code = "gl.depthMask(!!arg0)")
+    @JavaScriptWASM(code = "gl.depthMask(!!arg0)")
     public static native void glDepthMask_ZV(boolean mask);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glColorMask_ZZZZV")
-    @JavaScript(code = "gl.colorMask(!!arg0,!!arg1,!!arg2,!!arg3)")
+    @JavaScriptWASM(code = "gl.colorMask(!!arg0,!!arg1,!!arg2,!!arg3)")
     public static native void glColorMask_ZZZZV(boolean r, boolean g, boolean b, boolean a);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCullFace_IV")
-    @JavaScript(code = "gl.cullFace(arg0)")
+    @JavaScriptWASM(code = "gl.cullFace(arg0)")
     public static native void glCullFace_IV(int mode);
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glDrawElementsInstanced_IIIJIV")
-    @JavaScript(code = "gl.drawElementsInstanced(arg0,arg1,arg2,0,arg4)")
+    @JavaScriptWASM(code = "gl.drawElementsInstanced(arg0,arg1,arg2,0,arg4)")
     public static native void glDrawElementsInstanced_IIIJIV(int a, int b, int c, long ptr, int e);
 
     @NoThrow
-    @JavaScript(code = "window.tmp=[]")
+    @JavaScriptWASM(code = "window.tmp=[]")
     private static native void drawBuffersCreate();
 
     @NoThrow
-    @JavaScript(code = "window.tmp.push(arg0)")
+    @JavaScriptWASM(code = "window.tmp.push(arg0)")
     private static native void drawBuffersPush(int mode);
 
     @NoThrow
-    @JavaScript(code = "/*console.log('glDrawBuffers', window.tmp);*/gl.drawBuffers(window.tmp);delete window.tmp")
+    @JavaScriptWASM(code = "/*console.log('glDrawBuffers', window.tmp);*/gl.drawBuffers(window.tmp);delete window.tmp")
     private static native void drawBuffersExec();
 
     @NoThrow
@@ -1307,11 +1307,11 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glCheckFramebufferStatus_II")
-    @JavaScript(code = "/*console.log('glCheckFramebufferStatus');*/return gl.checkFramebufferStatus(arg0)")
+    @JavaScriptWASM(code = "/*console.log('glCheckFramebufferStatus');*/return gl.checkFramebufferStatus(arg0)")
     public static native int glCheckFramebufferStatus_II(int target);
 
     @NoThrow
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void objectLabel(int type, int glPtr, String name);
 
     @NoThrow
@@ -1342,16 +1342,16 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glGenQueries_I")
-    @JavaScript(code = "return map(gl.createQuery())")
+    @JavaScriptWASM(code = "return map(gl.createQuery())")
     private static native int glGenQueries_I();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL15C_glDeleteQueries_IV")
-    @JavaScript(code = "gl.deleteQuery(unmap(arg0))")
+    @JavaScriptWASM(code = "gl.deleteQuery(unmap(arg0))")
     private static native void glDeleteQueries_IV(int id);
 
     @NoThrow
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void glPushDebugGroup(int target, int custom, String name);
 
     @NoThrow
@@ -1362,16 +1362,16 @@ public class LWJGLxOpenGL {
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL46C_glPopDebugGroup_V")
-    @JavaScript(code = "")
+    @JavaScriptWASM(code = "")
     public static native void glPopDebugGroup_V();
 
     @NoThrow
     @Alias(names = "org_lwjgl_opengl_GL20C_glDrawBuffers_IV")
-    @JavaScript(code = "gl.drawBuffers([arg0])")
+    @JavaScriptWASM(code = "gl.drawBuffers([arg0])")
     private static native void glDrawBuffers_IV(int i);
 
     @NoThrow
-    @JavaScript(code = "") // not supported :(
+    @JavaScriptWASM(code = "") // not supported :(
     @Alias(names = "org_lwjgl_opengl_GL11C_glPolygonMode_IIV")
     public static native void glPolygonMode_IIV(int x, int y);
 

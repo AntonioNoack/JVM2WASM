@@ -2,7 +2,7 @@ package jvm.utf8;
 
 import annotations.Alias;
 import annotations.NoThrow;
-import annotations.PureJavaScript;
+import annotations.JavaScriptNative;
 import jvm.Pointer;
 
 import java.nio.charset.Charset;
@@ -288,25 +288,25 @@ public class StringsUTF8 {
     }
 
     @NoThrow
-    @PureJavaScript(code = "return arg0.value;")
+    @JavaScriptNative(code = "return arg0.value;")
     private static byte[] getValue(String s) {
         return readPtrAtOffset(s, OFFSET_STRING_VALUE);
     }
 
     @NoThrow
-    @PureJavaScript(code = "arg0.value = arg1;")
+    @JavaScriptNative(code = "arg0.value = arg1;")
     private static void setValue(String s, byte[] value) {
         writePtrAtOffset(s, OFFSET_STRING_VALUE, value);
     }
 
     @NoThrow
-    @PureJavaScript(code = "return arg0.hash;")
+    @JavaScriptNative(code = "return arg0.hash;")
     private static int getHashCode(String str) {
         return readI32AtOffset(str, OFFSET_STRING_HASH);
     }
 
     @NoThrow
-    @PureJavaScript(code = "arg0.hash = arg1;")
+    @JavaScriptNative(code = "arg0.hash = arg1;")
     private static void setHashCode(String str, int hashCode) {
         writeI32AtOffset(str, OFFSET_STRING_HASH, hashCode);
     }

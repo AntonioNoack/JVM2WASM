@@ -40,77 +40,77 @@ public class JavaLang {
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_sin_DD", "java_lang_Math_sin_DD"})
-    @JavaScript(code = "return Math.sin(arg0);")
+    @JavaScriptWASM(code = "return Math.sin(arg0);")
     public static native double StrictMath_sin_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_cos_DD", "java_lang_Math_cos_DD"})
-    @JavaScript(code = "return Math.cos(arg0);")
+    @JavaScriptWASM(code = "return Math.cos(arg0);")
     public static native double StrictMath_cos_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_tan_DD", "java_lang_Math_tan_DD"})
-    @JavaScript(code = "return Math.tan(arg0);")
+    @JavaScriptWASM(code = "return Math.tan(arg0);")
     public static native double StrictMath_tan_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_asin_DD", "java_lang_Math_asin_DD"})
-    @JavaScript(code = "return Math.asin(arg0);")
+    @JavaScriptWASM(code = "return Math.asin(arg0);")
     public static native double StrictMath_asin_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_acos_DD", "java_lang_Math_acos_DD"})
-    @JavaScript(code = "return Math.acos(arg0);")
+    @JavaScriptWASM(code = "return Math.acos(arg0);")
     public static native double StrictMath_acos_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atan_DD", "java_lang_Math_atan_DD"})
-    @JavaScript(code = "return Math.atan(arg0);")
+    @JavaScriptWASM(code = "return Math.atan(arg0);")
     public static native double StrictMath_atan_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_sinh_DD", "java_lang_Math_sinh_DD"})
-    @JavaScript(code = "return Math.sinh(arg0);")
+    @JavaScriptWASM(code = "return Math.sinh(arg0);")
     public static native double StrictMath_sinh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_cosh_DD", "java_lang_Math_cosh_DD"})
-    @JavaScript(code = "return Math.cosh(arg0);")
+    @JavaScriptWASM(code = "return Math.cosh(arg0);")
     public static native double StrictMath_cosh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_tanh_DD", "java_lang_Math_tanh_DD"})
-    @JavaScript(code = "return Math.tanh(arg0);")
+    @JavaScriptWASM(code = "return Math.tanh(arg0);")
     public static native double StrictMath_tanh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_asinh_DD", "java_lang_Math_asinh_DD"})
-    @JavaScript(code = "return Math.asinh(arg0);")
+    @JavaScriptWASM(code = "return Math.asinh(arg0);")
     public static native double StrictMath_asinh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_acosh_DD", "java_lang_Math_acosh_DD"})
-    @JavaScript(code = "return Math.acosh(arg0);")
+    @JavaScriptWASM(code = "return Math.acosh(arg0);")
     public static native double StrictMath_acosh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atanh_DD", "java_lang_Math_atanh_DD"})
-    @JavaScript(code = "return Math.atanh(arg0);")
+    @JavaScriptWASM(code = "return Math.atanh(arg0);")
     public static native double StrictMath_atanh_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_exp_DD", "java_lang_Math_exp_DD"})
-    @JavaScript(code = "return Math.exp(arg0);")
+    @JavaScriptWASM(code = "return Math.exp(arg0);")
     public static native double StrictMath_exp_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_log_DD", "java_lang_Math_log_DD"})
-    @JavaScript(code = "return Math.log(arg0);")
+    @JavaScriptWASM(code = "return Math.log(arg0);")
     public static native double StrictMath_log_DD(double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_log10_DD", "java_lang_Math_log10_DD"})
-    @JavaScript(code = "return Math.log10(arg0);")
+    @JavaScriptWASM(code = "return Math.log10(arg0);")
     public static native double StrictMath_log10_DD(double x);
 
     @NoThrow
@@ -120,22 +120,22 @@ public class JavaLang {
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_atan2_DDD", "java_lang_Math_atan2_DDD"})
-    @JavaScript(code = "return Math.atan2(arg0,arg1);")
+    @JavaScriptWASM(code = "return Math.atan2(arg0,arg1);")
     public static native double StrictMath_atan2_DDD(double y, double x);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_hypot_DDD", "java_lang_Math_hypot_DDD"})
-    @JavaScript(code = "return Math.hypot(arg0,arg1);")
+    @JavaScriptWASM(code = "return Math.hypot(arg0,arg1);")
     public static native double StrictMath_hypot_DDD(double x, double y);
 
     @NoThrow
     @Alias(names = {"java_lang_StrictMath_pow_DDD", "java_lang_Math_pow_DDD"})
-    @JavaScript(code = "return Math.pow(arg0,arg1);")
+    @JavaScriptWASM(code = "return Math.pow(arg0,arg1);")
     public static native double StrictMath_pow_DDD(double x, double y);
 
     @NoThrow
     @Alias(names = "java_lang_Math_round_FI")
-    @JavaScript(code = "return Math.round(arg0)")
+    @JavaScriptWASM(code = "return Math.round(arg0)")
     public static native int java_lang_Math_round_FI(float f);
 
     @NoThrow
@@ -217,7 +217,7 @@ public class JavaLang {
         if (offset < 0 || offset + length > availableLength) throw new IndexOutOfBoundsException();
     }
 
-    @PureJavaScript(code = "" +
+    @JavaScriptNative(code = "" +
             "const src = arg0.values, srcIndex = arg1, dst = arg2.values, dstIndex = arg3, length = arg4;\n" +
             "if ((src === dst && srcIndex == dstIndex) || length == 0) return;\n" +
             "if (src !== dst || srcIndex > dstIndex) {\n" +
@@ -311,12 +311,12 @@ public class JavaLang {
 
     @NoThrow
     @Alias(names = "java_lang_System_currentTimeMillis_J")
-    @JavaScript(code = "return BigInt(Date.now());")
+    @JavaScriptWASM(code = "return BigInt(Date.now());")
     public static native long java_lang_System_currentTimeMillis_J();
 
     @NoThrow
     @Alias(names = "java_lang_System_nanoTime_J")
-    @JavaScript(code = "return BigInt(Math.round(performance.now()*1e6));")
+    @JavaScriptWASM(code = "return BigInt(Math.round(performance.now()*1e6));")
     public static native long java_lang_System_nanoTime_J();
 
     @NoThrow
@@ -401,15 +401,15 @@ public class JavaLang {
     }
 
     @NoThrow
-    @JavaScript(code = "commandLine[arg1].push(String.fromCharCode(arg0))")
+    @JavaScriptWASM(code = "commandLine[arg1].push(String.fromCharCode(arg0))")
     public static native void printByte(int i, boolean justLog);
 
     @NoThrow
-    @JavaScript(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)hasCrashed++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
+    @JavaScriptWASM(code = "let c=commandLine[arg0];if(c.length>0){if(!arg0)hasCrashed++;(arg0?console.log:console.error)(c.join('')); commandLine[arg0] = []}")
     public static native void printFlush(boolean justLog);
 
     @NoThrow
-    @JavaScript(code = "let strI = str(arg0); (arg1?console.log:console.error)(strI);")
+    @JavaScriptWASM(code = "let strI = str(arg0); (arg1?console.log:console.error)(strI);")
     public static native void printString(String line, boolean justLog);
 
     @Alias(names = "AW_clone_Ljava_lang_Object")
@@ -472,13 +472,13 @@ public class JavaLang {
         return 1;
     }
 
-    @PureJavaScript(code = "return 0n;")
+    @JavaScriptNative(code = "return 0n;")
     @Alias(names = "java_lang_Runtime_totalMemory_J")
     public static long java_lang_Runtime_totalMemory_J(Runtime runtime) {
         return getAddrS(getAllocatedSize());
     }
 
-    @PureJavaScript(code = "return 0n;")
+    @JavaScriptNative(code = "return 0n;")
     @Alias(names = "java_lang_Runtime_freeMemory_J")
     public static long java_lang_Runtime_freeMemory_J(Runtime runtime) {
         return GarbageCollector.freeMemory + diff(getAllocatedSize(), getNextPtr());
@@ -504,7 +504,7 @@ public class JavaLang {
     // todo we're using byte-strings for a while now, add a byte-variant, too
 
     @NoThrow
-    @JavaScript(code = "let s=arg1+'';if(s.indexOf('.')<0)s+='.0';return fill(arg0,s)")
+    @JavaScriptWASM(code = "let s=arg1+'';if(s.indexOf('.')<0)s+='.0';return fill(arg0,s)")
     public static native int fillD2S(char[] chr, double v);
 
     @Alias(names = "java_lang_Double_toString_DLjava_lang_String")
@@ -515,7 +515,7 @@ public class JavaLang {
     }
 
     @NoThrow
-    @JavaScript(code = "return fill(arg0, arg1.toFixed(arg2))")
+    @JavaScriptWASM(code = "return fill(arg0, arg1.toFixed(arg2))")
     public static native int fillD2S(char[] chr, double v, int digits);
 
     public static synchronized String toFixed(double d, int digits) {
@@ -540,7 +540,7 @@ public class JavaLang {
     }
 
     @Alias(names = "java_lang_System_identityHashCode_Ljava_lang_ObjectI")
-    @PureJavaScript(code = "" + // lazy implementation
+    @JavaScriptNative(code = "" + // lazy implementation
             "let hash = arg0.__hash;\n" +
             "if(hash === undefined) {\n" +
             "   arg0.__hash = hash = (Math.random() * 2147483647)|0;\n" +
@@ -591,14 +591,14 @@ public class JavaLang {
 
     @NoThrow
     @Alias(names = "java_lang_Runtime_gc_V")
-    @JavaScript(code = "gcCtr=1e9")
-    @PureJavaScript(code = "")
+    @JavaScriptWASM(code = "gcCtr=1e9")
+    @JavaScriptNative(code = "")
     public static native void Runtime_gc_V(Runtime rt);
 
     @NoThrow
     @Alias(names = "java_lang_System_gc_V")
-    @JavaScript(code = "gcCtr=1e9")
-    @PureJavaScript(code = "")
+    @JavaScriptWASM(code = "gcCtr=1e9")
+    @JavaScriptNative(code = "")
     public static native void System_gc_V();
 
     private static byte sleepCtr = 0;
