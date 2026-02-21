@@ -1,5 +1,6 @@
 package engine
 
+import jvm.NativeLog
 import me.anno.fonts.Font
 import me.anno.fonts.FontImpl
 import me.anno.image.raw.IntImage
@@ -62,19 +63,17 @@ object TextGeneratorImpl : FontImpl<List<Font>>() {
         backgroundColor: Int,
         portableImages: Boolean
     ) {
-        val dstOffset = image.getIndex(x0,y0)
-        TextGen.genASCIITexture(
-            font.name, font.size,
-            codepoint, x1 - x0, y1 - y0,
+        NativeLog.log("drawGlyph($x0 - $x1, $y0 - $y1)")
+        if (x1 > x0 && y1 > y0) TextGen.genASCIITexture(
+            font.name, font.size, codepoint,
+            x1 - x0, y1 - y0,
             textColor, backgroundColor,
-            image.data, dstOffset, image.height,
+            image.data, image.getIndex(x0, y0), image.stride,
         )
     }
 
-    override fun getBaselineY(font: Font): Float = 0f
-
+    override fun getBaselineY(font: Font): Float = font.size * 0.73f
     override fun getLineHeight(font: Font): Float = font.size
-
     override fun getFallbackFonts(font: Font): List<Font> = emptyList()
 
     override fun getSupportLevel(

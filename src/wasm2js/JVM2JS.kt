@@ -64,7 +64,8 @@ data class Field(val sig: FieldSig, val annotations: List<Int>)
 data class ClassInfo(
     val interfaces: Set<String>,
     val fields: List<Field>,
-    val methods: List<Method>
+    val methods: List<Method>,
+    val modifiers: Int,
 )
 
 fun wasm2js(
@@ -196,8 +197,8 @@ fun wasm2js(
             }
             // println("  $method -> $resolved")
             resolved ?: continue
-            val pureJS = hIndex.getAnnotation(resolved, Annotations.PURE_JAVASCRIPT)
-            val jsImplementation = pureJS ?: hIndex.getAnnotation(resolved, Annotations.JAVASCRIPT)
+            val pureJS = hIndex.getAnnotation(resolved, Annotations.JAVASCRIPT_NATIVE)
+            val jsImplementation = pureJS ?: hIndex.getAnnotation(resolved, Annotations.JAVASCRIPT_FOR_WASM)
             val func = functionByName[methodName(resolved)]
             if (jsImplementation != null) {
                 val shortName = shortName(method)
@@ -232,7 +233,8 @@ fun wasm2js(
         // todo replace tree-calls with actual call
         // todo replace instanceof-function-call with proper instance-of check
 
-        classInfos.add(ClassInfo(interfaces, fields1, methods1))
+        val modifiers = hIndex.classFlags[className] ?: 0
+        classInfos.add(ClassInfo(interfaces, fields1, methods1, modifiers))
 
         writer.append(if (minifyJavaScript) "}" else "}\n")
     }
@@ -275,7 +277,8 @@ fun wasm2js(
         val classInfo = classInfos[classId]
         val superClassName = hIndex.superClass[className] ?: "java/lang/Object"
         writer.append("init(")
-        writer.append(gIndex.getClassId(superClassName)).append(",[")
+        writer.append(gIndex.getClassId(superClassName)).append(",")
+        writer.append(classInfo.modifiers).append(",[")
         val interfaceIds = classInfo.interfaces
             .mapNotNull { gIndex.getClassIdOrNull(it) }
         for (interfaceId in interfaceIds.sorted()) {

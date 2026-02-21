@@ -94,7 +94,6 @@ public class JavaReflect {
 
     @Alias(names = "java_lang_Class_isInterface_Z")
     public static boolean Class_isInterface_Z(Class<Object> self) {
-        // todo confirm this flag is saved like that
         return (self.getModifiers() & ACC_INTERFACE) != 0;
     }
 
@@ -517,6 +516,7 @@ public class JavaReflect {
 
     @NoThrow
     @Alias(names = "java_lang_Class_getModifiers_I")
+    @JavaScriptNative(code = "return arg0.modifiers")
     public static <V> int getClassModifiers(Class<V> self) {
         if (self == null) return 0;
         return readI32AtOffset(self, OFFSET_CLASS_MODIFIERS);

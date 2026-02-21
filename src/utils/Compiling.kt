@@ -449,7 +449,7 @@ private fun parseInlineWASM(code: String): List<Instruction> {
 fun generateJavaScriptFile(missingMethods: HashSet<MethodSig>): Map<String, Pair<MethodSig, String>> {
     val jsImplemented = HashMap<String, Pair<MethodSig, String>>() // name -> sig, impl
     for (sig in dIndex.usedMethods) {
-        val js = hIndex.getAnnotation(sig, Annotations.JAVASCRIPT) ?: continue
+        val js = hIndex.getAnnotation(sig, Annotations.JAVASCRIPT_FOR_WASM) ?: continue
         val code = js.properties["code"] as String
         missingMethods.remove(sig)
         for (name in methodNames(sig)) {

@@ -22,8 +22,8 @@ object Annotations {
     private val LOGGER = LogManager.getLogger(Annotations::class)
 
     val EXPORT_CLASS: String = getClassName(Export::class)
-    val JAVASCRIPT: String = getClassName(JavaScriptWASM::class)
-    val PURE_JAVASCRIPT: String = getClassName(JavaScriptNative::class)
+    val JAVASCRIPT_FOR_WASM: String = getClassName(JavaScriptWASM::class)
+    val JAVASCRIPT_NATIVE: String = getClassName(JavaScriptNative::class)
     val WASM: String = getClassName(annotations.WASM::class)
     val USED_IF_INDEXED: String = getClassName(UsedIfIndexed::class)
     val NO_THROW: String = getClassName(NoThrow::class)
@@ -145,7 +145,7 @@ object Annotations {
             val funcName = methodName2(sig)
             val selfParam = Param("self", "java/lang/Object", ptrTypeI)
             hIndex.registerMethod(sig)
-            hIndex.addAnnotation(sig, Annota(PURE_JAVASCRIPT, hashMapOf("code" to "return arg0.$fieldName;")))
+            hIndex.addAnnotation(sig, Annota(JAVASCRIPT_NATIVE, hashMapOf("code" to "return arg0.$fieldName;")))
             gIndex.translatedMethods[sig] = FunctionImpl(
                 funcName, listOf(selfParam), listOf(fieldType),
                 emptyList(), arrayListOf(

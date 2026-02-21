@@ -93,9 +93,9 @@ window.link = function(jvmName, jsClass){
     jvmClass.simpleName = wrapString(simpleName);
 }
 
-window.init = function(superId,interfaces,fields,methods){
+window.init = function(superId,modifiers,interfaces,fields,methods){
     let classId = initCtr++;
-    createClass(classId,superId,interfaces,fields,methods);
+    createClass(classId,superId,modifiers,interfaces,fields,methods);
 }
 
 window.unpackFloatArray = function(buffer,length) {
@@ -141,9 +141,10 @@ window.toUint8Array = function(buffer) {
     return result;
 }
 
-function createClass(classId,superId,interfaces,fields,methods) {
+function createClass(classId,superId,modifiers,interfaces,fields,methods) {
     const clazz = CLASS_INSTANCES[classId];
     clazz.superClass = superId != classId ? CLASS_INSTANCES[superId] : null;
+    clazz.modifiers = modifiers;
     fields = fields.split(';');
     const fields1 = clazz.fields = new AW();
     const fields2 = fields1.values = superId < classId ? [...CLASS_INSTANCES[superId].fields.values] : [];

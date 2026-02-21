@@ -29,6 +29,9 @@ import me.anno.gpu.*;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.graph.visual.render.RenderGraph;
+import me.anno.graph.visual.render.effects.BloomSettings;
+import me.anno.graph.visual.render.effects.SSAOSettings;
+import me.anno.graph.visual.render.effects.SSRSettings;
 import me.anno.graph.visual.scalar.FloatMathBinary;
 import me.anno.image.Image;
 import me.anno.image.ImageCache;
@@ -95,6 +98,10 @@ public class Engine {
         settings.setShowDebugFrames(true);
         settings.setShowRenderTimes(true);
         settings.setSuperMaterial(SuperMaterial.Companion.getNONE());
+
+        new SSAOSettings();
+        new SSRSettings();
+        new BloomSettings();
     }
 
     private static void runMeshTest() {

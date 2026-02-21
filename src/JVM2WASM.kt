@@ -478,7 +478,7 @@ fun jvm2wasm() {
 
     for (sig in dIndex.usedMethods) {
         if (!hIndex.isNative(sig)) continue
-        if (hIndex.hasAnnotation(sig, Annotations.JAVASCRIPT) ||
+        if (hIndex.hasAnnotation(sig, Annotations.JAVASCRIPT_FOR_WASM) ||
             hIndex.hasAnnotation(sig, Annotations.WASM)
         ) {
             hIndex.notImplementedMethods.remove(sig)

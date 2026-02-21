@@ -67,13 +67,11 @@ public class TextGen {
             "ctx.textAlign='center'\n" +
             "ctx.font=(arg1|0)+'px '+str(font);\n" +
 
-            "   ctx.fillStyle=color0;\n" + // clear space, just in case
-            "   ctx.fillRect(0,0,w,h);\n" +
-            "   ctx.fillStyle=color1;\n" +
-            "   ctx.fillText(String.fromCharCode(arg2),w/2,arg1);\n" +
-
-            // todo copy data into dst buffer,
-            //  use more efficient way
+            "ctx.fillStyle=color0;\n" + // clear space, just in case
+            "ctx.fillRect(0,0,w,h);\n" +
+            "ctx.fillStyle=color1;\n" +
+            // todo what is the correct y???
+            "ctx.fillText(String.fromCharCode(arg2),w/2,arg1*0.5);\n" +
             "let buffer = ctx.getImageData(0,0,w,h).data;\n" +
             "let readPtr = 0;\n";
 
@@ -92,8 +90,11 @@ public class TextGen {
             "for(let y=0;y<h;y++){\n" +
             "   let dstPtr = dstOffset+dstStride*y;\n" +
             "   for(let x=0,len=w;x<len;x++){\n" +
-            // todo read int somehow???
-            "       dstArray.values[dstPtr++] = buffer[readPtr++];\n" +
+            "       dstArray.values[dstPtr++] = " +
+            "(buffer[readPtr++] << 24) | " +
+            "(buffer[readPtr++] << 16) | " +
+            "(buffer[readPtr++] << 8) | " +
+            "(buffer[readPtr++]);\n" +
             "   }\n" +
             "}\n")
     public static native void genASCIITexture(
