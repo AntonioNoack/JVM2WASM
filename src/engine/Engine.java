@@ -10,6 +10,8 @@ import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import kotlin.jvm.functions.Function2;
 import me.anno.Time;
+import me.anno.cache.CacheSection;
+import me.anno.cache.Promise;
 import me.anno.ecs.Entity;
 import me.anno.ecs.components.mesh.IMesh;
 import me.anno.ecs.components.mesh.Mesh;
@@ -31,19 +33,20 @@ import me.anno.gpu.pipeline.InstancedStack;
 import me.anno.gpu.texture.ITexture2D;
 import me.anno.gpu.texture.Texture2D;
 import me.anno.graph.visual.render.RenderGraph;
-import me.anno.graph.visual.render.effects.BloomSettings;
-import me.anno.graph.visual.render.effects.SSAOSettings;
-import me.anno.graph.visual.render.effects.SSRSettings;
+import me.anno.graph.visual.render.effects.*;
 import me.anno.graph.visual.scalar.FloatMathBinary;
 import me.anno.image.Image;
 import me.anno.image.ImageCache;
+import me.anno.image.raw.GPUImage;
 import me.anno.image.raw.IntImage;
 import me.anno.input.Clipboard;
 import me.anno.input.Input;
 import me.anno.input.Key;
 import me.anno.io.files.BundledRef;
+import me.anno.io.files.FileKey;
 import me.anno.io.files.FileReference;
 import me.anno.io.files.InvalidRef;
+import me.anno.io.files.inner.temporary.InnerTmpImageFile;
 import me.anno.io.utils.StringMap;
 import me.anno.ui.Panel;
 import me.anno.ui.WindowStack;
@@ -54,6 +57,8 @@ import me.anno.utils.OS;
 import me.anno.utils.OSFeatures;
 import me.anno.utils.async.Callback;
 import org.apache.logging.log4j.LoggerImpl;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11C;
 
 import java.io.File;
@@ -101,11 +106,16 @@ public class Engine {
         settings.setShowRenderTimes(true);
         settings.setSuperMaterial(SuperMaterial.Companion.getNONE());
 
+        // todo all classes, which are settings, should automatically be marked as constructable
         new SSAOSettings();
         new SSRSettings();
         new BloomSettings();
         new InstancedStack();
         new InstancedAnimStack();
+        new AnimeOutlineSettings();
+        new SnowSettings();
+        new DepthOfFieldSettings();
+        new HeightExpFogSettings();
     }
 
     private static void runMeshTest() {
@@ -191,7 +201,7 @@ public class Engine {
 
         Entity scene = new Entity("Scene");
         scene.add(new MeshComponent(icoSphere));
-        panel = SceneView.Companion.testScene2(scene, null);
+        panel = SceneView.Companion.createSceneUI(scene, null);
 
         panel.setWeight(1f);
         instance = new TestEngine("Engine", () -> Collections.singletonList(panel));
@@ -449,6 +459,7 @@ public class Engine {
     }
 
     @NoThrow
+    @UsedIfIndexed
     @Alias(names = "createIntArray")
     private static int[] createIntArray(int length) {
         return new int[length];
@@ -481,20 +492,23 @@ public class Engine {
         }
     }
 
-    /*@Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJZLme_anno_gpu_texture_ITexture2D")
-    public static ITexture2D TextureCache_get(Object self, FileReference file, long timeout, boolean async) {
+    private static final CacheSection<FileKey, ITexture2D> textures = new CacheSection<>("Texture");
+
+    @NotNull
+    @Alias(names = "me_anno_gpu_texture_TextureCache_get_Lme_anno_io_files_FileReferenceJLme_anno_cache_Promise")
+    public static Promise<ITexture2D> TextureCache_get(Object self, @Nullable FileReference file, long timeout) {
         file = file.resolved(); // resolve file
-        if (file == InvalidRef.INSTANCE) return null;
+        if (file == InvalidRef.INSTANCE) return Promise.Companion.empty();
         if (file instanceof InnerTmpImageFile) {
             InnerTmpImageFile file1 = (InnerTmpImageFile) file;
             Image image1 = file1.getImage();
             if (image1 instanceof GPUImage) {
-                return ((GPUImage) image1).getTexture();
+                return new Promise<>(((GPUImage) image1).getTexture());
             }
         }
-        if (!async) throw new IllegalArgumentException("Non-async textures are not supported in Web");
-        FileReference file1 = file;
-        AsyncCacheData<ITexture2D> tex = TextureCache.INSTANCE.getLateinitTexture(file, timeout, true, (callback) -> {
+
+        return textures.getEntry(file.getFileKey(), timeout, (k, callback) -> {
+            FileReference file1 = k.getFile();
             log("Reading image", file1.getAbsolutePath());
             if (file1 instanceof WebRef2 || file1 instanceof BundledRef) {
                 // call JS to generate a texture for us :)
@@ -512,8 +526,7 @@ public class Engine {
             }
             return Unit.INSTANCE;
         });
-        return tex != null ? tex.getValue() : null;
-    }*/
+    }
 
     @Alias(names = "me_anno_io_files_thumbs_Thumbs_generateSystemIcon_Lme_anno_io_files_FileReferenceLme_anno_io_files_FileReferenceILkotlin_jvm_functions_Function2V")
     public static void Thumbs_generateSystemIcon(FileReference src, FileReference dst, int size, Function2<ITexture2D, Exception, Unit> callback) {
