@@ -55,6 +55,7 @@ public class GCGapFinder {
         WeakRef.weakRefInstances.collectKeys(nextWeakRef);
         unlockMallocMutex();
 
+        // we're sorting addresses, so we could use radix sort here
         nextWeakRef.sort(AddressComparator.INSTANCE);
         nextWeakRef.add(null);
 

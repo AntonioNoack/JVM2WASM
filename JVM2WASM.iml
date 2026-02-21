@@ -7,11 +7,12 @@
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/src/assets" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
+      <excludeFolder url="file://$MODULE_DIR$/lib" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="asm-all-5.2" level="project" />
-    <orderEntry type="library" name="VideoStudio" level="project" />
+    <orderEntry type="library" name="RemsEngine" level="project" />
     <orderEntry type="library" name="scimark2lib" level="project" />
     <orderEntry type="library" name="KotlinJavaRuntime" level="project" />
     <orderEntry type="library" name="KotlynReflect" level="project" />
